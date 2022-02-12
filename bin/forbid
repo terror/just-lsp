@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+
+which rg
+
+! rg \
+  --color always \
+  --ignore-case \
+  --glob !bin/forbid \
+  'dbg!|fixme|todo|xxx'
