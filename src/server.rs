@@ -38,6 +38,17 @@ impl Inner {
     }
   }
 
+  async fn log(&self, message: Message<'_>) {
+    self.client.log_message(message.kind, message.content).await;
+  }
+
+  async fn show(&self, message: Message<'_>) {
+    self
+      .client
+      .show_message(message.kind, message.content)
+      .await;
+  }
+
   async fn initialize(
     &self,
     _params: lsp::InitializeParams,
@@ -55,11 +66,10 @@ impl Inner {
 
   async fn initialized(&self, _: lsp::InitializedParams) {
     self
-      .client
-      .show_message(
-        lsp::MessageType::INFO,
-        format!("{} initialized", env!("CARGO_PKG_NAME")),
-      )
+      .show(Message {
+        content: &format!("{} initialized", env!("CARGO_PKG_NAME")),
+        kind: lsp::MessageType::INFO,
+      })
       .await;
   }
 
@@ -72,7 +82,9 @@ impl Inner {
 
   async fn did_change(&mut self, params: lsp::DidChangeTextDocumentParams) {
     if let Some(document) = self.documents.get_mut(&params.text_document.uri) {
-      document.apply_change(params);
+      if let Err(error) = document.apply_change(params) {
+        log::debug!("error: {}", error);
+      }
     }
   }
 

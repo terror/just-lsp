@@ -23,14 +23,15 @@ impl Document {
   pub(crate) fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
-  ) {
-    params
-      .content_changes
-      .iter()
-      .map(|change| self.content.build_edit(change))
-      .collect::<Result<Vec<_>, _>>()
-      .unwrap()
-      .iter()
-      .for_each(|edit| self.content.apply_edit(edit));
+  ) -> Result {
+    Ok(
+      params
+        .content_changes
+        .iter()
+        .map(|change| self.content.build_edit(change))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .for_each(|edit| self.content.apply_edit(edit)),
+    )
   }
 }

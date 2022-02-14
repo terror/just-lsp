@@ -2,6 +2,7 @@ use crate::common::*;
 
 mod common;
 mod document;
+mod message;
 mod server;
 
 async fn run() -> Result {

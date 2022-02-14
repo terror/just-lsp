@@ -9,7 +9,7 @@ pub(crate) use {
 };
 
 // structs and enums
-pub(crate) use crate::{document::Document, server::Server};
+pub(crate) use crate::{document::Document, message::Message, server::Server};
 
 // type aliases
 pub(crate) type Result<T = (), E = Box<dyn std::error::Error>> =
