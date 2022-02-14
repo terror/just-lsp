@@ -6,7 +6,12 @@ edition = "2021"
 [dependencies]
 env_logger = "0.9.0"
 log = "0.4.14"
-lspower = "1.5.0"
+lsp-text = "0.3.0"
+ropey = "1.3.2"
+
+[dependencies.lspower]
+version = "1.5.0"
+git = "https://github.com/silvanshade/lspower.git"
 
 [dependencies.tokio]
 version = "1.16.1"
