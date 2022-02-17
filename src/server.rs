@@ -1,29 +1,25 @@
 use crate::common::*;
 
 #[derive(Debug)]
-pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
+pub struct Server(Arc<tokio::sync::Mutex<Inner>>);
 
 impl Server {
-  pub(crate) fn new(client: Client) -> Self {
+  pub fn new(client: Client) -> Self {
     Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client))))
   }
-}
 
-#[derive(Debug)]
-pub(crate) struct Inner {
-  pub(crate) client: Client,
-  documents: Documents,
-}
+  pub async fn run() -> Result {
+    let (service, messages) = LspService::new(Server::new);
 
-impl Inner {
-  fn new(client: Client) -> Self {
-    Self {
-      client,
-      documents: Documents::new(),
-    }
+    lspower::Server::new(tokio::io::stdin(), tokio::io::stdout())
+      .interleave(messages)
+      .serve(service)
+      .await;
+
+    Ok(())
   }
 
-  pub(crate) fn capabilities(&self) -> lsp::ServerCapabilities {
+  pub fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
         lsp::TextDocumentSyncOptions {
@@ -37,9 +33,20 @@ impl Inner {
       ..Default::default()
     }
   }
+}
 
-  async fn log(&self, message: Message<'_>) {
-    self.client.log_message(message.kind, message.content).await;
+#[derive(Debug)]
+pub(crate) struct Inner {
+  pub(crate) client: Client,
+  documents: BTreeMap<lsp::Url, Document>,
+}
+
+impl Inner {
+  fn new(client: Client) -> Self {
+    Self {
+      client,
+      documents: BTreeMap::new(),
+    }
   }
 
   async fn show(&self, message: Message<'_>) {
@@ -56,7 +63,7 @@ impl Inner {
     log::info!("Starting just language server...");
 
     Ok(lsp::InitializeResult {
-      capabilities: self.capabilities(),
+      capabilities: Server::capabilities(),
       server_info: Some(lsp::ServerInfo {
         name: env!("CARGO_PKG_NAME").to_string(),
         version: Some(env!("CARGO_PKG_VERSION").to_string()),

@@ -1,10 +1,10 @@
 use crate::common::*;
 
 #[derive(Debug)]
-pub(crate) struct Document {
+pub struct Document {
   content: Rope,
-  language: String,
-  version: i32,
+  _language: String,
+  _version: i32,
 }
 
 impl Document {
@@ -14,8 +14,8 @@ impl Document {
     let document = params.text_document;
     Self {
       content: Rope::from_str(&document.text),
-      language: document.language_id,
-      version: document.version,
+      _language: document.language_id,
+      _version: document.version,
     }
   }
 
@@ -24,14 +24,13 @@ impl Document {
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    Ok(
-      params
-        .content_changes
-        .iter()
-        .map(|change| self.content.build_edit(change))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .for_each(|edit| self.content.apply_edit(edit)),
-    )
+    params
+      .content_changes
+      .iter()
+      .map(|change| self.content.build_edit(change))
+      .collect::<Result<Vec<_>, _>>()?
+      .iter()
+      .for_each(|edit| self.content.apply_edit(edit));
+    Ok(())
   }
 }

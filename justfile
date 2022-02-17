@@ -6,7 +6,7 @@ default:
 alias f := fmt
 alias r := run
 
-ci: build test clippy fmt-check
+all: build test clippy fmt-check
 
 build:
 	cargo build
