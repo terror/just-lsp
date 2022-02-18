@@ -12,8 +12,8 @@ type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 #[derive(Debug)]
 struct Test {
   _messages: MessageStream,
-  request: Value,
-  response: Value,
+  requests: Vec<Value>,
+  responses: Vec<Value>,
   service: Spawn<LspService>,
 }
 
@@ -23,30 +23,36 @@ impl Test {
 
     Ok(Self {
       _messages: messages,
-      request: Value::default(),
-      response: Value::default(),
+      requests: Vec::new(),
+      responses: Vec::new(),
       service: Spawn::new(service),
     })
   }
 
-  fn request(self, request: Value) -> Self {
-    Self { request, ..self }
+  fn request(mut self, request: Value) -> Self {
+    self.requests.push(request);
+    self
   }
 
-  fn response(self, response: Value) -> Self {
-    Self { response, ..self }
+  fn response(mut self, response: Value) -> Self {
+    self.responses.push(response);
+    self
   }
 
   async fn run(mut self) -> Result {
-    let request = serde_json::from_value(self.request)?;
-
-    let response = self
-      .service
-      .call(request)
-      .await?
-      .map(|v| serde_json::to_value(v).unwrap());
-
-    assert_eq!(self.response, response.unwrap());
+    for (request, expected_response) in
+      self.requests.iter().zip(self.responses.iter())
+    {
+      assert_eq!(
+        *expected_response,
+        self
+          .service
+          .call(serde_json::from_value(request.clone())?)
+          .await?
+          .map(|v| serde_json::to_value(v).unwrap())
+          .unwrap()
+      );
+    }
 
     Ok(())
   }
@@ -57,14 +63,15 @@ async fn initialize() -> Result {
   Test::new()?
     .request(json!({
       "jsonrpc": "2.0",
+      "id": 1,
       "method": "initialize",
       "params": {
         "capabilities": {}
       },
-      "id": 1
     }))
     .response(json!({
       "jsonrpc": "2.0",
+      "id": 1,
       "result": {
         "serverInfo": {
           "name": env!("CARGO_PKG_NAME"),
@@ -72,7 +79,48 @@ async fn initialize() -> Result {
         },
         "capabilities": Server::capabilities()
       },
-      "id": 1
+    }))
+    .run()
+    .await
+}
+
+#[tokio::test]
+async fn initialize_once() -> Result {
+  Test::new()?
+    .request(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "capabilities": {}
+      },
+    }))
+    .response(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "serverInfo": {
+          "name": env!("CARGO_PKG_NAME"),
+          "version": env!("CARGO_PKG_VERSION")
+        },
+        "capabilities": Server::capabilities()
+      }
+    }))
+    .request(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "capabilities": {}
+      }
+    }))
+    .response(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32600,
+        "message": "Invalid request"
+      }
     }))
     .run()
     .await
