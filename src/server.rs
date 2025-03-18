@@ -25,6 +25,7 @@ impl Server {
         ..Default::default()
       }),
       definition_provider: Some(lsp::OneOf::Left(true)),
+      hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Left(true)),
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
@@ -76,6 +77,13 @@ impl LanguageServer for Server {
     params: lsp::GotoDefinitionParams,
   ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
     self.0.lock().await.goto_definition(params).await
+  }
+
+  async fn hover(
+    &self,
+    params: lsp::HoverParams,
+  ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
+    self.0.lock().await.hover(params).await
   }
 
   async fn initialize(
@@ -270,6 +278,72 @@ impl Inner {
     }))
   }
 
+  async fn hover(
+    &self,
+    params: lsp::HoverParams,
+  ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
+    let uri = params.text_document_position_params.text_document.uri;
+    let position = params.text_document_position_params.position;
+
+    Ok(self.documents.get(&uri).and_then(|document| {
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .and_then(|node| {
+          let text = document.get_node_text(&node);
+
+          for (name, signature, description) in builtin_functions() {
+            if text == name {
+              let documentation =
+                get_function_documentation(&name, &description);
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::Markdown,
+                  value: format!(
+                    "```\n{}\n```\n\n{}",
+                    signature, documentation
+                  ),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
+          for (name, description) in builtin_constants() {
+            if text == name {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::Markdown,
+                  value: format!("**Constant**: {}", description),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
+          if let Some(recipe_node) = document.find_recipe_by_name(&text) {
+            if let Some(body) =
+              document.find_child_by_kind(&recipe_node, "recipe_body")
+            {
+              let body_text = document.get_node_text(&body).trim().to_string();
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::Markdown,
+                  value: format!(
+                    "**Recipe**: {}\n\n```\n{}\n```",
+                    text, body_text
+                  ),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
+          None
+        })
+    }))
+  }
+
   async fn initialize(
     &self,
     _params: lsp::InitializeParams,
@@ -363,8 +437,7 @@ impl Inner {
 
           lsp::WorkspaceEdit {
             changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
+            ..Default::default()
           }
         })
     }))
@@ -515,7 +588,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn goto_definition() -> Result {
+  async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()?
       .request(json!({
         "jsonrpc": "2.0",
@@ -592,7 +665,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn references() -> Result {
+  async fn recipe_references() -> Result {
     Test::new()?
       .request(json!({
         "jsonrpc": "2.0",
@@ -702,7 +775,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn rename() -> Result {
+  async fn rename_recipe() -> Result {
     Test::new()?
       .request(json!({
         "jsonrpc": "2.0",
@@ -806,6 +879,163 @@ mod tests {
                 "newText": "renamed"
               }
             ]
+          }
+        }
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_builtin_function() -> Result {
+    Test::new()?
+    .request(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "capabilities": {}
+      },
+    }))
+    .response(json!({
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "serverInfo": {
+          "name": env!("CARGO_PKG_NAME"),
+          "version": env!("CARGO_PKG_VERSION")
+        },
+        "capabilities": Server::capabilities()
+      },
+    }))
+    .notification(json!({
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "uri": "file:///test.just",
+          "languageId": "just",
+          "version": 1,
+          "text": indoc! {
+            "
+            foo:
+              echo {{arch()}}
+            "
+          }
+        }
+      }
+    }))
+    .request(json!({
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "textDocument/hover",
+      "params": {
+        "textDocument": {
+          "uri": "file:///test.just"
+        },
+        "position": {
+          "line": 1,
+          "character": 11
+        }
+      }
+    }))
+    .response(json!({
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "contents": {
+          "kind": "markdown",
+          "value": "```\narch() -> string\n```\n\nInstruction set architecture\n\n**Examples:**\n```\n\narch() => \"x86_64\"\n```"
+        },
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 9
+          },
+          "end": {
+            "line": 1,
+            "character": 13
+          }
+        }
+      }
+    }))
+    .run()
+    .await
+  }
+
+  #[tokio::test]
+  async fn hover_recipe() -> Result {
+    Test::new()?
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        },
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverInfo": {
+            "name": env!("CARGO_PKG_NAME"),
+            "version": env!("CARGO_PKG_VERSION")
+          },
+          "capabilities": Server::capabilities()
+        },
+      }))
+      .notification(json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just",
+            "languageId": "just",
+            "version": 1,
+            "text": indoc! {
+              "
+            foo:
+              echo \"foo\"
+
+            bar: foo
+              echo \"bar\"
+            "
+            }
+          }
+        }
+      }))
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "textDocument/hover",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just"
+          },
+          "position": {
+            "line": 3,
+            "character": 5
+          }
+        }
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "**Recipe**: foo\n\n```\necho \"foo\"\n```"
+          },
+          "range": {
+            "start": {
+              "line": 3,
+              "character": 5
+            },
+            "end": {
+              "line": 3,
+              "character": 8
+            }
           }
         }
       }))

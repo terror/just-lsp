@@ -19,6 +19,11 @@ functions, and constants.
 
 You're able to go to a recipe definition from an identifier.
 
+### `textDocument/hover`
+
+You can request hover information for recipes, built-in functions, constants
+and see information about them.
+
 ### `textDocument/publishDiagnostics`
 
 We try to publish useful diagnostics. Some of them include checks for non-existent

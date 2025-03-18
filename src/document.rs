@@ -205,7 +205,7 @@ impl Document {
     }
   }
 
-  fn find_child_by_kind<'a>(
+  pub(crate) fn find_child_by_kind<'a>(
     &'a self,
     node: &'a Node,
     kind: &str,
