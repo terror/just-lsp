@@ -700,4 +700,116 @@ mod tests {
       .run()
       .await
   }
+
+  #[tokio::test]
+  async fn rename() -> Result {
+    Test::new()?
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        },
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverInfo": {
+            "name": env!("CARGO_PKG_NAME"),
+            "version": env!("CARGO_PKG_VERSION")
+          },
+          "capabilities": Server::capabilities()
+        },
+      }))
+      .notification(json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just",
+            "languageId": "just",
+            "version": 1,
+            "text": indoc! {
+              "
+              foo:
+                echo \"foo\"
+
+              bar: foo
+                echo \"bar\"
+
+              alias baz := foo
+              "
+            }
+          }
+        }
+      }))
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "textDocument/rename",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just"
+          },
+          "position": {
+            "line": 0,
+            "character": 1
+          },
+          "newName": "renamed"
+        }
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "changes": {
+            "file:///test.just": [
+              {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 3
+                  }
+                },
+                "newText": "renamed"
+              },
+              {
+                "range": {
+                  "start": {
+                    "line": 3,
+                    "character": 5
+                  },
+                  "end": {
+                    "line": 3,
+                    "character": 8
+                  }
+                },
+                "newText": "renamed"
+              },
+              {
+                "range": {
+                  "start": {
+                    "line": 6,
+                    "character": 13
+                  },
+                  "end": {
+                    "line": 6,
+                    "character": 16
+                  }
+                },
+                "newText": "renamed"
+              }
+            ]
+          }
+        }
+      }))
+      .run()
+      .await
+  }
 }
