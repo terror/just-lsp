@@ -10,6 +10,7 @@
 - Diagnostics (`textDocument/publishDiagnostics`)
 - Find references (`textDocument/references`)
 - Go to definition (`textDocument/definition`)
+- Symbol renaming (`textDocument/rename`)
 
 ### Prior Art
 

@@ -26,6 +26,7 @@ impl Server {
       }),
       definition_provider: Some(lsp::OneOf::Left(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
+      rename_provider: Some(lsp::OneOf::Left(true)),
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
         lsp::TextDocumentSyncOptions {
           open_close: Some(true),
@@ -93,6 +94,13 @@ impl LanguageServer for Server {
     params: lsp::ReferenceParams,
   ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
     self.0.lock().await.references(params).await
+  }
+
+  async fn rename(
+    &self,
+    params: lsp::RenameParams,
+  ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
+    self.0.lock().await.rename(params).await
   }
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
@@ -283,6 +291,46 @@ impl Inner {
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
           Some(document.find_references(&document.get_node_text(&identifier)))
+        })
+    }))
+  }
+
+  async fn rename(
+    &self,
+    params: lsp::RenameParams,
+  ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
+    let uri = params.text_document_position.text_document.uri.clone();
+
+    let position = params.text_document_position.position;
+
+    let new_name = params.new_name;
+
+    Ok(self.documents.get(&uri).and_then(|document| {
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .map(|node| {
+          let old_name = document.get_node_text(&node);
+
+          let references = document.find_references(&old_name);
+
+          let text_edits: Vec<lsp::TextEdit> = references
+            .iter()
+            .map(|location| lsp::TextEdit {
+              range: location.range,
+              new_text: new_name.clone(),
+            })
+            .collect();
+
+          let mut changes = std::collections::HashMap::new();
+
+          changes.insert(uri.clone(), text_edits);
+
+          lsp::WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+          }
         })
     }))
   }
