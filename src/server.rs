@@ -247,8 +247,7 @@ impl Inner {
                 range: document.node_to_range(&node),
               });
 
-              locations
-                .extend(document.find_recipe_references(&recipe_name, &uri));
+              locations.extend(document.find_recipe_references(&recipe_name));
 
               return Ok(Some(locations));
             }

@@ -3,9 +3,8 @@ use super::*;
 #[derive(Debug)]
 pub struct Document {
   content: Rope,
-  _language: String,
-  _version: i32,
   tree: Option<Tree>,
+  uri: lsp::Url,
 }
 
 impl From<lsp::DidOpenTextDocumentParams> for Document {
@@ -14,9 +13,8 @@ impl From<lsp::DidOpenTextDocumentParams> for Document {
 
     let mut doc = Self {
       content: Rope::from_str(&document.text),
-      _language: document.language_id,
-      _version: document.version,
       tree: None,
+      uri: document.uri,
     };
 
     doc.parse();
@@ -56,31 +54,22 @@ impl Document {
     &'a self,
     name: &str,
   ) -> Option<Node<'a>> {
-    let recipe_nodes = self.find_nodes_by_kind("recipe");
-
-    for recipe_node in recipe_nodes {
-      if let Some(recipe_header) =
-        self.find_child_by_kind(&recipe_node, "recipe_header")
-      {
-        if let Some(identifier) =
-          self.find_child_by_kind(&recipe_header, "identifier")
-        {
-          let recipe_name = self.get_node_text(&identifier);
-
-          if recipe_name == name {
-            return Some(recipe_node);
-          }
-        }
-      }
-    }
-
-    None
+    self
+      .find_nodes_by_kind("recipe")
+      .into_iter()
+      .find(|recipe_node| {
+        self
+          .find_child_by_kind(recipe_node, "recipe_header")
+          .as_ref()
+          .and_then(|header| self.find_child_by_kind(&header, "identifier"))
+          .map(|identifier| self.get_node_text(&identifier) == name)
+          .unwrap_or(false)
+      })
   }
 
   pub(crate) fn find_recipe_references(
     &self,
     recipe_name: &str,
-    uri: &lsp::Url,
   ) -> Vec<lsp::Location> {
     let mut locations = Vec::new();
 
@@ -94,7 +83,7 @@ impl Document {
 
         if dep_name == recipe_name {
           locations.push(lsp::Location {
-            uri: uri.clone(),
+            uri: self.uri.clone(),
             range: self.node_to_range(&identifier),
           });
         }
@@ -111,7 +100,7 @@ impl Document {
 
         if alias_target == recipe_name {
           locations.push(lsp::Location {
-            uri: uri.clone(),
+            uri: self.uri.clone(),
             range: self.node_to_range(&identifier),
           });
         }
@@ -219,15 +208,9 @@ impl Document {
     node: &'a Node,
     kind: &str,
   ) -> Option<Node<'a>> {
-    for i in 0..node.child_count() {
-      if let Some(child) = node.child(i) {
-        if child.kind() == kind {
-          return Some(child);
-        }
-      }
-    }
-
-    None
+    (0..node.child_count())
+      .filter_map(|i| node.child(i))
+      .find(|child| child.kind() == kind)
   }
 
   fn find_child_by_kind_at_position<'a>(
@@ -236,34 +219,22 @@ impl Document {
     kind: &str,
     position: usize,
   ) -> Option<Node<'a>> {
-    for i in 0..node.child_count() {
-      if i == position {
-        if let Some(child) = node.child(i) {
-          if child.kind() == kind {
-            return Some(child);
-          }
-        }
-      }
-    }
-
-    None
+    node.child(position).filter(|child| child.kind() == kind)
   }
 
   fn get_recipe_names(&self) -> Vec<String> {
     self
       .find_nodes_by_kind("recipe")
       .iter()
-      .filter_map(|r| {
-        if let Some(header) = self.find_child_by_kind(r, "recipe_header") {
-          for i in 0..header.named_child_count() {
-            if let Some(child) = header.named_child(i) {
-              if child.kind() == "identifier" {
-                return Some(self.get_node_text(&child));
-              }
-            }
-          }
-        }
-        None
+      .filter_map(|recipe| {
+        self
+          .find_child_by_kind(recipe, "recipe_header")
+          .and_then(|header| {
+            (0..header.named_child_count())
+              .filter_map(|i| header.named_child(i))
+              .find(|child| child.kind() == "identifier")
+              .map(|identifier| self.get_node_text(&identifier))
+          })
       })
       .collect()
   }
@@ -285,13 +256,9 @@ impl Document {
           diagnostics.push(lsp::Diagnostic {
             range: self.node_to_range(&alias_node),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
-            code: None,
-            code_description: None,
             source: Some("just-lsp".to_string()),
             message: format!("Recipe '{}' not found", target_name),
-            related_information: None,
-            tags: None,
-            data: None,
+            ..Default::default()
           });
         }
       }
@@ -309,24 +276,27 @@ impl Document {
       if let Some(header) =
         self.find_child_by_kind(&recipe_node, "recipe_header")
       {
-        if let Some(deps) = self.find_child_by_kind(&header, "dependencies") {
-          for i in 0..deps.named_child_count() {
-            if let Some(dep) = deps.named_child(i) {
-              if dep.kind() == "dependency" {
-                if let Some(id) = self.find_child_by_kind(&dep, "identifier") {
-                  let dep_name = self.get_node_text(&id);
+        if let Some(dependencies) =
+          self.find_child_by_kind(&header, "dependencies")
+        {
+          for i in 0..dependencies.named_child_count() {
+            if let Some(dependency) = dependencies.named_child(i) {
+              if dependency.kind() == "dependency" {
+                if let Some(identifier) =
+                  self.find_child_by_kind(&dependency, "identifier")
+                {
+                  let dependency_name = self.get_node_text(&identifier);
 
-                  if !recipe_names.contains(&dep_name) {
+                  if !recipe_names.contains(&dependency_name) {
                     diagnostics.push(lsp::Diagnostic {
-                      range: self.node_to_range(&id),
+                      range: self.node_to_range(&identifier),
                       severity: Some(lsp::DiagnosticSeverity::ERROR),
-                      code: None,
-                      code_description: None,
                       source: Some("just-lsp".to_string()),
-                      message: format!("Recipe '{}' not found", dep_name),
-                      related_information: None,
-                      tags: None,
-                      data: None,
+                      message: format!(
+                        "Recipe '{}' not found",
+                        dependency_name
+                      ),
+                      ..Default::default()
                     });
                   }
                 }
@@ -582,9 +552,7 @@ mod tests {
       "
     });
 
-    let uri = lsp::Url::parse("file:///test.just").unwrap();
-
-    let references = doc.find_recipe_references("foo", &uri);
+    let references = doc.find_recipe_references("foo");
 
     assert_eq!(references.len(), 2);
     assert_eq!(references[0].range.start.line, 3);
