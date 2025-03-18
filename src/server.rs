@@ -138,10 +138,9 @@ impl Inner {
   async fn did_open(&mut self, params: lsp::DidOpenTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    self.documents.insert(
-      params.text_document.uri.to_owned(),
-      Document::from_params(params),
-    );
+    self
+      .documents
+      .insert(params.text_document.uri.to_owned(), Document::from(params));
 
     self.validate_and_publish_diagnostics(&uri).await;
   }
@@ -235,9 +234,8 @@ impl Inner {
                 range: document.node_to_range(&node),
               });
 
-              locations.extend(
-                document.find_all_recipe_references(&recipe_name, &uri),
-              );
+              locations
+                .extend(document.find_recipe_references(&recipe_name, &uri));
 
               return Ok(Some(locations));
             }
@@ -250,18 +248,13 @@ impl Inner {
   }
 
   async fn validate_and_publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized {
-      log::debug!("Skipping diagnostics - server not yet initialized");
-      return;
-    }
-
-    if let Some(document) = self.documents.get(uri) {
-      let diagnostics = document.validate();
-
-      self
-        .client
-        .publish_diagnostics(uri.clone(), diagnostics, None)
-        .await;
+    if self.initialized {
+      if let Some(document) = self.documents.get(uri) {
+        self
+          .client
+          .publish_diagnostics(uri.clone(), document.validate(), None)
+          .await;
+      }
     }
   }
 }

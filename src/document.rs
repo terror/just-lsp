@@ -8,9 +8,9 @@ pub struct Document {
   tree: Option<Tree>,
 }
 
-impl Document {
-  pub(crate) fn from_params(params: lsp::DidOpenTextDocumentParams) -> Self {
-    let document = params.text_document;
+impl From<lsp::DidOpenTextDocumentParams> for Document {
+  fn from(value: lsp::DidOpenTextDocumentParams) -> Self {
+    let document = value.text_document;
 
     let mut doc = Self {
       content: Rope::from_str(&document.text),
@@ -23,21 +23,9 @@ impl Document {
 
     doc
   }
+}
 
-  pub(crate) fn parse(&mut self) {
-    let mut parser = Parser::new();
-
-    unsafe {
-      parser
-        .set_language(&tree_sitter_just())
-        .expect("Failed to load `tree-sitter-just`");
-    }
-
-    let text = self.content.to_string();
-
-    self.tree = parser.parse(&text, None);
-  }
-
+impl Document {
   pub(crate) fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -57,25 +45,84 @@ impl Document {
     Ok(())
   }
 
-  pub(crate) fn position_to_point(&self, position: lsp::Position) -> Point {
-    Point {
-      row: position.line as usize,
-      column: position.character as usize,
+  pub(crate) fn find_recipe_by_name<'a>(
+    &'a self,
+    name: &str,
+  ) -> Option<Node<'a>> {
+    let recipe_nodes = self.find_nodes_by_kind("recipe");
+
+    for recipe_node in recipe_nodes {
+      if let Some(recipe_header) =
+        self.find_child_by_kind(&recipe_node, "recipe_header")
+      {
+        if let Some(identifier) =
+          self.find_child_by_kind(&recipe_header, "identifier")
+        {
+          let recipe_name = self.get_node_text(&identifier);
+
+          if recipe_name == name {
+            return Some(recipe_node);
+          }
+        }
+      }
     }
+
+    None
   }
 
-  pub(crate) fn point_to_position(&self, point: Point) -> lsp::Position {
-    lsp::Position {
-      line: point.row as u32,
-      character: point.column as u32,
+  pub(crate) fn find_recipe_references(
+    &self,
+    recipe_name: &str,
+    uri: &lsp::Url,
+  ) -> Vec<lsp::Location> {
+    let mut locations = Vec::new();
+
+    let dependency_nodes = self.find_nodes_by_kind("dependency");
+
+    for dependency_node in dependency_nodes {
+      if let Some(identifier) =
+        self.find_child_by_kind(&dependency_node, "identifier")
+      {
+        let dep_name = self.get_node_text(&identifier);
+
+        if dep_name == recipe_name {
+          locations.push(lsp::Location {
+            uri: uri.clone(),
+            range: self.node_to_range(&identifier),
+          });
+        }
+      }
     }
+
+    let alias_nodes = self.find_nodes_by_kind("alias");
+
+    for alias_node in alias_nodes {
+      if let Some(right) = self.find_child_by_kind(&alias_node, "right") {
+        if let Some(identifier) = self.find_child_by_kind(&right, "identifier")
+        {
+          let alias_target = self.get_node_text(&identifier);
+
+          if alias_target == recipe_name {
+            locations.push(lsp::Location {
+              uri: uri.clone(),
+              range: self.node_to_range(&identifier),
+            });
+          }
+        }
+      }
+    }
+
+    locations
   }
 
-  pub(crate) fn node_to_range(&self, node: &Node) -> lsp::Range {
-    lsp::Range {
-      start: self.point_to_position(node.start_position()),
-      end: self.point_to_position(node.end_position()),
-    }
+  pub(crate) fn get_node_text(&self, node: &Node) -> String {
+    self
+      .content
+      .slice(
+        self.content.byte_to_char(node.start_byte())
+          ..self.content.byte_to_char(node.end_byte()),
+      )
+      .to_string()
   }
 
   pub(crate) fn node_at_position(
@@ -90,7 +137,49 @@ impl Document {
     }
   }
 
-  pub(crate) fn find_nodes(&self, kind: &str) -> Vec<Node> {
+  pub(crate) fn parse(&mut self) {
+    let mut parser = Parser::new();
+
+    unsafe {
+      parser
+        .set_language(&tree_sitter_just())
+        .expect("Failed to load `tree-sitter-just`");
+    }
+
+    let text = self.content.to_string();
+
+    self.tree = parser.parse(&text, None);
+  }
+
+  pub(crate) fn validate(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+    diagnostics.extend(self.validate_aliases());
+    diagnostics.extend(self.validate_dependencies());
+    diagnostics
+  }
+
+  fn position_to_point(&self, position: lsp::Position) -> Point {
+    Point {
+      row: position.line as usize,
+      column: position.character as usize,
+    }
+  }
+
+  fn point_to_position(&self, point: Point) -> lsp::Position {
+    lsp::Position {
+      line: point.row as u32,
+      character: point.column as u32,
+    }
+  }
+
+  pub(crate) fn node_to_range(&self, node: &Node) -> lsp::Range {
+    lsp::Range {
+      start: self.point_to_position(node.start_position()),
+      end: self.point_to_position(node.end_position()),
+    }
+  }
+
+  fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
     let mut nodes = Vec::new();
 
     if let Some(tree) = &self.tree {
@@ -103,7 +192,7 @@ impl Document {
 
   fn collect_nodes<'a>(
     &self,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
+    cursor: &mut TreeCursor<'a>,
     kind: &str,
     nodes: &mut Vec<Node<'a>>,
   ) {
@@ -126,46 +215,11 @@ impl Document {
     }
   }
 
-  pub(crate) fn get_node_text(&self, node: &Node) -> String {
-    self
-      .content
-      .slice(
-        self.content.byte_to_char(node.start_byte())
-          ..self.content.byte_to_char(node.end_byte()),
-      )
-      .to_string()
-  }
-
-  pub(crate) fn find_recipe_by_name<'a>(
-    &'a self,
-    name: &str,
-  ) -> Option<tree_sitter::Node<'a>> {
-    let recipe_nodes = self.find_nodes("recipe");
-
-    for recipe_node in recipe_nodes {
-      if let Some(recipe_header) =
-        self.find_child_by_kind(&recipe_node, "recipe_header")
-      {
-        if let Some(identifier) =
-          self.find_child_by_kind(&recipe_header, "identifier")
-        {
-          let recipe_name = self.get_node_text(&identifier);
-
-          if recipe_name == name {
-            return Some(recipe_node);
-          }
-        }
-      }
-    }
-
-    None
-  }
-
   fn find_child_by_kind<'a>(
     &'a self,
-    node: &'a tree_sitter::Node,
+    node: &'a Node,
     kind: &str,
-  ) -> Option<tree_sitter::Node<'a>> {
+  ) -> Option<Node<'a>> {
     for i in 0..node.child_count() {
       if let Some(child) = node.child(i) {
         if child.kind() == kind {
@@ -179,10 +233,10 @@ impl Document {
 
   fn find_child_by_kind_at_position<'a>(
     &'a self,
-    node: &'a tree_sitter::Node,
+    node: &'a Node,
     kind: &str,
     position: usize,
-  ) -> Option<tree_sitter::Node<'a>> {
+  ) -> Option<Node<'a>> {
     for i in 0..node.child_count() {
       if i == position {
         if let Some(child) = node.child(i) {
@@ -196,55 +250,9 @@ impl Document {
     None
   }
 
-  pub(crate) fn find_all_recipe_references(
-    &self,
-    recipe_name: &str,
-    uri: &lsp::Url,
-  ) -> Vec<lsp::Location> {
-    let mut locations = Vec::new();
-
-    let dependency_nodes = self.find_nodes("dependency");
-
-    for dependency_node in dependency_nodes {
-      if let Some(identifier) =
-        self.find_child_by_kind(&dependency_node, "identifier")
-      {
-        let dep_name = self.get_node_text(&identifier);
-
-        if dep_name == recipe_name {
-          locations.push(lsp::Location {
-            uri: uri.clone(),
-            range: self.node_to_range(&identifier),
-          });
-        }
-      }
-    }
-
-    let alias_nodes = self.find_nodes("alias");
-
-    for alias_node in alias_nodes {
-      if let Some(right) = self.find_child_by_kind(&alias_node, "right") {
-        if let Some(identifier) = self.find_child_by_kind(&right, "identifier")
-        {
-          let alias_target = self.get_node_text(&identifier);
-
-          if alias_target == recipe_name {
-            locations.push(lsp::Location {
-              uri: uri.clone(),
-              range: self.node_to_range(&identifier),
-            });
-          }
-        }
-      }
-    }
-
-    locations
-  }
-
   fn get_recipe_names(&self) -> Vec<String> {
-    let recipes = self.find_nodes("recipe");
-
-    let recipe_names: Vec<String> = recipes
+    self
+      .find_nodes_by_kind("recipe")
       .iter()
       .filter_map(|r| {
         if let Some(header) = self.find_child_by_kind(r, "recipe_header") {
@@ -258,19 +266,15 @@ impl Document {
         }
         None
       })
-      .collect();
-
-    recipe_names
+      .collect()
   }
 
-  pub(crate) fn validate_aliases(&self) -> Vec<lsp::Diagnostic> {
+  fn validate_aliases(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let recipe_names = self.get_recipe_names();
 
-    log::debug!("Found recipes: {:?}", recipe_names);
-
-    let alias_nodes = self.find_nodes("alias");
+    let alias_nodes = self.find_nodes_by_kind("alias");
 
     for alias_node in alias_nodes {
       if let Some(identifier) =
@@ -297,12 +301,12 @@ impl Document {
     diagnostics
   }
 
-  pub(crate) fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
+  fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let recipe_names = self.get_recipe_names();
 
-    for recipe_node in self.find_nodes("recipe") {
+    for recipe_node in self.find_nodes_by_kind("recipe") {
       if let Some(header) =
         self.find_child_by_kind(&recipe_node, "recipe_header")
       {
@@ -320,7 +324,7 @@ impl Document {
                       code: None,
                       code_description: None,
                       source: Some("just-lsp".to_string()),
-                      message: format!("Dependency '{}' not found", dep_name),
+                      message: format!("Recipe '{}' not found", dep_name),
                       related_information: None,
                       tags: None,
                       data: None,
@@ -334,13 +338,6 @@ impl Document {
       }
     }
 
-    diagnostics
-  }
-
-  pub(crate) fn validate(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-    diagnostics.extend(self.validate_aliases());
-    diagnostics.extend(self.validate_dependencies());
     diagnostics
   }
 }

@@ -4,7 +4,7 @@ use {
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
   std::{collections::BTreeMap, env, process, sync::Arc},
-  tree_sitter::{Language, Node, Parser, Point, Tree},
+  tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
 mod document;
