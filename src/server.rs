@@ -44,6 +44,25 @@ impl Server {
 
 #[lspower::async_trait]
 impl LanguageServer for Server {
+  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
+    self.0.lock().await.did_change(params).await
+  }
+
+  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+    self.0.lock().await.did_close(params).await
+  }
+
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
+    self.0.lock().await.did_open(params).await
+  }
+
+  async fn goto_definition(
+    &self,
+    params: lsp::GotoDefinitionParams,
+  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
+    self.0.lock().await.goto_definition(params).await
+  }
+
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
@@ -55,40 +74,21 @@ impl LanguageServer for Server {
     self.0.lock().await.initialized(params).await
   }
 
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    self.0.lock().await.did_open(params).await
-  }
-
-  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    self.0.lock().await.did_change(params).await
-  }
-
-  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.lock().await.did_close(params).await
-  }
-
-  async fn goto_definition(
-    &self,
-    params: lsp::GotoDefinitionParams,
-  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    self.0.lock().await.goto_definition(params).await
-  }
-
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.lock().await.shutdown().await
-  }
-
   async fn references(
     &self,
     params: lsp::ReferenceParams,
   ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
     self.0.lock().await.references(params).await
   }
+
+  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+    self.0.lock().await.shutdown().await
+  }
 }
 
 #[derive(Debug)]
 pub(crate) struct Inner {
-  pub(crate) client: Client,
+  client: Client,
   documents: BTreeMap<lsp::Url, Document>,
   initialized: bool,
 }
@@ -102,49 +102,6 @@ impl Inner {
     }
   }
 
-  async fn show(&self, message: Message<'_>) {
-    self
-      .client
-      .show_message(message.kind, message.content)
-      .await;
-  }
-
-  async fn initialize(
-    &self,
-    _params: lsp::InitializeParams,
-  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    log::info!("Starting just language server...");
-
-    Ok(lsp::InitializeResult {
-      capabilities: Server::capabilities(),
-      server_info: Some(lsp::ServerInfo {
-        name: env!("CARGO_PKG_NAME").to_string(),
-        version: Some(env!("CARGO_PKG_VERSION").to_string()),
-      }),
-    })
-  }
-
-  async fn initialized(&mut self, _: lsp::InitializedParams) {
-    self.initialized = true;
-
-    self
-      .show(Message {
-        content: &format!("{} initialized", env!("CARGO_PKG_NAME")),
-        kind: lsp::MessageType::INFO,
-      })
-      .await;
-  }
-
-  async fn did_open(&mut self, params: lsp::DidOpenTextDocumentParams) {
-    let uri = params.text_document.uri.clone();
-
-    self
-      .documents
-      .insert(params.text_document.uri.to_owned(), Document::from(params));
-
-    self.validate_and_publish_diagnostics(&uri).await;
-  }
-
   async fn did_change(&mut self, params: lsp::DidChangeTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
@@ -153,7 +110,7 @@ impl Inner {
         log::debug!("error: {}", error);
       }
 
-      self.validate_and_publish_diagnostics(&uri).await;
+      self.publish_diagnostics(&uri).await;
     }
   }
 
@@ -170,6 +127,16 @@ impl Inner {
     }
   }
 
+  async fn did_open(&mut self, params: lsp::DidOpenTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+
+    self
+      .documents
+      .insert(params.text_document.uri.to_owned(), Document::from(params));
+
+    self.publish_diagnostics(&uri).await;
+  }
+
   async fn goto_definition(
     &self,
     params: lsp::GotoDefinitionParams,
@@ -184,7 +151,9 @@ impl Inner {
           let parent = node.parent();
 
           if let Some(parent) = parent {
-            if parent.kind() == "dependency" {
+            let kind = parent.kind();
+
+            if kind == "dependency" || kind == "alias" {
               let recipe_name = document.get_node_text(&node);
 
               if let Some(recipe_node) =
@@ -206,8 +175,52 @@ impl Inner {
     Ok(None)
   }
 
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    Ok(())
+  async fn initialize(
+    &self,
+    _params: lsp::InitializeParams,
+  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
+    log::info!("Starting just language server...");
+
+    Ok(lsp::InitializeResult {
+      capabilities: Server::capabilities(),
+      server_info: Some(lsp::ServerInfo {
+        name: env!("CARGO_PKG_NAME").to_string(),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+      }),
+    })
+  }
+
+  async fn initialized(&mut self, _: lsp::InitializedParams) {
+    self
+      .show(Message {
+        content: &format!("{} initialized", env!("CARGO_PKG_NAME")),
+        kind: lsp::MessageType::INFO,
+      })
+      .await;
+
+    self.initialized = true;
+  }
+
+  async fn publish_diagnostics(&self, uri: &lsp::Url) {
+    if self.initialized {
+      if let Some(document) = self.documents.get(uri) {
+        self
+          .client
+          .publish_diagnostics(
+            uri.clone(),
+            document.collect_diagnostics(),
+            None,
+          )
+          .await;
+      }
+    }
+  }
+
+  async fn show(&self, message: Message<'_>) {
+    self
+      .client
+      .show_message(message.kind, message.content)
+      .await;
   }
 
   async fn references(
@@ -247,15 +260,8 @@ impl Inner {
     Ok(None)
   }
 
-  async fn validate_and_publish_diagnostics(&self, uri: &lsp::Url) {
-    if self.initialized {
-      if let Some(document) = self.documents.get(uri) {
-        self
-          .client
-          .publish_diagnostics(uri.clone(), document.validate(), None)
-          .await;
-      }
-    }
+  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+    Ok(())
   }
 }
 

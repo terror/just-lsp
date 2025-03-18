@@ -45,6 +45,13 @@ impl Document {
     Ok(())
   }
 
+  pub(crate) fn collect_diagnostics(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+    diagnostics.extend(self.validate_aliases());
+    diagnostics.extend(self.validate_dependencies());
+    diagnostics
+  }
+
   pub(crate) fn find_recipe_by_name<'a>(
     &'a self,
     name: &str,
@@ -97,17 +104,16 @@ impl Document {
     let alias_nodes = self.find_nodes_by_kind("alias");
 
     for alias_node in alias_nodes {
-      if let Some(right) = self.find_child_by_kind(&alias_node, "right") {
-        if let Some(identifier) = self.find_child_by_kind(&right, "identifier")
-        {
-          let alias_target = self.get_node_text(&identifier);
+      if let Some(identifier) =
+        self.find_child_by_kind_at_position(&alias_node, "identifier", 3)
+      {
+        let alias_target = self.get_node_text(&identifier);
 
-          if alias_target == recipe_name {
-            locations.push(lsp::Location {
-              uri: uri.clone(),
-              range: self.node_to_range(&identifier),
-            });
-          }
+        if alias_target == recipe_name {
+          locations.push(lsp::Location {
+            uri: uri.clone(),
+            range: self.node_to_range(&identifier),
+          });
         }
       }
     }
@@ -149,13 +155,6 @@ impl Document {
     let text = self.content.to_string();
 
     self.tree = parser.parse(&text, None);
-  }
-
-  pub(crate) fn validate(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-    diagnostics.extend(self.validate_aliases());
-    diagnostics.extend(self.validate_dependencies());
-    diagnostics
   }
 
   fn position_to_point(&self, position: lsp::Position) -> Point {
@@ -535,5 +534,112 @@ mod tests {
 
     let nonexistent = doc.find_child_by_kind(recipe, "nonexistent");
     assert!(nonexistent.is_none());
+  }
+
+  #[test]
+  fn apply_change() {
+    let mut doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let original_content = doc.content.to_string();
+
+    let change = lsp::DidChangeTextDocumentParams {
+      text_document: lsp::VersionedTextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+        version: 2,
+      },
+      content_changes: vec![lsp::TextDocumentContentChangeEvent {
+        range: Some(lsp::Range {
+          start: position(1, 7),
+          end: position(1, 13),
+        }),
+        range_length: None,
+        text: "\"bar\"".to_string(),
+      }],
+    };
+
+    doc.apply_change(change).unwrap();
+
+    assert_ne!(doc.content.to_string(), original_content);
+    assert_eq!(doc.content.to_string(), "foo:\n  echo \"bar\"");
+  }
+
+  #[test]
+  fn find_recipe_references() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+
+      alias baz := foo
+      "
+    });
+
+    let uri = lsp::Url::parse("file:///test.just").unwrap();
+
+    let references = doc.find_recipe_references("foo", &uri);
+
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].range.start.line, 3);
+    assert_eq!(references[1].range.start.line, 6);
+  }
+
+  #[test]
+  fn collect_diagnostics() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: missing
+        echo \"bar\"
+
+      alias baz := nonexistent
+      "
+    });
+
+    let diagnostics = doc.collect_diagnostics();
+
+    assert_eq!(diagnostics.len(), 2);
+
+    let messages: Vec<String> =
+      diagnostics.iter().map(|d| d.message.clone()).collect();
+
+    assert!(messages.contains(&"Recipe 'missing' not found".to_string()));
+    assert!(messages.contains(&"Recipe 'nonexistent' not found".to_string()));
+  }
+
+  #[test]
+  fn find_child_by_kind_at_position() {
+    let doc = document(indoc! {
+      "
+      alias foo := bar
+      "
+    });
+
+    let alias_nodes = doc.find_nodes_by_kind("alias");
+
+    assert_eq!(alias_nodes.len(), 2);
+
+    let alias_node = alias_nodes.first().unwrap();
+
+    let alias_name =
+      doc.find_child_by_kind_at_position(&alias_node, "identifier", 1);
+
+    assert!(alias_name.is_some());
+    assert_eq!(doc.get_node_text(&alias_name.unwrap()), "foo");
+
+    let target_name =
+      doc.find_child_by_kind_at_position(&alias_node, "identifier", 3);
+
+    assert!(target_name.is_some());
+    assert_eq!(doc.get_node_text(&target_name.unwrap()), "bar");
   }
 }
