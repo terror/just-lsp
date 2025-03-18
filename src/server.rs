@@ -379,6 +379,7 @@ impl Inner {
 mod tests {
   use {
     super::*,
+    indoc::indoc,
     lspower::{LspService, MessageStream},
     pretty_assertions::assert_eq,
     serde_json::{json, Value},
@@ -390,7 +391,7 @@ mod tests {
   struct Test {
     _messages: MessageStream,
     requests: Vec<Value>,
-    responses: Vec<Value>,
+    responses: Vec<Option<Value>>,
     service: Spawn<LspService>,
   }
 
@@ -412,7 +413,13 @@ mod tests {
     }
 
     fn response(mut self, response: Value) -> Self {
-      self.responses.push(response);
+      self.responses.push(Some(response));
+      self
+    }
+
+    fn notification(mut self, notification: Value) -> Self {
+      self.requests.push(notification);
+      self.responses.push(None);
       self
     }
 
@@ -420,15 +427,19 @@ mod tests {
       for (request, expected_response) in
         self.requests.iter().zip(self.responses.iter())
       {
-        assert_eq!(
-          *expected_response,
-          self
-            .service
-            .call(serde_json::from_value(request.clone())?)
-            .await?
-            .map(|v| serde_json::to_value(v).unwrap())
-            .unwrap()
-        );
+        let response = self
+          .service
+          .call(serde_json::from_value(request.clone())?)
+          .await?;
+
+        if let Some(expected) = expected_response {
+          assert_eq!(
+            *expected,
+            response.map(|v| serde_json::to_value(v).unwrap()).unwrap()
+          );
+        } else {
+          assert!(response.is_none(), "Expected no response for notification");
+        }
       }
 
       Ok(())
@@ -497,6 +508,83 @@ mod tests {
         "error": {
           "code": -32600,
           "message": "Invalid request"
+        }
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn goto_definition() -> Result {
+    Test::new()?
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        },
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverInfo": {
+            "name": env!("CARGO_PKG_NAME"),
+            "version": env!("CARGO_PKG_VERSION")
+          },
+          "capabilities": Server::capabilities()
+        },
+      }))
+      .notification(json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just",
+            "languageId": "just",
+            "version": 1,
+            "text": indoc! {
+              "
+              foo:
+                echo \"foo\"
+
+              bar: foo
+                echo \"bar\"
+              "
+            }
+          }
+        }
+      }))
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "textDocument/definition",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just"
+          },
+          "position": {
+            "line": 3,
+            "character": 5
+          }
+        }
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "uri": "file:///test.just",
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 3,
+              "character": 0
+            }
+          }
         }
       }))
       .run()
