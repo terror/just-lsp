@@ -21,6 +21,11 @@ impl Server {
 
   pub fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
+      completion_provider: Some(lsp::CompletionOptions {
+        ..Default::default()
+      }),
+      definition_provider: Some(lsp::OneOf::Left(true)),
+      references_provider: Some(lsp::OneOf::Left(true)),
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
         lsp::TextDocumentSyncOptions {
           open_close: Some(true),
@@ -35,8 +40,6 @@ impl Server {
           ),
         },
       )),
-      definition_provider: Some(lsp::OneOf::Left(true)),
-      references_provider: Some(lsp::OneOf::Left(true)),
       ..Default::default()
     }
   }
@@ -44,6 +47,13 @@ impl Server {
 
 #[lspower::async_trait]
 impl LanguageServer for Server {
+  async fn completion(
+    &self,
+    params: lsp::CompletionParams,
+  ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
+    self.0.lock().await.completion(params).await
+  }
+
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
     if let Err(error) = self.0.lock().await.did_change(params).await {
       log::debug!("error: {error}");
@@ -104,6 +114,33 @@ impl Inner {
       documents: BTreeMap::new(),
       initialized: false,
     }
+  }
+
+  async fn completion(
+    &self,
+    params: lsp::CompletionParams,
+  ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
+    let uri = params.text_document_position.text_document.uri;
+
+    if let Some(document) = self.documents.get(&uri) {
+      let recipe_names = document.get_recipe_names();
+
+      return Ok(Some(lsp::CompletionResponse::Array(
+        recipe_names
+          .into_iter()
+          .map(|name| lsp::CompletionItem {
+            label: name.clone(),
+            kind: Some(lsp::CompletionItemKind::FUNCTION),
+            detail: Some("Recipe".to_string()),
+            insert_text: Some(name),
+            insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+          })
+          .collect::<Vec<_>>(),
+      )));
+    }
+
+    Ok(None)
   }
 
   async fn did_change(

@@ -228,7 +228,7 @@ impl Document {
     nodes
   }
 
-  fn get_recipe_names(&self) -> Vec<String> {
+  pub(crate) fn get_recipe_names(&self) -> Vec<String> {
     self
       .find_nodes_by_kind("recipe")
       .iter()

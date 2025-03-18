@@ -6,9 +6,10 @@
 
 ### Features
 
-- Go to definition (`textDocument/definition`)
-- Find references (`textDocument/references`)
+- Completions (`textDocument/completion`)
 - Diagnostics (`textDocument/publishDiagnostics`)
+- Find references (`textDocument/references`)
+- Go to definition (`textDocument/definition`)
 
 ### Prior Art
 
