@@ -30,6 +30,7 @@ impl Server {
           save: Some(lsp::SaveOptions::default().into()),
         },
       )),
+      definition_provider: Some(lsp::OneOf::Left(true)),
       ..Default::default()
     }
   }
@@ -58,6 +59,13 @@ impl LanguageServer for Server {
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     self.0.lock().await.did_close(params).await
+  }
+
+  async fn goto_definition(
+    &self,
+    params: lsp::GotoDefinitionParams,
+  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
+    self.0.lock().await.goto_definition(params).await
   }
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
@@ -131,6 +139,42 @@ impl Inner {
     if self.documents.contains_key(id) {
       self.documents.remove(id);
     }
+  }
+
+  async fn goto_definition(
+    &self,
+    params: lsp::GotoDefinitionParams,
+  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
+    let uri = params.text_document_position_params.text_document.uri;
+
+    let position = params.text_document_position_params.position;
+
+    if let Some(document) = self.documents.get(&uri) {
+      if let Some(node) = document.node_at_position(position) {
+        if node.kind() == "identifier" {
+          let parent = node.parent();
+
+          if let Some(parent) = parent {
+            if parent.kind() == "dependency" {
+              let recipe_name = document.get_node_text(&node);
+
+              if let Some(recipe_node) =
+                document.find_recipe_by_name(&recipe_name)
+              {
+                return Ok(Some(lsp::GotoDefinitionResponse::Scalar(
+                  lsp::Location {
+                    uri: uri.clone(),
+                    range: document.node_to_range(&recipe_node),
+                  },
+                )));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    Ok(None)
   }
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {

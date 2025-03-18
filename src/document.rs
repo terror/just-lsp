@@ -8,7 +8,6 @@ pub struct Document {
   tree: Option<Tree>,
 }
 
-#[allow(unused)]
 impl Document {
   pub(crate) fn from_params(params: lsp::DidOpenTextDocumentParams) -> Self {
     let document = params.text_document;
@@ -135,5 +134,46 @@ impl Document {
           ..self.content.byte_to_char(node.end_byte()),
       )
       .to_string()
+  }
+
+  pub(crate) fn find_recipe_by_name<'a>(
+    &'a self,
+    name: &str,
+  ) -> Option<tree_sitter::Node<'a>> {
+    let recipe_nodes = self.find_nodes("recipe");
+
+    for recipe_node in recipe_nodes {
+      if let Some(recipe_header) =
+        self.find_child_by_kind(&recipe_node, "recipe_header")
+      {
+        if let Some(identifier) =
+          self.find_child_by_kind(&recipe_header, "identifier")
+        {
+          let recipe_name = self.get_node_text(&identifier);
+
+          if recipe_name == name {
+            return Some(recipe_node);
+          }
+        }
+      }
+    }
+
+    None
+  }
+
+  fn find_child_by_kind<'a>(
+    &'a self,
+    node: &'a tree_sitter::Node,
+    kind: &str,
+  ) -> Option<tree_sitter::Node<'a>> {
+    for i in 0..node.child_count() {
+      if let Some(child) = node.child(i) {
+        if child.kind() == kind {
+          return Some(child);
+        }
+      }
+    }
+
+    None
   }
 }
