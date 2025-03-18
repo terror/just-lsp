@@ -1,5 +1,5 @@
 use {
-  crate::{document::Document, message::Message, server::Server},
+  crate::{document::Document, message::Message, server::Server, util::*},
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
@@ -10,6 +10,7 @@ use {
 mod document;
 mod message;
 mod server;
+mod util;
 
 type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 

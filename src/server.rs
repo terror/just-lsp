@@ -131,21 +131,46 @@ impl Inner {
     let uri = params.text_document_position.text_document.uri;
 
     if let Some(document) = self.documents.get(&uri) {
+      let mut completion_items = Vec::new();
+
       let recipe_names = document.get_recipe_names();
 
-      return Ok(Some(lsp::CompletionResponse::Array(
-        recipe_names
-          .into_iter()
-          .map(|name| lsp::CompletionItem {
-            label: name.clone(),
-            kind: Some(lsp::CompletionItemKind::FUNCTION),
-            detail: Some("Recipe".to_string()),
-            insert_text: Some(name),
-            insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-            ..Default::default()
-          })
-          .collect::<Vec<_>>(),
-      )));
+      for name in recipe_names {
+        completion_items.push(lsp::CompletionItem {
+          label: name.clone(),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          detail: Some("Recipe".to_string()),
+          insert_text: Some(name),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          ..Default::default()
+        });
+      }
+
+      for (name, detail) in builtin_functions() {
+        completion_items.push(lsp::CompletionItem {
+          label: name.clone(),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          detail: Some(format!("Function - {}", detail)),
+          insert_text: Some(name.clone()),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          sort_text: Some(format!("z{}", name)),
+          ..Default::default()
+        });
+      }
+
+      for (name, value) in builtin_constants() {
+        completion_items.push(lsp::CompletionItem {
+          label: name.clone(),
+          kind: Some(lsp::CompletionItemKind::CONSTANT),
+          detail: Some(format!("Constant - {}", value)),
+          insert_text: Some(name.clone()),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          sort_text: Some(format!("z{}", name)),
+          ..Default::default()
+        });
+      }
+
+      return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
     }
 
     Ok(None)
