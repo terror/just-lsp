@@ -45,6 +45,7 @@ impl Document {
 
   pub(crate) fn collect_diagnostics(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
+    diagnostics.extend(self.collect_parser_errors());
     diagnostics.extend(self.validate_aliases());
     diagnostics.extend(self.validate_dependencies());
     diagnostics
@@ -132,6 +133,13 @@ impl Document {
     }
   }
 
+  pub(crate) fn node_to_range(&self, node: &Node) -> lsp::Range {
+    lsp::Range {
+      start: self.point_to_position(node.start_position()),
+      end: self.point_to_position(node.end_position()),
+    }
+  }
+
   pub(crate) fn parse(&mut self) {
     let mut parser = Parser::new();
 
@@ -144,38 +152,6 @@ impl Document {
     let text = self.content.to_string();
 
     self.tree = parser.parse(&text, None);
-  }
-
-  fn position_to_point(&self, position: lsp::Position) -> Point {
-    Point {
-      row: position.line as usize,
-      column: position.character as usize,
-    }
-  }
-
-  fn point_to_position(&self, point: Point) -> lsp::Position {
-    lsp::Position {
-      line: point.row as u32,
-      character: point.column as u32,
-    }
-  }
-
-  pub(crate) fn node_to_range(&self, node: &Node) -> lsp::Range {
-    lsp::Range {
-      start: self.point_to_position(node.start_position()),
-      end: self.point_to_position(node.end_position()),
-    }
-  }
-
-  fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
-    let mut nodes = Vec::new();
-
-    if let Some(tree) = &self.tree {
-      let mut cursor = tree.root_node().walk();
-      self.collect_nodes(&mut cursor, kind, &mut nodes);
-    }
-
-    nodes
   }
 
   fn collect_nodes<'a>(
@@ -193,6 +169,57 @@ impl Document {
     if cursor.goto_first_child() {
       loop {
         self.collect_nodes(cursor, kind, nodes);
+
+        if !cursor.goto_next_sibling() {
+          break;
+        }
+      }
+
+      cursor.goto_parent();
+    }
+  }
+
+  fn collect_parser_errors(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    if let Some(tree) = &self.tree {
+      let mut cursor = tree.root_node().walk();
+      self.collect_parser_errors_rec(&mut cursor, &mut diagnostics);
+    }
+
+    diagnostics
+  }
+
+  fn collect_parser_errors_rec<'a>(
+    &self,
+    cursor: &mut TreeCursor<'a>,
+    diagnostics: &mut Vec<lsp::Diagnostic>,
+  ) {
+    let node = cursor.node();
+
+    if node.is_error() {
+      diagnostics.push(lsp::Diagnostic {
+        range: self.node_to_range(&node),
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        source: Some("just-lsp".to_string()),
+        message: "Syntax error".to_string(),
+        ..Default::default()
+      });
+    }
+
+    if node.is_missing() {
+      diagnostics.push(lsp::Diagnostic {
+        range: self.node_to_range(&node),
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        source: Some("just-lsp".to_string()),
+        message: "Missing syntax element".to_string(),
+        ..Default::default()
+      });
+    }
+
+    if cursor.goto_first_child() {
+      loop {
+        self.collect_parser_errors_rec(cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;
@@ -222,6 +249,17 @@ impl Document {
     node.child(position).filter(|child| child.kind() == kind)
   }
 
+  fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
+    let mut nodes = Vec::new();
+
+    if let Some(tree) = &self.tree {
+      let mut cursor = tree.root_node().walk();
+      self.collect_nodes(&mut cursor, kind, &mut nodes);
+    }
+
+    nodes
+  }
+
   fn get_recipe_names(&self) -> Vec<String> {
     self
       .find_nodes_by_kind("recipe")
@@ -237,6 +275,20 @@ impl Document {
           })
       })
       .collect()
+  }
+
+  fn point_to_position(&self, point: Point) -> lsp::Position {
+    lsp::Position {
+      line: point.row as u32,
+      character: point.column as u32,
+    }
+  }
+
+  fn position_to_point(&self, position: lsp::Position) -> Point {
+    Point {
+      row: position.line as usize,
+      column: position.character as usize,
+    }
   }
 
   fn validate_aliases(&self) -> Vec<lsp::Diagnostic> {
@@ -609,5 +661,46 @@ mod tests {
 
     assert!(target_name.is_some());
     assert_eq!(doc.get_node_text(&target_name.unwrap()), "bar");
+  }
+
+  #[test]
+  fn collect_parser_errors() {
+    let doc = document(indoc! {
+      "
+      foo
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.collect_parser_errors();
+
+    assert!(!diagnostics.is_empty(), "Should detect syntax errors");
+
+    let syntax_errors: Vec<_> = diagnostics
+      .iter()
+      .filter(|d| {
+        d.message.contains("Syntax error")
+          || d.message.contains("Missing syntax")
+      })
+      .collect();
+
+    assert!(
+      !syntax_errors.is_empty(),
+      "Should have at least one syntax error diagnostic"
+    );
+
+    let valid_doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let valid_diagnostics = valid_doc.collect_parser_errors();
+
+    assert!(
+      valid_diagnostics.is_empty(),
+      "Valid document should not have syntax errors"
+    );
   }
 }
