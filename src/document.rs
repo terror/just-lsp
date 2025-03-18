@@ -12,18 +12,20 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
   type Error = Box<dyn std::error::Error>;
 
   fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
-    let document = params.text_document;
+    let lsp::TextDocumentItem {
+      text, uri, version, ..
+    } = params.text_document;
 
-    let mut doc = Self {
-      content: Rope::from_str(&document.text),
+    let mut document = Self {
+      content: Rope::from_str(&text),
       tree: None,
-      uri: document.uri,
-      version: document.version,
+      uri,
+      version,
     };
 
-    doc.parse()?;
+    document.parse()?;
 
-    Ok(doc)
+    Ok(document)
   }
 }
 
@@ -38,7 +40,7 @@ impl Document {
       .map(|change| self.content.build_edit(change))
       .collect::<Result<Vec<_>, _>>()?;
 
-    edits.iter().for_each(|edit| self.content.apply_edit(&edit));
+    edits.iter().for_each(|edit| self.content.apply_edit(edit));
 
     self.parse()?;
 
@@ -65,7 +67,7 @@ impl Document {
         self
           .find_child_by_kind(recipe_node, "recipe_header")
           .as_ref()
-          .and_then(|header| self.find_child_by_kind(&header, "identifier"))
+          .and_then(|header| self.find_child_by_kind(header, "identifier"))
           .map(|identifier| self.get_node_text(&identifier) == name)
           .unwrap_or(false)
       })
@@ -119,7 +121,7 @@ impl Document {
 
     parser.set_language(&language)?;
 
-    self.tree = parser.parse(&self.content.to_string(), None);
+    self.tree = parser.parse(self.content.to_string(), None);
 
     Ok(())
   }
@@ -129,7 +131,6 @@ impl Document {
   }
 
   fn collect_nodes<'a>(
-    &self,
     cursor: &mut TreeCursor<'a>,
     kind: &str,
     nodes: &mut Vec<Node<'a>>,
@@ -142,7 +143,7 @@ impl Document {
 
     if cursor.goto_first_child() {
       loop {
-        self.collect_nodes(cursor, kind, nodes);
+        Self::collect_nodes(cursor, kind, nodes);
 
         if !cursor.goto_next_sibling() {
           break;
@@ -164,9 +165,9 @@ impl Document {
     diagnostics
   }
 
-  fn collect_parser_errors_rec<'a>(
+  fn collect_parser_errors_rec(
     &self,
-    cursor: &mut TreeCursor<'a>,
+    cursor: &mut TreeCursor<'_>,
     diagnostics: &mut Vec<lsp::Diagnostic>,
   ) {
     let node = cursor.node();
@@ -228,7 +229,7 @@ impl Document {
 
     if let Some(tree) = &self.tree {
       let mut cursor = tree.root_node().walk();
-      self.collect_nodes(&mut cursor, kind, &mut nodes);
+      Self::collect_nodes(&mut cursor, kind, &mut nodes);
     }
 
     nodes
@@ -307,36 +308,33 @@ impl Document {
         let recipe_header =
           self.find_child_by_kind(recipe_node, "recipe_header");
 
-        recipe_header
+        let dependencies = recipe_header
           .as_ref()
-          .and_then(|header| self.find_child_by_kind(&header, "dependencies"))
-          .map_or(Vec::new(), |dependencies| {
-            (0..dependencies.named_child_count())
-              .filter_map(|i| dependencies.named_child(i))
-              .filter(|dependency| dependency.kind() == "dependency")
-              .filter_map(|dependency| {
-                self.find_child_by_kind(&dependency, "identifier").map(
-                  |identifier| {
-                    let dependency_name = self.get_node_text(&identifier);
+          .and_then(|header| self.find_child_by_kind(header, "dependencies"));
 
-                    (!recipe_names.contains(&dependency_name)).then_some(
-                      lsp::Diagnostic {
-                        range: self.node_to_range(&identifier),
-                        severity: Some(lsp::DiagnosticSeverity::ERROR),
-                        source: Some("just-lsp".to_string()),
-                        message: format!(
-                          "Recipe '{}' not found",
-                          dependency_name
-                        ),
-                        ..Default::default()
-                      },
-                    )
-                  },
-                )
+        dependencies.map_or(Vec::new(), |dependencies| {
+          (0..dependencies.named_child_count())
+            .filter_map(|i| dependencies.named_child(i))
+            .filter(|dependency| dependency.kind() == "dependency")
+            .filter_map(|dependency| {
+              let identifier =
+                self.find_child_by_kind(&dependency, "identifier");
+
+              identifier.map(|identifier| {
+                let text = self.get_node_text(&identifier);
+
+                (!recipe_names.contains(&text)).then_some(lsp::Diagnostic {
+                  range: self.node_to_range(&identifier),
+                  severity: Some(lsp::DiagnosticSeverity::ERROR),
+                  source: Some("just-lsp".to_string()),
+                  message: format!("Recipe '{}' not found", text),
+                  ..Default::default()
+                })
               })
-              .flatten()
-              .collect::<Vec<_>>()
-          })
+            })
+            .flatten()
+            .collect::<Vec<_>>()
+        })
       })
       .collect()
   }
@@ -632,13 +630,13 @@ mod tests {
     let alias_node = alias_nodes.first().unwrap();
 
     let alias_name =
-      doc.find_child_by_kind_at_position(&alias_node, "identifier", 1);
+      doc.find_child_by_kind_at_position(alias_node, "identifier", 1);
 
     assert!(alias_name.is_some());
     assert_eq!(doc.get_node_text(&alias_name.unwrap()), "foo");
 
     let target_name =
-      doc.find_child_by_kind_at_position(&alias_node, "identifier", 3);
+      doc.find_child_by_kind_at_position(alias_node, "identifier", 3);
 
     assert!(target_name.is_some());
     assert_eq!(doc.get_node_text(&target_name.unwrap()), "bar");

@@ -16,26 +16,19 @@ check:
  cargo check
 
 clippy:
-  cargo clippy --all-targets --all-features
+	cargo clippy -- --deny warnings
 
 fmt:
 	cargo +nightly fmt
 
 fmt-check:
-  cargo +nightly fmt --all -- --check
-  @echo formatting check done
-
-install:
-	cargo install --path .
+	cargo +nightly fmt --all -- --check
 
 run *args:
 	cargo run -- --{{args}}
 
 test:
 	cargo test
-
-usage:
-	cargo run -- --help | pbcopy
 
 watch +COMMAND='test':
 	cargo watch --clear --exec "{{COMMAND}}"

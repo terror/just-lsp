@@ -280,7 +280,7 @@ pub(crate) fn get_function_documentation(
   doc.push_str(description);
 
   if !example.is_empty() {
-    doc.push_str("\n\n**Examples:**\n```\n");
+    doc.push_str("\n\n**Examples:**\n```\n\n");
     doc.push_str(example);
     doc.push_str("\n```");
   }

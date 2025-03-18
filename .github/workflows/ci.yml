@@ -69,7 +69,7 @@ jobs:
         run: cargo update --locked --package just-lsp
 
       - name: Lint
-        run: cargo clippy --all-targets --all-features
+        run: cargo clippy -- --deny warnings
 
       - name: Format
         run: cargo fmt --all -- --check

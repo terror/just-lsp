@@ -6,7 +6,7 @@ struct Parser<'a> {
   extra: Vec<&'a str>,
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
   fn build(&self) {
     let path = PathBuf::from(self.src);
 
@@ -23,7 +23,7 @@ impl<'a> Parser<'a> {
     build.include(&path).warnings(false);
 
     c.iter().for_each(|file| {
-      build.file(&path.join(file));
+      build.file(path.join(file));
     });
 
     build.compile(self.name);

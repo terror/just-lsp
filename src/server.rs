@@ -172,7 +172,13 @@ impl Inner {
         completion_items.push(lsp::CompletionItem {
           label: name.clone(),
           kind: Some(lsp::CompletionItemKind::CONSTANT),
-          detail: Some(format!("Constant - {}", value)),
+          detail: Some("Constant".into()),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::Markdown,
+              value,
+            },
+          )),
           insert_text: Some(name.clone()),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           sort_text: Some(format!("z{}", name)),
@@ -324,8 +330,8 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| {
-          Some(document.find_references(&document.get_node_text(&identifier)))
+        .map(|identifier| {
+          document.find_references(&document.get_node_text(&identifier))
         })
     }))
   }
