@@ -5,6 +5,7 @@ default:
 
 alias f := fmt
 alias r := run
+alias t := test
 
 all: build test clippy fmt-check
 
