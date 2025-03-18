@@ -1,4 +1,4 @@
-use crate::common::*;
+use super::*;
 
 #[derive(Debug)]
 pub struct Document {
@@ -8,8 +8,6 @@ pub struct Document {
 }
 
 impl Document {
-  /// Construct a new `Document` from a `textDocument/didOpen` notification's
-  /// parameters.
   pub(crate) fn from_params(params: lsp::DidOpenTextDocumentParams) -> Self {
     let document = params.text_document;
     Self {
@@ -19,7 +17,6 @@ impl Document {
     }
   }
 
-  /// Apply a `textDocument/didChange` notification sent from the client.
   pub(crate) fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -31,6 +28,7 @@ impl Document {
       .collect::<Result<Vec<_>, _>>()?
       .iter()
       .for_each(|edit| self.content.apply_edit(edit));
+
     Ok(())
   }
 }

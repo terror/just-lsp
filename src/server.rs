@@ -1,4 +1,4 @@
-use crate::common::*;
+use super::*;
 
 #[derive(Debug)]
 pub struct Server(Arc<tokio::sync::Mutex<Inner>>);
@@ -32,6 +32,36 @@ impl Server {
       )),
       ..Default::default()
     }
+  }
+}
+
+#[lspower::async_trait]
+impl LanguageServer for Server {
+  async fn initialize(
+    &self,
+    params: lsp::InitializeParams,
+  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
+    self.0.lock().await.initialize(params).await
+  }
+
+  async fn initialized(&self, params: lsp::InitializedParams) {
+    self.0.lock().await.initialized(params).await
+  }
+
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
+    self.0.lock().await.did_open(params).await
+  }
+
+  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
+    self.0.lock().await.did_change(params).await
+  }
+
+  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+    self.0.lock().await.did_close(params).await
+  }
+
+  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+    self.0.lock().await.shutdown().await
   }
 }
 
@@ -97,6 +127,7 @@ impl Inner {
 
   async fn did_close(&mut self, params: lsp::DidCloseTextDocumentParams) {
     let id = &params.text_document.uri;
+
     if self.documents.contains_key(id) {
       self.documents.remove(id);
     }
@@ -107,32 +138,131 @@ impl Inner {
   }
 }
 
-#[lspower::async_trait]
-impl LanguageServer for Server {
-  async fn initialize(
-    &self,
-    params: lsp::InitializeParams,
-  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    self.0.lock().await.initialize(params).await
+#[cfg(test)]
+mod tests {
+  use {
+    super::*,
+    lspower::{LspService, MessageStream},
+    pretty_assertions::assert_eq,
+    serde_json::{json, Value},
+    std::env,
+    tower_test::mock::Spawn,
+  };
+
+  #[derive(Debug)]
+  struct Test {
+    _messages: MessageStream,
+    requests: Vec<Value>,
+    responses: Vec<Value>,
+    service: Spawn<LspService>,
   }
 
-  async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.lock().await.initialized(params).await
+  impl Test {
+    fn new() -> Result<Self> {
+      let (service, messages) = LspService::new(Server::new);
+
+      Ok(Self {
+        _messages: messages,
+        requests: Vec::new(),
+        responses: Vec::new(),
+        service: Spawn::new(service),
+      })
+    }
+
+    fn request(mut self, request: Value) -> Self {
+      self.requests.push(request);
+      self
+    }
+
+    fn response(mut self, response: Value) -> Self {
+      self.responses.push(response);
+      self
+    }
+
+    async fn run(mut self) -> Result {
+      for (request, expected_response) in
+        self.requests.iter().zip(self.responses.iter())
+      {
+        assert_eq!(
+          *expected_response,
+          self
+            .service
+            .call(serde_json::from_value(request.clone())?)
+            .await?
+            .map(|v| serde_json::to_value(v).unwrap())
+            .unwrap()
+        );
+      }
+
+      Ok(())
+    }
   }
 
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    self.0.lock().await.did_open(params).await
+  #[tokio::test]
+  async fn initialize() -> Result {
+    Test::new()?
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        },
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverInfo": {
+            "name": env!("CARGO_PKG_NAME"),
+            "version": env!("CARGO_PKG_VERSION")
+          },
+          "capabilities": Server::capabilities()
+        },
+      }))
+      .run()
+      .await
   }
 
-  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    self.0.lock().await.did_change(params).await
-  }
-
-  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.lock().await.did_close(params).await
-  }
-
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.lock().await.shutdown().await
+  #[tokio::test]
+  async fn initialize_once() -> Result {
+    Test::new()?
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        },
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverInfo": {
+            "name": env!("CARGO_PKG_NAME"),
+            "version": env!("CARGO_PKG_VERSION")
+          },
+          "capabilities": Server::capabilities()
+        }
+      }))
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {}
+        }
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32600,
+          "message": "Invalid request"
+        }
+      }))
+      .run()
+      .await
   }
 }
