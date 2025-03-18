@@ -7,9 +7,11 @@ pub struct Document {
   uri: lsp::Url,
 }
 
-impl From<lsp::DidOpenTextDocumentParams> for Document {
-  fn from(value: lsp::DidOpenTextDocumentParams) -> Self {
-    let document = value.text_document;
+impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
+  type Error = Box<dyn std::error::Error>;
+
+  fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
+    let document = params.text_document;
 
     let mut doc = Self {
       content: Rope::from_str(&document.text),
@@ -17,9 +19,9 @@ impl From<lsp::DidOpenTextDocumentParams> for Document {
       uri: document.uri,
     };
 
-    doc.parse();
+    doc.parse()?;
 
-    doc
+    Ok(doc)
   }
 }
 
@@ -34,21 +36,20 @@ impl Document {
       .map(|change| self.content.build_edit(change))
       .collect::<Result<Vec<_>, _>>()?;
 
-    for edit in edits {
-      self.content.apply_edit(&edit);
-    }
+    edits.iter().for_each(|edit| self.content.apply_edit(&edit));
 
-    self.parse();
+    self.parse()?;
 
     Ok(())
   }
 
   pub(crate) fn collect_diagnostics(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-    diagnostics.extend(self.collect_parser_errors());
-    diagnostics.extend(self.validate_aliases());
-    diagnostics.extend(self.validate_dependencies());
-    diagnostics
+    self
+      .collect_parser_errors()
+      .into_iter()
+      .chain(self.validate_aliases())
+      .chain(self.validate_dependencies())
+      .collect()
   }
 
   pub(crate) fn find_recipe_by_name<'a>(
@@ -68,47 +69,16 @@ impl Document {
       })
   }
 
-  pub(crate) fn find_recipe_references(
-    &self,
-    recipe_name: &str,
-  ) -> Vec<lsp::Location> {
-    let mut locations = Vec::new();
-
-    let dependency_nodes = self.find_nodes_by_kind("dependency");
-
-    for dependency_node in dependency_nodes {
-      if let Some(identifier) =
-        self.find_child_by_kind(&dependency_node, "identifier")
-      {
-        let dep_name = self.get_node_text(&identifier);
-
-        if dep_name == recipe_name {
-          locations.push(lsp::Location {
-            uri: self.uri.clone(),
-            range: self.node_to_range(&identifier),
-          });
-        }
-      }
-    }
-
-    let alias_nodes = self.find_nodes_by_kind("alias");
-
-    for alias_node in alias_nodes {
-      if let Some(identifier) =
-        self.find_child_by_kind_at_position(&alias_node, "identifier", 3)
-      {
-        let alias_target = self.get_node_text(&identifier);
-
-        if alias_target == recipe_name {
-          locations.push(lsp::Location {
-            uri: self.uri.clone(),
-            range: self.node_to_range(&identifier),
-          });
-        }
-      }
-    }
-
-    locations
+  pub(crate) fn find_references(&self, name: &str) -> Vec<lsp::Location> {
+    self
+      .find_nodes_by_kind("identifier")
+      .into_iter()
+      .filter(|identifier| self.get_node_text(identifier) == name)
+      .map(|identifier| lsp::Location {
+        uri: self.uri.clone(),
+        range: self.node_to_range(&identifier),
+      })
+      .collect()
   }
 
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
@@ -140,18 +110,16 @@ impl Document {
     }
   }
 
-  pub(crate) fn parse(&mut self) {
+  pub(crate) fn parse(&mut self) -> Result {
     let mut parser = Parser::new();
 
-    unsafe {
-      parser
-        .set_language(&tree_sitter_just())
-        .expect("Failed to load `tree-sitter-just`");
-    }
+    let language = unsafe { tree_sitter_just() };
 
-    let text = self.content.to_string();
+    parser.set_language(&language)?;
 
-    self.tree = parser.parse(&text, None);
+    self.tree = parser.parse(&self.content.to_string(), None);
+
+    Ok(())
   }
 
   fn collect_nodes<'a>(
@@ -292,74 +260,79 @@ impl Document {
   }
 
   fn validate_aliases(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
     let recipe_names = self.get_recipe_names();
 
     let alias_nodes = self.find_nodes_by_kind("alias");
 
-    for alias_node in alias_nodes {
-      if let Some(identifier) =
-        self.find_child_by_kind_at_position(&alias_node, "identifier", 3)
-      {
-        let target_name = self.get_node_text(&identifier);
-
-        if !recipe_names.contains(&target_name) {
-          diagnostics.push(lsp::Diagnostic {
+    alias_nodes
+      .into_iter()
+      .filter_map(|alias_node| {
+        self
+          .find_child_by_kind_at_position(&alias_node, "identifier", 3)
+          .filter(|identifier| {
+            !recipe_names.contains(&self.get_node_text(identifier))
+          })
+          .map(|identifier| lsp::Diagnostic {
             range: self.node_to_range(&alias_node),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: None,
             source: Some("just-lsp".to_string()),
-            message: format!("Recipe '{}' not found", target_name),
-            ..Default::default()
-          });
-        }
-      }
-    }
-
-    diagnostics
+            message: format!(
+              "Recipe '{}' not found",
+              self.get_node_text(&identifier)
+            ),
+            related_information: None,
+            tags: None,
+            data: None,
+          })
+      })
+      .collect()
   }
 
   fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
     let recipe_names = self.get_recipe_names();
 
-    for recipe_node in self.find_nodes_by_kind("recipe") {
-      if let Some(header) =
-        self.find_child_by_kind(&recipe_node, "recipe_header")
-      {
-        if let Some(dependencies) =
-          self.find_child_by_kind(&header, "dependencies")
-        {
-          for i in 0..dependencies.named_child_count() {
-            if let Some(dependency) = dependencies.named_child(i) {
-              if dependency.kind() == "dependency" {
-                if let Some(identifier) =
-                  self.find_child_by_kind(&dependency, "identifier")
-                {
-                  let dependency_name = self.get_node_text(&identifier);
+    let recipe_nodes = self.find_nodes_by_kind("recipe");
 
-                  if !recipe_names.contains(&dependency_name) {
-                    diagnostics.push(lsp::Diagnostic {
-                      range: self.node_to_range(&identifier),
-                      severity: Some(lsp::DiagnosticSeverity::ERROR),
-                      source: Some("just-lsp".to_string()),
-                      message: format!(
-                        "Recipe '{}' not found",
-                        dependency_name
-                      ),
-                      ..Default::default()
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    recipe_nodes
+      .iter()
+      .flat_map(|recipe_node| {
+        let recipe_header =
+          self.find_child_by_kind(recipe_node, "recipe_header");
 
-    diagnostics
+        recipe_header
+          .as_ref()
+          .and_then(|header| self.find_child_by_kind(&header, "dependencies"))
+          .map_or(Vec::new(), |dependencies| {
+            (0..dependencies.named_child_count())
+              .filter_map(|i| dependencies.named_child(i))
+              .filter(|dependency| dependency.kind() == "dependency")
+              .filter_map(|dependency| {
+                self.find_child_by_kind(&dependency, "identifier").map(
+                  |identifier| {
+                    let dependency_name = self.get_node_text(&identifier);
+
+                    (!recipe_names.contains(&dependency_name)).then_some(
+                      lsp::Diagnostic {
+                        range: self.node_to_range(&identifier),
+                        severity: Some(lsp::DiagnosticSeverity::ERROR),
+                        source: Some("just-lsp".to_string()),
+                        message: format!(
+                          "Recipe '{}' not found",
+                          dependency_name
+                        ),
+                        ..Default::default()
+                      },
+                    )
+                  },
+                )
+              })
+              .flatten()
+              .collect::<Vec<_>>()
+          })
+      })
+      .collect()
   }
 }
 
@@ -368,7 +341,7 @@ mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   fn document(content: &str) -> Document {
-    Document::from(lsp::DidOpenTextDocumentParams {
+    Document::try_from(lsp::DidOpenTextDocumentParams {
       text_document: lsp::TextDocumentItem {
         uri: lsp::Url::parse("file:///test.just").unwrap(),
         language_id: "just".to_string(),
@@ -376,6 +349,7 @@ mod tests {
         text: content.to_string(),
       },
     })
+    .unwrap()
   }
 
   fn position(line: u32, character: u32) -> lsp::Position {
@@ -591,7 +565,7 @@ mod tests {
   }
 
   #[test]
-  fn find_recipe_references() {
+  fn find_references() {
     let doc = document(indoc! {
       "
       foo:
@@ -604,11 +578,12 @@ mod tests {
       "
     });
 
-    let references = doc.find_recipe_references("foo");
+    let references = doc.find_references("foo");
 
-    assert_eq!(references.len(), 2);
-    assert_eq!(references[0].range.start.line, 3);
-    assert_eq!(references[1].range.start.line, 6);
+    assert_eq!(references.len(), 3);
+    assert_eq!(references[0].range.start.line, 0);
+    assert_eq!(references[1].range.start.line, 3);
+    assert_eq!(references[2].range.start.line, 6);
   }
 
   #[test]

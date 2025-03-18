@@ -45,7 +45,9 @@ impl Server {
 #[lspower::async_trait]
 impl LanguageServer for Server {
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    self.0.lock().await.did_change(params).await
+    if let Err(error) = self.0.lock().await.did_change(params).await {
+      log::debug!("error: {error}");
+    }
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
@@ -53,7 +55,9 @@ impl LanguageServer for Server {
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    self.0.lock().await.did_open(params).await
+    if let Err(error) = self.0.lock().await.did_open(params).await {
+      log::debug!("error: {error}");
+    }
   }
 
   async fn goto_definition(
@@ -102,16 +106,18 @@ impl Inner {
     }
   }
 
-  async fn did_change(&mut self, params: lsp::DidChangeTextDocumentParams) {
+  async fn did_change(
+    &mut self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result {
     let uri = params.text_document.uri.clone();
 
     if let Some(document) = self.documents.get_mut(&params.text_document.uri) {
-      if let Err(error) = document.apply_change(params) {
-        log::debug!("error: {}", error);
-      }
-
+      document.apply_change(params)?;
       self.publish_diagnostics(&uri).await;
     }
+
+    Ok(())
   }
 
   async fn did_close(&mut self, params: lsp::DidCloseTextDocumentParams) {
@@ -127,14 +133,20 @@ impl Inner {
     }
   }
 
-  async fn did_open(&mut self, params: lsp::DidOpenTextDocumentParams) {
+  async fn did_open(
+    &mut self,
+    params: lsp::DidOpenTextDocumentParams,
+  ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    self
-      .documents
-      .insert(params.text_document.uri.to_owned(), Document::from(params));
+    self.documents.insert(
+      params.text_document.uri.to_owned(),
+      Document::try_from(params)?,
+    );
 
     self.publish_diagnostics(&uri).await;
+
+    Ok(())
   }
 
   async fn goto_definition(
@@ -145,34 +157,31 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    if let Some(document) = self.documents.get(&uri) {
-      if let Some(node) = document.node_at_position(position) {
-        if node.kind() == "identifier" {
-          let parent = node.parent();
+    Ok(self.documents.get(&uri).and_then(|document| {
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .and_then(|node| {
+          node
+            .parent()
+            .filter(|parent| {
+              parent.kind() == "dependency" || parent.kind() == "alias"
+            })
+            .map(|_| node)
+        })
+        .and_then(|node| {
+          let recipe_name = document.get_node_text(&node);
 
-          if let Some(parent) = parent {
-            let kind = parent.kind();
-
-            if kind == "dependency" || kind == "alias" {
-              let recipe_name = document.get_node_text(&node);
-
-              if let Some(recipe_node) =
-                document.find_recipe_by_name(&recipe_name)
-              {
-                return Ok(Some(lsp::GotoDefinitionResponse::Scalar(
-                  lsp::Location {
-                    uri: uri.clone(),
-                    range: document.node_to_range(&recipe_node),
-                  },
-                )));
-              }
-            }
-          }
-        }
-      }
-    }
-
-    Ok(None)
+          document
+            .find_recipe_by_name(&recipe_name)
+            .map(|recipe_node| {
+              lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+                uri: uri.clone(),
+                range: document.node_to_range(&recipe_node),
+              })
+            })
+        })
+    }))
   }
 
   async fn initialize(
@@ -231,32 +240,14 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    if let Some(document) = self.documents.get(&uri) {
-      if let Some(node) = document.node_at_position(position) {
-        if node.kind() == "identifier" {
-          let parent = node.parent();
-
-          if let Some(parent) = parent {
-            if parent.kind() == "recipe_header" {
-              let recipe_name = document.get_node_text(&node);
-
-              let mut locations = Vec::new();
-
-              locations.push(lsp::Location {
-                uri: uri.clone(),
-                range: document.node_to_range(&node),
-              });
-
-              locations.extend(document.find_recipe_references(&recipe_name));
-
-              return Ok(Some(locations));
-            }
-          }
-        }
-      }
-    }
-
-    Ok(None)
+    Ok(self.documents.get(&uri).and_then(|document| {
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .and_then(|identifier| {
+          Some(document.find_references(&document.get_node_text(&identifier)))
+        })
+    }))
   }
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
