@@ -341,3 +341,199 @@ impl Document {
     diagnostics
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  fn document(content: &str) -> Document {
+    Document::from(lsp::DidOpenTextDocumentParams {
+      text_document: lsp::TextDocumentItem {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+        language_id: "just".to_string(),
+        version: 1,
+        text: content.to_string(),
+      },
+    })
+  }
+
+  fn position(line: u32, character: u32) -> lsp::Position {
+    lsp::Position { line, character }
+  }
+
+  #[test]
+  fn document_creation() {
+    let content = indoc! {"
+      foo:
+        echo foo
+    "};
+
+    let doc = document(content);
+
+    assert_eq!(doc.content.to_string(), content);
+
+    assert!(doc.tree.is_some());
+  }
+
+  #[test]
+  fn find_recipe_by_name() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+    "});
+
+    let recipe = doc.find_recipe_by_name("foo").unwrap();
+    assert!(doc.get_node_text(&recipe).contains("foo"));
+
+    let recipe = doc.find_recipe_by_name("bar").unwrap();
+    assert!(doc.get_node_text(&recipe).contains("bar"));
+
+    assert!(doc.find_recipe_by_name("baz").is_none());
+  }
+
+  #[test]
+  fn node_at_position() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+    "});
+
+    let node = doc.node_at_position(position(1, 1)).unwrap();
+    assert_eq!(node.kind(), "recipe");
+    assert_eq!(doc.get_node_text(&node), "foo:\n  echo \"foo\"\n\n");
+
+    let node = doc.node_at_position(position(4, 6)).unwrap();
+    assert_eq!(node.kind(), "text");
+    assert_eq!(doc.get_node_text(&node), "echo \"bar\"");
+  }
+
+  #[test]
+  fn validate_dependencies() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+    "});
+
+    let diagnostics = doc.validate_dependencies();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
+    assert_eq!(diagnostics[0].range.start.line, 3);
+
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+    "});
+
+    let diagnostics = doc.validate_dependencies();
+    assert_eq!(diagnostics.len(), 0);
+
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: missing1 missing2
+        echo \"bar\"
+    "});
+
+    let diagnostics = doc.validate_dependencies();
+    assert_eq!(diagnostics.len(), 2);
+  }
+
+  #[test]
+  fn validate_aliases() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := baz
+    "});
+
+    let diagnostics = doc.validate_aliases();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
+
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := foo
+    "});
+
+    let diagnostics = doc.validate_aliases();
+    assert_eq!(diagnostics.len(), 0);
+  }
+
+  #[test]
+  fn find_nodes_by_kind() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz:
+        echo \"baz\"
+    "});
+
+    let recipes = doc.find_nodes_by_kind("recipe");
+    assert_eq!(recipes.len(), 3);
+
+    let identifiers = doc.find_nodes_by_kind("identifier");
+    assert_eq!(identifiers.len(), 3);
+  }
+
+  #[test]
+  fn get_recipe_names() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz:
+        echo \"baz\"
+    "});
+
+    let names = doc.get_recipe_names();
+    assert_eq!(names.len(), 3);
+    assert!(names.contains(&"foo".to_string()));
+    assert!(names.contains(&"bar".to_string()));
+    assert!(names.contains(&"baz".to_string()));
+  }
+
+  #[test]
+  fn find_child_by_kind() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+    "});
+
+    let recipes = doc.find_nodes_by_kind("recipe");
+    assert_eq!(recipes.len(), 1);
+
+    let recipe = &recipes[0];
+
+    let header = doc.find_child_by_kind(recipe, "recipe_header");
+    assert!(header.is_some());
+
+    let body = doc.find_child_by_kind(recipe, "recipe_body");
+    assert!(body.is_some());
+
+    let nonexistent = doc.find_child_by_kind(recipe, "nonexistent");
+    assert!(nonexistent.is_none());
+  }
+}
