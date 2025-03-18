@@ -176,4 +176,49 @@ impl Document {
 
     None
   }
+
+  pub(crate) fn find_all_recipe_references(
+    &self,
+    recipe_name: &str,
+    uri: &lsp::Url,
+  ) -> Vec<lsp::Location> {
+    let mut locations = Vec::new();
+
+    let dependency_nodes = self.find_nodes("dependency");
+
+    for dependency_node in dependency_nodes {
+      if let Some(identifier) =
+        self.find_child_by_kind(&dependency_node, "identifier")
+      {
+        let dep_name = self.get_node_text(&identifier);
+
+        if dep_name == recipe_name {
+          locations.push(lsp::Location {
+            uri: uri.clone(),
+            range: self.node_to_range(&identifier),
+          });
+        }
+      }
+    }
+
+    let alias_nodes = self.find_nodes("alias");
+
+    for alias_node in alias_nodes {
+      if let Some(right) = self.find_child_by_kind(&alias_node, "right") {
+        if let Some(identifier) = self.find_child_by_kind(&right, "identifier")
+        {
+          let alias_target = self.get_node_text(&identifier);
+
+          if alias_target == recipe_name {
+            locations.push(lsp::Location {
+              uri: uri.clone(),
+              range: self.node_to_range(&identifier),
+            });
+          }
+        }
+      }
+    }
+
+    locations
+  }
 }

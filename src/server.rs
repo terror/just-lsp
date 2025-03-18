@@ -31,6 +31,7 @@ impl Server {
         },
       )),
       definition_provider: Some(lsp::OneOf::Left(true)),
+      references_provider: Some(lsp::OneOf::Left(true)),
       ..Default::default()
     }
   }
@@ -70,6 +71,13 @@ impl LanguageServer for Server {
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     self.0.lock().await.shutdown().await
+  }
+
+  async fn references(
+    &self,
+    params: lsp::ReferenceParams,
+  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
+    self.0.lock().await.references(params).await
   }
 }
 
@@ -179,6 +187,44 @@ impl Inner {
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
+  }
+
+  async fn references(
+    &self,
+    params: lsp::ReferenceParams,
+  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
+    let uri = params.text_document_position.text_document.uri;
+
+    let position = params.text_document_position.position;
+
+    if let Some(document) = self.documents.get(&uri) {
+      if let Some(node) = document.node_at_position(position) {
+        if node.kind() == "identifier" {
+          let parent = node.parent();
+
+          if let Some(parent) = parent {
+            if parent.kind() == "recipe_header" {
+              let recipe_name = document.get_node_text(&node);
+
+              let mut locations = Vec::new();
+
+              locations.push(lsp::Location {
+                uri: uri.clone(),
+                range: document.node_to_range(&node),
+              });
+
+              locations.extend(
+                document.find_all_recipe_references(&recipe_name, &uri),
+              );
+
+              return Ok(Some(locations));
+            }
+          }
+        }
+      }
+    }
+
+    Ok(None)
   }
 }
 
