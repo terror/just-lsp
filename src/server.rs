@@ -287,10 +287,11 @@ impl Inner {
 
   async fn initialized(&mut self, _: lsp::InitializedParams) {
     self
-      .show(Message {
-        content: &format!("{} initialized", env!("CARGO_PKG_NAME")),
-        kind: lsp::MessageType::INFO,
-      })
+      .client
+      .show_message(
+        lsp::MessageType::INFO,
+        &format!("{} initialized", env!("CARGO_PKG_NAME")),
+      )
       .await;
 
     self.initialized = true;
@@ -309,13 +310,6 @@ impl Inner {
           .await;
       }
     }
-  }
-
-  async fn show(&self, message: Message<'_>) {
-    self
-      .client
-      .show_message(message.kind, message.content)
-      .await;
   }
 
   async fn references(

@@ -1,5 +1,5 @@
 use {
-  crate::{document::Document, message::Message, server::Server, util::*},
+  crate::{document::Document, server::Server, util::*},
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
@@ -8,7 +8,6 @@ use {
 };
 
 mod document;
-mod message;
 mod server;
 mod util;
 
