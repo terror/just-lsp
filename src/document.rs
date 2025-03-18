@@ -177,6 +177,25 @@ impl Document {
     None
   }
 
+  fn find_child_by_kind_at_position<'a>(
+    &'a self,
+    node: &'a tree_sitter::Node,
+    kind: &str,
+    position: usize,
+  ) -> Option<tree_sitter::Node<'a>> {
+    for i in 0..node.child_count() {
+      if i == position {
+        if let Some(child) = node.child(i) {
+          if child.kind() == kind {
+            return Some(child);
+          }
+        }
+      }
+    }
+
+    None
+  }
+
   pub(crate) fn find_all_recipe_references(
     &self,
     recipe_name: &str,
@@ -220,5 +239,108 @@ impl Document {
     }
 
     locations
+  }
+
+  fn get_recipe_names(&self) -> Vec<String> {
+    let recipes = self.find_nodes("recipe");
+
+    let recipe_names: Vec<String> = recipes
+      .iter()
+      .filter_map(|r| {
+        if let Some(header) = self.find_child_by_kind(r, "recipe_header") {
+          for i in 0..header.named_child_count() {
+            if let Some(child) = header.named_child(i) {
+              if child.kind() == "identifier" {
+                return Some(self.get_node_text(&child));
+              }
+            }
+          }
+        }
+        None
+      })
+      .collect();
+
+    recipe_names
+  }
+
+  pub(crate) fn validate_aliases(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let recipe_names = self.get_recipe_names();
+
+    log::debug!("Found recipes: {:?}", recipe_names);
+
+    let alias_nodes = self.find_nodes("alias");
+
+    for alias_node in alias_nodes {
+      if let Some(identifier) =
+        self.find_child_by_kind_at_position(&alias_node, "identifier", 3)
+      {
+        let target_name = self.get_node_text(&identifier);
+
+        if !recipe_names.contains(&target_name) {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&alias_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: None,
+            source: Some("just-lsp".to_string()),
+            message: format!("Recipe '{}' not found", target_name),
+            related_information: None,
+            tags: None,
+            data: None,
+          });
+        }
+      }
+    }
+
+    diagnostics
+  }
+
+  pub(crate) fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let recipe_names = self.get_recipe_names();
+
+    for recipe_node in self.find_nodes("recipe") {
+      if let Some(header) =
+        self.find_child_by_kind(&recipe_node, "recipe_header")
+      {
+        if let Some(deps) = self.find_child_by_kind(&header, "dependencies") {
+          for i in 0..deps.named_child_count() {
+            if let Some(dep) = deps.named_child(i) {
+              if dep.kind() == "dependency" {
+                if let Some(id) = self.find_child_by_kind(&dep, "identifier") {
+                  let dep_name = self.get_node_text(&id);
+
+                  if !recipe_names.contains(&dep_name) {
+                    diagnostics.push(lsp::Diagnostic {
+                      range: self.node_to_range(&id),
+                      severity: Some(lsp::DiagnosticSeverity::ERROR),
+                      code: None,
+                      code_description: None,
+                      source: Some("just-lsp".to_string()),
+                      message: format!("Dependency '{}' not found", dep_name),
+                      related_information: None,
+                      tags: None,
+                      data: None,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    diagnostics
+  }
+
+  pub(crate) fn validate(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+    diagnostics.extend(self.validate_aliases());
+    diagnostics.extend(self.validate_dependencies());
+    diagnostics
   }
 }

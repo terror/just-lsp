@@ -27,7 +27,12 @@ impl Server {
           change: Some(lsp::TextDocumentSyncKind::INCREMENTAL),
           will_save: None,
           will_save_wait_until: None,
-          save: Some(lsp::SaveOptions::default().into()),
+          save: Some(
+            lsp::SaveOptions {
+              include_text: Some(false),
+            }
+            .into(),
+          ),
         },
       )),
       definition_provider: Some(lsp::OneOf::Left(true)),
@@ -85,6 +90,7 @@ impl LanguageServer for Server {
 pub(crate) struct Inner {
   pub(crate) client: Client,
   documents: BTreeMap<lsp::Url, Document>,
+  initialized: bool,
 }
 
 impl Inner {
@@ -92,6 +98,7 @@ impl Inner {
     Self {
       client,
       documents: BTreeMap::new(),
+      initialized: false,
     }
   }
 
@@ -117,7 +124,9 @@ impl Inner {
     })
   }
 
-  async fn initialized(&self, _: lsp::InitializedParams) {
+  async fn initialized(&mut self, _: lsp::InitializedParams) {
+    self.initialized = true;
+
     self
       .show(Message {
         content: &format!("{} initialized", env!("CARGO_PKG_NAME")),
@@ -127,25 +136,38 @@ impl Inner {
   }
 
   async fn did_open(&mut self, params: lsp::DidOpenTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+
     self.documents.insert(
       params.text_document.uri.to_owned(),
       Document::from_params(params),
     );
+
+    self.validate_and_publish_diagnostics(&uri).await;
   }
 
   async fn did_change(&mut self, params: lsp::DidChangeTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+
     if let Some(document) = self.documents.get_mut(&params.text_document.uri) {
       if let Err(error) = document.apply_change(params) {
         log::debug!("error: {}", error);
       }
+
+      self.validate_and_publish_diagnostics(&uri).await;
     }
   }
 
   async fn did_close(&mut self, params: lsp::DidCloseTextDocumentParams) {
-    let id = &params.text_document.uri;
+    let uri = &params.text_document.uri;
 
-    if self.documents.contains_key(id) {
-      self.documents.remove(id);
+    if self.documents.contains_key(uri) {
+      self.documents.remove(uri);
+
+      self
+        .client
+        .publish_diagnostics(uri.clone(), vec![], None)
+        .await;
     }
   }
 
@@ -225,6 +247,22 @@ impl Inner {
     }
 
     Ok(None)
+  }
+
+  async fn validate_and_publish_diagnostics(&self, uri: &lsp::Url) {
+    if !self.initialized {
+      log::debug!("Skipping diagnostics - server not yet initialized");
+      return;
+    }
+
+    if let Some(document) = self.documents.get(uri) {
+      let diagnostics = document.validate();
+
+      self
+        .client
+        .publish_diagnostics(uri.clone(), diagnostics, None)
+        .await;
+    }
   }
 }
 

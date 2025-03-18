@@ -16,14 +16,14 @@ check:
  cargo check
 
 clippy:
-	cargo clippy --all-targets --all-features
+  cargo clippy --all-targets --all-features
 
 fmt:
 	cargo +nightly fmt
 
 fmt-check:
-	cargo +nightly fmt --all -- --check
-	@echo formatting check done
+  cargo +nightly fmt --all -- --check
+  @echo formatting check done
 
 install:
 	cargo install --path .
