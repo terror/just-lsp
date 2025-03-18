@@ -146,13 +146,23 @@ impl Inner {
         });
       }
 
-      for (name, detail) in builtin_functions() {
+      for (name, signature, description) in builtin_functions() {
+        let insert_text = create_function_snippet(&name);
+
+        let documentation = get_function_documentation(&name, &description);
+
         completion_items.push(lsp::CompletionItem {
           label: name.clone(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
-          detail: Some(format!("Function - {}", detail)),
-          insert_text: Some(name.clone()),
-          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          detail: Some(signature.clone()),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::Markdown,
+              value: documentation,
+            },
+          )),
+          insert_text: Some(insert_text),
+          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
           sort_text: Some(format!("z{}", name)),
           ..Default::default()
         });
