@@ -263,7 +263,7 @@ impl Inner {
           .publish_diagnostics(
             uri.clone(),
             document.collect_diagnostics(),
-            None,
+            Some(document.version()),
           )
           .await;
       }

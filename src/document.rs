@@ -5,6 +5,7 @@ pub struct Document {
   content: Rope,
   tree: Option<Tree>,
   uri: lsp::Url,
+  version: i32,
 }
 
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
@@ -17,6 +18,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
       content: Rope::from_str(&document.text),
       tree: None,
       uri: document.uri,
+      version: document.version,
     };
 
     doc.parse()?;
@@ -120,6 +122,10 @@ impl Document {
     self.tree = parser.parse(&self.content.to_string(), None);
 
     Ok(())
+  }
+
+  pub(crate) fn version(&self) -> i32 {
+    self.version
   }
 
   fn collect_nodes<'a>(
