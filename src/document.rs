@@ -47,8 +47,34 @@ impl Document {
     Ok(())
   }
 
-  pub(crate) fn tree(&self) -> Option<&Tree> {
-    self.tree.as_ref()
+  pub(crate) fn find_child_by_kind<'a>(
+    &'a self,
+    node: &'a Node,
+    kind: &str,
+  ) -> Option<Node<'a>> {
+    (0..node.child_count())
+      .filter_map(|i| node.child(i))
+      .find(|child| child.kind() == kind)
+  }
+
+  pub(crate) fn find_child_by_kind_at_position<'a>(
+    &'a self,
+    node: &'a Node,
+    kind: &str,
+    position: usize,
+  ) -> Option<Node<'a>> {
+    node.child(position).filter(|child| child.kind() == kind)
+  }
+
+  pub(crate) fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
+    let mut nodes = Vec::new();
+
+    if let Some(tree) = &self.tree {
+      let mut cursor = tree.root_node().walk();
+      Self::collect_nodes(&mut cursor, kind, &mut nodes);
+    }
+
+    nodes
   }
 
   pub(crate) fn find_recipe_by_name<'a>(
@@ -90,6 +116,23 @@ impl Document {
       .to_string()
   }
 
+  pub(crate) fn get_recipe_names(&self) -> Vec<String> {
+    self
+      .find_nodes_by_kind("recipe")
+      .iter()
+      .filter_map(|recipe| {
+        self
+          .find_child_by_kind(recipe, "recipe_header")
+          .and_then(|header| {
+            (0..header.named_child_count())
+              .filter_map(|i| header.named_child(i))
+              .find(|child| child.kind() == "identifier")
+              .map(|identifier| self.get_node_text(&identifier))
+          })
+      })
+      .collect()
+  }
+
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
@@ -121,6 +164,10 @@ impl Document {
     Ok(())
   }
 
+  pub(crate) fn tree(&self) -> Option<&Tree> {
+    self.tree.as_ref()
+  }
+
   pub(crate) fn version(&self) -> i32 {
     self.version
   }
@@ -147,53 +194,6 @@ impl Document {
 
       cursor.goto_parent();
     }
-  }
-
-  pub(crate) fn find_child_by_kind<'a>(
-    &'a self,
-    node: &'a Node,
-    kind: &str,
-  ) -> Option<Node<'a>> {
-    (0..node.child_count())
-      .filter_map(|i| node.child(i))
-      .find(|child| child.kind() == kind)
-  }
-
-  pub(crate) fn find_child_by_kind_at_position<'a>(
-    &'a self,
-    node: &'a Node,
-    kind: &str,
-    position: usize,
-  ) -> Option<Node<'a>> {
-    node.child(position).filter(|child| child.kind() == kind)
-  }
-
-  pub(crate) fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
-    let mut nodes = Vec::new();
-
-    if let Some(tree) = &self.tree {
-      let mut cursor = tree.root_node().walk();
-      Self::collect_nodes(&mut cursor, kind, &mut nodes);
-    }
-
-    nodes
-  }
-
-  pub(crate) fn get_recipe_names(&self) -> Vec<String> {
-    self
-      .find_nodes_by_kind("recipe")
-      .iter()
-      .filter_map(|recipe| {
-        self
-          .find_child_by_kind(recipe, "recipe_header")
-          .and_then(|header| {
-            (0..header.named_child_count())
-              .filter_map(|i| header.named_child(i))
-              .find(|child| child.kind() == "identifier")
-              .map(|identifier| self.get_node_text(&identifier))
-          })
-      })
-      .collect()
   }
 
   fn point_to_position(&self, point: Point) -> lsp::Position {
