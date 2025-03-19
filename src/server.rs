@@ -625,6 +625,29 @@ mod tests {
   }
 
   #[derive(Debug)]
+  struct DidChangeNotification<'a> {
+    uri: &'a str,
+    version: i32,
+    changes: Vec<lsp::TextDocumentContentChangeEvent>,
+  }
+
+  impl IntoValue for DidChangeNotification<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didChange",
+        "params": {
+          "textDocument": {
+            "uri": self.uri,
+            "version": self.version
+          },
+          "contentChanges": self.changes
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
   struct GotoDefinitionRequest<'a> {
     id: i64,
     uri: &'a str,
@@ -767,7 +790,7 @@ mod tests {
   }
 
   #[derive(Debug)]
-  struct TextEdit<'a> {
+  struct Rename<'a> {
     start_line: u32,
     start_char: u32,
     end_line: u32,
@@ -775,7 +798,7 @@ mod tests {
     new_text: &'a str,
   }
 
-  impl IntoValue for TextEdit<'_> {
+  impl IntoValue for Rename<'_> {
     fn into_value(self) -> Value {
       json!({
         "range": {
@@ -826,10 +849,10 @@ mod tests {
   struct RenameResponse<'a> {
     id: i64,
     uri: &'a str,
-    edits: Vec<TextEdit<'a>>,
+    edits: Vec<Rename<'a>>,
   }
 
-  impl IntoValue for Vec<TextEdit<'_>> {
+  impl IntoValue for Vec<Rename<'_>> {
     fn into_value(self) -> Value {
       self.into_iter().map(|edit| edit.into_value()).collect()
     }
@@ -935,6 +958,76 @@ mod tests {
           "message": "Invalid request"
         }
       }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn shutdown() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .request(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "shutdown",
+      }))
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_updates_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 7,
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 13,
+            },
+          }),
+          range_length: None,
+          text: "\"updated\"".into(),
+        }],
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo \"updated\"",
+        kind: "plaintext",
+        start_line: 0,
+        start_char: 0,
+        end_line: 0,
+        end_char: 3,
+      })
       .run()
       .await
   }
@@ -1060,21 +1153,21 @@ mod tests {
         id: 2,
         uri: "file:///test.just",
         edits: vec![
-          TextEdit {
+          Rename {
             start_line: 0,
             start_char: 0,
             end_line: 0,
             end_char: 3,
             new_text: "renamed",
           },
-          TextEdit {
+          Rename {
             start_line: 3,
             start_char: 5,
             end_line: 3,
             end_char: 8,
             new_text: "renamed",
           },
-          TextEdit {
+          Rename {
             start_line: 6,
             start_char: 13,
             end_line: 6,
