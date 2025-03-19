@@ -513,18 +513,18 @@ mod tests {
       })
     }
 
-    fn request(mut self, request: Value) -> Self {
-      self.requests.push(request);
+    fn request<T: IntoValue>(mut self, request: T) -> Self {
+      self.requests.push(request.into_value());
       self
     }
 
-    fn response(mut self, response: Value) -> Self {
-      self.responses.push(Some(response));
+    fn response<T: IntoValue>(mut self, response: T) -> Self {
+      self.responses.push(Some(response.into_value()));
       self
     }
 
-    fn notification(mut self, notification: Value) -> Self {
-      self.requests.push(notification);
+    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
+      self.requests.push(notification.into_value());
       self.responses.push(None);
       self
     }
@@ -552,20 +552,44 @@ mod tests {
     }
   }
 
-  #[tokio::test]
-  async fn initialize() -> Result {
-    Test::new()?
-      .request(json!({
+  trait IntoValue {
+    fn into_value(self) -> Value;
+  }
+
+  impl IntoValue for Value {
+    fn into_value(self) -> Value {
+      self
+    }
+  }
+
+  #[derive(Debug)]
+  struct InitializeRequest {
+    id: i64,
+  }
+
+  impl IntoValue for InitializeRequest {
+    fn into_value(self) -> Value {
+      json!({
         "jsonrpc": "2.0",
-        "id": 1,
+        "id": self.id,
         "method": "initialize",
         "params": {
           "capabilities": {}
         },
-      }))
-      .response(json!({
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct InitializeResponse {
+    id: i64,
+  }
+
+  impl IntoValue for InitializeResponse {
+    fn into_value(self) -> Value {
+      json!({
         "jsonrpc": "2.0",
-        "id": 1,
+        "id": self.id,
         "result": {
           "serverInfo": {
             "name": env!("CARGO_PKG_NAME"),
@@ -573,7 +597,326 @@ mod tests {
           },
           "capabilities": Server::capabilities()
         },
-      }))
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct DidOpenNotification<'a> {
+    uri: &'a str,
+    text: &'a str,
+  }
+
+  impl IntoValue for DidOpenNotification<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didOpen",
+        "params": {
+          "textDocument": {
+            "uri": self.uri,
+            "languageId": "just",
+            "version": 1,
+            "text": self.text
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct GotoDefinitionRequest<'a> {
+    id: i64,
+    uri: &'a str,
+    line: u32,
+    character: u32,
+  }
+
+  impl IntoValue for GotoDefinitionRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/definition",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct GotoDefinitionResponse<'a> {
+    id: i64,
+    uri: &'a str,
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+  }
+
+  impl IntoValue for GotoDefinitionResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "uri": self.uri,
+          "range": {
+            "start": {
+              "line": self.start_line,
+              "character": self.start_char
+            },
+            "end": {
+              "line": self.end_line,
+              "character": self.end_char
+            }
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct Location<'a> {
+    uri: &'a str,
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+  }
+
+  impl IntoValue for Location<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "uri": self.uri,
+        "range": {
+          "start": {
+            "line": self.start_line,
+            "character": self.start_char
+          },
+          "end": {
+            "line": self.end_line,
+            "character": self.end_char
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct ReferencesRequest<'a> {
+    id: i64,
+    uri: &'a str,
+    line: u32,
+    character: u32,
+    include_declaration: bool,
+  }
+
+  impl IntoValue for ReferencesRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/references",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          },
+          "context": {
+            "includeDeclaration": self.include_declaration
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct ReferencesResponse<'a> {
+    id: i64,
+    locations: Vec<Location<'a>>,
+  }
+
+  impl IntoValue for Vec<Location<'_>> {
+    fn into_value(self) -> Value {
+      self
+        .into_iter()
+        .map(|location| location.into_value())
+        .collect()
+    }
+  }
+
+  impl IntoValue for ReferencesResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.locations.into_value()
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct TextEdit<'a> {
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+    new_text: &'a str,
+  }
+
+  impl IntoValue for TextEdit<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "range": {
+          "start": {
+            "line": self.start_line,
+            "character": self.start_char
+          },
+          "end": {
+            "line": self.end_line,
+            "character": self.end_char
+          }
+        },
+        "newText": self.new_text
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct RenameRequest<'a> {
+    id: i64,
+    uri: &'a str,
+    line: u32,
+    character: u32,
+    new_name: &'a str,
+  }
+
+  impl IntoValue for RenameRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/rename",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          },
+          "newName": self.new_name
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct RenameResponse<'a> {
+    id: i64,
+    uri: &'a str,
+    edits: Vec<TextEdit<'a>>,
+  }
+
+  impl IntoValue for Vec<TextEdit<'_>> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|edit| edit.into_value()).collect()
+    }
+  }
+
+  impl IntoValue for RenameResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "changes": {
+            self.uri: self.edits.into_value()
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct HoverRequest<'a> {
+    id: i64,
+    uri: &'a str,
+    line: u32,
+    character: u32,
+  }
+
+  impl IntoValue for HoverRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/hover",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct HoverResponse<'a> {
+    id: i64,
+    content: &'a str,
+    kind: &'a str,
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+  }
+
+  impl IntoValue for HoverResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "contents": {
+            "kind": self.kind,
+            "value": self.content
+          },
+          "range": {
+            "start": {
+              "line": self.start_line,
+              "character": self.start_char
+            },
+            "end": {
+              "line": self.end_line,
+              "character": self.end_char
+            }
+          }
+        }
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn initialize() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
       .run()
       .await
   }
@@ -581,33 +924,9 @@ mod tests {
   #[tokio::test]
   async fn initialize_once() -> Result {
     Test::new()?
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        }
-      }))
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        }
-      }))
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .request(InitializeRequest { id: 1 })
       .response(json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -623,76 +942,34 @@ mod tests {
   #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()?
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        },
-      }))
-      .notification(json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just",
-            "languageId": "just",
-            "version": 1,
-            "text": indoc! {
-              "
-              foo:
-                echo \"foo\"
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
 
-              bar: foo
-                echo \"bar\"
-              "
-            }
-          }
-        }
-      }))
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/definition",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just"
-          },
-          "position": {
-            "line": 3,
-            "character": 5
-          }
-        }
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": {
-          "uri": "file:///test.just",
-          "range": {
-            "start": {
-              "line": 0,
-              "character": 0
-            },
-            "end": {
-              "line": 3,
-              "character": 0
-            }
-          }
-        }
-      }))
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(GotoDefinitionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: "file:///test.just",
+        start_line: 0,
+        start_char: 0,
+        end_line: 3,
+        end_char: 0,
+      })
       .run()
       .await
   }
@@ -700,109 +977,55 @@ mod tests {
   #[tokio::test]
   async fn recipe_references() -> Result {
     Test::new()?
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        },
-      }))
-      .notification(json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just",
-            "languageId": "just",
-            "version": 1,
-            "text": indoc! {
-              "
-              foo:
-                echo \"foo\"
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
 
-              bar: foo
-                echo \"bar\"
+          bar: foo
+            echo \"bar\"
 
-              alias baz := foo
-              "
-            }
-          }
-        }
-      }))
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/references",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just"
+          alias baz := foo
+          "
+        },
+      })
+      .request(ReferencesRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+        include_declaration: true,
+      })
+      .response(ReferencesResponse {
+        id: 2,
+        locations: vec![
+          Location {
+            uri: "file:///test.just",
+            start_line: 0,
+            start_char: 0,
+            end_line: 0,
+            end_char: 3,
           },
-          "position": {
-            "line": 0,
-            "character": 1
+          Location {
+            uri: "file:///test.just",
+            start_line: 3,
+            start_char: 5,
+            end_line: 3,
+            end_char: 8,
           },
-          "context": {
-            "includeDeclaration": true
-          }
-        }
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "uri": "file:///test.just",
-            "range": {
-              "start": {
-                "line": 0,
-                "character": 0
-              },
-              "end": {
-                "line": 0,
-                "character": 3
-              }
-            }
+          Location {
+            uri: "file:///test.just",
+            start_line: 6,
+            start_char: 13,
+            end_line: 6,
+            end_char: 16,
           },
-          {
-            "uri": "file:///test.just",
-            "range": {
-              "start": {
-                "line": 3,
-                "character": 5
-              },
-              "end": {
-                "line": 3,
-                "character": 8
-              }
-            }
-          },
-          {
-            "uri": "file:///test.just",
-            "range": {
-              "start": {
-                "line": 6,
-                "character": 13
-              },
-              "end": {
-                "line": 6,
-                "character": 16
-              }
-            }
-          }
-        ]
-      }))
+        ],
+      })
       .run()
       .await
   }
@@ -810,111 +1033,56 @@ mod tests {
   #[tokio::test]
   async fn rename_recipe() -> Result {
     Test::new()?
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        },
-      }))
-      .notification(json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just",
-            "languageId": "just",
-            "version": 1,
-            "text": indoc! {
-              "
-              foo:
-                echo \"foo\"
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
 
-              bar: foo
-                echo \"bar\"
+          bar: foo
+            echo \"bar\"
 
-              alias baz := foo
-              "
-            }
-          }
-        }
-      }))
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/rename",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just"
+          alias baz := foo
+          "
+        },
+      })
+      .request(RenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+        new_name: "renamed",
+      })
+      .response(RenameResponse {
+        id: 2,
+        uri: "file:///test.just",
+        edits: vec![
+          TextEdit {
+            start_line: 0,
+            start_char: 0,
+            end_line: 0,
+            end_char: 3,
+            new_text: "renamed",
           },
-          "position": {
-            "line": 0,
-            "character": 1
+          TextEdit {
+            start_line: 3,
+            start_char: 5,
+            end_line: 3,
+            end_char: 8,
+            new_text: "renamed",
           },
-          "newName": "renamed"
-        }
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": {
-          "changes": {
-            "file:///test.just": [
-              {
-                "range": {
-                  "start": {
-                    "line": 0,
-                    "character": 0
-                  },
-                  "end": {
-                    "line": 0,
-                    "character": 3
-                  }
-                },
-                "newText": "renamed"
-              },
-              {
-                "range": {
-                  "start": {
-                    "line": 3,
-                    "character": 5
-                  },
-                  "end": {
-                    "line": 3,
-                    "character": 8
-                  }
-                },
-                "newText": "renamed"
-              },
-              {
-                "range": {
-                  "start": {
-                    "line": 6,
-                    "character": 13
-                  },
-                  "end": {
-                    "line": 6,
-                    "character": 16
-                  }
-                },
-                "newText": "renamed"
-              }
-            ]
-          }
-        }
-      }))
+          TextEdit {
+            start_line: 6,
+            start_char: 13,
+            end_line: 6,
+            end_char: 16,
+            new_text: "renamed",
+          },
+        ],
+      })
       .run()
       .await
   }
@@ -922,156 +1090,174 @@ mod tests {
   #[tokio::test]
   async fn hover_builtin_function() -> Result {
     Test::new()?
-    .request(json!({
-      "jsonrpc": "2.0",
-      "id": 1,
-      "method": "initialize",
-      "params": {
-        "capabilities": {}
-      },
-    }))
-    .response(json!({
-      "jsonrpc": "2.0",
-      "id": 1,
-      "result": {
-        "serverInfo": {
-          "name": env!("CARGO_PKG_NAME"),
-          "version": env!("CARGO_PKG_VERSION")
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
         },
-        "capabilities": Server::capabilities()
-      },
-    }))
-    .notification(json!({
-      "jsonrpc": "2.0",
-      "method": "textDocument/didOpen",
-      "params": {
-        "textDocument": {
-          "uri": "file:///test.just",
-          "languageId": "just",
-          "version": 1,
-          "text": indoc! {
-            "
-            foo:
-              echo {{arch()}}
-            "
-          }
-        }
-      }
-    }))
-    .request(json!({
-      "jsonrpc": "2.0",
-      "id": 2,
-      "method": "textDocument/hover",
-      "params": {
-        "textDocument": {
-          "uri": "file:///test.just"
-        },
-        "position": {
-          "line": 1,
-          "character": 11
-        }
-      }
-    }))
-    .response(json!({
-      "jsonrpc": "2.0",
-      "id": 2,
-      "result": {
-        "contents": {
-          "kind": "markdown",
-          "value": "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```"
-        },
-        "range": {
-          "start": {
-            "line": 1,
-            "character": 9
-          },
-          "end": {
-            "line": 1,
-            "character": 13
-          }
-        }
-      }
-    }))
-    .run()
-    .await
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```",
+        kind: "markdown",
+        start_line: 1,
+        start_char: 9,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
   }
 
   #[tokio::test]
   async fn hover_recipe() -> Result {
     Test::new()?
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        },
-      }))
-      .notification(json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just",
-            "languageId": "just",
-            "version": 1,
-            "text": indoc! {
-              "
-            foo:
-              echo \"foo\"
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
 
-            bar: foo
-              echo \"bar\"
-            "
-            }
-          }
-        }
-      }))
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "textDocument/hover",
-        "params": {
-          "textDocument": {
-            "uri": "file:///test.just"
-          },
-          "position": {
-            "line": 3,
-            "character": 5
-          }
-        }
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": {
-          "contents": {
-            "kind": "plaintext",
-            "value": "foo:\n  echo \"foo\""
-          },
-          "range": {
-            "start": {
-              "line": 3,
-              "character": 5
-            },
-            "end": {
-              "line": 3,
-              "character": 8
-            }
-          }
-        }
-      }))
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_constant() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ HEX }}
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 12,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "Lowercase hexadecimal digit string\n\"0123456789abcdef\"",
+        kind: "plaintext",
+        start_line: 1,
+        start_char: 10,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_prioritizes_recipes_over_functions() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          arch:
+            echo \"foo\"
+
+          bar: arch
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arch:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 9,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_attribute() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          [no-cd]
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 3,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "**Attribute**: [no-cd]\n\nDon't change directory before executing recipe.\n\n**Introduced in**: 1.9.0\n\n**Target**: recipe",
+        kind: "markdown",
+        start_line: 0,
+        start_char: 1,
+        end_line: 0,
+        end_char: 6,
+      })
       .run()
       .await
   }
