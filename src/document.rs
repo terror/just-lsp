@@ -34,8 +34,11 @@ impl Document {
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let edits = params
-      .content_changes
+    let lsp::DidChangeTextDocumentParams {
+      content_changes, ..
+    } = params;
+
+    let edits = content_changes
       .iter()
       .map(|change| self.content.build_edit(change))
       .collect::<Result<Vec<_>, _>>()?;
@@ -147,7 +150,7 @@ impl Document {
         Some(Recipe {
           name,
           dependencies,
-          content: self.get_node_text(&body),
+          content: self.get_node_text(&body).trim().to_string(),
         })
       })
       .collect()
@@ -338,23 +341,26 @@ mod tests {
       "
     });
 
-    let recipes = doc.get_recipes();
-    assert_eq!(recipes.len(), 3);
-
-    let foo_recipe = recipes.iter().find(|r| r.name == "foo").unwrap();
-    assert_eq!(foo_recipe.dependencies.len(), 0);
-    assert!(foo_recipe.content.contains("echo \"foo\""));
-
-    let bar_recipe = recipes.iter().find(|r| r.name == "bar").unwrap();
-    assert_eq!(bar_recipe.dependencies.len(), 1);
-    assert_eq!(bar_recipe.dependencies[0], "foo");
-    assert!(bar_recipe.content.contains("echo \"bar\""));
-
-    let baz_recipe = recipes.iter().find(|r| r.name == "baz").unwrap();
-    assert_eq!(baz_recipe.dependencies.len(), 2);
-    assert_eq!(baz_recipe.dependencies[0], "foo");
-    assert_eq!(baz_recipe.dependencies[1], "bar");
-    assert!(baz_recipe.content.contains("echo \"baz\""));
+    assert_eq!(
+      doc.get_recipes(),
+      vec![
+        Recipe {
+          name: "foo".into(),
+          dependencies: vec![],
+          content: "echo \"foo\"".into(),
+        },
+        Recipe {
+          name: "bar".into(),
+          dependencies: vec!["foo".into()],
+          content: "echo \"bar\"".into(),
+        },
+        Recipe {
+          name: "baz".into(),
+          dependencies: vec!["foo".into(), "bar".into()],
+          content: "echo \"baz\"".into(),
+        }
+      ]
+    );
   }
 
   #[test]
