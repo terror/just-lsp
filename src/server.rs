@@ -158,7 +158,6 @@ impl Inner {
         completion_items.push(lsp::CompletionItem {
           label: function.name.to_string(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
-          detail: Some(function.signature.to_string()),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
               kind: lsp::MarkupKind::Markdown,
@@ -176,14 +175,13 @@ impl Inner {
         completion_items.push(lsp::CompletionItem {
           label: constant.name.to_string(),
           kind: Some(lsp::CompletionItemKind::CONSTANT),
-          detail: Some(format!("Constant: {}", constant.value)),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
               kind: lsp::MarkupKind::Markdown,
-              value: constant.description.to_string(),
+              value: format!("{}\n{}", constant.description, constant.value),
             },
           )),
-          insert_text: Some(constant.value.to_string()),
+          insert_text: Some(constant.name.to_string()),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           sort_text: Some(format!("z{}", constant.name)),
           ..Default::default()
@@ -289,6 +287,46 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
+          if let Some(recipe_node) = document.find_recipe_by_name(&text) {
+            let recipe_text =
+              document.get_node_text(&recipe_node).trim().to_string();
+
+            return Some(lsp::Hover {
+              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: recipe_text,
+              }),
+              range: Some(document.node_to_range(&node)),
+            });
+          }
+
+          for constant in constants::CONSTANTS {
+            if text == constant.name {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::PlainText,
+                  value: format!(
+                    "{}\n{}",
+                    constant.description, constant.value
+                  ),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
+          for function in constants::FUNCTIONS {
+            if text == function.name {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::Markdown,
+                  value: function.documentation().to_string(),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
           if node.parent().is_some_and(|p| p.kind() == "attribute") {
             let text = document.get_node_text(&node);
 
@@ -325,50 +363,6 @@ impl Inner {
                 });
               }
             }
-          }
-
-          for constant in constants::CONSTANTS {
-            if text == constant.name {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::Markdown,
-                  value: format!(
-                    "**Constant**: {}\n\n**Value**: {}",
-                    constant.description, constant.value
-                  ),
-                }),
-                range: Some(document.node_to_range(&node)),
-              });
-            }
-          }
-
-          for function in constants::FUNCTIONS {
-            if text == function.name {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::Markdown,
-                  value: format!(
-                    "```\n{}\n```\n\n{}",
-                    function.signature,
-                    function.documentation()
-                  ),
-                }),
-                range: Some(document.node_to_range(&node)),
-              });
-            }
-          }
-
-          if let Some(recipe_node) = document.find_recipe_by_name(&text) {
-            let recipe_text =
-              document.get_node_text(&recipe_node).trim().to_string();
-
-            return Some(lsp::Hover {
-              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                kind: lsp::MarkupKind::PlainText,
-                value: recipe_text,
-              }),
-              range: Some(document.node_to_range(&node)),
-            });
           }
 
           None
@@ -979,7 +973,7 @@ mod tests {
       "result": {
         "contents": {
           "kind": "markdown",
-          "value": "```\narch() -> string\n```\n\nInstruction set architecture\n\n**Examples:**\n```\n\narch() => \"x86_64\"\n```"
+          "value": "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```"
         },
         "range": {
           "start": {

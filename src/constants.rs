@@ -132,17 +132,17 @@ pub(crate) const ATTRIBUTES: [Attribute<'_>; 18] = [
 pub(crate) const CONSTANTS: [Constant<'_>; 27] = [
   Constant {
     name: "HEX",
-    description: "0123456789abcdef",
+    description: "Lowercase hexadecimal digit string",
     value: "\"0123456789abcdef\"",
   },
   Constant {
     name: "HEXLOWER",
-    description: "0123456789abcdef",
+    description: "Explicit lowercase hex digits",
     value: "\"0123456789abcdef\"",
   },
   Constant {
     name: "HEXUPPER",
-    description: "0123456789ABCDEF",
+    description: "Uppercase hexadecimal digit string",
     value: "\"0123456789ABCDEF\"",
   },
   Constant {

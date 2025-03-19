@@ -66,8 +66,10 @@ impl Function<'_> {
 
     doc.push_str(self.description);
 
+    doc.push_str(format!("\n```\n{}\n```", self.signature).as_str());
+
     if !example.is_empty() {
-      doc.push_str("\n\n**Examples:**\n```\n\n");
+      doc.push_str("\n**Examples:**\n```\n");
       doc.push_str(example);
       doc.push_str("\n```");
     }
