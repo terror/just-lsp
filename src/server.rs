@@ -279,6 +279,7 @@ impl Inner {
     params: lsp::HoverParams,
   ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
     let uri = params.text_document_position_params.text_document.uri;
+
     let position = params.text_document_position_params.position;
 
     Ok(self.documents.get(&uri).and_then(|document| {
@@ -309,6 +310,7 @@ impl Inner {
                   "\n\n**Introduced in**: {}",
                   attribute.version
                 ));
+
                 value.push_str(&format!(
                   "\n\n**Target**: {}",
                   attribute.target.as_str()
@@ -357,22 +359,16 @@ impl Inner {
           }
 
           if let Some(recipe_node) = document.find_recipe_by_name(&text) {
-            if let Some(body) =
-              document.find_child_by_kind(&recipe_node, "recipe_body")
-            {
-              let body_text = document.get_node_text(&body).trim().to_string();
+            let recipe_text =
+              document.get_node_text(&recipe_node).trim().to_string();
 
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::Markdown,
-                  value: format!(
-                    "**Recipe**: {}\n\n```\n{}\n```",
-                    text, body_text
-                  ),
-                }),
-                range: Some(document.node_to_range(&node)),
-              });
-            }
+            return Some(lsp::Hover {
+              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: recipe_text,
+              }),
+              range: Some(document.node_to_range(&node)),
+            });
           }
 
           None
@@ -1062,8 +1058,8 @@ mod tests {
         "id": 2,
         "result": {
           "contents": {
-            "kind": "markdown",
-            "value": "**Recipe**: foo\n\n```\necho \"foo\"\n```"
+            "kind": "plaintext",
+            "value": "foo:\n  echo \"foo\""
           },
           "range": {
             "start": {
