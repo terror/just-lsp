@@ -2,10 +2,10 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Document {
-  content: Rope,
-  tree: Option<Tree>,
-  uri: lsp::Url,
-  version: i32,
+  pub(crate) content: Rope,
+  pub(crate) tree: Option<Tree>,
+  pub(crate) uri: lsp::Url,
+  pub(crate) version: i32,
 }
 
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
@@ -80,21 +80,11 @@ impl Document {
     nodes
   }
 
-  pub(crate) fn find_recipe_by_name<'a>(
-    &'a self,
-    name: &str,
-  ) -> Option<Node<'a>> {
+  pub(crate) fn find_recipe<'a>(&'a self, name: &str) -> Option<Recipe> {
     self
-      .find_nodes_by_kind("recipe")
+      .get_recipes()
       .into_iter()
-      .find(|recipe_node| {
-        self
-          .find_child_by_kind(recipe_node, "recipe_header")
-          .as_ref()
-          .and_then(|header| self.find_child_by_kind(header, "identifier"))
-          .map(|identifier| self.get_node_text(&identifier) == name)
-          .unwrap_or(false)
-      })
+      .find(|recipe| recipe.name == name)
   }
 
   pub(crate) fn find_references(&self, name: &str) -> Vec<lsp::Location> {
@@ -145,12 +135,11 @@ impl Document {
           })
           .unwrap_or_default();
 
-        let body = self.find_child_by_kind(recipe_node, "recipe_body")?;
-
         Some(Recipe {
           name,
           dependencies,
-          content: self.get_node_text(&body).trim().to_string(),
+          content: self.get_node_text(&recipe_node).trim().to_string(),
+          range: self.node_to_range(&recipe_node),
         })
       })
       .collect()
@@ -185,14 +174,6 @@ impl Document {
     self.tree = parser.parse(self.content.to_string(), None);
 
     Ok(())
-  }
-
-  pub(crate) fn tree(&self) -> Option<&Tree> {
-    self.tree.as_ref()
-  }
-
-  pub(crate) fn version(&self) -> i32 {
-    self.version
   }
 
   fn collect_nodes<'a>(
@@ -250,12 +231,8 @@ mod tests {
     .unwrap()
   }
 
-  fn position(line: u32, character: u32) -> lsp::Position {
-    lsp::Position { line, character }
-  }
-
   #[test]
-  fn document_creation() {
+  fn create_document() {
     let content = indoc! {"
       foo:
         echo foo
@@ -269,7 +246,45 @@ mod tests {
   }
 
   #[test]
-  fn find_recipe_by_name() {
+  fn apply_change() {
+    let mut doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let original_content = doc.content.to_string();
+
+    let change = lsp::DidChangeTextDocumentParams {
+      text_document: lsp::VersionedTextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+        version: 2,
+      },
+      content_changes: vec![lsp::TextDocumentContentChangeEvent {
+        range: Some(lsp::Range {
+          start: lsp::Position {
+            line: 1,
+            character: 7,
+          },
+          end: lsp::Position {
+            line: 1,
+            character: 13,
+          },
+        }),
+        range_length: None,
+        text: "\"bar\"".to_string(),
+      }],
+    };
+
+    doc.apply_change(change).unwrap();
+
+    assert_ne!(doc.content.to_string(), original_content);
+    assert_eq!(doc.content.to_string(), "foo:\n  echo \"bar\"");
+  }
+
+  #[test]
+  fn find_recipe() {
     let doc = document(indoc! {"
       foo:
         echo \"foo\"
@@ -278,13 +293,45 @@ mod tests {
         echo \"bar\"
     "});
 
-    let recipe = doc.find_recipe_by_name("foo").unwrap();
-    assert!(doc.get_node_text(&recipe).contains("foo"));
+    assert_eq!(
+      doc.find_recipe("foo").unwrap(),
+      Recipe {
+        name: "foo".into(),
+        dependencies: vec![],
+        content: "foo:\n  echo \"foo\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 0
+          },
+        }
+      }
+    );
 
-    let recipe = doc.find_recipe_by_name("bar").unwrap();
-    assert!(doc.get_node_text(&recipe).contains("bar"));
+    assert_eq!(
+      doc.find_recipe("bar").unwrap(),
+      Recipe {
+        name: "bar".into(),
+        dependencies: vec![],
+        content: "bar:\n  echo \"bar\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 5,
+            character: 0
+          },
+        }
+      }
+    );
 
-    assert!(doc.find_recipe_by_name("baz").is_none());
+    assert!(doc.find_recipe("baz").is_none());
   }
 
   #[test]
@@ -297,11 +344,23 @@ mod tests {
         echo \"bar\"
     "});
 
-    let node = doc.node_at_position(position(1, 1)).unwrap();
+    let node = doc
+      .node_at_position(lsp::Position {
+        line: 1,
+        character: 1,
+      })
+      .unwrap();
+
     assert_eq!(node.kind(), "recipe");
     assert_eq!(doc.get_node_text(&node), "foo:\n  echo \"foo\"\n\n");
 
-    let node = doc.node_at_position(position(4, 6)).unwrap();
+    let node = doc
+      .node_at_position(lsp::Position {
+        line: 4,
+        character: 6,
+      })
+      .unwrap();
+
     assert_eq!(node.kind(), "text");
     assert_eq!(doc.get_node_text(&node), "echo \"bar\"");
   }
@@ -347,17 +406,47 @@ mod tests {
         Recipe {
           name: "foo".into(),
           dependencies: vec![],
-          content: "echo \"foo\"".into(),
+          content: "foo:\n  echo \"foo\"".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 3,
+              character: 0
+            },
+          }
         },
         Recipe {
           name: "bar".into(),
           dependencies: vec!["foo".into()],
-          content: "echo \"bar\"".into(),
+          content: "bar: foo\n  echo \"bar\"".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 3,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 6,
+              character: 0
+            },
+          }
         },
         Recipe {
           name: "baz".into(),
           dependencies: vec!["foo".into(), "bar".into()],
-          content: "echo \"baz\"".into(),
+          content: "baz: foo bar\n  echo \"baz\"".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 6,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 8,
+              character: 0
+            },
+          }
         }
       ]
     );
@@ -383,38 +472,6 @@ mod tests {
 
     let nonexistent = doc.find_child_by_kind(recipe, "nonexistent");
     assert!(nonexistent.is_none());
-  }
-
-  #[test]
-  fn apply_change() {
-    let mut doc = document(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let original_content = doc.content.to_string();
-
-    let change = lsp::DidChangeTextDocumentParams {
-      text_document: lsp::VersionedTextDocumentIdentifier {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        version: 2,
-      },
-      content_changes: vec![lsp::TextDocumentContentChangeEvent {
-        range: Some(lsp::Range {
-          start: position(1, 7),
-          end: position(1, 13),
-        }),
-        range_length: None,
-        text: "\"bar\"".to_string(),
-      }],
-    };
-
-    doc.apply_change(change).unwrap();
-
-    assert_ne!(doc.content.to_string(), original_content);
-    assert_eq!(doc.content.to_string(), "foo:\n  echo \"bar\"");
   }
 
   #[test]

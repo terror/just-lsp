@@ -265,14 +265,12 @@ impl Inner {
         .and_then(|node| {
           let recipe_name = document.get_node_text(&node);
 
-          document
-            .find_recipe_by_name(&recipe_name)
-            .map(|recipe_node| {
-              lsp::GotoDefinitionResponse::Scalar(lsp::Location {
-                uri: uri.clone(),
-                range: document.node_to_range(&recipe_node),
-              })
+          document.find_recipe(&recipe_name).map(|recipe| {
+            lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+              uri: uri.clone(),
+              range: recipe.range,
             })
+          })
         })
     }))
   }
@@ -292,14 +290,11 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
-          if let Some(recipe_node) = document.find_recipe_by_name(&text) {
-            let recipe_text =
-              document.get_node_text(&recipe_node).trim().to_string();
-
+          if let Some(recipe) = document.find_recipe(&text) {
             return Some(lsp::Hover {
               contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                 kind: lsp::MarkupKind::PlainText,
-                value: recipe_text,
+                value: recipe.content,
               }),
               range: Some(document.node_to_range(&node)),
             });
@@ -412,7 +407,7 @@ impl Inner {
           .publish_diagnostics(
             uri.clone(),
             analyzer.analyze(),
-            Some(document.version()),
+            Some(document.version),
           )
           .await;
       }

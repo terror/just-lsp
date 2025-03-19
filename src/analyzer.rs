@@ -26,7 +26,7 @@ impl<'a> Analyzer<'a> {
   fn aggregate_parser_errors(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    if let Some(tree) = self.document.tree() {
+    if let Some(tree) = &self.document.tree {
       let mut cursor = tree.root_node().walk();
       self.aggregate_parser_errors_rec(&mut cursor, &mut diagnostics);
     }
