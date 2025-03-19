@@ -55,6 +55,7 @@ impl Document {
       .chain(self.validate_dependencies())
       .chain(self.validate_function_calls())
       .chain(self.validate_settings())
+      .chain(self.validate_recipe_parameters())
       .collect()
   }
 
@@ -393,6 +394,84 @@ impl Document {
             message: format!("Unknown function '{}'", function_name),
             ..Default::default()
           });
+        }
+      }
+    }
+
+    diagnostics
+  }
+
+  fn validate_recipe_parameters(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let recipe_nodes = self.find_nodes_by_kind("recipe");
+
+    for recipe_node in recipe_nodes {
+      let recipe_name = self
+        .find_child_by_kind(&recipe_node, "recipe_header")
+        .as_ref()
+        .and_then(|header| self.find_child_by_kind(&header, "identifier"))
+        .map(|id| self.get_node_text(&id))
+        .unwrap_or_else(|| "unknown".to_string());
+
+      if let Some(header) =
+        self.find_child_by_kind(&recipe_node, "recipe_header")
+      {
+        if let Some(parameter_list) =
+          self.find_child_by_kind(&header, "parameters")
+        {
+          let mut parameters = Vec::new();
+
+          let mut seen = HashSet::new();
+
+          let mut passed_default = false;
+
+          for i in 0..parameter_list.named_child_count() {
+            if let Some(param) = parameter_list.named_child(i) {
+              if param.kind() == "parameter" {
+                let param_name_node =
+                  self.find_child_by_kind(&param, "identifier");
+
+                if let Some(param_name) = param_name_node {
+                  let name_text = self.get_node_text(&param_name);
+
+                  if !seen.insert(name_text.clone()) {
+                    diagnostics.push(
+                      lsp::Diagnostic {
+                        range: self.node_to_range(&param_name),
+                        severity: Some(lsp::DiagnosticSeverity::ERROR),
+                        source: Some("just-lsp".to_string()),
+                        message: format!("Duplicate parameter '{name_text}' in recipe '{recipe_name}'"),
+                        ..Default::default()
+                    });
+                  }
+
+                  let has_default =
+                    self.find_child_by_kind(&param, "=").is_some();
+
+                  if passed_default
+                    && !has_default
+                    && !name_text.starts_with('+')
+                  {
+                    diagnostics.push(
+                      lsp::Diagnostic {
+                        range: self.node_to_range(&param_name),
+                        severity: Some(lsp::DiagnosticSeverity::ERROR),
+                        source: Some("just-lsp".to_string()),
+                        message: format!("Required parameter '{}' follows a parameter with a default value", name_text),
+                        ..Default::default()
+                    });
+                  }
+
+                  if has_default {
+                    passed_default = true;
+                  }
+
+                  parameters.push((name_text, has_default));
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -1074,5 +1153,80 @@ mod tests {
     assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
 
     assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
+  }
+
+  #[test]
+  fn validate_recipe_parameters() {
+    let doc = document(indoc! {
+      "
+      recipe_with_duplicate_param arg1 arg1:
+        echo \"{{arg1}}\"
+      "
+    });
+
+    let diagnostics = doc.validate_recipe_parameters();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics[0].message.contains("Duplicate parameter"));
+
+    let doc = document(indoc! {
+      "
+      recipe_with_param_order arg1=\"default\" arg2:
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let diagnostics = doc.validate_recipe_parameters();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0].message.contains(
+      "Required parameter 'arg2' follows a parameter with a default value"
+    ));
+
+    let doc = document(indoc! {
+      "
+      recipe_with_variadic arg1=\"default\" +args:
+        echo \"{{arg1}} {{args}}\"
+      "
+    });
+
+    let diagnostics = doc.validate_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Variadic parameter after default should not produce diagnostics"
+    );
+
+    let doc = document(indoc! {
+      "
+      recipe_with_defaults arg1=\"first\" arg2=\"second\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let diagnostics = doc.validate_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Parameters with all defaults should not produce diagnostics"
+    );
+
+    let doc = document(indoc! {
+      "
+      valid_recipe arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let diagnostics = doc.validate_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid parameter order should not produce diagnostics"
+    );
   }
 }

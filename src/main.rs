@@ -9,7 +9,11 @@ use {
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
-  std::{collections::BTreeMap, env, process, sync::Arc},
+  std::{
+    collections::{BTreeMap, HashSet},
+    env, process,
+    sync::Arc,
+  },
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
