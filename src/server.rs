@@ -373,11 +373,13 @@ impl Inner {
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
     if self.initialized {
       if let Some(document) = self.documents.get(uri) {
+        let analyzer = Analyzer::new(document);
+
         self
           .client
           .publish_diagnostics(
             uri.clone(),
-            document.collect_diagnostics(),
+            analyzer.analyze(),
             Some(document.version()),
           )
           .await;

@@ -1,5 +1,6 @@
 use {
   crate::{
+    analyzer::Analyzer,
     constant::Constant,
     document::Document,
     function::Function,
@@ -17,6 +18,7 @@ use {
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
+mod analyzer;
 mod constant;
 mod constants;
 mod document;
