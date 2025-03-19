@@ -52,6 +52,7 @@ impl Document {
       .collect_parser_errors()
       .into_iter()
       .chain(self.validate_aliases())
+      .chain(self.validate_function_calls())
       .chain(self.validate_dependencies())
       .collect()
   }
@@ -295,6 +296,71 @@ impl Document {
           })
       })
       .collect()
+  }
+
+  fn validate_function_calls(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let function_calls = self.find_nodes_by_kind("function_call");
+
+    for function_call in function_calls {
+      if let Some(name_node) =
+        self.find_child_by_kind(&function_call, "identifier")
+      {
+        let function_name = self.get_node_text(&name_node);
+
+        let builtin_functions = util::builtin_functions();
+
+        if !builtin_functions
+          .iter()
+          .any(|(name, _, _)| name == &function_name)
+        {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&name_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Unknown function '{}'", function_name),
+            ..Default::default()
+          });
+          continue;
+        }
+
+        let arguments = self.find_child_by_kind(&function_call, "sequence");
+
+        let arg_count = arguments.map_or(0, |args| args.named_child_count());
+
+        let required_args =
+          util::get_required_args_for_function(&function_name);
+
+        let accepts_variadic = util::function_accepts_variadic(&function_name);
+
+        if arg_count < required_args {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&function_call),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Function '{}' requires at least {} argument(s), but {} provided",
+              function_name, required_args, arg_count
+            ),
+            ..Default::default()
+          });
+        } else if !accepts_variadic && arg_count > required_args {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&function_call),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Function '{}' accepts {} argument(s), but {} provided",
+              function_name, required_args, arg_count
+            ),
+            ..Default::default()
+          });
+        }
+      }
+    }
+
+    diagnostics
   }
 
   fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
@@ -680,6 +746,79 @@ mod tests {
     assert!(
       valid_diagnostics.is_empty(),
       "Valid document should not have syntax errors"
+    );
+  }
+
+  #[test]
+  fn validate_function_calls() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ unknown_function() }}
+      "
+    });
+
+    let diagnostics = doc.validate_function_calls();
+
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unknown function 'unknown_function'")),
+      "Should have diagnostic about unknown function"
+    );
+
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ replace() }}
+      "
+    });
+
+    let diagnostics = doc.validate_function_calls();
+
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("requires at least 3 argument(s)")),
+      "Should have diagnostic about missing arguments"
+    );
+
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ uppercase(\"hello\", \"extra\") }}
+      "
+    });
+
+    let diagnostics = doc.validate_function_calls();
+
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("accepts 1 argument(s)")),
+      "Should have diagnostic about too many arguments"
+    );
+
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+        echo {{ join(\"a\", \"b\", \"c\") }}
+      "
+    });
+
+    let diagnostics = doc.validate_function_calls();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid function calls should not produce diagnostics"
     );
   }
 }

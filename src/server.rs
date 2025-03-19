@@ -154,10 +154,11 @@ impl Inner {
         });
       }
 
-      for (name, signature, description) in builtin_functions() {
-        let insert_text = create_function_snippet(&name);
+      for (name, signature, description) in util::builtin_functions() {
+        let insert_text = util::create_function_snippet(&name);
 
-        let documentation = get_function_documentation(&name, &description);
+        let documentation =
+          util::get_function_documentation(&name, &description);
 
         completion_items.push(lsp::CompletionItem {
           label: name.clone(),
@@ -176,7 +177,7 @@ impl Inner {
         });
       }
 
-      for (name, value) in builtin_constants() {
+      for (name, value) in util::builtin_constants() {
         completion_items.push(lsp::CompletionItem {
           label: name.clone(),
           kind: Some(lsp::CompletionItemKind::CONSTANT),
@@ -292,10 +293,11 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
-          for (name, signature, description) in builtin_functions() {
+          for (name, signature, description) in util::builtin_functions() {
             if text == name {
               let documentation =
-                get_function_documentation(&name, &description);
+                util::get_function_documentation(&name, &description);
+
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                   kind: lsp::MarkupKind::Markdown,
@@ -309,7 +311,7 @@ impl Inner {
             }
           }
 
-          for (name, description) in builtin_constants() {
+          for (name, description) in util::builtin_constants() {
             if text == name {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {

@@ -2,7 +2,7 @@
 
 **just-lsp** is a server implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) for [just](https://github.com/casey/just), the command runner.
 
-<img width="1667" alt="Screenshot 2025-03-18 at 7 58 29 PM" src="https://github.com/user-attachments/assets/feb42313-3309-478b-bb66-632a077c2bac" />
+<img width="1667" alt="Screenshot 2025-03-18 at 8 34 54 PM" src="https://github.com/user-attachments/assets/056ce791-3cb9-40f1-8ed1-10fe0640aab1" />
 
 ## Features
 

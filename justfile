@@ -10,25 +10,28 @@ alias t := test
 all: build test clippy fmt-check
 
 build:
-	cargo build
+  cargo build
 
 check:
  cargo check
 
 clippy:
-	cargo clippy -- --deny warnings
+  cargo clippy -- --deny warnings
 
+[group: 'format']
 fmt:
-	cargo +nightly fmt
+  cargo +nightly fmt
 
+[group: 'format']
 fmt-check:
-	cargo +nightly fmt --all -- --check
+  cargo +nightly fmt --all -- --check
 
 run *args:
-	cargo run -- --{{args}}
+  cargo run -- --{{args}}
 
+[group: 'test']
 test:
-	cargo test
+  cargo test
 
 watch +COMMAND='test':
-	cargo watch --clear --exec "{{COMMAND}}"
+  cargo watch --clear --exec "{{COMMAND}}"

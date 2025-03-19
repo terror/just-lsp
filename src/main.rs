@@ -1,5 +1,5 @@
 use {
-  crate::{document::Document, server::Server, util::*},
+  crate::{document::Document, server::Server},
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,

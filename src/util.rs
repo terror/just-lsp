@@ -287,3 +287,76 @@ pub(crate) fn get_function_documentation(
 
   doc
 }
+
+pub(crate) fn get_required_args_for_function(function_name: &str) -> usize {
+  match function_name {
+    "arch"
+    | "num_cpus"
+    | "os"
+    | "os_family"
+    | "is_dependency"
+    | "invocation_directory"
+    | "invocation_directory_native"
+    | "justfile"
+    | "justfile_directory"
+    | "source_file"
+    | "source_directory"
+    | "just_executable"
+    | "just_pid"
+    | "uuid"
+    | "cache_directory"
+    | "config_directory"
+    | "config_local_directory"
+    | "data_directory"
+    | "data_local_directory"
+    | "executable_directory"
+    | "home_directory" => 0,
+    "require"
+    | "which"
+    | "error"
+    | "encode_uri_component"
+    | "quote"
+    | "trim"
+    | "trim_end"
+    | "trim_start"
+    | "capitalize"
+    | "kebabcase"
+    | "lowercamelcase"
+    | "lowercase"
+    | "shoutykebabcase"
+    | "shoutysnakecase"
+    | "snakecase"
+    | "titlecase"
+    | "uppercamelcase"
+    | "uppercase"
+    | "absolute_path"
+    | "canonicalize"
+    | "extension"
+    | "file_name"
+    | "file_stem"
+    | "parent_directory"
+    | "without_extension"
+    | "clean"
+    | "path_exists"
+    | "read"
+    | "blake3"
+    | "blake3_file"
+    | "sha256"
+    | "sha256_file"
+    | "datetime"
+    | "datetime_utc"
+    | "style" => 1,
+    "append" | "prepend" | "trim_end_match" | "trim_end_matches"
+    | "trim_start_match" | "trim_start_matches" | "choose"
+    | "semver_matches" => 2,
+    "replace" | "replace_regex" => 3,
+    "env" => 1,   // Minimum of 1 (key), with optional default
+    "shell" => 1, // Minimum of 1 (command), with optional args
+    "join" => 2,  // Minimum of 2 (a, b), with optional more
+    _ => 0,
+  }
+}
+
+pub(crate) fn function_accepts_variadic(function_name: &str) -> bool {
+  matches!(function_name, "env" | "shell" | "join")
+}
