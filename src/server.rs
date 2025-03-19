@@ -176,14 +176,14 @@ impl Inner {
         completion_items.push(lsp::CompletionItem {
           label: constant.name.to_string(),
           kind: Some(lsp::CompletionItemKind::CONSTANT),
-          detail: Some("Constant".into()),
+          detail: Some(format!("Constant: {}", constant.value)),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
               kind: lsp::MarkupKind::Markdown,
               value: constant.description.to_string(),
             },
           )),
-          insert_text: Some(constant.name.to_string()),
+          insert_text: Some(constant.value.to_string()),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           sort_text: Some(format!("z{}", constant.name)),
           ..Default::default()
@@ -309,7 +309,10 @@ impl Inner {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                   kind: lsp::MarkupKind::Markdown,
-                  value: format!("**Constant**: {}", constant.description),
+                  value: format!(
+                    "**Constant**: {}\n\n**Value**: {}",
+                    constant.description, constant.value
+                  ),
                 }),
                 range: Some(document.node_to_range(&node)),
               });
@@ -321,6 +324,7 @@ impl Inner {
               document.find_child_by_kind(&recipe_node, "recipe_body")
             {
               let body_text = document.get_node_text(&body).trim().to_string();
+
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                   kind: lsp::MarkupKind::Markdown,

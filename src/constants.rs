@@ -4,110 +4,137 @@ pub(crate) const CONSTANTS: [Constant<'_>; 27] = [
   Constant {
     name: "HEX",
     description: "0123456789abcdef",
+    value: "\"0123456789abcdef\"",
   },
   Constant {
     name: "HEXLOWER",
     description: "0123456789abcdef",
+    value: "\"0123456789abcdef\"",
   },
   Constant {
     name: "HEXUPPER",
     description: "0123456789ABCDEF",
+    value: "\"0123456789ABCDEF\"",
   },
   Constant {
     name: "CLEAR",
     description: "Clear screen",
+    value: "\"\\ec\"",
   },
   Constant {
     name: "NORMAL",
     description: "Reset terminal style",
+    value: "\"\\e[0m\"",
   },
   Constant {
     name: "BOLD",
     description: "Bold text",
+    value: "\"\\e[1m\"",
   },
   Constant {
     name: "ITALIC",
     description: "Italic text",
+    value: "\"\\e[3m\"",
   },
   Constant {
     name: "UNDERLINE",
     description: "Underlined text",
+    value: "\"\\e[4m\"",
   },
   Constant {
     name: "INVERT",
     description: "Inverted colors",
+    value: "\"\\e[7m\"",
   },
   Constant {
     name: "HIDE",
     description: "Hidden text",
+    value: "\"\\e[8m\"",
   },
   Constant {
     name: "STRIKETHROUGH",
     description: "Strikethrough text",
+    value: "\"\\e[9m\"",
   },
   Constant {
     name: "BLACK",
     description: "Black text",
+    value: "\"\\e[30m\"",
   },
   Constant {
     name: "RED",
     description: "Red text",
+    value: "\"\\e[31m\"",
   },
   Constant {
     name: "GREEN",
     description: "Green text",
+    value: "\"\\e[32m\"",
   },
   Constant {
     name: "YELLOW",
     description: "Yellow text",
+    value: "\"\\e[33m\"",
   },
   Constant {
     name: "BLUE",
     description: "Blue text",
+    value: "\"\\e[34m\"",
   },
   Constant {
     name: "MAGENTA",
     description: "Magenta text",
+    value: "\"\\e[35m\"",
   },
   Constant {
     name: "CYAN",
     description: "Cyan text",
+    value: "\"\\e[36m\"",
   },
   Constant {
     name: "WHITE",
     description: "White text",
+    value: "\"\\e[37m\"",
   },
   Constant {
     name: "BG_BLACK",
     description: "Black background",
+    value: "\"\\e[40m\"",
   },
   Constant {
     name: "BG_RED",
     description: "Red background",
+    value: "\"\\e[41m\"",
   },
   Constant {
     name: "BG_GREEN",
     description: "Green background",
+    value: "\"\\e[42m\"",
   },
   Constant {
     name: "BG_YELLOW",
     description: "Yellow background",
+    value: "\"\\e[43m\"",
   },
   Constant {
     name: "BG_BLUE",
     description: "Blue background",
+    value: "\"\\e[44m\"",
   },
   Constant {
     name: "BG_MAGENTA",
     description: "Magenta background",
+    value: "\"\\e[45m\"",
   },
   Constant {
     name: "BG_CYAN",
     description: "Cyan background",
+    value: "\"\\e[46m\"",
   },
   Constant {
     name: "BG_WHITE",
     description: "White background",
+    value: "\"\\e[47m\"",
   },
 ];
 
