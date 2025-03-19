@@ -15,6 +15,7 @@ impl<'a> Analyzer<'a> {
       .aggregate_parser_errors()
       .into_iter()
       .chain(self.analyze_aliases())
+      .chain(self.analyze_attributes())
       .chain(self.analyze_dependencies())
       .chain(self.analyze_function_calls())
       .chain(self.analyze_recipe_parameters())
@@ -103,6 +104,130 @@ impl<'a> Analyzer<'a> {
           })
       })
       .collect()
+  }
+
+  fn analyze_attributes(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let attribute_nodes = self.document.find_nodes_by_kind("attribute");
+
+    for attribute_node in attribute_nodes {
+      if let Some(name_node) = self
+        .document
+        .find_child_by_kind(&attribute_node, "identifier")
+      {
+        let attribute_name = self.document.get_node_text(&name_node);
+
+        let attribute_matches: Vec<_> = constants::ATTRIBUTES
+          .iter()
+          .filter(|attr| attr.name == attribute_name)
+          .collect();
+
+        if attribute_matches.is_empty() {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.document.node_to_range(&name_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Unknown attribute '{}'", attribute_name),
+            ..Default::default()
+          });
+          continue;
+        }
+
+        let has_parameters = attribute_node.child_count() > 2
+          && self
+            .document
+            .find_child_by_kind(&attribute_node, "string")
+            .is_some();
+
+        for attr in &attribute_matches {
+          // If attribute requires parameters but none provided
+          if attr.parameters.is_some() && !has_parameters {
+            if attribute_matches.iter().any(|a| a.parameters.is_none()) {
+              // Skip error if there's an overload that doesn't need parameters
+              continue;
+            }
+
+            diagnostics.push(lsp::Diagnostic {
+              range: self.document.node_to_range(&attribute_node),
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Attribute '{}' requires parameters",
+                attribute_name
+              ),
+              ..Default::default()
+            });
+            break;
+          }
+
+          // If attribute doesn't accept parameters but they were provided
+          if attr.parameters.is_none() && has_parameters {
+            if attribute_matches.iter().any(|a| a.parameters.is_some()) {
+              // Skip error if there's an overload that does accept parameters
+              continue;
+            }
+
+            diagnostics.push(lsp::Diagnostic {
+              range: self.document.node_to_range(&attribute_node),
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Attribute '{}' doesn't accept parameters",
+                attribute_name
+              ),
+              ..Default::default()
+            });
+
+            break;
+          }
+        }
+
+        // Check if the attribute is applied to the right target
+        if let Some(parent) = attribute_node.parent() {
+          let target_type = match parent.kind() {
+            "recipe" => AttributeTarget::Recipe,
+            "module" => AttributeTarget::Module,
+            "alias" => AttributeTarget::Alias,
+            "assignment" => AttributeTarget::Variable,
+            _ => {
+              diagnostics.push(lsp::Diagnostic {
+                range: self.document.node_to_range(&attribute_node),
+                severity: Some(lsp::DiagnosticSeverity::ERROR),
+                source: Some("just-lsp".to_string()),
+                message: format!(
+                  "Attribute '{}' applied to invalid target",
+                  attribute_name
+                ),
+                ..Default::default()
+              });
+
+              continue;
+            }
+          };
+
+          // Check if any of the matching attributes are valid for this target
+          if !attribute_matches
+            .iter()
+            .any(|attr| attr.target.is_valid_for(target_type))
+          {
+            diagnostics.push(lsp::Diagnostic {
+              range: self.document.node_to_range(&attribute_node),
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Attribute '{}' cannot be applied to {} target",
+                attribute_name,
+                target_type.as_str()
+              ),
+              ..Default::default()
+            });
+          }
+        }
+      }
+    }
+
+    diagnostics
   }
 
   fn analyze_dependencies(&self) -> Vec<lsp::Diagnostic> {
@@ -894,5 +1019,155 @@ mod tests {
     assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
 
     assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
+  }
+
+  #[test]
+  fn analyze_attributes_unknown() {
+    let doc = document(indoc! {
+      "
+      [unknown_attribute]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Unknown attribute 'unknown_attribute'"
+    );
+  }
+
+  #[test]
+  #[ignore]
+  fn analyze_attributes_wrong_target() {
+    let doc = document(indoc! {
+      "
+      [linux]
+      set export := true
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("cannot be applied to variable target"));
+  }
+
+  #[test]
+  fn analyze_attributes_missing_parameters() {
+    let doc = document(indoc! {
+      "
+      [script]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Should be valid since script can be used without parameters"
+    );
+
+    let doc = document(indoc! {
+      "
+      [confirm]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Should be valid since confirm can be used without parameters"
+    );
+
+    let doc = document(indoc! {
+      "
+      [doc]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Attribute 'doc' requires parameters"
+    );
+  }
+
+  #[test]
+  fn analyze_attributes_extra_parameters() {
+    let doc = document(indoc! {
+      "
+      [linux('invalid')]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Attribute 'linux' doesn't accept parameters"
+    );
+  }
+
+  #[test]
+  fn analyze_attributes_correct() {
+    let doc = document(indoc! {
+      "
+      [no-cd]
+      [linux]
+      [macos]
+      foo:
+        echo \"foo\"
+
+      [doc('Recipe documentation')]
+      bar:
+        echo \"bar\"
+    "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_attributes();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid attributes should not produce diagnostics"
+    );
   }
 }

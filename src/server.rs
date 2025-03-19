@@ -288,7 +288,7 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
-          if node.parent().map_or(false, |p| p.kind() == "attribute") {
+          if node.parent().is_some_and(|p| p.kind() == "attribute") {
             let text = document.get_node_text(&node);
 
             for attribute in constants::ATTRIBUTES.iter() {
