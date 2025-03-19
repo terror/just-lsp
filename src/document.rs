@@ -99,6 +99,26 @@ impl Document {
       .collect()
   }
 
+  pub(crate) fn get_aliases(&self) -> Vec<Alias> {
+    self
+      .find_nodes_by_kind("alias")
+      .iter()
+      .filter_map(|alias_node| {
+        let left_node =
+          self.find_child_by_kind_at_position(alias_node, "identifier", 1)?;
+
+        let right_node =
+          self.find_child_by_kind_at_position(alias_node, "identifier", 3)?;
+
+        Some(Alias {
+          left: self.get_node_text(&left_node),
+          right: self.get_node_text(&right_node),
+          range: alias_node.get_range(),
+        })
+      })
+      .collect()
+  }
+
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
     self
       .content
@@ -362,6 +382,87 @@ mod tests {
 
     let identifiers = doc.find_nodes_by_kind("identifier");
     assert_eq!(identifiers.len(), 3);
+  }
+
+  #[test]
+  fn get_aliases() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      alias a1 := foo
+      alias a2 := bar
+
+      alias duplicate := foo
+      alias duplicate := bar
+      "
+    });
+
+    assert_eq!(
+      doc.get_aliases(),
+      vec![
+        Alias {
+          left: "a1".into(),
+          right: "foo".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 6,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 6,
+              character: 15
+            },
+          }
+        },
+        Alias {
+          left: "a2".into(),
+          right: "bar".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 7,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 7,
+              character: 15
+            },
+          }
+        },
+        Alias {
+          left: "duplicate".into(),
+          right: "foo".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 9,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 9,
+              character: 22
+            },
+          }
+        },
+        Alias {
+          left: "duplicate".into(),
+          right: "bar".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 10,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 10,
+              character: 22
+            },
+          }
+        }
+      ]
+    );
   }
 
   #[test]

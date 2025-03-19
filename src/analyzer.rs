@@ -81,33 +81,37 @@ impl<'a> Analyzer<'a> {
       .map(|recipe| recipe.name.clone())
       .collect::<HashSet<_>>();
 
-    let alias_nodes = self.document.find_nodes_by_kind("alias");
+    let aliases = self.document.get_aliases();
 
-    alias_nodes
-      .into_iter()
-      .filter_map(|alias_node| {
-        self
-          .document
-          .find_child_by_kind_at_position(&alias_node, "identifier", 3)
-          .filter(|identifier| {
-            !recipe_names.contains(&self.document.get_node_text(identifier))
-          })
-          .map(|identifier| lsp::Diagnostic {
-            range: alias_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            code: None,
-            code_description: None,
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Recipe '{}' not found",
-              self.document.get_node_text(&identifier)
-            ),
-            related_information: None,
-            tags: None,
-            data: None,
-          })
-      })
-      .collect()
+    let mut diagnostics = Vec::new();
+
+    for alias in &aliases {
+      if !recipe_names.contains(&alias.right) {
+        diagnostics.push(lsp::Diagnostic {
+          range: alias.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Recipe '{}' not found", alias.right),
+          ..Default::default()
+        });
+      }
+    }
+
+    let mut seen = HashSet::new();
+
+    for alias in &aliases {
+      if !seen.insert(&alias.left) {
+        diagnostics.push(lsp::Diagnostic {
+          range: alias.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Duplicate alias '{}'", alias.left),
+          ..Default::default()
+        });
+      }
+    }
+
+    diagnostics
   }
 
   fn analyze_attributes(&self) -> Vec<lsp::Diagnostic> {
@@ -627,8 +631,26 @@ mod tests {
     let analyzer = Analyzer::new(&doc);
 
     let diagnostics = analyzer.analyze_aliases();
+
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
+
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := foo
+      alias bar := foo
+      alias bar := foo
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_aliases();
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0].message, "Duplicate alias 'bar'");
+    assert_eq!(diagnostics[1].message, "Duplicate alias 'bar'");
 
     let doc = document(indoc! {"
       foo:
@@ -640,6 +662,7 @@ mod tests {
     let analyzer = Analyzer::new(&doc);
 
     let diagnostics = analyzer.analyze_aliases();
+
     assert_eq!(diagnostics.len(), 0);
   }
 
@@ -857,11 +880,11 @@ mod tests {
   fn analyze_settings_unknown_setting() {
     let doc = document(indoc! {
       "
-    set unknown-setting := true
+      set unknown-setting := true
 
-    foo:
-      echo \"foo\"
-    "
+      foo:
+        echo \"foo\"
+      "
     });
 
     let analyzer = Analyzer::new(&doc);
@@ -876,11 +899,11 @@ mod tests {
   fn analyze_settings_boolean_type() {
     let doc = document(indoc! {
       "
-    set export := 'foo'
+      set export := 'foo'
 
-    foo:
-      echo \"foo\"
-    "
+      foo:
+        echo \"foo\"
+      "
     });
 
     let analyzer = Analyzer::new(&doc);
@@ -1160,7 +1183,7 @@ mod tests {
       [doc('Recipe documentation')]
       bar:
         echo \"bar\"
-    "
+      "
     });
 
     let analyzer = Analyzer::new(&doc);

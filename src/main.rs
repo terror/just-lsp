@@ -1,5 +1,6 @@
 use {
   crate::{
+    alias::Alias,
     analyzer::Analyzer,
     attribute::{Attribute, AttributeTarget},
     constant::Constant,
@@ -23,6 +24,7 @@ use {
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
+mod alias;
 mod analyzer;
 mod attribute;
 mod constant;
