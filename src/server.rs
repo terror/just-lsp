@@ -141,14 +141,19 @@ impl Inner {
     if let Some(document) = self.documents.get(&uri) {
       let mut completion_items = Vec::new();
 
-      let recipe_names = document.get_recipe_names();
+      let recipes = document.get_recipes();
 
-      for name in recipe_names {
+      for recipe in recipes {
         completion_items.push(lsp::CompletionItem {
-          label: name.clone(),
+          label: recipe.name.clone(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
-          detail: Some("Recipe".to_string()),
-          insert_text: Some(name),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::PlainText,
+              value: recipe.content,
+            },
+          )),
+          insert_text: Some(recipe.name),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           ..Default::default()
         });

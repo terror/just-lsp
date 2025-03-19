@@ -5,6 +5,7 @@ use {
     constant::Constant,
     document::Document,
     function::Function,
+    recipe::Recipe,
     server::Server,
     setting::{Setting, SettingKind},
   },
@@ -25,6 +26,7 @@ mod constant;
 mod constants;
 mod document;
 mod function;
+mod recipe;
 mod server;
 mod setting;
 

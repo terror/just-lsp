@@ -116,19 +116,39 @@ impl Document {
       .to_string()
   }
 
-  pub(crate) fn get_recipe_names(&self) -> Vec<String> {
+  pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
     self
       .find_nodes_by_kind("recipe")
       .iter()
-      .filter_map(|recipe| {
-        self
-          .find_child_by_kind(recipe, "recipe_header")
-          .and_then(|header| {
-            (0..header.named_child_count())
-              .filter_map(|i| header.named_child(i))
-              .find(|child| child.kind() == "identifier")
-              .map(|identifier| self.get_node_text(&identifier))
+      .filter_map(|recipe_node| {
+        let header = self.find_child_by_kind(recipe_node, "recipe_header")?;
+
+        let name_node = self.find_child_by_kind(&header, "identifier")?;
+
+        let name = self.get_node_text(&name_node);
+
+        let dependencies = self
+          .find_child_by_kind(&header, "dependencies")
+          .map(|deps_node| {
+            (0..deps_node.named_child_count())
+              .filter_map(|i| deps_node.named_child(i))
+              .filter(|child| child.kind() == "dependency")
+              .filter_map(|dep_node| {
+                self
+                  .find_child_by_kind(&dep_node, "identifier")
+                  .map(|id_node| self.get_node_text(&id_node))
+              })
+              .collect::<Vec<_>>()
           })
+          .unwrap_or_default();
+
+        let body = self.find_child_by_kind(recipe_node, "recipe_body")?;
+
+        Some(Recipe {
+          name,
+          dependencies,
+          content: self.get_node_text(&body),
+        })
       })
       .collect()
   }
@@ -304,23 +324,37 @@ mod tests {
   }
 
   #[test]
-  fn get_recipe_names() {
-    let doc = document(indoc! {"
+  fn get_recipes() {
+    let doc = document(indoc! {
+      "
       foo:
         echo \"foo\"
 
-      bar:
+      bar: foo
         echo \"bar\"
 
-      baz:
+      baz: foo bar
         echo \"baz\"
-    "});
+      "
+    });
 
-    let names = doc.get_recipe_names();
-    assert_eq!(names.len(), 3);
-    assert!(names.contains(&"foo".to_string()));
-    assert!(names.contains(&"bar".to_string()));
-    assert!(names.contains(&"baz".to_string()));
+    let recipes = doc.get_recipes();
+    assert_eq!(recipes.len(), 3);
+
+    let foo_recipe = recipes.iter().find(|r| r.name == "foo").unwrap();
+    assert_eq!(foo_recipe.dependencies.len(), 0);
+    assert!(foo_recipe.content.contains("echo \"foo\""));
+
+    let bar_recipe = recipes.iter().find(|r| r.name == "bar").unwrap();
+    assert_eq!(bar_recipe.dependencies.len(), 1);
+    assert_eq!(bar_recipe.dependencies[0], "foo");
+    assert!(bar_recipe.content.contains("echo \"bar\""));
+
+    let baz_recipe = recipes.iter().find(|r| r.name == "baz").unwrap();
+    assert_eq!(baz_recipe.dependencies.len(), 2);
+    assert_eq!(baz_recipe.dependencies[0], "foo");
+    assert_eq!(baz_recipe.dependencies[1], "bar");
+    assert!(baz_recipe.content.contains("echo \"baz\""));
   }
 
   #[test]

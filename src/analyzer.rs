@@ -75,7 +75,12 @@ impl<'a> Analyzer<'a> {
   }
 
   fn analyze_aliases(&self) -> Vec<lsp::Diagnostic> {
-    let recipe_names = self.document.get_recipe_names();
+    let recipe_names = self
+      .document
+      .get_recipes()
+      .iter()
+      .map(|recipe| recipe.name.clone())
+      .collect::<HashSet<_>>();
 
     let alias_nodes = self.document.find_nodes_by_kind("alias");
 
@@ -141,10 +146,8 @@ impl<'a> Analyzer<'a> {
             .is_some();
 
         for attr in &attribute_matches {
-          // If attribute requires parameters but none provided
           if attr.parameters.is_some() && !has_parameters {
             if attribute_matches.iter().any(|a| a.parameters.is_none()) {
-              // Skip error if there's an overload that doesn't need parameters
               continue;
             }
 
@@ -161,10 +164,8 @@ impl<'a> Analyzer<'a> {
             break;
           }
 
-          // If attribute doesn't accept parameters but they were provided
           if attr.parameters.is_none() && has_parameters {
             if attribute_matches.iter().any(|a| a.parameters.is_some()) {
-              // Skip error if there's an overload that does accept parameters
               continue;
             }
 
@@ -183,7 +184,6 @@ impl<'a> Analyzer<'a> {
           }
         }
 
-        // Check if the attribute is applied to the right target
         if let Some(parent) = attribute_node.parent() {
           let target_type = match parent.kind() {
             "recipe" => AttributeTarget::Recipe,
@@ -206,7 +206,6 @@ impl<'a> Analyzer<'a> {
             }
           };
 
-          // Check if any of the matching attributes are valid for this target
           if !attribute_matches
             .iter()
             .any(|attr| attr.target.is_valid_for(target_type))
@@ -231,7 +230,12 @@ impl<'a> Analyzer<'a> {
   }
 
   fn analyze_dependencies(&self) -> Vec<lsp::Diagnostic> {
-    let recipe_names = self.document.get_recipe_names();
+    let recipe_names = self
+      .document
+      .get_recipes()
+      .iter()
+      .map(|recipe| recipe.name.clone())
+      .collect::<HashSet<_>>();
 
     let recipe_nodes = self.document.find_nodes_by_kind("recipe");
 
