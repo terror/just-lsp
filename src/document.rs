@@ -52,8 +52,9 @@ impl Document {
       .collect_parser_errors()
       .into_iter()
       .chain(self.validate_aliases())
-      .chain(self.validate_function_calls())
       .chain(self.validate_dependencies())
+      .chain(self.validate_function_calls())
+      .chain(self.validate_settings())
       .collect()
   }
 
@@ -298,71 +299,6 @@ impl Document {
       .collect()
   }
 
-  fn validate_function_calls(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let function_calls = self.find_nodes_by_kind("function_call");
-
-    for function_call in function_calls {
-      if let Some(name_node) =
-        self.find_child_by_kind(&function_call, "identifier")
-      {
-        let function_name = self.get_node_text(&name_node);
-
-        let builtin_functions = util::builtin_functions();
-
-        if !builtin_functions
-          .iter()
-          .any(|(name, _, _)| name == &function_name)
-        {
-          diagnostics.push(lsp::Diagnostic {
-            range: self.node_to_range(&name_node),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Unknown function '{}'", function_name),
-            ..Default::default()
-          });
-          continue;
-        }
-
-        let arguments = self.find_child_by_kind(&function_call, "sequence");
-
-        let arg_count = arguments.map_or(0, |args| args.named_child_count());
-
-        let required_args =
-          util::get_required_args_for_function(&function_name);
-
-        let accepts_variadic = util::function_accepts_variadic(&function_name);
-
-        if arg_count < required_args {
-          diagnostics.push(lsp::Diagnostic {
-            range: self.node_to_range(&function_call),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Function '{}' requires at least {} argument(s), but {} provided",
-              function_name, required_args, arg_count
-            ),
-            ..Default::default()
-          });
-        } else if !accepts_variadic && arg_count > required_args {
-          diagnostics.push(lsp::Diagnostic {
-            range: self.node_to_range(&function_call),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Function '{}' accepts {} argument(s), but {} provided",
-              function_name, required_args, arg_count
-            ),
-            ..Default::default()
-          });
-        }
-      }
-    }
-
-    diagnostics
-  }
-
   fn validate_dependencies(&self) -> Vec<lsp::Diagnostic> {
     let recipe_names = self.get_recipe_names();
 
@@ -403,6 +339,174 @@ impl Document {
         })
       })
       .collect()
+  }
+
+  fn validate_function_calls(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let function_calls = self.find_nodes_by_kind("function_call");
+
+    for function_call in function_calls {
+      if let Some(name_node) =
+        self.find_child_by_kind(&function_call, "identifier")
+      {
+        let function_name = self.get_node_text(&name_node);
+
+        let builtin_functions = util::builtin_functions();
+
+        if !builtin_functions
+          .iter()
+          .any(|(name, _, _)| name == &function_name)
+        {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&name_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Unknown function '{}'", function_name),
+            ..Default::default()
+          });
+
+          continue;
+        }
+
+        let arguments = self.find_child_by_kind(&function_call, "sequence");
+
+        let arg_count = arguments.map_or(0, |args| args.named_child_count());
+
+        let required_args = util::required_args_for_function(&function_name);
+
+        if arg_count < required_args {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&function_call),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Function '{}' requires at least {} argument(s), but {} provided",
+              function_name, required_args, arg_count
+            ),
+            ..Default::default()
+          });
+        } else if !util::function_accepts_variadic(&function_name)
+          && arg_count > required_args
+        {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&function_call),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Function '{}' accepts {} argument(s), but {} provided",
+              function_name, required_args, arg_count
+            ),
+            ..Default::default()
+          });
+        }
+      }
+    }
+
+    diagnostics
+  }
+
+  fn validate_settings(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+    let setting_nodes = self.find_nodes_by_kind("setting");
+
+    for setting_node in setting_nodes.clone() {
+      if let Some(name_node) =
+        self.find_child_by_kind(&setting_node, "identifier")
+      {
+        let setting_name = self.get_node_text(&name_node);
+
+        let valid_setting = constants::SETTINGS
+          .iter()
+          .find(|setting| setting.name == setting_name);
+
+        if let Some(setting) = valid_setting {
+          if let Some(setting_value_node) = setting_node.child(3) {
+            let (setting_value_kind, setting_value) = (
+              setting_value_node.kind(),
+              self.get_node_text(&setting_value_node),
+            );
+
+            match setting.kind {
+              SettingKind::Boolean => {
+                if !(setting_value_kind == "boolean") {
+                  diagnostics.push(lsp::Diagnostic {
+                    range: self.node_to_range(&setting_value_node),
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("just-lsp".to_string()),
+                    message: format!(
+                      "Setting '{}' expects a boolean value",
+                      setting_name
+                    ),
+                    ..Default::default()
+                  });
+                }
+              }
+              SettingKind::String => {
+                if !(setting_value_kind == "string") {
+                  diagnostics.push(lsp::Diagnostic {
+                    range: self.node_to_range(&setting_value_node),
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("just-lsp".to_string()),
+                    message: format!(
+                      "Setting '{}' expects a string value",
+                      setting_name
+                    ),
+                    ..Default::default()
+                  });
+                }
+              }
+              SettingKind::Array => {
+                if !setting_value.starts_with('[')
+                  || !setting_value.ends_with(']')
+                {
+                  diagnostics.push(lsp::Diagnostic {
+                    range: self.node_to_range(&setting_value_node),
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("just-lsp".to_string()),
+                    message: format!(
+                      "Setting '{}' expects an array value",
+                      setting_name
+                    ),
+                    ..Default::default()
+                  });
+                }
+              }
+            }
+          }
+        } else {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&name_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Unknown setting '{}'", setting_name),
+            ..Default::default()
+          });
+        }
+      }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+
+    for setting_node in setting_nodes {
+      if let Some(name_node) =
+        self.find_child_by_kind(&setting_node, "identifier")
+      {
+        let setting_name = self.get_node_text(&name_node);
+
+        if !seen.insert(setting_name.clone()) {
+          diagnostics.push(lsp::Diagnostic {
+            range: self.node_to_range(&name_node),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Duplicate setting '{}'", setting_name),
+            ..Default::default()
+          });
+        }
+      }
+    }
+
+    diagnostics
   }
 }
 
@@ -820,5 +924,160 @@ mod tests {
       0,
       "Valid function calls should not produce diagnostics"
     );
+  }
+
+  #[test]
+  fn validate_settings_unknown_setting() {
+    let doc = document(indoc! {
+      "
+    set unknown-setting := true
+
+    foo:
+      echo \"foo\"
+    "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Unknown setting 'unknown-setting'");
+  }
+
+  #[test]
+  fn validate_settings_boolean_type() {
+    let doc = document(indoc! {
+      "
+    set export := 'foo'
+
+    foo:
+      echo \"foo\"
+    "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Setting 'export' expects a boolean value"
+    );
+
+    let doc = document(indoc! {
+      "
+      set export
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Shorthand boolean syntax should be valid"
+    );
+
+    let doc = document(indoc! {
+      "
+      set export := true
+      set dotenv-load := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid boolean values should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn validate_settings_string_type() {
+    let doc = document(indoc! {
+      "
+      set dotenv-path := true
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+      diagnostics[0].message,
+      "Setting 'dotenv-path' expects a string value"
+    );
+
+    let doc = document(indoc! {
+      "
+      set dotenv-path := \".env.development\"
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid string value should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn validate_settings_duplicate() {
+    let doc = document(indoc! {
+      "
+      set export := true
+      set shell := [\"bash\", \"-c\"]
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Duplicate setting 'export'");
+  }
+
+  #[test]
+  fn validate_settings_multiple_errors() {
+    let doc = document(indoc! {
+      "
+      set unknown-setting := true
+      set export := false
+      set shell := ['bash']
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let diagnostics = doc.validate_settings();
+
+    assert_eq!(diagnostics.len(), 2, "Should detect all errors in settings");
+
+    let messages: Vec<String> =
+      diagnostics.iter().map(|d| d.message.clone()).collect();
+
+    assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
+
+    assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
   }
 }

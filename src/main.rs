@@ -1,5 +1,9 @@
 use {
-  crate::{document::Document, server::Server},
+  crate::{
+    document::Document,
+    server::Server,
+    setting::{Setting, SettingKind},
+  },
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
@@ -7,8 +11,10 @@ use {
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
+mod constants;
 mod document;
 mod server;
+mod setting;
 mod util;
 
 type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
