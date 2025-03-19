@@ -80,7 +80,7 @@ impl Document {
     nodes
   }
 
-  pub(crate) fn find_recipe<'a>(&'a self, name: &str) -> Option<Recipe> {
+  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .get_recipes()
       .into_iter()
@@ -94,7 +94,7 @@ impl Document {
       .filter(|identifier| self.get_node_text(identifier) == name)
       .map(|identifier| lsp::Location {
         uri: self.uri.clone(),
-        range: self.node_to_range(&identifier),
+        range: identifier.get_range(),
       })
       .collect()
   }
@@ -138,8 +138,8 @@ impl Document {
         Some(Recipe {
           name,
           dependencies,
-          content: self.get_node_text(&recipe_node).trim().to_string(),
-          range: self.node_to_range(&recipe_node),
+          content: self.get_node_text(recipe_node).trim().to_string(),
+          range: recipe_node.get_range(),
         })
       })
       .collect()
@@ -150,17 +150,10 @@ impl Document {
     position: lsp::Position,
   ) -> Option<Node> {
     if let Some(tree) = &self.tree {
-      let point = self.position_to_point(position);
+      let point = position.point();
       Some(tree.root_node().descendant_for_point_range(point, point)?)
     } else {
       None
-    }
-  }
-
-  pub(crate) fn node_to_range(&self, node: &Node) -> lsp::Range {
-    lsp::Range {
-      start: self.point_to_position(node.start_position()),
-      end: self.point_to_position(node.end_position()),
     }
   }
 
@@ -197,20 +190,6 @@ impl Document {
       }
 
       cursor.goto_parent();
-    }
-  }
-
-  fn point_to_position(&self, point: Point) -> lsp::Position {
-    lsp::Position {
-      line: point.row as u32,
-      character: point.column as u32,
-    }
-  }
-
-  fn position_to_point(&self, position: lsp::Position) -> Point {
-    Point {
-      row: position.line as usize,
-      column: position.character as usize,
     }
   }
 }

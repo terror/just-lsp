@@ -5,6 +5,9 @@ use {
     constant::Constant,
     document::Document,
     function::Function,
+    node_ext::NodeExt,
+    point_ext::PointExt,
+    position_ext::PositionExt,
     recipe::Recipe,
     server::Server,
     setting::{Setting, SettingKind},
@@ -26,6 +29,9 @@ mod constant;
 mod constants;
 mod document;
 mod function;
+mod node_ext;
+mod point_ext;
+mod position_ext;
 mod recipe;
 mod server;
 mod setting;

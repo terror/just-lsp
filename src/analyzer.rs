@@ -28,14 +28,13 @@ impl<'a> Analyzer<'a> {
 
     if let Some(tree) = &self.document.tree {
       let mut cursor = tree.root_node().walk();
-      self.aggregate_parser_errors_rec(&mut cursor, &mut diagnostics);
+      Self::aggregate_parser_errors_rec(&mut cursor, &mut diagnostics);
     }
 
     diagnostics
   }
 
   fn aggregate_parser_errors_rec(
-    &self,
     cursor: &mut TreeCursor<'_>,
     diagnostics: &mut Vec<lsp::Diagnostic>,
   ) {
@@ -43,7 +42,7 @@ impl<'a> Analyzer<'a> {
 
     if node.is_error() {
       diagnostics.push(lsp::Diagnostic {
-        range: self.document.node_to_range(&node),
+        range: node.get_range(),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
         source: Some("just-lsp".to_string()),
         message: "Syntax error".to_string(),
@@ -53,7 +52,7 @@ impl<'a> Analyzer<'a> {
 
     if node.is_missing() {
       diagnostics.push(lsp::Diagnostic {
-        range: self.document.node_to_range(&node),
+        range: node.get_range(),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
         source: Some("just-lsp".to_string()),
         message: "Missing syntax element".to_string(),
@@ -63,7 +62,7 @@ impl<'a> Analyzer<'a> {
 
     if cursor.goto_first_child() {
       loop {
-        self.aggregate_parser_errors_rec(cursor, diagnostics);
+        Self::aggregate_parser_errors_rec(cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;
@@ -94,7 +93,7 @@ impl<'a> Analyzer<'a> {
             !recipe_names.contains(&self.document.get_node_text(identifier))
           })
           .map(|identifier| lsp::Diagnostic {
-            range: self.document.node_to_range(&alias_node),
+            range: alias_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             code: None,
             code_description: None,
@@ -130,7 +129,7 @@ impl<'a> Analyzer<'a> {
 
         if attribute_matches.is_empty() {
           diagnostics.push(lsp::Diagnostic {
-            range: self.document.node_to_range(&name_node),
+            range: name_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown attribute '{}'", attribute_name),
@@ -152,7 +151,7 @@ impl<'a> Analyzer<'a> {
             }
 
             diagnostics.push(lsp::Diagnostic {
-              range: self.document.node_to_range(&attribute_node),
+              range: attribute_node.get_range(),
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
@@ -170,7 +169,7 @@ impl<'a> Analyzer<'a> {
             }
 
             diagnostics.push(lsp::Diagnostic {
-              range: self.document.node_to_range(&attribute_node),
+              range: attribute_node.get_range(),
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
@@ -192,7 +191,7 @@ impl<'a> Analyzer<'a> {
             "assignment" => AttributeTarget::Variable,
             _ => {
               diagnostics.push(lsp::Diagnostic {
-                range: self.document.node_to_range(&attribute_node),
+                range: attribute_node.get_range(),
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
@@ -211,7 +210,7 @@ impl<'a> Analyzer<'a> {
             .any(|attr| attr.target.is_valid_for(target_type))
           {
             diagnostics.push(lsp::Diagnostic {
-              range: self.document.node_to_range(&attribute_node),
+              range: attribute_node.get_range(),
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
@@ -262,7 +261,7 @@ impl<'a> Analyzer<'a> {
                 let text = self.document.get_node_text(&identifier);
 
                 (!recipe_names.contains(&text)).then_some(lsp::Diagnostic {
-                  range: self.document.node_to_range(&identifier),
+                  range: identifier.get_range(),
                   severity: Some(lsp::DiagnosticSeverity::ERROR),
                   source: Some("just-lsp".to_string()),
                   message: format!("Recipe '{}' not found", text),
@@ -301,7 +300,7 @@ impl<'a> Analyzer<'a> {
           if arg_count < function.required_args {
             diagnostics.push(
               lsp::Diagnostic {
-                range: self.document.node_to_range(&function_call),
+                range: function_call.get_range(),
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
@@ -314,7 +313,7 @@ impl<'a> Analyzer<'a> {
             && arg_count > function.required_args
           {
             diagnostics.push(lsp::Diagnostic {
-              range: self.document.node_to_range(&function_call),
+              range: function_call.get_range(),
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
@@ -326,7 +325,7 @@ impl<'a> Analyzer<'a> {
           }
         } else {
           diagnostics.push(lsp::Diagnostic {
-            range: self.document.node_to_range(&name_node),
+            range: name_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown function '{}'", function_name),
@@ -380,7 +379,7 @@ impl<'a> Analyzer<'a> {
                   if !seen.insert(name_text.clone()) {
                     diagnostics.push(
                       lsp::Diagnostic {
-                        range: self.document.node_to_range(&param_name),
+                        range: param_name.get_range(),
                         severity: Some(lsp::DiagnosticSeverity::ERROR),
                         source: Some("just-lsp".to_string()),
                         message: format!("Duplicate parameter '{name_text}' in recipe '{recipe_name}'"),
@@ -397,7 +396,7 @@ impl<'a> Analyzer<'a> {
                   {
                     diagnostics.push(
                       lsp::Diagnostic {
-                        range: self.document.node_to_range(&param_name),
+                        range: param_name.get_range(),
                         severity: Some(lsp::DiagnosticSeverity::ERROR),
                         source: Some("just-lsp".to_string()),
                         message: format!("Required parameter '{}' follows a parameter with a default value", name_text),
@@ -448,7 +447,7 @@ impl<'a> Analyzer<'a> {
               SettingKind::Boolean => {
                 if setting_value_kind != "boolean" {
                   diagnostics.push(lsp::Diagnostic {
-                    range: self.document.node_to_range(&setting_value_node),
+                    range: setting_value_node.get_range(),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("just-lsp".to_string()),
                     message: format!(
@@ -462,7 +461,7 @@ impl<'a> Analyzer<'a> {
               SettingKind::String => {
                 if setting_value_kind != "string" {
                   diagnostics.push(lsp::Diagnostic {
-                    range: self.document.node_to_range(&setting_value_node),
+                    range: setting_value_node.get_range(),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("just-lsp".to_string()),
                     message: format!(
@@ -478,7 +477,7 @@ impl<'a> Analyzer<'a> {
                   || !setting_value.ends_with(']')
                 {
                   diagnostics.push(lsp::Diagnostic {
-                    range: self.document.node_to_range(&setting_value_node),
+                    range: setting_value_node.get_range(),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("just-lsp".to_string()),
                     message: format!(
@@ -493,7 +492,7 @@ impl<'a> Analyzer<'a> {
           }
         } else {
           diagnostics.push(lsp::Diagnostic {
-            range: self.document.node_to_range(&name_node),
+            range: name_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown setting '{}'", setting_name),
@@ -514,7 +513,7 @@ impl<'a> Analyzer<'a> {
 
         if !seen.insert(setting_name.clone()) {
           diagnostics.push(lsp::Diagnostic {
-            range: self.document.node_to_range(&name_node),
+            range: name_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Duplicate setting '{}'", setting_name),

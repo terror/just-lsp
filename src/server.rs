@@ -296,7 +296,7 @@ impl Inner {
                 kind: lsp::MarkupKind::PlainText,
                 value: recipe.content,
               }),
-              range: Some(document.node_to_range(&node)),
+              range: Some(node.get_range()),
             });
           }
 
@@ -310,7 +310,7 @@ impl Inner {
                     constant.description, constant.value
                   ),
                 }),
-                range: Some(document.node_to_range(&node)),
+                range: Some(node.get_range()),
               });
             }
           }
@@ -322,7 +322,7 @@ impl Inner {
                   kind: lsp::MarkupKind::Markdown,
                   value: function.documentation().to_string(),
                 }),
-                range: Some(document.node_to_range(&node)),
+                range: Some(node.get_range()),
               });
             }
           }
@@ -359,7 +359,7 @@ impl Inner {
                     kind: lsp::MarkupKind::Markdown,
                     value,
                   }),
-                  range: Some(document.node_to_range(&node)),
+                  range: Some(node.get_range()),
                 });
               }
             }
