@@ -154,43 +154,38 @@ impl Inner {
         });
       }
 
-      for (name, signature, description) in util::builtin_functions() {
-        let insert_text = util::create_function_snippet(&name);
-
-        let documentation =
-          util::get_function_documentation(&name, &description);
-
+      for function in constants::FUNCTIONS {
         completion_items.push(lsp::CompletionItem {
-          label: name.clone(),
+          label: function.name.to_string(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
-          detail: Some(signature.clone()),
+          detail: Some(function.signature.to_string()),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
               kind: lsp::MarkupKind::Markdown,
-              value: documentation,
+              value: function.documentation(),
             },
           )),
-          insert_text: Some(insert_text),
+          insert_text: Some(function.snippet()),
           insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some(format!("z{}", name)),
+          sort_text: Some(format!("z{}", function.name)),
           ..Default::default()
         });
       }
 
-      for (name, value) in util::builtin_constants() {
+      for constant in constants::CONSTANTS {
         completion_items.push(lsp::CompletionItem {
-          label: name.clone(),
+          label: constant.name.to_string(),
           kind: Some(lsp::CompletionItemKind::CONSTANT),
           detail: Some("Constant".into()),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
               kind: lsp::MarkupKind::Markdown,
-              value,
+              value: constant.description.to_string(),
             },
           )),
-          insert_text: Some(name.clone()),
+          insert_text: Some(constant.name.to_string()),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-          sort_text: Some(format!("z{}", name)),
+          sort_text: Some(format!("z{}", constant.name)),
           ..Default::default()
         });
       }
@@ -293,17 +288,15 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
-          for (name, signature, description) in util::builtin_functions() {
-            if text == name {
-              let documentation =
-                util::get_function_documentation(&name, &description);
-
+          for function in constants::FUNCTIONS {
+            if text == function.name {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                   kind: lsp::MarkupKind::Markdown,
                   value: format!(
                     "```\n{}\n```\n\n{}",
-                    signature, documentation
+                    function.signature,
+                    function.documentation()
                   ),
                 }),
                 range: Some(document.node_to_range(&node)),
@@ -311,12 +304,12 @@ impl Inner {
             }
           }
 
-          for (name, description) in util::builtin_constants() {
-            if text == name {
+          for constant in constants::CONSTANTS {
+            if text == constant.name {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                   kind: lsp::MarkupKind::Markdown,
-                  value: format!("**Constant**: {}", description),
+                  value: format!("**Constant**: {}", constant.description),
                 }),
                 range: Some(document.node_to_range(&node)),
               });

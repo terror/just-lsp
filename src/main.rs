@@ -1,6 +1,8 @@
 use {
   crate::{
+    constant::Constant,
     document::Document,
+    function::Function,
     server::Server,
     setting::{Setting, SettingKind},
   },
@@ -11,11 +13,12 @@ use {
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
+mod constant;
 mod constants;
 mod document;
+mod function;
 mod server;
 mod setting;
-mod util;
 
 type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 

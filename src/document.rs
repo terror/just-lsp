@@ -352,51 +352,45 @@ impl Document {
       {
         let function_name = self.get_node_text(&name_node);
 
-        let builtin_functions = util::builtin_functions();
-
-        if !builtin_functions
+        if let Some(function) = constants::FUNCTIONS
           .iter()
-          .any(|(name, _, _)| name == &function_name)
+          .find(|f| f.name == function_name)
         {
+          let arguments = self.find_child_by_kind(&function_call, "sequence");
+
+          let arg_count = arguments.map_or(0, |args| args.named_child_count());
+
+          if arg_count < function.required_args {
+            diagnostics.push(lsp::Diagnostic {
+              range: self.node_to_range(&function_call),
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+              "Function '{}' requires at least {} argument(s), but {} provided",
+              function_name, function.required_args, arg_count
+            ),
+              ..Default::default()
+            });
+          } else if !function.accepts_variadic
+            && arg_count > function.required_args
+          {
+            diagnostics.push(lsp::Diagnostic {
+              range: self.node_to_range(&function_call),
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Function '{}' accepts {} argument(s), but {} provided",
+                function_name, function.required_args, arg_count
+              ),
+              ..Default::default()
+            });
+          }
+        } else {
           diagnostics.push(lsp::Diagnostic {
             range: self.node_to_range(&name_node),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown function '{}'", function_name),
-            ..Default::default()
-          });
-
-          continue;
-        }
-
-        let arguments = self.find_child_by_kind(&function_call, "sequence");
-
-        let arg_count = arguments.map_or(0, |args| args.named_child_count());
-
-        let required_args = util::required_args_for_function(&function_name);
-
-        if arg_count < required_args {
-          diagnostics.push(lsp::Diagnostic {
-            range: self.node_to_range(&function_call),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Function '{}' requires at least {} argument(s), but {} provided",
-              function_name, required_args, arg_count
-            ),
-            ..Default::default()
-          });
-        } else if !util::function_accepts_variadic(&function_name)
-          && arg_count > required_args
-        {
-          diagnostics.push(lsp::Diagnostic {
-            range: self.node_to_range(&function_call),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Function '{}' accepts {} argument(s), but {} provided",
-              function_name, required_args, arg_count
-            ),
             ..Default::default()
           });
         }
@@ -408,6 +402,7 @@ impl Document {
 
   fn validate_settings(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
+
     let setting_nodes = self.find_nodes_by_kind("setting");
 
     for setting_node in setting_nodes.clone() {
@@ -429,7 +424,7 @@ impl Document {
 
             match setting.kind {
               SettingKind::Boolean => {
-                if !(setting_value_kind == "boolean") {
+                if setting_value_kind != "boolean" {
                   diagnostics.push(lsp::Diagnostic {
                     range: self.node_to_range(&setting_value_node),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -443,7 +438,7 @@ impl Document {
                 }
               }
               SettingKind::String => {
-                if !(setting_value_kind == "string") {
+                if setting_value_kind != "string" {
                   diagnostics.push(lsp::Diagnostic {
                     range: self.node_to_range(&setting_value_node),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
