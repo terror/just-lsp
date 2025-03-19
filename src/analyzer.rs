@@ -641,6 +641,91 @@ mod tests {
   }
 
   #[test]
+  fn analyze_recipe_parameters() {
+    let doc = document(indoc! {
+      "
+      recipe_with_duplicate_param arg1 arg1:
+        echo \"{{arg1}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipe_parameters();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics[0].message.contains("Duplicate parameter"));
+
+    let doc = document(indoc! {
+      "
+      recipe_with_param_order arg1=\"default\" arg2:
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipe_parameters();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0].message.contains(
+      "Required parameter 'arg2' follows a parameter with a default value"
+    ));
+
+    let doc = document(indoc! {
+      "
+      recipe_with_variadic arg1=\"default\" +args:
+        echo \"{{arg1}} {{args}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Variadic parameter after default should not produce diagnostics"
+    );
+
+    let doc = document(indoc! {
+      "
+      recipe_with_defaults arg1=\"first\" arg2=\"second\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Parameters with all defaults should not produce diagnostics"
+    );
+
+    let doc = document(indoc! {
+      "
+      valid_recipe arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipe_parameters();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid parameter order should not produce diagnostics"
+    );
+  }
+
+  #[test]
   fn analyze_settings_unknown_setting() {
     let doc = document(indoc! {
       "
@@ -809,90 +894,5 @@ mod tests {
     assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
 
     assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
-  }
-
-  #[test]
-  fn analyze_recipe_parameters() {
-    let doc = document(indoc! {
-      "
-      recipe_with_duplicate_param arg1 arg1:
-        echo \"{{arg1}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipe_parameters();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert!(diagnostics[0].message.contains("Duplicate parameter"));
-
-    let doc = document(indoc! {
-      "
-      recipe_with_param_order arg1=\"default\" arg2:
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipe_parameters();
-
-    assert_eq!(diagnostics.len(), 1);
-
-    assert!(diagnostics[0].message.contains(
-      "Required parameter 'arg2' follows a parameter with a default value"
-    ));
-
-    let doc = document(indoc! {
-      "
-      recipe_with_variadic arg1=\"default\" +args:
-        echo \"{{arg1}} {{args}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipe_parameters();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Variadic parameter after default should not produce diagnostics"
-    );
-
-    let doc = document(indoc! {
-      "
-      recipe_with_defaults arg1=\"first\" arg2=\"second\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipe_parameters();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Parameters with all defaults should not produce diagnostics"
-    );
-
-    let doc = document(indoc! {
-      "
-      valid_recipe arg1 arg2=\"default\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipe_parameters();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Valid parameter order should not produce diagnostics"
-    );
   }
 }

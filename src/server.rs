@@ -288,19 +288,40 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
-          for function in constants::FUNCTIONS {
-            if text == function.name {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::Markdown,
-                  value: format!(
-                    "```\n{}\n```\n\n{}",
-                    function.signature,
-                    function.documentation()
-                  ),
-                }),
-                range: Some(document.node_to_range(&node)),
-              });
+          if node.parent().map_or(false, |p| p.kind() == "attribute") {
+            let text = document.get_node_text(&node);
+
+            for attribute in constants::ATTRIBUTES.iter() {
+              if text == attribute.name {
+                let mut value = format!(
+                  "**Attribute**: [{}]\n\n{}",
+                  attribute.name, attribute.description
+                );
+
+                if let Some(params) = attribute.parameters {
+                  value.push_str(&format!(
+                    "\n\n**Syntax**: [{}({})]",
+                    attribute.name, params
+                  ));
+                }
+
+                value.push_str(&format!(
+                  "\n\n**Introduced in**: {}",
+                  attribute.version
+                ));
+                value.push_str(&format!(
+                  "\n\n**Target**: {}",
+                  attribute.target.as_str()
+                ));
+
+                return Some(lsp::Hover {
+                  contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value,
+                  }),
+                  range: Some(document.node_to_range(&node)),
+                });
+              }
             }
           }
 
@@ -312,6 +333,22 @@ impl Inner {
                   value: format!(
                     "**Constant**: {}\n\n**Value**: {}",
                     constant.description, constant.value
+                  ),
+                }),
+                range: Some(document.node_to_range(&node)),
+              });
+            }
+          }
+
+          for function in constants::FUNCTIONS {
+            if text == function.name {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::Markdown,
+                  value: format!(
+                    "```\n{}\n```\n\n{}",
+                    function.signature,
+                    function.documentation()
                   ),
                 }),
                 range: Some(document.node_to_range(&node)),

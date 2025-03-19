@@ -1,6 +1,7 @@
 use {
   crate::{
     analyzer::Analyzer,
+    attribute::{Attribute, AttributeTarget},
     constant::Constant,
     document::Document,
     function::Function,
@@ -19,6 +20,7 @@ use {
 };
 
 mod analyzer;
+mod attribute;
 mod constant;
 mod constants;
 mod document;
