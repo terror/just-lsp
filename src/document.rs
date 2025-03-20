@@ -155,10 +155,31 @@ impl Document {
           })
           .unwrap_or_default();
 
+        let parameters =
+          self.find_child_by_kind(&header, "parameters").map_or_else(
+            || Vec::new(),
+            |params_node| {
+              (0..params_node.named_child_count())
+                .filter_map(|i| params_node.named_child(i))
+                .filter(|param_node| {
+                  param_node.kind() == "parameter"
+                    || param_node.kind() == "variadic_parameter"
+                })
+                .filter_map(|param_node| {
+                  Parameter::parse(
+                    &self.get_node_text(&param_node),
+                    param_node.get_range(),
+                  )
+                })
+                .collect()
+            },
+          );
+
         Some(Recipe {
           name,
           dependencies,
           content: self.get_node_text(recipe_node).trim().to_string(),
+          parameters,
           range: recipe_node.get_range(),
         })
       })
@@ -229,7 +250,12 @@ impl Document {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::indoc,
+    pretty_assertions::assert_eq,
+    recipe::{ParameterKind, VariadicType},
+  };
 
   fn document(content: &str) -> Document {
     Document::try_from(lsp::DidOpenTextDocumentParams {
@@ -311,6 +337,7 @@ mod tests {
         name: "foo".into(),
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
+        parameters: vec![],
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -330,6 +357,7 @@ mod tests {
         name: "bar".into(),
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
+        parameters: vec![],
         range: lsp::Range {
           start: lsp::Position {
             line: 3,
@@ -485,64 +513,129 @@ mod tests {
       foo:
         echo \"foo\"
 
-      bar: foo
-        echo \"bar\"
+      bar target $  lol  : foo
+        echo \"Building {{target}}\"
 
-      baz: foo bar
-        echo \"baz\"
-      "
+      baz first + second=\"default\": foo bar
+        echo \"{{first}} {{second}}\"
+     "
     });
 
     assert_eq!(
-      doc.get_recipes(),
-      vec![
-        Recipe {
-          name: "foo".into(),
-          dependencies: vec![],
-          content: "foo:\n  echo \"foo\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 0
-            },
-            end: lsp::Position {
-              line: 3,
-              character: 0
-            },
-          }
-        },
-        Recipe {
-          name: "bar".into(),
-          dependencies: vec!["foo".into()],
-          content: "bar: foo\n  echo \"bar\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 3,
-              character: 0
-            },
-            end: lsp::Position {
-              line: 6,
-              character: 0
-            },
-          }
-        },
-        Recipe {
-          name: "baz".into(),
-          dependencies: vec!["foo".into(), "bar".into()],
-          content: "baz: foo bar\n  echo \"baz\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 6,
-              character: 0
-            },
-            end: lsp::Position {
-              line: 8,
-              character: 0
-            },
-          }
+    doc.get_recipes(),
+    vec![
+      Recipe {
+        name: "foo".into(),
+        dependencies: vec![],
+        content: "foo:\n  echo \"foo\"".into(),
+        parameters: vec![],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 0
+          },
         }
-      ]
-    );
+      },
+      Recipe {
+        name: "bar".into(),
+        dependencies: vec!["foo".into()],
+        content: "bar target $  lol  : foo\n  echo \"Building {{target}}\"".into(),
+        parameters: vec![
+          Parameter {
+            name: "target".into(),
+            kind: ParameterKind::Normal,
+            default_value: None,
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 3,
+                character: 4
+              },
+              end: lsp::Position {
+                line: 3,
+                character: 10
+              },
+            }
+          },
+            Parameter {
+                name: "lol".into(),
+                kind: ParameterKind::Export,
+                default_value: None,
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 3,
+                        character: 11,
+                    },
+                    end: lsp::Position {
+                        line: 3,
+                        character: 17,
+                    },
+                },
+            },
+        ],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 6,
+            character: 0
+          },
+        }
+      },
+      Recipe {
+        name: "baz".into(),
+        dependencies: vec!["foo".into(), "bar".into()],
+        content: "baz first + second=\"default\": foo bar\n  echo \"{{first}} {{second}}\"".into(),
+        parameters: vec![
+          Parameter {
+            name: "first".into(),
+            kind: ParameterKind::Normal,
+            default_value: None,
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 6,
+                character: 4
+              },
+              end: lsp::Position {
+                line: 6,
+                character: 9
+              },
+            }
+          },
+          Parameter {
+            name: "second".into(),
+            kind: ParameterKind::Variadic(VariadicType::OneOrMore),
+            default_value: Some("\"default\"".into()),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 6,
+                character: 10
+              },
+              end: lsp::Position {
+                line: 6,
+                character: 28
+              },
+            }
+          }
+        ],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 6,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 8,
+            character: 0
+          },
+        }
+      }
+    ]
+  );
   }
 
   #[test]

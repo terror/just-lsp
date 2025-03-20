@@ -16,9 +16,8 @@ impl<'a> Analyzer<'a> {
       .into_iter()
       .chain(self.analyze_aliases())
       .chain(self.analyze_attributes())
-      .chain(self.analyze_dependencies())
       .chain(self.analyze_function_calls())
-      .chain(self.analyze_recipe_parameters())
+      .chain(self.analyze_recipes())
       .chain(self.analyze_settings())
       .collect()
   }
@@ -229,34 +228,6 @@ impl<'a> Analyzer<'a> {
     diagnostics
   }
 
-  fn analyze_dependencies(&self) -> Vec<lsp::Diagnostic> {
-    let recipe_names: HashSet<_> = self
-      .document
-      .get_recipes()
-      .iter()
-      .map(|recipe| recipe.name.clone())
-      .collect();
-
-    self
-      .document
-      .get_recipes()
-      .iter()
-      .flat_map(|recipe| {
-        recipe
-          .dependencies
-          .iter()
-          .filter(|dep| !recipe_names.contains(*dep))
-          .map(move |dep| lsp::Diagnostic {
-            range: recipe.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Recipe '{}' not found", dep),
-            ..Default::default()
-          })
-      })
-      .collect()
-  }
-
   fn analyze_function_calls(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
@@ -323,81 +294,95 @@ impl<'a> Analyzer<'a> {
     diagnostics
   }
 
-  fn analyze_recipe_parameters(&self) -> Vec<lsp::Diagnostic> {
+  fn analyze_recipes(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let recipe_nodes = self.document.find_nodes_by_kind("recipe");
+    let recipes = self.document.get_recipes();
 
-    for recipe_node in recipe_nodes {
-      let recipe_name = self
-        .document
-        .find_child_by_kind(&recipe_node, "recipe_header")
-        .as_ref()
-        .and_then(|header| {
-          self.document.find_child_by_kind(header, "identifier")
+    let recipe_names: HashSet<_> =
+      recipes.iter().map(|recipe| recipe.name.clone()).collect();
+
+    diagnostics.extend(self.document.get_recipes().iter().flat_map(|recipe| {
+      recipe
+        .dependencies
+        .iter()
+        .filter(|dep| !recipe_names.contains(*dep))
+        .map(move |dep| lsp::Diagnostic {
+          range: recipe.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Recipe '{}' not found", dep),
+          ..Default::default()
         })
-        .map(|id| self.document.get_node_text(&id))
-        .unwrap_or_else(|| "unknown".to_string());
+    }));
 
-      if let Some(header) = self
-        .document
-        .find_child_by_kind(&recipe_node, "recipe_header")
-      {
-        if let Some(parameter_list) =
-          self.document.find_child_by_kind(&header, "parameters")
-        {
-          let mut parameters = Vec::new();
+    for recipe in recipes {
+      let mut seen = HashSet::new();
 
-          let mut seen = HashSet::new();
+      let mut passed_default = false;
+      let mut passed_variadic = false;
 
-          let mut passed_default = false;
+      for (index, param) in recipe.parameters.iter().enumerate() {
+        if !seen.insert(param.name.clone()) {
+          diagnostics.push(lsp::Diagnostic {
+            range: param.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Duplicate parameter '{}' in recipe '{}'",
+              param.name, recipe.name
+            ),
+            ..Default::default()
+          });
+        }
 
-          for i in 0..parameter_list.named_child_count() {
-            if let Some(param) = parameter_list.named_child(i) {
-              if param.kind() == "parameter" {
-                let param_name_node =
-                  self.document.find_child_by_kind(&param, "identifier");
+        let has_default = param.default_value.is_some();
 
-                if let Some(param_name) = param_name_node {
-                  let name_text = self.document.get_node_text(&param_name);
-
-                  if !seen.insert(name_text.clone()) {
-                    diagnostics.push(
-                      lsp::Diagnostic {
-                        range: param_name.get_range(),
-                        severity: Some(lsp::DiagnosticSeverity::ERROR),
-                        source: Some("just-lsp".to_string()),
-                        message: format!("Duplicate parameter '{name_text}' in recipe '{recipe_name}'"),
-                        ..Default::default()
-                    });
-                  }
-
-                  let has_default =
-                    self.document.find_child_by_kind(&param, "=").is_some();
-
-                  if passed_default
-                    && !has_default
-                    && !name_text.starts_with('+')
-                  {
-                    diagnostics.push(
-                      lsp::Diagnostic {
-                        range: param_name.get_range(),
-                        severity: Some(lsp::DiagnosticSeverity::ERROR),
-                        source: Some("just-lsp".to_string()),
-                        message: format!("Required parameter '{}' follows a parameter with a default value", name_text),
-                        ..Default::default()
-                    });
-                  }
-
-                  if has_default {
-                    passed_default = true;
-                  }
-
-                  parameters.push((name_text, has_default));
-                }
-              }
-            }
+        if matches!(param.kind, ParameterKind::Variadic(_)) {
+          if index < recipe.parameters.len() - 1 {
+            diagnostics.push(lsp::Diagnostic {
+              range: param.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Variadic parameter '{}' must be the last parameter",
+                param.name
+              ),
+              ..Default::default()
+            });
           }
+
+          passed_variadic = true;
+        }
+
+        if passed_default
+          && !has_default
+          && !matches!(param.kind, ParameterKind::Variadic(_))
+        {
+          diagnostics.push(lsp::Diagnostic {
+            range: param.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
+            ..Default::default()
+          });
+        }
+
+        if passed_variadic && index < recipe.parameters.len() - 1 {
+          diagnostics.push(lsp::Diagnostic {
+            range: param.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Parameter '{}' follows a variadic parameter",
+              param.name
+            ),
+            ..Default::default()
+          });
+        }
+
+        if has_default {
+          passed_default = true;
         }
       }
     }
@@ -604,7 +589,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_dependencies();
+    let diagnostics = analyzer.analyze_recipes();
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
     assert_eq!(diagnostics[0].range.start.line, 3);
@@ -619,7 +604,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_dependencies();
+    let diagnostics = analyzer.analyze_recipes();
     assert_eq!(diagnostics.len(), 0);
 
     let doc = document(indoc! {"
@@ -632,7 +617,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_dependencies();
+    let diagnostics = analyzer.analyze_recipes();
     assert_eq!(diagnostics.len(), 2);
   }
 
@@ -728,7 +713,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipe_parameters();
+    let diagnostics = analyzer.analyze_recipes();
 
     assert_eq!(diagnostics.len(), 1);
     assert!(diagnostics[0].message.contains("Duplicate parameter"));
@@ -742,7 +727,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipe_parameters();
+    let diagnostics = analyzer.analyze_recipes();
 
     assert_eq!(diagnostics.len(), 1);
 
@@ -759,7 +744,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipe_parameters();
+    let diagnostics = analyzer.analyze_recipes();
 
     assert_eq!(
       diagnostics.len(),
@@ -776,7 +761,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipe_parameters();
+    let diagnostics = analyzer.analyze_recipes();
 
     assert_eq!(
       diagnostics.len(),
@@ -793,7 +778,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipe_parameters();
+    let diagnostics = analyzer.analyze_recipes();
 
     assert_eq!(
       diagnostics.len(),

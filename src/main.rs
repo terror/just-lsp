@@ -7,7 +7,7 @@ use {
     node_ext::NodeExt,
     point_ext::PointExt,
     position_ext::PositionExt,
-    recipe::Recipe,
+    recipe::{Parameter, ParameterKind, Recipe},
     server::Server,
     setting::{Setting, SettingKind},
   },
