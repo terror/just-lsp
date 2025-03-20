@@ -180,34 +180,36 @@ impl Document {
       .get_nodes_by_kind("recipe")
       .iter()
       .filter_map(|recipe_node| {
-        let header = self.find_child_by_kind(recipe_node, "recipe_header")?;
+        let recipe_header =
+          self.find_child_by_kind(recipe_node, "recipe_header")?;
 
-        let name_node = self.find_child_by_kind(&header, "identifier")?;
-
-        let name = self.get_node_text(&name_node);
+        let recipe_name = self.get_node_text(
+          &self.find_child_by_kind(&recipe_header, "identifier")?,
+        );
 
         let dependencies = self
-          .find_child_by_kind(&header, "dependencies")
-          .map(|deps_node| {
-            (0..deps_node.named_child_count())
-              .filter_map(|i| deps_node.named_child(i))
-              .filter(|child| child.kind() == "dependency")
-              .filter_map(|dep_node| {
-                let id_node =
-                  self.find_child_by_kind_recursive(&dep_node, "identifier")?;
-
-                let dep_name = self.get_node_text(&id_node);
+          .find_child_by_kind(&recipe_header, "dependencies")
+          .map(|dependencies_node| {
+            self
+              .find_children_by_kind_recursive(&dependencies_node, "dependency")
+              .into_iter()
+              .filter_map(|dependency_node| {
+                let dependency_name =
+                  self.get_node_text(&self.find_child_by_kind_recursive(
+                    &dependency_node,
+                    "identifier",
+                  )?);
 
                 let arguments = self
-                  .find_children_by_kind_recursive(&dep_node, "value")
+                  .find_children_by_kind_recursive(&dependency_node, "value")
                   .iter()
-                  .map(|arg_node| self.get_node_text(arg_node))
+                  .map(|argument_node| self.get_node_text(argument_node))
                   .collect::<Vec<_>>();
 
                 Some(Dependency {
-                  name: dep_name,
+                  name: dependency_name,
                   arguments,
-                  range: dep_node.get_range(),
+                  range: dependency_node.get_range(),
                 })
               })
               .collect::<Vec<_>>()
@@ -215,7 +217,7 @@ impl Document {
           .unwrap_or_default();
 
         let parameters = self
-          .find_child_by_kind(&header, "parameters")
+          .find_child_by_kind(&recipe_header, "parameters")
           .map_or_else(Vec::new, |params_node| {
             (0..params_node.named_child_count())
               .filter_map(|i| params_node.named_child(i))
@@ -233,7 +235,7 @@ impl Document {
           });
 
         Some(Recipe {
-          name,
+          name: recipe_name,
           dependencies,
           content: self.get_node_text(recipe_node).trim().to_string(),
           parameters,
