@@ -203,7 +203,9 @@ impl Document {
                 let arguments = self
                   .find_children_by_kind_recursive(&dependency_node, "value")
                   .iter()
-                  .map(|argument_node| self.get_node_text(argument_node))
+                  .map(|argument_node| DependencyArgument {
+                    value: self.get_node_text(argument_node),
+                  })
                   .collect::<Vec<_>>();
 
                 Some(Dependency {
@@ -1148,7 +1150,14 @@ mod tests {
         name: "bar".into(),
         dependencies: vec![Dependency {
           name: "foo".into(),
-          arguments: vec!["'value1'".into(), "'value2'".into()],
+          arguments: vec![
+            DependencyArgument {
+              value: "'value1'".into()
+            },
+            DependencyArgument {
+              value: "'value2'".into()
+            }
+          ],
           range: lsp::Range {
             start: lsp::Position {
               line: 3,

@@ -295,10 +295,10 @@ impl<'a> Analyzer<'a> {
 
     let recipes = self.document.get_recipes();
 
-    let mut seen = HashSet::new();
+    let mut recipe_names = HashSet::new();
 
     for recipe in &recipes {
-      if !seen.insert(&recipe.name) {
+      if !recipe_names.insert(&recipe.name) {
         diagnostics.push(lsp::Diagnostic {
           range: recipe.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -309,28 +309,10 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    let recipe_names: HashSet<_> =
-      recipes.iter().map(|recipe| recipe.name.clone()).collect();
-
-    diagnostics.extend(self.document.get_recipes().iter().flat_map(|recipe| {
-      recipe
-        .dependencies
-        .iter()
-        .filter(|dep| !recipe_names.contains(&dep.name))
-        .map(move |dep| lsp::Diagnostic {
-          range: recipe.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Recipe '{}' not found", dep.name),
-          ..Default::default()
-        })
-    }));
-
     for recipe in &recipes {
       let mut seen = HashSet::new();
 
-      let mut passed_default = false;
-      let mut passed_variadic = false;
+      let (mut passed_default, mut passed_variadic) = (false, false);
 
       for (index, param) in recipe.parameters.iter().enumerate() {
         if !seen.insert(param.name.clone()) {
@@ -397,44 +379,43 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    let recipe_params = recipes
-      .iter()
-      .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
-      .collect::<HashMap<String, Vec<Parameter>>>();
-
-    let variable_names = self
+    let variables = self
       .document
       .get_variables()
       .iter()
       .map(|variable| variable.name.clone())
       .collect::<HashSet<_>>();
 
-    fn is_quoted(s: &str) -> bool {
-      if s.len() < 2 {
-        return false;
-      }
-
-      let first_char = s.chars().next().unwrap();
-      let last_char = s.chars().last().unwrap();
-
-      matches!((first_char, last_char), ('"', '"') | ('\'', '\''))
-    }
+    let recipe_parameters = recipes
+      .iter()
+      .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
+      .collect::<HashMap<String, Vec<Parameter>>>();
 
     for recipe in &recipes {
       for dependency in &recipe.dependencies {
+        if !recipe_names.contains(&dependency.name) {
+          diagnostics.push(lsp::Diagnostic {
+            range: recipe.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Recipe '{}' not found", dependency.name),
+            ..Default::default()
+          });
+        }
+
         for argument in &dependency.arguments {
-          if !is_quoted(argument) && !variable_names.contains(argument) {
+          if !argument.is_quoted() && !variables.contains(&argument.value) {
             diagnostics.push(lsp::Diagnostic {
               range: dependency.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
-              message: format!("Variable '{}' not found", argument),
+              message: format!("Variable '{}' not found", argument.value),
               ..Default::default()
             });
           }
         }
 
-        if let Some(params) = recipe_params.get(&dependency.name) {
+        if let Some(params) = recipe_parameters.get(&dependency.name) {
           let required_params = params
             .iter()
             .filter(|p| {

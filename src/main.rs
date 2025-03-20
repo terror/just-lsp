@@ -7,7 +7,9 @@ use {
     node_ext::NodeExt,
     point_ext::PointExt,
     position_ext::PositionExt,
-    recipe::{Dependency, Parameter, ParameterKind, Recipe},
+    recipe::{
+      Dependency, DependencyArgument, Parameter, ParameterKind, Recipe,
+    },
     server::Server,
     setting::{Setting, SettingKind},
     variable::Variable,
