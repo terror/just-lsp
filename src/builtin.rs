@@ -57,36 +57,30 @@ pub(crate) enum Builtin<'a> {
 }
 
 impl Builtin<'_> {
-  pub(crate) fn completion_item(&self) -> Option<lsp::CompletionItem> {
+  pub(crate) fn completion_item(&self) -> lsp::CompletionItem {
     match self {
-      Self::Attribute { name, .. } => Some(lsp::CompletionItem {
+      Self::Attribute { name, .. } => lsp::CompletionItem {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::Markdown,
-            value: self.documentation(),
-          },
+          self.documentation(),
         )),
         insert_text: Some(format!("[{}]", name)),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{}", name)),
         ..Default::default()
-      }),
-      Self::Constant { name, .. } => Some(lsp::CompletionItem {
+      },
+      Self::Constant { name, .. } => lsp::CompletionItem {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::Markdown,
-            value: self.documentation(),
-          },
+          self.documentation(),
         )),
         insert_text: Some(name.to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{}", name)),
         ..Default::default()
-      }),
+      },
       Self::Function { name, .. } => {
         let snippet = match *name {
           "absolute_path" => format!("{}(${{1:path:string}})", name),
@@ -193,39 +187,33 @@ impl Builtin<'_> {
           _ => format!("{}(${{1:}})", name),
         };
 
-        Some(lsp::CompletionItem {
+        lsp::CompletionItem {
           label: name.to_string(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: self.documentation(),
-            },
+            self.documentation(),
           )),
           insert_text: Some(snippet),
           insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
           sort_text: Some(format!("z{}", name)),
           ..Default::default()
-        })
+        }
       }
-      Self::Setting { name, .. } => Some(lsp::CompletionItem {
+      Self::Setting { name, .. } => lsp::CompletionItem {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::PROPERTY),
         documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::Markdown,
-            value: self.documentation(),
-          },
+          self.documentation(),
         )),
         insert_text: Some(format!("set {} := ", name)),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{}", name)),
         ..Default::default()
-      }),
+      },
     }
   }
 
-  pub(crate) fn documentation(&self) -> String {
+  pub(crate) fn documentation(&self) -> lsp::MarkupContent {
     match self {
       Self::Attribute {
         name,
@@ -252,13 +240,17 @@ impl Builtin<'_> {
         documentation
           .push_str(&format!("\n**Target(s)**: {}", targets.join(", ")));
 
-        documentation
+        lsp::MarkupContent {
+          kind: lsp::MarkupKind::Markdown,
+          value: documentation,
+        }
       }
       Self::Constant {
         description, value, ..
-      } => {
-        format!("{}\n{}", description, value)
-      }
+      } => lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: format!("{}\n{}", description, value),
+      },
       Self::Function {
         name,
         signature,
@@ -330,7 +322,10 @@ impl Builtin<'_> {
           documentation.push_str("\n```");
         }
 
-        documentation
+        lsp::MarkupContent {
+          kind: lsp::MarkupKind::Markdown,
+          value: documentation,
+        }
       }
       Self::Setting {
         name,
@@ -345,7 +340,10 @@ impl Builtin<'_> {
         documentation.push_str(&format!("\n**Type**: {:?}", kind));
         documentation.push_str(&format!("\n**Default**: {}", default));
 
-        documentation
+        lsp::MarkupContent {
+          kind: lsp::MarkupKind::Markdown,
+          value: documentation,
+        }
       }
     }
   }

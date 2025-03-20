@@ -160,9 +160,7 @@ impl Inner {
       }
 
       for builtin in builtins::BUILTINS {
-        if let Some(completion_item) = builtin.completion_item() {
-          completion_items.push(completion_item);
-        }
+        completion_items.push(builtin.completion_item());
       }
 
       return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
@@ -262,9 +260,11 @@ impl Inner {
         .and_then(|node| {
           let text = document.get_node_text(&node);
 
+          let parent_kind = node.parent().map(|p| p.kind());
+
           if let Some(recipe) = document.find_recipe(&text) {
-            if node.parent().is_some_and(|p| {
-              ["alias", "dependency", "recipe_header"].contains(&p.kind())
+            if parent_kind.is_some_and(|kind| {
+              ["alias", "dependency", "recipe_header"].contains(&kind)
             }) {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
@@ -278,40 +278,25 @@ impl Inner {
 
           for builtin in builtins::BUILTINS {
             match builtin {
-              Builtin::Attribute { name, .. } => {
-                if text == name
-                  && node.parent().is_some_and(|p| p.kind() == "attribute")
-                {
+              Builtin::Attribute { name, .. } if text == name => {
+                if parent_kind.is_some_and(|kind| kind == "attribute") {
                   return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                      kind: lsp::MarkupKind::Markdown,
-                      value: builtin.documentation(),
-                    }),
+                    contents: lsp::HoverContents::Markup(
+                      builtin.documentation(),
+                    ),
                     range: Some(node.get_range()),
                   });
                 }
               }
-              Builtin::Constant { name, .. } => {
-                if text == name {
-                  return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                      kind: lsp::MarkupKind::PlainText,
-                      value: builtin.documentation(),
-                    }),
-                    range: Some(node.get_range()),
-                  });
-                }
-              }
-              Builtin::Function { name, .. } => {
-                if text == name {
-                  return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                      kind: lsp::MarkupKind::Markdown,
-                      value: builtin.documentation(),
-                    }),
-                    range: Some(node.get_range()),
-                  });
-                }
+              Builtin::Constant { name, .. }
+              | Builtin::Function { name, .. }
+              | Builtin::Setting { name, .. }
+                if text == name =>
+              {
+                return Some(lsp::Hover {
+                  contents: lsp::HoverContents::Markup(builtin.documentation()),
+                  range: Some(node.get_range()),
+                });
               }
               _ => {}
             }
@@ -1222,7 +1207,7 @@ mod tests {
       .response(HoverResponse {
         id: 2,
         content: "Lowercase hexadecimal digit string\n\"0123456789abcdef\"",
-        kind: "plaintext",
+        kind: "markdown",
         start_line: 1,
         start_char: 10,
         end_line: 1,
@@ -1233,7 +1218,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn hover_prioritizes_recipes_over_functions() -> Result {
+  async fn hover_same_named_recipes_and_functions() -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
@@ -1245,7 +1230,7 @@ mod tests {
             echo \"foo\"
 
           bar: arch
-            echo \"bar\"
+            echo {{ arch() }}
           "
         },
       })
@@ -1263,6 +1248,21 @@ mod tests {
         start_char: 5,
         end_line: 3,
         end_char: 9,
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```",
+        kind: "markdown",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
+        end_char: 14,
       })
       .run()
       .await
@@ -1297,6 +1297,41 @@ mod tests {
         start_char: 1,
         end_line: 0,
         end_char: 6,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_setting() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          set export := true
+
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 4,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "**Setting**: export\nExport all variables as environment variables.\n**Type**: Boolean\n**Default**: false",
+        kind: "markdown",
+        start_line: 0,
+        start_char: 4,
+        end_line: 0,
+        end_char: 10,
       })
       .run()
       .await
