@@ -57,17 +57,27 @@ pub(crate) enum Builtin<'a> {
 impl Builtin<'_> {
   pub(crate) fn completion_item(&self) -> Option<lsp::CompletionItem> {
     match self {
-      Self::Constant {
-        name,
-        description,
-        value,
-      } => Some(lsp::CompletionItem {
+      Self::Attribute { name, .. } => Some(lsp::CompletionItem {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
           lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
-            value: format!("{}\n{}", description, value),
+            value: self.documentation(),
+          },
+        )),
+        insert_text: Some(format!("[{}]", name)),
+        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+        sort_text: Some(format!("z{}", name)),
+        ..Default::default()
+      }),
+      Self::Constant { name, .. } => Some(lsp::CompletionItem {
+        label: name.to_string(),
+        kind: Some(lsp::CompletionItemKind::CONSTANT),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: self.documentation(),
           },
         )),
         insert_text: Some(name.to_string()),
@@ -229,6 +239,11 @@ impl Builtin<'_> {
 
         documentation
       }
+      Self::Constant {
+        description, value, ..
+      } => {
+        format!("{}\n{}", description, value)
+      }
       Self::Function {
         name,
         signature,
@@ -301,11 +316,6 @@ impl Builtin<'_> {
         }
 
         documentation
-      }
-      Self::Constant {
-        description, value, ..
-      } => {
-        format!("{}\n{}", description, value)
       }
       _ => "".into(),
     }
