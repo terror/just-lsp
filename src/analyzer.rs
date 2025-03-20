@@ -549,7 +549,64 @@ mod tests {
   }
 
   #[test]
-  fn analyze() {
+  fn aliases_basic() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := foo
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid alias should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn aliases_duplicate() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := foo
+      alias bar := foo
+      alias bar := foo
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0].message, "Duplicate alias 'bar'");
+    assert_eq!(diagnostics[1].message, "Duplicate alias 'bar'");
+  }
+
+  #[test]
+  fn aliases_missing_recipe() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      alias bar := baz
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
+  }
+
+  #[test]
+  fn analyze_complete() {
     let doc = document(indoc! {
       "
       foo:
@@ -576,523 +633,78 @@ mod tests {
   }
 
   #[test]
-  fn aggregate_parser_errors() {
+  fn attributes_correct() {
     let doc = document(indoc! {
       "
-      foo
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.aggregate_parser_errors();
-
-    assert!(!diagnostics.is_empty(), "Should detect syntax errors");
-
-    let syntax_errors: Vec<_> = diagnostics
-      .iter()
-      .filter(|d| {
-        d.message.contains("Syntax error")
-          || d.message.contains("Missing syntax")
-      })
-      .collect();
-
-    assert!(
-      !syntax_errors.is_empty(),
-      "Should have at least one syntax error diagnostic"
-    );
-
-    let valid_doc = document(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&valid_doc);
-
-    let valid_diagnostics = analyzer.aggregate_parser_errors();
-
-    assert!(
-      valid_diagnostics.is_empty(),
-      "Valid document should not have syntax errors"
-    );
-  }
-
-  #[test]
-  fn analyze_aliases() {
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      alias bar := baz
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_aliases();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
-
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      alias bar := foo
-      alias bar := foo
-      alias bar := foo
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_aliases();
-
-    assert_eq!(diagnostics.len(), 2);
-    assert_eq!(diagnostics[0].message, "Duplicate alias 'bar'");
-    assert_eq!(diagnostics[1].message, "Duplicate alias 'bar'");
-
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      alias bar := foo
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_aliases();
-
-    assert_eq!(diagnostics.len(), 0);
-  }
-
-  #[test]
-  fn analyze_dependencies() {
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      bar: baz
-        echo \"bar\"
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
-    assert_eq!(diagnostics[0].range.start.line, 3);
-
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      bar: foo
-        echo \"bar\"
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-    assert_eq!(diagnostics.len(), 0);
-
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      bar: missing1 missing2
-        echo \"bar\"
-    "});
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-    assert_eq!(diagnostics.len(), 2);
-  }
-
-  #[test]
-  fn analyze_function_calls() {
-    let doc = document(indoc! {
-      "
-      foo:
-        echo {{ unknown_function() }}
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_function_calls();
-
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
-
-    assert!(
-      diagnostics
-        .iter()
-        .any(|d| d.message.contains("Unknown function 'unknown_function'")),
-      "Should have diagnostic about unknown function"
-    );
-
-    let doc = document(indoc! {
-      "
-      foo:
-        echo {{ replace() }}
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_function_calls();
-
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
-
-    assert!(
-      diagnostics
-        .iter()
-        .any(|d| d.message.contains("requires at least 3 argument(s)")),
-      "Should have diagnostic about missing arguments"
-    );
-
-    let doc = document(indoc! {
-      "
-      foo:
-        echo {{ uppercase(\"hello\", \"extra\") }}
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_function_calls();
-
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
-
-    assert!(
-      diagnostics
-        .iter()
-        .any(|d| d.message.contains("accepts 1 argument(s)")),
-      "Should have diagnostic about too many arguments"
-    );
-
-    let doc = document(indoc! {
-      "
-      foo:
-        echo {{ arch() }}
-        echo {{ join(\"a\", \"b\", \"c\") }}
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_function_calls();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Valid function calls should not produce diagnostics"
-    );
-  }
-
-  #[test]
-  fn analyze_recipe_parameters() {
-    let doc = document(indoc! {
-      "
-      recipe_with_duplicate_param arg1 arg1:
-        echo \"{{arg1}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert!(diagnostics[0].message.contains("Duplicate parameter"));
-
-    let doc = document(indoc! {
-      "
-      recipe_with_param_order arg1=\"default\" arg2:
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(diagnostics.len(), 1);
-
-    assert!(diagnostics[0].message.contains(
-      "Required parameter 'arg2' follows a parameter with a default value"
-    ));
-
-    let doc = document(indoc! {
-      "
-      recipe_with_variadic arg1=\"default\" +args:
-        echo \"{{arg1}} {{args}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Variadic parameter after default should not produce diagnostics"
-    );
-
-    let doc = document(indoc! {
-      "
-      recipe_with_defaults arg1=\"first\" arg2=\"second\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Parameters with all defaults should not produce diagnostics"
-    );
-
-    let doc = document(indoc! {
-      "
-      valid_recipe arg1 arg2=\"default\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Valid parameter order should not produce diagnostics"
-    );
-  }
-
-  #[test]
-  fn analyze_settings_unknown_setting() {
-    let doc = document(indoc! {
-      "
-      set unknown-setting := true
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].message, "Unknown setting 'unknown-setting'");
-  }
-
-  #[test]
-  fn analyze_settings_boolean_type() {
-    let doc = document(indoc! {
-      "
-      set export := 'foo'
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(diagnostics.len(), 1);
-
-    assert_eq!(
-      diagnostics[0].message,
-      "Setting 'export' expects a boolean value"
-    );
-
-    let doc = document(indoc! {
-      "
-      set export
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Shorthand boolean syntax should be valid"
-    );
-
-    let doc = document(indoc! {
-      "
-      set export := true
-      set dotenv-load := false
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Valid boolean values should not produce diagnostics"
-    );
-  }
-
-  #[test]
-  fn analyze_settings_string_type() {
-    let doc = document(indoc! {
-      "
-      set dotenv-path := true
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(
-      diagnostics[0].message,
-      "Setting 'dotenv-path' expects a string value"
-    );
-
-    let doc = document(indoc! {
-      "
-      set dotenv-path := \".env.development\"
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Valid string value should not produce diagnostics"
-    );
-  }
-
-  #[test]
-  fn analyze_settings_duplicate() {
-    let doc = document(indoc! {
-      "
-      set export := true
-      set shell := [\"bash\", \"-c\"]
-      set export := false
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].message, "Duplicate setting 'export'");
-  }
-
-  #[test]
-  fn analyze_settings_multiple_errors() {
-    let doc = document(indoc! {
-      "
-      set unknown-setting := true
-      set export := false
-      set shell := ['bash']
-      set export := false
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_settings();
-
-    assert_eq!(diagnostics.len(), 2, "Should detect all errors in settings");
-
-    let messages: Vec<String> =
-      diagnostics.iter().map(|d| d.message.clone()).collect();
-
-    assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
-
-    assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
-  }
-
-  #[test]
-  fn analyze_attributes_unknown() {
-    let doc = document(indoc! {
-      "
-      [unknown_attribute]
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_attributes();
-
-    assert_eq!(diagnostics.len(), 1);
-
-    assert_eq!(
-      diagnostics[0].message,
-      "Unknown attribute 'unknown_attribute'"
-    );
-  }
-
-  #[test]
-  #[ignore]
-  fn analyze_attributes_wrong_target() {
-    let doc = document(indoc! {
-      "
+      [no-cd]
       [linux]
-      set export := true
+      [macos]
+      foo:
+        echo \"foo\"
+
+      [doc('Recipe documentation')]
+      bar:
+        echo \"bar\"
       "
     });
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_attributes();
+    let diagnostics = analyzer.analyze();
 
-    assert_eq!(diagnostics.len(), 1);
-
-    assert!(diagnostics[0]
-      .message
-      .contains("cannot be applied to variable target"));
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid attributes should not produce diagnostics"
+    );
   }
 
   #[test]
-  fn analyze_attributes_missing_parameters() {
+  fn attributes_extra_parameters() {
+    let doc = document(indoc! {
+      "
+      [linux('invalid')]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Attribute 'linux' doesn't accept parameters"
+    );
+  }
+
+  #[test]
+  fn attributes_missing_parameters() {
+    let doc = document(indoc! {
+      "
+      [doc]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Attribute 'doc' requires parameters"
+    );
+  }
+
+  #[test]
+  fn attributes_no_parameters_needed() {
     let doc = document(indoc! {
       "
       [script]
@@ -1103,7 +715,7 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_attributes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(
       diagnostics.len(),
@@ -1121,17 +733,20 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_attributes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(
       diagnostics.len(),
       0,
       "Should be valid since confirm can be used without parameters"
     );
+  }
 
+  #[test]
+  fn attributes_unknown() {
     let doc = document(indoc! {
       "
-      [doc]
+      [unknown_attribute]
       foo:
         echo \"foo\"
       "
@@ -1139,107 +754,230 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_attributes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 1);
 
     assert_eq!(
       diagnostics[0].message,
-      "Attribute 'doc' requires parameters"
+      "Unknown attribute 'unknown_attribute'"
     );
   }
 
   #[test]
-  fn analyze_attributes_extra_parameters() {
+  #[ignore]
+  fn attributes_wrong_target() {
     let doc = document(indoc! {
       "
-      [linux('invalid')]
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_attributes();
-
-    assert_eq!(diagnostics.len(), 1);
-
-    assert_eq!(
-      diagnostics[0].message,
-      "Attribute 'linux' doesn't accept parameters"
-    );
-  }
-
-  #[test]
-  fn analyze_attributes_correct() {
-    let doc = document(indoc! {
-      "
-      [no-cd]
       [linux]
-      [macos]
-      foo:
-        echo \"foo\"
-
-      [doc('Recipe documentation')]
-      bar:
-        echo \"bar\"
+      set export := true
       "
     });
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_attributes();
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("cannot be applied to variable target"));
+  }
+
+  #[test]
+  fn function_calls_correct() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+        echo {{ join(\"a\", \"b\", \"c\") }}
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(
       diagnostics.len(),
       0,
-      "Valid attributes should not produce diagnostics"
+      "Valid function calls should not produce diagnostics"
     );
   }
 
   #[test]
-  fn analyze_recipes() {
+  fn function_calls_too_few_args() {
     let doc = document(indoc! {
       "
-      foo arg1 arg2:
-        echo \"{{arg1}} {{arg2}}\"
-
-      bar: (foo 'value1')
-        echo \"bar\"
+      foo:
+        echo {{ replace() }}
       "
     });
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
 
-    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
 
-    assert!(diagnostics[0]
-      .message
-      .contains("requires 2 argument(s), but 1 provided"));
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("requires at least 3 argument(s)")),
+      "Should have diagnostic about missing arguments"
+    );
+  }
 
+  #[test]
+  fn function_calls_too_many_args() {
     let doc = document(indoc! {
       "
-      foo arg1:
-        echo \"{{arg1}}\"
-
-      bar: (foo 'value1' 'value2' 'value3')
-        echo \"bar\"
+      foo:
+        echo {{ uppercase(\"hello\", \"extra\") }}
       "
     });
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
+
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("accepts 1 argument(s)")),
+      "Should have diagnostic about too many arguments"
+    );
+  }
+
+  #[test]
+  fn function_calls_unknown() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ unknown_function() }}
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+
+    assert!(
+      diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unknown function 'unknown_function'")),
+      "Should have diagnostic about unknown function"
+    );
+  }
+
+  #[test]
+  fn parser_errors_invalid() {
+    let doc = document(indoc! {
+      "
+      foo
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert!(!diagnostics.is_empty(), "Should detect syntax errors");
+
+    let syntax_errors = diagnostics
+      .iter()
+      .filter(|d| {
+        d.message.contains("Syntax error")
+          || d.message.contains("Missing syntax")
+      })
+      .collect::<Vec<_>>();
+
+    assert!(
+      !syntax_errors.is_empty(),
+      "Should have at least one syntax error diagnostic"
+    );
+  }
+
+  #[test]
+  fn parser_errors_valid() {
+    let valid_doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&valid_doc);
+
+    let valid_diagnostics = analyzer.analyze();
+
+    assert!(
+      valid_diagnostics.is_empty(),
+      "Valid document should not have syntax errors"
+    );
+  }
+
+  #[test]
+  fn recipe_dependencies_correct() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 0);
+  }
+
+  #[test]
+  fn recipe_dependencies_missing() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Recipe 'baz' not found");
+    assert_eq!(diagnostics[0].range.start.line, 3);
+  }
 
-    assert!(diagnostics[0]
-      .message
-      .contains("accepts 1 argument(s), but 3 provided"));
+  #[test]
+  fn recipe_dependencies_multiple_missing() {
+    let doc = document(indoc! {"
+      foo:
+        echo \"foo\"
 
+      bar: missing1 missing2
+        echo \"bar\"
+    "});
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 2);
+  }
+
+  #[test]
+  fn recipe_invocation_argument_count_correct() {
     let doc = document(indoc! {
       "
       foo arg1 arg2=\"default\":
@@ -1252,34 +990,17 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(
       diagnostics.len(),
       0,
       "Should not have errors when default values are used"
     );
+  }
 
-    let doc = document(indoc! {
-      "
-      foo arg1 +args:
-        echo \"{{arg1}} {{args}}\"
-
-      bar: (foo 'value1' 'value2' 'value3')
-        echo \"bar\"
-      "
-    });
-
-    let analyzer = Analyzer::new(&doc);
-
-    let diagnostics = analyzer.analyze_recipes();
-
-    assert_eq!(
-      diagnostics.len(),
-      0,
-      "Should not have errors when variadic parameters are used"
-    );
-
+  #[test]
+  fn recipe_invocation_missing_args() {
     let doc = document(indoc! {
       "
       foo arg1 arg2:
@@ -1292,14 +1013,63 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 1);
 
     assert!(diagnostics[0]
       .message
       .contains("requires 2 argument(s), but 0 provided"));
+  }
 
+  #[test]
+  fn recipe_invocation_too_few_args() {
+    let doc = document(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo 'value1')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("requires 2 argument(s), but 1 provided"));
+  }
+
+  #[test]
+  fn recipe_invocation_too_many_args() {
+    let doc = document(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("accepts 1 argument(s), but 3 provided"));
+  }
+
+  #[test]
+  fn recipe_invocation_unknown_variable() {
     let doc = document(indoc! {
       "
       foo arg1:
@@ -1312,12 +1082,15 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 1);
 
     assert!(diagnostics[0].message.contains("Variable 'wow' not found"));
+  }
 
+  #[test]
+  fn recipe_invocation_valid_variable() {
     let doc = document(indoc! {
       "
       wow := 'foo'
@@ -1332,8 +1105,308 @@ mod tests {
 
     let analyzer = Analyzer::new(&doc);
 
-    let diagnostics = analyzer.analyze_recipes();
+    let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 0);
+  }
+
+  #[test]
+  fn recipe_invocation_variadic_params() {
+    let doc = document(indoc! {
+      "
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Should not have errors when variadic parameters are used"
+    );
+  }
+
+  #[test]
+  fn recipe_parameters_defaults_all() {
+    let doc = document(indoc! {
+      "
+      recipe_with_defaults arg1=\"first\" arg2=\"second\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Parameters with all defaults should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn recipe_parameters_duplicate() {
+    let doc = document(indoc! {
+      "
+      recipe_with_duplicate_param arg1 arg1:
+        echo \"{{arg1}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics[0].message.contains("Duplicate parameter"));
+  }
+
+  #[test]
+  fn recipe_parameters_order() {
+    let doc = document(indoc! {
+      "
+      recipe_with_param_order arg1=\"default\" arg2:
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0].message.contains(
+      "Required parameter 'arg2' follows a parameter with a default value"
+    ));
+  }
+
+  #[test]
+  fn recipe_parameters_valid() {
+    let doc = document(indoc! {
+      "
+      valid_recipe arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid parameter order should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn recipe_parameters_variadic() {
+    let doc = document(indoc! {
+      "
+      recipe_with_variadic arg1=\"default\" +args:
+        echo \"{{arg1}} {{args}}\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Variadic parameter after default should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn settings_boolean_shorthand() {
+    let doc = document(indoc! {
+      "
+      set export
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Shorthand boolean syntax should be valid"
+    );
+  }
+
+  #[test]
+  fn settings_boolean_type_correct() {
+    let doc = document(indoc! {
+      "
+      set export := true
+      set dotenv-load := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid boolean values should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn settings_boolean_type_error() {
+    let doc = document(indoc! {
+      "
+      set export := 'foo'
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Setting 'export' expects a boolean value"
+    );
+  }
+
+  #[test]
+  fn settings_duplicate() {
+    let doc = document(indoc! {
+      "
+      set export := true
+      set shell := [\"bash\", \"-c\"]
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Duplicate setting 'export'");
+  }
+
+  #[test]
+  fn settings_multiple_errors() {
+    let doc = document(indoc! {
+      "
+      set unknown-setting := true
+      set export := false
+      set shell := ['bash']
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 2, "Should detect all errors in settings");
+
+    let messages: Vec<String> =
+      diagnostics.iter().map(|d| d.message.clone()).collect();
+
+    assert!(messages.contains(&"Unknown setting 'unknown-setting'".to_string()));
+    assert!(messages.contains(&"Duplicate setting 'export'".to_string()));
+  }
+
+  #[test]
+  fn settings_string_type_correct() {
+    let doc = document(indoc! {
+      "
+      set dotenv-path := \".env.development\"
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Valid string value should not produce diagnostics"
+    );
+  }
+
+  #[test]
+  fn settings_string_type_error() {
+    let doc = document(indoc! {
+      "
+      set dotenv-path := true
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Setting 'dotenv-path' expects a string value"
+    );
+  }
+
+  #[test]
+  fn settings_unknown() {
+    let doc = document(indoc! {
+      "
+      set unknown-setting := true
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Unknown setting 'unknown-setting'");
   }
 }
