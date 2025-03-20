@@ -263,13 +263,19 @@ impl Inner {
           let text = document.get_node_text(&node);
 
           if let Some(recipe) = document.find_recipe(&text) {
-            return Some(lsp::Hover {
-              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                kind: lsp::MarkupKind::PlainText,
-                value: recipe.content,
-              }),
-              range: Some(node.get_range()),
-            });
+            if node.parent().is_some_and(|p| {
+              p.kind() == "alias"
+                || p.kind() == "dependency"
+                || p.kind() == "recipe_header"
+            }) {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::PlainText,
+                  value: recipe.content,
+                }),
+                range: Some(node.get_range()),
+              });
+            }
           }
 
           for builtin in builtins::BUILTINS {
