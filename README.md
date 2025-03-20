@@ -8,6 +8,15 @@
 
 <img width="1667" alt="Screenshot 2025-03-19 at 2 19 48 PM" src="https://github.com/user-attachments/assets/f10f3eb7-1a62-4449-aa09-2891b7f91187" />
 
+## Installation
+
+You can install the server using the [cargo](https://doc.rust-lang.org/cargo/index.html)
+package manager:
+
+```bash
+cargo install just-lsp
+```
+
 ## Features
 
 The server implements a decent amount of the
