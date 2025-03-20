@@ -25,6 +25,7 @@ impl Server {
         ..Default::default()
       }),
       definition_provider: Some(lsp::OneOf::Left(true)),
+      document_highlight_provider: Some(lsp::OneOf::Left(true)),
       hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Left(true)),
@@ -70,6 +71,13 @@ impl LanguageServer for Server {
     if let Err(error) = self.0.lock().await.did_open(params).await {
       log::debug!("error: {error}");
     }
+  }
+
+  async fn document_highlight(
+    &self,
+    params: lsp::DocumentHighlightParams,
+  ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
+    self.0.lock().await.document_highlight(params).await
   }
 
   async fn goto_definition(
@@ -210,6 +218,31 @@ impl Inner {
     self.publish_diagnostics(&uri).await;
 
     Ok(())
+  }
+
+  async fn document_highlight(
+    &self,
+    params: lsp::DocumentHighlightParams,
+  ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
+    let uri = params.text_document_position_params.text_document.uri;
+
+    let position = params.text_document_position_params.position;
+
+    Ok(self.documents.get(&uri).and_then(|document| {
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .map(|identifier| {
+          document
+            .find_references(&document.get_node_text(&identifier))
+            .into_iter()
+            .map(|location| lsp::DocumentHighlight {
+              range: location.range,
+              kind: Some(lsp::DocumentHighlightKind::TEXT),
+            })
+            .collect()
+        })
+    }))
   }
 
   async fn goto_definition(
@@ -899,6 +932,90 @@ mod tests {
     }
   }
 
+  #[derive(Debug)]
+  struct DocumentHighlightRequest<'a> {
+    id: i64,
+    uri: &'a str,
+    line: u32,
+    character: u32,
+  }
+
+  impl IntoValue for DocumentHighlightRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/documentHighlight",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct DocumentHighlightResponse<'a> {
+    id: i64,
+    highlights: Vec<Highlight<'a>>,
+  }
+
+  #[derive(Debug)]
+  struct Highlight<'a> {
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+    kind: &'a str,
+  }
+
+  impl IntoValue for Highlight<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "range": {
+          "start": {
+            "line": self.start_line,
+            "character": self.start_char
+          },
+          "end": {
+            "line": self.end_line,
+            "character": self.end_char
+          }
+        },
+        "kind": match self.kind {
+          "text" => 1,
+          "read" => 2,
+          "write" => 3,
+          _ => 1
+        }
+      })
+    }
+  }
+
+  impl IntoValue for Vec<Highlight<'_>> {
+    fn into_value(self) -> Value {
+      self
+        .into_iter()
+        .map(|highlight| highlight.into_value())
+        .collect()
+    }
+  }
+
+  impl IntoValue for DocumentHighlightResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.highlights.into_value()
+      })
+    }
+  }
+
   #[tokio::test]
   async fn initialize() -> Result {
     Test::new()?
@@ -1468,6 +1585,61 @@ mod tests {
         start_char: 10,
         end_line: 3,
         end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_highlight() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+
+          alias baz := foo
+          "
+        },
+      })
+      .request(DocumentHighlightRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+      })
+      .response(DocumentHighlightResponse {
+        id: 2,
+        highlights: vec![
+          Highlight {
+            start_line: 0,
+            start_char: 0,
+            end_line: 0,
+            end_char: 3,
+            kind: "text",
+          },
+          Highlight {
+            start_line: 3,
+            start_char: 5,
+            end_line: 3,
+            end_char: 8,
+            kind: "text",
+          },
+          Highlight {
+            start_line: 6,
+            start_char: 13,
+            end_line: 6,
+            end_char: 16,
+            kind: "text",
+          },
+        ],
       })
       .run()
       .await

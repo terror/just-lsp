@@ -19,6 +19,10 @@ functions, and constants.
 
 You're able to go to a recipe definition from an identifier.
 
+### `textDocument/documentHighlight`
+
+Like references, but highlights them inside the document.
+
 ### `textDocument/hover`
 
 You can request hover information for recipes, built-in functions, constants
