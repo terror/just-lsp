@@ -1,6 +1,13 @@
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Dependency {
+  pub(crate) name: String,
+  pub(crate) arguments: Vec<String>,
+  pub(crate) range: lsp::Range,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ParameterKind {
   Normal,
   Variadic(VariadicType),
@@ -38,16 +45,16 @@ impl Parameter {
       return None;
     }
 
-    let (name, kind) = if param_name.starts_with('$') {
-      (param_name[1..].to_string(), ParameterKind::Export)
-    } else if param_name.starts_with('+') {
+    let (name, kind) = if let Some(stripped) = param_name.strip_prefix('$') {
+      (stripped.to_string(), ParameterKind::Export)
+    } else if let Some(stripped) = param_name.strip_prefix('+') {
       (
-        param_name[1..].to_string(),
+        stripped.to_string(),
         ParameterKind::Variadic(VariadicType::OneOrMore),
       )
-    } else if param_name.starts_with('*') {
+    } else if let Some(stripped) = param_name.strip_prefix('*') {
       (
-        param_name[1..].to_string(),
+        stripped.to_string(),
         ParameterKind::Variadic(VariadicType::ZeroOrMore),
       )
     } else {
@@ -71,7 +78,7 @@ impl Parameter {
 #[allow(unused)]
 pub(crate) struct Recipe {
   pub(crate) name: String,
-  pub(crate) dependencies: Vec<String>,
+  pub(crate) dependencies: Vec<Dependency>,
   pub(crate) parameters: Vec<Parameter>,
   pub(crate) content: String,
   pub(crate) range: lsp::Range,

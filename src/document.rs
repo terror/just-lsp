@@ -69,17 +69,6 @@ impl Document {
     node.child(position).filter(|child| child.kind() == kind)
   }
 
-  pub(crate) fn find_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
-    let mut nodes = Vec::new();
-
-    if let Some(tree) = &self.tree {
-      let mut cursor = tree.root_node().walk();
-      Self::collect_nodes(&mut cursor, kind, &mut nodes);
-    }
-
-    nodes
-  }
-
   pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .get_recipes()
@@ -89,7 +78,7 @@ impl Document {
 
   pub(crate) fn find_references(&self, name: &str) -> Vec<lsp::Location> {
     self
-      .find_nodes_by_kind("identifier")
+      .get_nodes_by_kind("identifier")
       .into_iter()
       .filter(|identifier| self.get_node_text(identifier) == name)
       .map(|identifier| lsp::Location {
@@ -101,7 +90,7 @@ impl Document {
 
   pub(crate) fn get_aliases(&self) -> Vec<Alias> {
     self
-      .find_nodes_by_kind("alias")
+      .get_nodes_by_kind("alias")
       .iter()
       .filter_map(|alias_node| {
         let left_node =
@@ -119,6 +108,17 @@ impl Document {
       .collect()
   }
 
+  pub(crate) fn get_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
+    let mut nodes = Vec::new();
+
+    if let Some(tree) = &self.tree {
+      let mut cursor = tree.root_node().walk();
+      Self::collect_nodes(&mut cursor, kind, &mut nodes);
+    }
+
+    nodes
+  }
+
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
     self
       .content
@@ -131,7 +131,7 @@ impl Document {
 
   pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
     self
-      .find_nodes_by_kind("recipe")
+      .get_nodes_by_kind("recipe")
       .iter()
       .filter_map(|recipe_node| {
         let header = self.find_child_by_kind(recipe_node, "recipe_header")?;
@@ -147,33 +147,44 @@ impl Document {
               .filter_map(|i| deps_node.named_child(i))
               .filter(|child| child.kind() == "dependency")
               .filter_map(|dep_node| {
-                self
-                  .find_child_by_kind(&dep_node, "identifier")
-                  .map(|id_node| self.get_node_text(&id_node))
+                let id_node =
+                  self.find_child_by_kind_recursive(&dep_node, "identifier")?;
+
+                let dep_name = self.get_node_text(&id_node);
+
+                let arguments = self
+                  .find_all_children_by_kind_recursive(&dep_node, "value")
+                  .iter()
+                  .map(|arg_node| self.get_node_text(arg_node))
+                  .collect::<Vec<_>>();
+
+                Some(Dependency {
+                  name: dep_name,
+                  arguments,
+                  range: dep_node.get_range(),
+                })
               })
               .collect::<Vec<_>>()
           })
           .unwrap_or_default();
 
-        let parameters =
-          self.find_child_by_kind(&header, "parameters").map_or_else(
-            || Vec::new(),
-            |params_node| {
-              (0..params_node.named_child_count())
-                .filter_map(|i| params_node.named_child(i))
-                .filter(|param_node| {
-                  param_node.kind() == "parameter"
-                    || param_node.kind() == "variadic_parameter"
-                })
-                .filter_map(|param_node| {
-                  Parameter::parse(
-                    &self.get_node_text(&param_node),
-                    param_node.get_range(),
-                  )
-                })
-                .collect()
-            },
-          );
+        let parameters = self
+          .find_child_by_kind(&header, "parameters")
+          .map_or_else(Vec::new, |params_node| {
+            (0..params_node.named_child_count())
+              .filter_map(|i| params_node.named_child(i))
+              .filter(|param_node| {
+                param_node.kind() == "parameter"
+                  || param_node.kind() == "variadic_parameter"
+              })
+              .filter_map(|param_node| {
+                Parameter::parse(
+                  &self.get_node_text(&param_node),
+                  param_node.get_range(),
+                )
+              })
+              .collect()
+          });
 
         Some(Recipe {
           name,
@@ -188,7 +199,7 @@ impl Document {
 
   pub(crate) fn get_settings(&self) -> Vec<Setting> {
     self
-      .find_nodes_by_kind("setting")
+      .get_nodes_by_kind("setting")
       .iter()
       .filter_map(|setting_node| {
         Setting::parse(
@@ -221,6 +232,28 @@ impl Document {
     self.tree = parser.parse(self.content.to_string(), None);
 
     Ok(())
+  }
+
+  fn find_child_by_kind_recursive<'a>(
+    &'a self,
+    start_node: &'a Node,
+    kind: &str,
+  ) -> Option<Node<'a>> {
+    self
+      .find_all_children_by_kind_recursive(start_node, kind)
+      .first()
+      .copied()
+  }
+
+  fn find_all_children_by_kind_recursive<'a>(
+    &'a self,
+    start_node: &'a Node,
+    kind: &str,
+  ) -> Vec<Node<'a>> {
+    let mut nodes = Vec::new();
+    let mut cursor = start_node.walk();
+    Self::collect_nodes(&mut cursor, kind, &mut nodes);
+    nodes
   }
 
   fn collect_nodes<'a>(
@@ -406,7 +439,7 @@ mod tests {
   }
 
   #[test]
-  fn find_nodes_by_kind() {
+  fn get_nodes_by_kind() {
     let doc = document(indoc! {"
       foo:
         echo \"foo\"
@@ -418,10 +451,10 @@ mod tests {
         echo \"baz\"
     "});
 
-    let recipes = doc.find_nodes_by_kind("recipe");
+    let recipes = doc.get_nodes_by_kind("recipe");
     assert_eq!(recipes.len(), 3);
 
-    let identifiers = doc.find_nodes_by_kind("identifier");
+    let identifiers = doc.get_nodes_by_kind("identifier");
     assert_eq!(identifiers.len(), 3);
   }
 
@@ -507,43 +540,95 @@ mod tests {
   }
 
   #[test]
-  fn get_recipes() {
+  fn recipe_without_parameters_or_dependencies() {
     let doc = document(indoc! {
       "
       foo:
         echo \"foo\"
-
-      bar target $  lol  : foo
-        echo \"Building {{target}}\"
-
-      baz first + second=\"default\": foo bar
-        echo \"{{first}} {{second}}\"
-     "
+      "
     });
 
     assert_eq!(
-    doc.get_recipes(),
-    vec![
-      Recipe {
+      doc.find_recipe("foo"),
+      Some(Recipe {
         name: "foo".into(),
         dependencies: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
         parameters: vec![],
+        content: "foo:\n  echo \"foo\"".into(),
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
             character: 0
           },
           end: lsp::Position {
-            line: 3,
+            line: 2,
             character: 0
           },
         }
-      },
-      Recipe {
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_dependency() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("bar"),
+      Some(Recipe {
         name: "bar".into(),
-        dependencies: vec!["foo".into()],
-        content: "bar target $  lol  : foo\n  echo \"Building {{target}}\"".into(),
+        dependencies: vec![Dependency {
+          name: "foo".into(),
+          arguments: vec![],
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 3,
+              character: 5
+            },
+            end: lsp::Position {
+              line: 3,
+              character: 8
+            },
+          }
+        }],
+        parameters: vec![],
+        content: "bar: foo\n  echo \"bar\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 5,
+            character: 0
+          },
+        }
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_parameters() {
+    let doc = document(indoc! {
+      "
+      bar target $lol:
+        echo \"Building {{target}}\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("bar"),
+      Some(Recipe {
+        name: "bar".into(),
+        dependencies: vec![],
         parameters: vec![
           Parameter {
             name: "target".into(),
@@ -551,46 +636,60 @@ mod tests {
             default_value: None,
             range: lsp::Range {
               start: lsp::Position {
-                line: 3,
+                line: 0,
                 character: 4
               },
               end: lsp::Position {
-                line: 3,
+                line: 0,
                 character: 10
               },
             }
           },
-            Parameter {
-                name: "lol".into(),
-                kind: ParameterKind::Export,
-                default_value: None,
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: 3,
-                        character: 11,
-                    },
-                    end: lsp::Position {
-                        line: 3,
-                        character: 17,
-                    },
-                },
-            },
+          Parameter {
+            name: "lol".into(),
+            kind: ParameterKind::Export,
+            default_value: None,
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 0,
+                character: 11
+              },
+              end: lsp::Position {
+                line: 0,
+                character: 15
+              },
+            }
+          }
         ],
+        content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
         range: lsp::Range {
           start: lsp::Position {
-            line: 3,
+            line: 0,
             character: 0
           },
           end: lsp::Position {
-            line: 6,
+            line: 2,
             character: 0
           },
         }
-      },
-      Recipe {
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_default_parameter() {
+    let doc = document(indoc! {
+      "
+      baz first second=\"default\":
+        echo \"{{first}} {{second}}\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("baz"),
+      Some(Recipe {
         name: "baz".into(),
-        dependencies: vec!["foo".into(), "bar".into()],
-        content: "baz first + second=\"default\": foo bar\n  echo \"{{first}} {{second}}\"".into(),
+        dependencies: vec![],
         parameters: vec![
           Parameter {
             name: "first".into(),
@@ -598,11 +697,74 @@ mod tests {
             default_value: None,
             range: lsp::Range {
               start: lsp::Position {
-                line: 6,
+                line: 0,
                 character: 4
               },
               end: lsp::Position {
-                line: 6,
+                line: 0,
+                character: 9
+              },
+            }
+          },
+          Parameter {
+            name: "second".into(),
+            kind: ParameterKind::Normal,
+            default_value: Some("\"default\"".into()),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 0,
+                character: 10
+              },
+              end: lsp::Position {
+                line: 0,
+                character: 26
+              },
+            }
+          }
+        ],
+        content:
+          "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
+            .into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 0
+          },
+        }
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_variadic_parameter() {
+    let doc = document(indoc! {
+      "
+      baz first +second=\"default\":
+        echo \"{{first}} {{second}}\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("baz"),
+      Some(Recipe {
+        name: "baz".into(),
+        dependencies: vec![],
+        parameters: vec![
+          Parameter {
+            name: "first".into(),
+            kind: ParameterKind::Normal,
+            default_value: None,
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 0,
+                character: 4
+              },
+              end: lsp::Position {
+                line: 0,
                 character: 9
               },
             }
@@ -613,16 +775,83 @@ mod tests {
             default_value: Some("\"default\"".into()),
             range: lsp::Range {
               start: lsp::Position {
-                line: 6,
+                line: 0,
                 character: 10
               },
               end: lsp::Position {
-                line: 6,
-                character: 28
+                line: 0,
+                character: 27
               },
             }
           }
         ],
+        content:
+          "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
+            .into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 0
+          },
+        }
+      })
+    );
+  }
+  #[test]
+  fn recipe_with_multiple_dependencies() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: foo bar
+        echo \"baz\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("baz"),
+      Some(Recipe {
+        name: "baz".into(),
+        dependencies: vec![
+          Dependency {
+            name: "foo".into(),
+            arguments: vec![],
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 6,
+                character: 5
+              },
+              end: lsp::Position {
+                line: 6,
+                character: 8
+              },
+            }
+          },
+          Dependency {
+            name: "bar".into(),
+            arguments: vec![],
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 6,
+                character: 9
+              },
+              end: lsp::Position {
+                line: 6,
+                character: 12
+              },
+            }
+          }
+        ],
+        parameters: vec![],
+        content: "baz: foo bar\n  echo \"baz\"".into(),
         range: lsp::Range {
           start: lsp::Position {
             line: 6,
@@ -633,9 +862,119 @@ mod tests {
             character: 0
           },
         }
-      }
-    ]
-  );
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_dependency_arguments() {
+    let doc = document(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo 'value1' 'value2')
+        echo \"bar\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("bar"),
+      Some(Recipe {
+        name: "bar".into(),
+        dependencies: vec![Dependency {
+          name: "foo".into(),
+          arguments: vec!["'value1'".into(), "'value2'".into()],
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 3,
+              character: 5
+            },
+            end: lsp::Position {
+              line: 3,
+              character: 28
+            },
+          }
+        }],
+        parameters: vec![],
+        content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 5,
+            character: 0
+          },
+        }
+      })
+    );
+  }
+
+  #[test]
+  fn find_nonexistent_recipe() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    assert_eq!(doc.find_recipe("nonexistent"), None);
+  }
+
+  #[test]
+  fn multiple_recipes() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+      "
+    });
+
+    assert_eq!(
+      doc.find_recipe("foo"),
+      Some(Recipe {
+        name: "foo".into(),
+        dependencies: vec![],
+        parameters: vec![],
+        content: "foo:\n  echo \"foo\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 0
+          },
+        }
+      })
+    );
+
+    assert_eq!(
+      doc.find_recipe("bar"),
+      Some(Recipe {
+        name: "bar".into(),
+        dependencies: vec![],
+        parameters: vec![],
+        content: "bar:\n  echo \"bar\"".into(),
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 5,
+            character: 0
+          },
+        }
+      })
+    );
   }
 
   #[test]
@@ -738,7 +1077,7 @@ mod tests {
         echo \"foo\"
     "});
 
-    let recipes = doc.find_nodes_by_kind("recipe");
+    let recipes = doc.get_nodes_by_kind("recipe");
     assert_eq!(recipes.len(), 1);
 
     let recipe = &recipes[0];
@@ -783,7 +1122,7 @@ mod tests {
       "
     });
 
-    let alias_nodes = doc.find_nodes_by_kind("alias");
+    let alias_nodes = doc.get_nodes_by_kind("alias");
 
     assert_eq!(alias_nodes.len(), 2);
 

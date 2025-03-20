@@ -116,7 +116,7 @@ impl<'a> Analyzer<'a> {
   fn analyze_attributes(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let attribute_nodes = self.document.find_nodes_by_kind("attribute");
+    let attribute_nodes = self.document.get_nodes_by_kind("attribute");
 
     for attribute_node in attribute_nodes {
       if let Some(name_node) = self
@@ -127,12 +127,7 @@ impl<'a> Analyzer<'a> {
 
         let matching_attributes: Vec<_> = builtins::BUILTINS
           .iter()
-          .filter_map(|f| match f {
-            Builtin::Attribute { name, .. } if *name == attribute_name => {
-              Some(f)
-            }
-            _ => None,
-          })
+          .filter(|f| matches!(f, Builtin::Attribute { name, .. } if *name == attribute_name))
           .collect();
 
         if matching_attributes.is_empty() {
@@ -231,7 +226,7 @@ impl<'a> Analyzer<'a> {
   fn analyze_function_calls(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let function_calls = self.document.find_nodes_by_kind("function_call");
+    let function_calls = self.document.get_nodes_by_kind("function_call");
 
     for function_call in function_calls {
       if let Some(name_node) = self
@@ -306,17 +301,17 @@ impl<'a> Analyzer<'a> {
       recipe
         .dependencies
         .iter()
-        .filter(|dep| !recipe_names.contains(*dep))
+        .filter(|dep| !recipe_names.contains(&dep.name))
         .map(move |dep| lsp::Diagnostic {
           range: recipe.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Recipe '{}' not found", dep),
+          message: format!("Recipe '{}' not found", dep.name),
           ..Default::default()
         })
     }));
 
-    for recipe in recipes {
+    for recipe in &recipes {
       let mut seen = HashSet::new();
 
       let mut passed_default = false;
@@ -383,6 +378,57 @@ impl<'a> Analyzer<'a> {
 
         if has_default {
           passed_default = true;
+        }
+      }
+    }
+
+    let recipe_params = recipes
+      .iter()
+      .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
+      .collect::<HashMap<String, Vec<Parameter>>>();
+
+    for recipe in &recipes {
+      for dependency in &recipe.dependencies {
+        if let Some(params) = recipe_params.get(&dependency.name) {
+          let required_params = params
+            .iter()
+            .filter(|p| {
+              p.default_value.is_none()
+                && !matches!(p.kind, ParameterKind::Variadic(_))
+            })
+            .count();
+
+          let has_variadic = params
+            .iter()
+            .any(|p| matches!(p.kind, ParameterKind::Variadic(_)));
+
+          let total_params = params.len();
+
+          let arg_count = dependency.arguments.len();
+
+          if arg_count < required_params {
+            diagnostics.push(lsp::Diagnostic {
+              range: dependency.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Dependency '{}' requires {} argument(s), but {} provided",
+                dependency.name, required_params, arg_count
+              ),
+              ..Default::default()
+            });
+          } else if !has_variadic && arg_count > total_params {
+            diagnostics.push(lsp::Diagnostic {
+              range: dependency.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!(
+                "Dependency '{}' accepts {} argument(s), but {} provided",
+                dependency.name, total_params, arg_count
+              ),
+              ..Default::default()
+            });
+          }
         }
       }
     }
@@ -1106,5 +1152,108 @@ mod tests {
       0,
       "Valid attributes should not produce diagnostics"
     );
+  }
+
+  #[test]
+  fn analyze_recipes() {
+    let doc = document(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo 'value1')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("requires 2 argument(s), but 1 provided"));
+
+    let doc = document(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("accepts 1 argument(s), but 3 provided"));
+
+    let doc = document(indoc! {
+      "
+      foo arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo 'value1')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Should not have errors when default values are used"
+    );
+
+    let doc = document(indoc! {
+      "
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(
+      diagnostics.len(),
+      0,
+      "Should not have errors when variadic parameters are used"
+    );
+
+    let doc = document(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0]
+      .message
+      .contains("requires 2 argument(s), but 0 provided"));
   }
 }

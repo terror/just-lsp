@@ -7,7 +7,7 @@ use {
     node_ext::NodeExt,
     point_ext::PointExt,
     position_ext::PositionExt,
-    recipe::{Parameter, ParameterKind, Recipe},
+    recipe::{Dependency, Parameter, ParameterKind, Recipe},
     server::Server,
     setting::{Setting, SettingKind},
   },
@@ -15,7 +15,7 @@ use {
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
   std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
     process,
