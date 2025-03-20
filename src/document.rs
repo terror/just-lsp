@@ -74,7 +74,7 @@ impl Document {
     }
   }
 
-  fn find_all_children_by_kind_recursive<'a>(
+  fn find_children_by_kind_recursive<'a>(
     &'a self,
     start_node: &'a Node,
     kind: &str,
@@ -110,7 +110,7 @@ impl Document {
     kind: &str,
   ) -> Option<Node<'a>> {
     self
-      .find_all_children_by_kind_recursive(start_node, kind)
+      .find_children_by_kind_recursive(start_node, kind)
       .first()
       .copied()
   }
@@ -199,7 +199,7 @@ impl Document {
                 let dep_name = self.get_node_text(&id_node);
 
                 let arguments = self
-                  .find_all_children_by_kind_recursive(&dep_node, "value")
+                  .find_children_by_kind_recursive(&dep_node, "value")
                   .iter()
                   .map(|arg_node| self.get_node_text(arg_node))
                   .collect::<Vec<_>>();
