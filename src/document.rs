@@ -210,6 +210,22 @@ impl Document {
       .collect()
   }
 
+  pub(crate) fn get_variables(&self) -> Vec<Variable> {
+    self
+      .get_nodes_by_kind("assignment")
+      .iter()
+      .filter_map(|assignment_node| {
+        let name_node =
+          self.find_child_by_kind(assignment_node, "identifier")?;
+
+        Some(Variable {
+          name: self.get_node_text(&name_node),
+          range: assignment_node.get_range(),
+        })
+      })
+      .collect()
+  }
+
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
@@ -1062,6 +1078,90 @@ mod tests {
             },
             end: lsp::Position {
               line: 9,
+              character: 0,
+            },
+          },
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn get_variables() {
+    let doc = document(indoc! {
+      "
+      tmpdir  := `mktemp -d`
+      version := \"0.2.7\"
+      tardir  := tmpdir / \"awesomesauce-\" + version
+      tarball := tardir + \".tar.gz\"
+      config  := quote(config_dir() / \".project-config\")
+      "
+    });
+
+    assert_eq!(
+      doc.get_variables(),
+      vec![
+        Variable {
+          name: "tmpdir".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 0,
+            },
+          },
+        },
+        Variable {
+          name: "version".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 2,
+              character: 0,
+            },
+          },
+        },
+        Variable {
+          name: "tardir".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 2,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 3,
+              character: 0,
+            },
+          },
+        },
+        Variable {
+          name: "tarball".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 3,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 4,
+              character: 0,
+            },
+          },
+        },
+        Variable {
+          name: "config".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 4,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 5,
               character: 0,
             },
           },

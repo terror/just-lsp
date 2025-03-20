@@ -387,8 +387,38 @@ impl<'a> Analyzer<'a> {
       .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
       .collect::<HashMap<String, Vec<Parameter>>>();
 
+    let variable_names = self
+      .document
+      .get_variables()
+      .iter()
+      .map(|variable| variable.name.clone())
+      .collect::<HashSet<_>>();
+
+    fn is_quoted(s: &str) -> bool {
+      if s.len() < 2 {
+        return false;
+      }
+
+      let first_char = s.chars().next().unwrap();
+      let last_char = s.chars().last().unwrap();
+
+      matches!((first_char, last_char), ('"', '"') | ('\'', '\''))
+    }
+
     for recipe in &recipes {
       for dependency in &recipe.dependencies {
+        for argument in &dependency.arguments {
+          if !is_quoted(argument) && !variable_names.contains(argument) {
+            diagnostics.push(lsp::Diagnostic {
+              range: recipe.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!("Variable '{}' not found", argument),
+              ..Default::default()
+            });
+          }
+        }
+
         if let Some(params) = recipe_params.get(&dependency.name) {
           let required_params = params
             .iter()
@@ -1255,5 +1285,41 @@ mod tests {
     assert!(diagnostics[0]
       .message
       .contains("requires 2 argument(s), but 0 provided"));
+
+    let doc = document(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo wow)
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0].message.contains("Variable 'wow' not found"));
+
+    let doc = document(indoc! {
+      "
+      wow := 'foo'
+
+      foo arg1:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo wow)
+        echo \"bar\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze_recipes();
+
+    assert_eq!(diagnostics.len(), 0);
   }
 }
