@@ -11,6 +11,15 @@ categories = ["just", "language-servers"]
 keywords = ["productivity", "compilers", "languager-servers", "just", "tree-sitter"]
 resolver = "2"
 
+include = [
+  "/LICENSE",
+  "/README.md",
+  "/build.rs",
+  "/src/",
+  "/vendor/*-src/**.c",
+  "/vendor/*-src/**/**.h"
+]
+
 [dependencies]
 env_logger = "0.9.3"
 log = "0.4.26"
