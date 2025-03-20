@@ -10,11 +10,11 @@ use {
     recipe::{
       Dependency, DependencyArgument, Parameter, ParameterKind, Recipe,
     },
+    rope_ext::RopeExt,
     server::Server,
     setting::{Setting, SettingKind},
     variable::Variable,
   },
-  lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
   std::{
@@ -36,6 +36,7 @@ mod node_ext;
 mod point_ext;
 mod position_ext;
 mod recipe;
+mod rope_ext;
 mod server;
 mod setting;
 mod variable;

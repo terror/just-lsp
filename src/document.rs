@@ -41,7 +41,7 @@ impl Document {
     let edits = content_changes
       .iter()
       .map(|change| self.content.build_edit(change))
-      .collect::<Result<Vec<_>, _>>()?;
+      .collect::<Vec<_>>();
 
     edits.iter().for_each(|edit| self.content.apply_edit(edit));
 
