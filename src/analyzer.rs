@@ -410,7 +410,7 @@ impl<'a> Analyzer<'a> {
         for argument in &dependency.arguments {
           if !is_quoted(argument) && !variable_names.contains(argument) {
             diagnostics.push(lsp::Diagnostic {
-              range: recipe.range,
+              range: dependency.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!("Variable '{}' not found", argument),
