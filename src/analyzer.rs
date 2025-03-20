@@ -230,49 +230,29 @@ impl<'a> Analyzer<'a> {
   }
 
   fn analyze_dependencies(&self) -> Vec<lsp::Diagnostic> {
-    let recipe_names = self
+    let recipe_names: HashSet<_> = self
       .document
       .get_recipes()
       .iter()
       .map(|recipe| recipe.name.clone())
-      .collect::<HashSet<_>>();
+      .collect();
 
-    let recipe_nodes = self.document.find_nodes_by_kind("recipe");
-
-    recipe_nodes
+    self
+      .document
+      .get_recipes()
       .iter()
-      .flat_map(|recipe_node| {
-        let recipe_header = self
-          .document
-          .find_child_by_kind(recipe_node, "recipe_header");
-
-        let dependencies = recipe_header.as_ref().and_then(|header| {
-          self.document.find_child_by_kind(header, "dependencies")
-        });
-
-        dependencies.map_or(Vec::new(), |dependencies| {
-          (0..dependencies.named_child_count())
-            .filter_map(|i| dependencies.named_child(i))
-            .filter(|dependency| dependency.kind() == "dependency")
-            .filter_map(|dependency| {
-              let identifier =
-                self.document.find_child_by_kind(&dependency, "identifier");
-
-              identifier.map(|identifier| {
-                let text = self.document.get_node_text(&identifier);
-
-                (!recipe_names.contains(&text)).then_some(lsp::Diagnostic {
-                  range: identifier.get_range(),
-                  severity: Some(lsp::DiagnosticSeverity::ERROR),
-                  source: Some("just-lsp".to_string()),
-                  message: format!("Recipe '{}' not found", text),
-                  ..Default::default()
-                })
-              })
-            })
-            .flatten()
-            .collect::<Vec<_>>()
-        })
+      .flat_map(|recipe| {
+        recipe
+          .dependencies
+          .iter()
+          .filter(|dep| !recipe_names.contains(*dep))
+          .map(move |dep| lsp::Diagnostic {
+            range: recipe.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Recipe '{}' not found", dep),
+            ..Default::default()
+          })
       })
       .collect()
   }
