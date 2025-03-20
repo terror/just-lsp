@@ -26,6 +26,9 @@ impl Server {
       }),
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
+      folding_range_provider: Some(
+        lsp::FoldingRangeProviderCapability::Simple(true),
+      ),
       hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Left(true)),
@@ -78,6 +81,13 @@ impl LanguageServer for Server {
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
     self.0.lock().await.document_highlight(params).await
+  }
+
+  async fn folding_range(
+    &self,
+    params: lsp::FoldingRangeParams,
+  ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
+    self.0.lock().await.folding_range(params).await
   }
 
   async fn goto_definition(
@@ -243,6 +253,46 @@ impl Inner {
             .collect()
         })
     }))
+  }
+
+  async fn folding_range(
+    &self,
+    params: lsp::FoldingRangeParams,
+  ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    if let Some(document) = self.documents.get(uri) {
+      let recipes = document.get_recipes();
+
+      let folding_ranges = recipes
+        .into_iter()
+        .map(|recipe| {
+          let start_line = recipe.range.start.line;
+
+          let end_line = recipe.range.end.line;
+
+          if end_line > start_line {
+            lsp::FoldingRange {
+              start_line,
+              end_line: end_line.saturating_sub(1),
+              kind: Some(lsp::FoldingRangeKind::Region),
+              ..Default::default()
+            }
+          } else {
+            lsp::FoldingRange {
+              start_line,
+              end_line: start_line,
+              kind: Some(lsp::FoldingRangeKind::Region),
+              ..Default::default()
+            }
+          }
+        })
+        .collect();
+
+      return Ok(Some(folding_ranges));
+    }
+
+    Ok(None)
   }
 
   async fn goto_definition(
@@ -1016,6 +1066,66 @@ mod tests {
     }
   }
 
+  #[derive(Debug)]
+  struct FoldingRange<'a> {
+    start_line: u32,
+    end_line: u32,
+    kind: &'a str,
+  }
+
+  impl IntoValue for FoldingRange<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "startLine": self.start_line,
+        "endLine": self.end_line,
+        "kind": self.kind
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct FoldingRangeRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for FoldingRangeRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/foldingRange",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct FoldingRangeResponse<'a> {
+    id: i64,
+    ranges: Vec<FoldingRange<'a>>,
+  }
+
+  impl IntoValue for FoldingRangeResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.ranges.into_value()
+      })
+    }
+  }
+
+  impl IntoValue for Vec<FoldingRange<'_>> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|range| range.into_value()).collect()
+    }
+  }
+
   #[tokio::test]
   async fn initialize() -> Result {
     Test::new()?
@@ -1638,6 +1748,47 @@ mod tests {
             end_line: 6,
             end_char: 16,
             kind: "text",
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn folding_range() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+        foo:
+          echo \"foo\"
+          echo \"another line\"
+
+        bar:
+          echo \"bar\"
+        "
+        },
+      })
+      .request(FoldingRangeRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(FoldingRangeResponse {
+        id: 2,
+        ranges: vec![
+          FoldingRange {
+            start_line: 0,
+            end_line: 3,
+            kind: "region",
+          },
+          FoldingRange {
+            start_line: 4,
+            end_line: 5,
+            kind: "region",
           },
         ],
       })

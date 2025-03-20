@@ -36,10 +36,14 @@ You're able to go to a recipe definition from an identifier.
 
 Like references, but highlights them inside the document.
 
+### `textDocument/foldingRange`
+
+Code folding for recipes.
+
 ### `textDocument/hover`
 
-You can request hover information for recipes, built-in functions, constants
-and see information about them.
+You can request hover information for syntactic elements like recipes, built-in
+functions, constants, etc. and see information about them.
 
 ### `textDocument/publishDiagnostics`
 
@@ -49,7 +53,7 @@ aliases, dependencies, and syntax errors.
 ### `textDocument/references`
 
 All references to an identifier can be shown. This includes aliases,
-dependencies, and recipes.
+dependencies, recipes, and more.
 
 ### `textDocument/rename`
 
