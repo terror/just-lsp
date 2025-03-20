@@ -179,10 +179,9 @@ impl<'a> Analyzer<'a> {
 
         if let Some(parent) = attribute_node.parent() {
           let target_type = match parent.kind() {
-            "recipe" => AttributeTarget::Recipe,
-            "module" => AttributeTarget::Module,
             "alias" => AttributeTarget::Alias,
-            "assignment" => AttributeTarget::Variable,
+            "module" => AttributeTarget::Module,
+            "recipe" => AttributeTarget::Recipe,
             _ => {
               diagnostics.push(lsp::Diagnostic {
                 range: attribute_node.get_range(),
@@ -200,8 +199,10 @@ impl<'a> Analyzer<'a> {
           };
 
           if !matching_attributes.iter().any(|attr| {
-            if let Builtin::Attribute { target, .. } = attr {
-              target.is_valid_for(target_type)
+            if let Builtin::Attribute { targets, .. } = attr {
+              targets
+                .iter()
+                .any(|target| target.is_valid_for(target_type))
             } else {
               false
             }

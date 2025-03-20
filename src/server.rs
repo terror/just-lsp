@@ -264,9 +264,7 @@ impl Inner {
 
           if let Some(recipe) = document.find_recipe(&text) {
             if node.parent().is_some_and(|p| {
-              p.kind() == "alias"
-                || p.kind() == "dependency"
-                || p.kind() == "recipe_header"
+              ["alias", "dependency", "recipe_header"].contains(&p.kind())
             }) {
               return Some(lsp::Hover {
                 contents: lsp::HoverContents::Markup(lsp::MarkupContent {
@@ -1293,7 +1291,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Attribute**: [no-cd]\n\nDon't change directory before executing recipe.\n\n**Introduced in**: 1.9.0\n\n**Target**: recipe",
+        content: "**Attribute**: [no-cd]\nDon't change directory before executing recipe.\n**Introduced in**: 1.9.0\n**Target(s)**: recipe",
         kind: "markdown",
         start_line: 0,
         start_char: 1,

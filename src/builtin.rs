@@ -2,11 +2,9 @@ use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AttributeTarget {
-  Recipe,
-  Module,
   Alias,
-  Variable,
-  Any,
+  Module,
+  Recipe,
 }
 
 impl Display for AttributeTarget {
@@ -15,11 +13,9 @@ impl Display for AttributeTarget {
       f,
       "{}",
       match self {
-        AttributeTarget::Recipe => "recipe",
-        AttributeTarget::Module => "module",
         AttributeTarget::Alias => "alias",
-        AttributeTarget::Variable => "variable",
-        AttributeTarget::Any => "any",
+        AttributeTarget::Module => "module",
+        AttributeTarget::Recipe => "recipe",
       }
     )
   }
@@ -27,7 +23,7 @@ impl Display for AttributeTarget {
 
 impl AttributeTarget {
   pub(crate) fn is_valid_for(&self, target: AttributeTarget) -> bool {
-    *self == AttributeTarget::Any || *self == target
+    *self == target
   }
 }
 
@@ -37,7 +33,7 @@ pub(crate) enum Builtin<'a> {
     name: &'a str,
     description: &'a str,
     version: &'a str,
-    target: AttributeTarget,
+    targets: &'a [AttributeTarget],
     parameters: Option<&'a str>,
   },
   Constant {
@@ -210,20 +206,26 @@ impl Builtin<'_> {
         name,
         description,
         version,
-        target,
+        targets,
         parameters,
       } => {
         let mut documentation =
-          format!("**Attribute**: [{}]\n\n{}", name, description);
+          format!("**Attribute**: [{}]\n{}", name, description);
 
         if let Some(params) = parameters {
           documentation
-            .push_str(&format!("\n\n**Syntax**: [{}({})]", name, params));
+            .push_str(&format!("\n**Syntax**: [{}({})]", name, params));
         }
 
-        documentation.push_str(&format!("\n\n**Introduced in**: {}", version));
+        documentation.push_str(&format!("\n**Introduced in**: {}", version));
 
-        documentation.push_str(&format!("\n\n**Target**: {target}",));
+        let targets = targets
+          .iter()
+          .map(|target| target.to_string())
+          .collect::<Vec<String>>();
+
+        documentation
+          .push_str(&format!("\n**Target(s)**: {}", targets.join(", ")));
 
         documentation
       }
