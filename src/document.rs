@@ -268,6 +268,7 @@ impl Document {
 
         Some(Variable {
           name: self.get_node_text(&name_node),
+          content: self.get_node_text(assignment_node).trim().to_string(),
           range: assignment_node.get_range(),
         })
       })
@@ -861,6 +862,7 @@ mod tests {
       vec![
         Variable {
           name: "tmpdir".into(),
+          content: "tmpdir  := `mktemp -d`".into(),
           range: lsp::Range {
             start: lsp::Position {
               line: 0,
@@ -874,6 +876,7 @@ mod tests {
         },
         Variable {
           name: "version".into(),
+          content: "version := \"0.2.7\"".into(),
           range: lsp::Range {
             start: lsp::Position {
               line: 1,
@@ -887,6 +890,7 @@ mod tests {
         },
         Variable {
           name: "tardir".into(),
+          content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
           range: lsp::Range {
             start: lsp::Position {
               line: 2,
@@ -900,6 +904,7 @@ mod tests {
         },
         Variable {
           name: "tarball".into(),
+          content: "tarball := tardir + \".tar.gz\"".into(),
           range: lsp::Range {
             start: lsp::Position {
               line: 3,
@@ -913,6 +918,8 @@ mod tests {
         },
         Variable {
           name: "config".into(),
+          content: "config  := quote(config_dir() / \".project-config\")"
+            .into(),
           range: lsp::Range {
             start: lsp::Position {
               line: 4,
@@ -1031,6 +1038,7 @@ mod tests {
             name: "first".into(),
             kind: ParameterKind::Normal,
             default_value: None,
+            content: "first".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,
@@ -1046,6 +1054,7 @@ mod tests {
             name: "second".into(),
             kind: ParameterKind::Normal,
             default_value: Some("\"default\"".into()),
+            content: "second=\"default\"".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,
@@ -1251,6 +1260,7 @@ mod tests {
             name: "target".into(),
             kind: ParameterKind::Normal,
             default_value: None,
+            content: "target".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,
@@ -1266,6 +1276,7 @@ mod tests {
             name: "lol".into(),
             kind: ParameterKind::Export,
             default_value: None,
+            content: "$lol".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,
@@ -1312,6 +1323,7 @@ mod tests {
             name: "first".into(),
             kind: ParameterKind::Normal,
             default_value: None,
+            content: "first".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,
@@ -1327,6 +1339,7 @@ mod tests {
             name: "second".into(),
             kind: ParameterKind::Variadic(VariadicType::OneOrMore),
             default_value: Some("\"default\"".into()),
+            content: "+second=\"default\"".into(),
             range: lsp::Range {
               start: lsp::Position {
                 line: 0,

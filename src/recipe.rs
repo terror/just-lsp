@@ -25,6 +25,7 @@ pub(crate) struct Parameter {
   pub(crate) name: String,
   pub(crate) kind: ParameterKind,
   pub(crate) default_value: Option<String>,
+  pub(crate) content: String,
   pub(crate) range: lsp::Range,
 }
 
@@ -69,6 +70,7 @@ impl Parameter {
       name: name.trim().into(),
       kind,
       default_value,
+      content: text.trim().to_string(),
       range,
     })
   }
@@ -120,6 +122,7 @@ mod tests {
         name: "target".to_string(),
         kind: ParameterKind::Normal,
         default_value: None,
+        content: "target".to_string(),
         range,
       }
     );
@@ -139,6 +142,7 @@ mod tests {
         name: "tests".to_string(),
         kind: ParameterKind::Normal,
         default_value: Some("\"default\"".to_string()),
+        content: "tests=\"default\"".to_string(),
         range,
       }
     );
@@ -158,6 +162,7 @@ mod tests {
         name: "triple".to_string(),
         kind: ParameterKind::Normal,
         default_value: Some("(arch + \"-unknown-unknown\")".to_string()),
+        content: "triple=(arch + \"-unknown-unknown\")".to_string(),
         range,
       }
     );
@@ -177,6 +182,7 @@ mod tests {
         name: "bar".to_string(),
         kind: ParameterKind::Export,
         default_value: None,
+        content: "$bar".to_string(),
         range,
       }
     );
@@ -196,6 +202,7 @@ mod tests {
         name: "FILES".to_string(),
         kind: ParameterKind::Variadic(VariadicType::OneOrMore),
         default_value: None,
+        content: "+FILES".to_string(),
         range,
       }
     );
@@ -215,6 +222,7 @@ mod tests {
         name: "FLAGS".to_string(),
         kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
         default_value: None,
+        content: "*FLAGS".to_string(),
         range,
       }
     );
@@ -234,6 +242,7 @@ mod tests {
         name: "FLAGS".to_string(),
         kind: ParameterKind::Variadic(VariadicType::OneOrMore),
         default_value: Some("'-q'".to_string()),
+        content: "+FLAGS='-q'".to_string(),
         range,
       }
     );

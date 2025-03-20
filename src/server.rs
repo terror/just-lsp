@@ -276,6 +276,38 @@ impl Inner {
             }
           }
 
+          if parent_kind.is_some_and(|kind| kind == "value") {
+            let recipes = document.get_recipes();
+
+            for recipe in recipes {
+              for parameter in recipe.parameters {
+                if parameter.name == text {
+                  return Some(lsp::Hover {
+                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                      kind: lsp::MarkupKind::PlainText,
+                      value: parameter.content,
+                    }),
+                    range: Some(node.get_range()),
+                  });
+                }
+              }
+            }
+
+            let variables = document.get_variables();
+
+            for variable in variables {
+              if variable.name == text {
+                return Some(lsp::Hover {
+                  contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                    kind: lsp::MarkupKind::PlainText,
+                    value: variable.content,
+                  }),
+                  range: Some(node.get_range()),
+                });
+              }
+            }
+          }
+
           for builtin in builtins::BUILTINS {
             match builtin {
               Builtin::Attribute { name, .. } if text == name => {
@@ -1332,6 +1364,110 @@ mod tests {
         start_char: 4,
         end_line: 0,
         end_char: 10,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_variable_in_interpolation() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo := 'foo'
+
+          foo:
+            echo {{ foo }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo := 'foo'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 10,
+        end_line: 3,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_recipe_parameter_in_interpolation() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 1,
+        start_char: 10,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation(
+  ) -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          arg := 'wow'
+
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 10,
+        end_line: 3,
+        end_char: 13,
       })
       .run()
       .await
