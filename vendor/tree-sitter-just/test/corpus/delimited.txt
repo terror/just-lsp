@@ -1,0 +1,265 @@
+================================================================================
+basic strings
+================================================================================
+
+foo := "a"
+bar := "b
+  c
+"
+baz := "a\"\t"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (escape_sequence)
+          (escape_sequence))))))
+
+================================================================================
+escape newlines
+================================================================================
+
+foo := "a\
+b"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (escape_sequence))))))
+
+================================================================================
+indented basic strings
+================================================================================
+
+foo := """a"""
+bar:= """b
+  c
+"""
+baz := """
+abc \t
+def \"
+ghi \n
+jkl
+"""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (escape_sequence)
+          (escape_sequence)
+          (escape_sequence))))))
+
+================================================================================
+indented with nested delim
+================================================================================
+
+foo := """ a " b """
+bar:= """b
+  "baz"
+"""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+raw strings
+================================================================================
+
+foo := 'a'
+bar := 'b
+  c
+'
+baz := 'a\"\t'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+indented raw strings
+================================================================================
+
+foo := '''a'''
+bar:= '''b
+  c
+'''
+  baz := ''''
+  abc \t
+  def \"
+'''
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+indented raw with nested delim
+================================================================================
+
+foo := ''' a ' '''
+bar:= '''b
+  'baz'
+'''
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+backticks
+================================================================================
+
+foo := `echo hi`
+bar := `echo hi
+  echo bye
+`
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body))))))
+
+================================================================================
+indented backticks
+================================================================================
+
+foo := ```echo hi```
+bar := ```
+echo bye
+```
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body))))))
+
+================================================================================
+indented backticks with nested delim
+================================================================================
+
+foo := ``` a ` ```
+bar:= ```b
+  `baz`
+```
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body))))))

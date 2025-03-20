@@ -1,0 +1,44 @@
+# Rust build
+target/**
+
+# C/C++ language server cache
+.ccls-cache/**
+
+# Node cache
+node_modules
+
+# Tree-sitter ouptut
+build/
+.build/
+log.html
+*.wasm
+*.dylib
+fuzzer-out/
+
+# Fuzzer items
+tree-sitter-src/
+fuzzer/failures/
+fuzzer/corpus
+fuzzer/artifacts
+**.log
+**.out
+**.dSYM
+
+# Windows things
+*.exp
+*.lib
+*.obj
+
+# Other repos
+repositories/
+
+# Editor files
+compile_commands.json
+.vscode/
+*.swp
+
+# No need to support ancient python
+setup.py
+
+# Configuring includes for autocompletion in C files
+.clangd

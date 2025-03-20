@@ -1,0 +1,20 @@
+/src/** linguist-vendored
+/examples/* linguist-vendored
+
+src/grammar.json linguist-generated
+src/node-types.json linguist-generated
+src/parser.c linguist-generated
+src/tree_sitter/alloc.h linguist-generated
+src/tree_sitter/array.h linguist-generated
+src/tree_sitter/parser.h linguist-generated
+
+src/grammar.json -diff
+src/node-types.json -diff
+src/parser.c -diff
+src/tree_sitter/alloc.h -diff
+src/tree_sitter/array.h -diff
+src/tree_sitter/parser.h -diff
+
+# These test files are from the fuzzer
+test/**timeout-* binary
+test/**crash-* binary

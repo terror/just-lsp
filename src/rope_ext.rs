@@ -30,6 +30,7 @@ pub trait RopeExt {
 impl RopeExt for Rope {
   fn apply_edit(&mut self, edit: &TextEdit) {
     self.remove(edit.start_char_idx..edit.end_char_idx);
+
     if !edit.text.is_empty() {
       self.insert(edit.start_char_idx, edit.text);
     }
@@ -40,7 +41,7 @@ impl RopeExt for Rope {
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> TextEdit<'a> {
     let text = change.text.as_str();
-    let text_end_byte_idx = text.as_bytes().len();
+    let text_end_byte_idx = text.len();
 
     // Determine the range for the edit
     let range = change.range.unwrap_or_else(|| lsp::Range {

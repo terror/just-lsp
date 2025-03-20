@@ -1,0 +1,52 @@
+name: Fuzz Parser
+
+on:
+  push:
+    paths:
+      - src/scanner.c
+      - .github/workflows/fuzz.yaml
+      - fuzzer/
+  pull_request:
+    paths:
+      - src/scanner.c
+      - .github/workflows/fuzz.yaml
+      - fuzzer/
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+  CI: 1
+
+jobs:
+  test:
+    name: Parser fuzzing
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Run in a container because we had some issues reproducing failures
+    container:
+      image: node:lts-slim
+    env:
+      # Just 10 minutes as a sanity check, should run longer locally.
+      # For whatever reason, this time is always wayyyy exceeded
+      # (hence the longer workflow timeout)
+      FUZZ_TOTAL_TIME: 600
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if [ -f /.dockerenv ]; then
+              echo "Running in docker"
+          else
+              echo "Not in a docker container!"
+              exit 1
+          fi
+
+          apt-get update
+          apt-get install -y clang curl make g++ git
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh |
+            bash -s -- --to /usr/bin
+      - run: just setup
+      - run: just fuzz
+      - name: Print failures
+        if: always()
+        run: ls fuzzer/failures/*  |
+          xargs -IFNAME sh -c 'echo "\nContents of FNAME:" && base64 -i FNAME'

@@ -1,0 +1,376 @@
+================================================================================
+empty
+================================================================================
+
+--------------------------------------------------------------------------------
+
+(source_file)
+
+================================================================================
+assignment
+================================================================================
+
+foo := "abc"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+expression
+================================================================================
+
+foo := "abc" + 'def'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string)))))
+
+================================================================================
+paths
+================================================================================
+
+relative := "abc" / 'def'
+absolute := / "abc"
+combined := "foo" / bar() / baz
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (function_call
+          (identifier)))
+      (value
+        (identifier)))))
+
+================================================================================
+if
+================================================================================
+
+foo := if bar == baz { qux } else { quux }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (identifier)))
+          (expression
+            (value
+              (identifier))))
+        (expression
+          (value
+            (identifier)))
+        (else_clause
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
+else if
+================================================================================
+
+foo := if a == "x" {
+  "val"
+} else if "1" != "2" {
+  foo_fn("val")
+} else if "3" == "4" {
+  if some_bool { val }
+} else { val }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (identifier)))
+          (expression
+            (value
+              (string))))
+        (expression
+          (value
+            (string)))
+        (else_if_clause
+          (condition
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))
+          (expression
+            (value
+              (function_call
+                (identifier)
+                (sequence
+                  (expression
+                    (value
+                      (string))))))))
+        (else_if_clause
+          (condition
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))
+          (expression
+            (if_expression
+              (condition
+                (expression
+                  (value
+                    (identifier))))
+              (expression
+                (value
+                  (identifier))))))
+        (else_clause
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
+function
+================================================================================
+
+foo := some_fn("param1", param2)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (function_call
+          (identifier)
+          (sequence
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (identifier)))))))))
+
+================================================================================
+export
+================================================================================
+
+export foo := "abc"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (export
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string))))))
+
+================================================================================
+import
+================================================================================
+
+import 'foo/bar.just'
+import? 'baz.just'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (import
+    (string))
+  (import
+    (string)))
+
+================================================================================
+modules
+================================================================================
+
+mod foo
+mod bar 'PATH'
+mod? baz
+mod? qux "PATH"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (module
+    (identifier))
+  (module
+    (identifier)
+    (string))
+  (module
+    (identifier))
+  (module
+    (identifier)
+    (string)))
+
+================================================================================
+set
+================================================================================
+
+set SOME_BOOL
+set FOO := true
+set dotenv-load
+set tempdir := "/tmp/just"
+set shell := ["powershell.exe", "-c"]
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (setting
+    (identifier))
+  (setting
+    (identifier)
+    (boolean))
+  (setting
+    (identifier))
+  (setting
+    (identifier)
+    (string))
+  (setting
+    (string)
+    (string)))
+
+================================================================================
+comment
+================================================================================
+
+# comment
+foo := bar # + baz
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (identifier)))
+    (comment)))
+
+================================================================================
+shebang
+================================================================================
+
+#!/usr/bin/env just
+
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang
+    (language))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with space
+================================================================================
+
+#! /usr/bin/env just
+
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang
+    (language))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+regex literal
+================================================================================
+
+foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch" }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (string)))
+          (regex_literal
+            (string)))
+        (expression
+          (value
+            (string)))
+        (else_clause
+          (expression
+            (value
+              (string))))))))
+
+================================================================================
+attribute on alias: Issue #158
+================================================================================
+
+[private]
+alias o := open
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (alias
+    (attribute
+      (identifier))
+     (identifier)
+     (identifier)))
+

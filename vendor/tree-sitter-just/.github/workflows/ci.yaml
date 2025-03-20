@@ -1,0 +1,86 @@
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  JUST_VERBOSE: 1
+  RUST_BACKTRACE: 1
+  CI: 1
+
+jobs:
+  codestyle:
+    name: codestyle & generated files
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@just
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pip install ruff
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+      - uses: actions/cache@v4
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+      - run: just setup
+      - name: Verify generated files are up to date (error)
+        run: just ci-validate-generated-files
+      - name: Check codestyle
+        run: just ci-codestyle
+
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@just
+      - uses: actions/setup-node@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          node-version: 20
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+      - uses: actions/cache@v4
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+      - run: just setup --locked
+      - name: Configure
+        run: just configure-tree-sitter
+      - name: Run tests
+        run: just test
+      - name: Check if generated files are up to date (warn only)
+        run: just ci-validate-generated-files 0
+      - name: Test WASM build
+        run: just build-wasm
+
+  success:
+    needs:
+      - codestyle
+      - test
+    runs-on: ubuntu-latest
+    # GitHub branch protection is exceedingly silly and treats "jobs skipped because a dependency
+    # failed" as success. So we have to do some contortions to ensure the job fails if any of its
+    # dependencies fails.
+    if: always() # make sure this is never "skipped"
+    steps:
+      # Manually check the status of all dependencies. `if: failure()` does not work.
+      - name: check if any dependency failed
+        run: jq --exit-status 'all(.result == "success")' <<< '${{ toJson(needs) }}'

@@ -1,0 +1,22 @@
+[package]
+name = "tree-sitter-just"
+description = "just grammar for the tree-sitter parsing library"
+version = "0.1.0"
+keywords = ["incremental", "parsing", "just"]
+categories = ["parsing", "text-editors"]
+repository = "https://github.com/IndianBoy42/tree-sitter-just"
+edition = "2021"
+license = "MIT"
+autoexamples = false
+
+build = "bindings/rust/build.rs"
+include = ["bindings/rust/*", "grammar.js", "queries-flavored/helix/*", "src/*"]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter = "~0.24.4"
+
+[build-dependencies]
+cc = "1.2.1"

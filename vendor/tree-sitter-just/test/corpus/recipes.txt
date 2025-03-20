@@ -1,0 +1,713 @@
+================================================================================
+recipe
+================================================================================
+
+foo:
+	body
+
+bar:
+    body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+quiet
+================================================================================
+
+@foo:
+	body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+dependencies
+================================================================================
+
+foo: bar baz
+	body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+arguments
+================================================================================
+
+foo bar:
+  body
+
+baz qux *quux:
+	body
+
+corge *grault:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))
+        (variadic_parameter
+          (parameter
+            (identifier)))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier)))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+dependency call
+================================================================================
+
+foo +bar: baz (bar)
+	body
+
+qux bar: (quux)
+	body
+
+quux bar: (quux corge)
+	body
+
+corge: foo (quux corge + banana)
+	body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (dependency_expression
+            (identifier)))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier)))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier)))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier))
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+subsequent dependencies
+================================================================================
+
+foo: bar && baz
+  body
+
+bar a="b": foo bar && baz
+  body
+
+baz: foo && (bar "x")
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier)
+          (value
+            (string))))
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (identifier))
+        (dependency
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (string)))))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+attribute
+================================================================================
+
+[attribute]
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+attribute with one argument
+================================================================================
+
+[attribute("foo")]
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+group attribute: Issue #176
+================================================================================
+
+[group("python")]
+fmt:
+  ruff format || true
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+attribute with multiple arguments
+================================================================================
+
+[attribute("foo", "bar")]
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (string)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+stacked attributes
+================================================================================
+
+[attr1]
+[attr2]
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier))
+    (attribute
+      (identifier))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+sequence attributes
+================================================================================
+
+[attr1, attr2]
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (identifier))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang: env -i bash --
+================================================================================
+
+foo:
+  #!/usr/local/bin/env -i bash --
+  ls
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (shebang
+        (language))
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang: local sh --debug
+================================================================================
+
+foo:
+  #!~/.local/bin/sh --debug
+  ls
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (shebang
+        (language))
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with spaces
+================================================================================
+
+foo:
+  #!  /bin/sh
+  if [ -f "foo" ]; then
+    echo "foo {{var}}"
+  fi
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (shebang
+        (language))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))
+        (text))
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with longer body
+================================================================================
+
+foo:
+  #!/bin/sh
+  if [ -f "foo" ]; then
+    echo "foo {{var}}"
+  fi
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (shebang
+        (language))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))
+        (text))
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with dependency
+================================================================================
+
+foo: bar
+  #!/usr/bin/env sh
+  echo "hello"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))))
+    (recipe_body
+      (shebang
+        (language))
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with flags
+================================================================================
+#!/usr/bin/env -S bash -euxo pipefail
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang
+    (language)))
+
+================================================================================
+shebang interpolation
+================================================================================
+#!{{interp}}
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang))
+
+================================================================================
+recipes with variable expansion in shebang
+================================================================================
+
+shebang_shell := "/bin/sh"
+
+foo:
+  #!{{shebang_shell}}
+  echo "foo"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (shebang)
+      (recipe_line
+        (text)))))
+
+================================================================================
+longer bodies
+================================================================================
+
+foo:
+    body
+
+    more body
+
+    # same body
+    and even more
+
+bar:
+    body
+
+    more body
+
+
+
+
+
+
+
+
+    # same body way lower
+    and even more
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text))
+      (recipe_line
+        (text)))))
+
+================================================================================
+recipes without multiple newline separation
+================================================================================
+
+# foo
+foo:
+  echo "foo"
+# bar
+bar:
+  echo "bar"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (comment)
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+recipes containing attributes with arguments
+================================================================================
+
+
+[group("foo"), group("echo")]
+foo:
+  echo "foo"
+
+[doc("this is bar")]
+bar:
+  echo "bar"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (string)
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (attribute
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+recipes containing key/value attributes
+================================================================================
+
+
+[group: "echo", group: "foo"]
+foo:
+  echo "foo"
+
+[doc("this is bar"), group: "bar"]
+bar:
+  echo "bar"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (string)
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (attribute
+      (identifier)
+      (string)
+      (identifier)
+      (string))
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
