@@ -2,23 +2,22 @@ use {
   crate::{
     alias::Alias,
     analyzer::Analyzer,
-    attribute::{Attribute, AttributeTarget},
-    constant::Constant,
+    builtin::{AttributeTarget, Builtin, SettingKind},
     document::Document,
-    function::Function,
     node_ext::NodeExt,
     point_ext::PointExt,
     position_ext::PositionExt,
     recipe::Recipe,
     server::Server,
-    setting::{Setting, SettingKind},
   },
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
   ropey::Rope,
   std::{
     collections::{BTreeMap, HashSet},
-    env, process,
+    env,
+    fmt::{self, Display, Formatter},
+    process,
     sync::Arc,
   },
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
@@ -26,17 +25,14 @@ use {
 
 mod alias;
 mod analyzer;
-mod attribute;
-mod constant;
-mod constants;
+mod builtin;
+mod builtins;
 mod document;
-mod function;
 mod node_ext;
 mod point_ext;
 mod position_ext;
 mod recipe;
 mod server;
-mod setting;
 
 type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 

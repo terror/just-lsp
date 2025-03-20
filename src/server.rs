@@ -159,38 +159,10 @@ impl Inner {
         });
       }
 
-      for function in constants::FUNCTIONS {
-        completion_items.push(lsp::CompletionItem {
-          label: function.name.to_string(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: function.documentation(),
-            },
-          )),
-          insert_text: Some(function.snippet()),
-          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some(format!("z{}", function.name)),
-          ..Default::default()
-        });
-      }
-
-      for constant in constants::CONSTANTS {
-        completion_items.push(lsp::CompletionItem {
-          label: constant.name.to_string(),
-          kind: Some(lsp::CompletionItemKind::CONSTANT),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: format!("{}\n{}", constant.description, constant.value),
-            },
-          )),
-          insert_text: Some(constant.name.to_string()),
-          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-          sort_text: Some(format!("z{}", constant.name)),
-          ..Default::default()
-        });
+      for builtin in builtins::BUILTINS {
+        if let Some(completion_item) = builtin.completion_item() {
+          completion_items.push(completion_item);
+        }
       }
 
       return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
@@ -300,68 +272,44 @@ impl Inner {
             });
           }
 
-          for constant in constants::CONSTANTS {
-            if text == constant.name {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::PlainText,
-                  value: format!(
-                    "{}\n{}",
-                    constant.description, constant.value
-                  ),
-                }),
-                range: Some(node.get_range()),
-              });
-            }
-          }
-
-          for function in constants::FUNCTIONS {
-            if text == function.name {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::Markdown,
-                  value: function.documentation().to_string(),
-                }),
-                range: Some(node.get_range()),
-              });
-            }
-          }
-
-          if node.parent().is_some_and(|p| p.kind() == "attribute") {
-            let text = document.get_node_text(&node);
-
-            for attribute in constants::ATTRIBUTES.iter() {
-              if text == attribute.name {
-                let mut value = format!(
-                  "**Attribute**: [{}]\n\n{}",
-                  attribute.name, attribute.description
-                );
-
-                if let Some(params) = attribute.parameters {
-                  value.push_str(&format!(
-                    "\n\n**Syntax**: [{}({})]",
-                    attribute.name, params
-                  ));
+          for builtin in builtins::BUILTINS {
+            match builtin {
+              Builtin::Attribute { name, .. } => {
+                if text == name
+                  && node.parent().is_some_and(|p| p.kind() == "attribute")
+                {
+                  return Some(lsp::Hover {
+                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                      kind: lsp::MarkupKind::Markdown,
+                      value: builtin.documentation(),
+                    }),
+                    range: Some(node.get_range()),
+                  });
                 }
-
-                value.push_str(&format!(
-                  "\n\n**Introduced in**: {}",
-                  attribute.version
-                ));
-
-                value.push_str(&format!(
-                  "\n\n**Target**: {}",
-                  attribute.target.as_str()
-                ));
-
-                return Some(lsp::Hover {
-                  contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value,
-                  }),
-                  range: Some(node.get_range()),
-                });
               }
+              Builtin::Constant { name, .. } => {
+                if text == name {
+                  return Some(lsp::Hover {
+                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                      kind: lsp::MarkupKind::PlainText,
+                      value: builtin.documentation(),
+                    }),
+                    range: Some(node.get_range()),
+                  });
+                }
+              }
+              Builtin::Function { name, .. } => {
+                if text == name {
+                  return Some(lsp::Hover {
+                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                      kind: lsp::MarkupKind::Markdown,
+                      value: builtin.documentation(),
+                    }),
+                    range: Some(node.get_range()),
+                  });
+                }
+              }
+              _ => {}
             }
           }
 

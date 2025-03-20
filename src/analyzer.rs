@@ -126,12 +126,17 @@ impl<'a> Analyzer<'a> {
       {
         let attribute_name = self.document.get_node_text(&name_node);
 
-        let attribute_matches: Vec<_> = constants::ATTRIBUTES
+        let matching_attributes: Vec<_> = builtins::BUILTINS
           .iter()
-          .filter(|attr| attr.name == attribute_name)
+          .filter_map(|f| match f {
+            Builtin::Attribute { name, .. } if *name == attribute_name => {
+              Some(f)
+            }
+            _ => None,
+          })
           .collect();
 
-        if attribute_matches.is_empty() {
+        if matching_attributes.is_empty() {
           diagnostics.push(lsp::Diagnostic {
             range: name_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -139,6 +144,7 @@ impl<'a> Analyzer<'a> {
             message: format!("Unknown attribute '{}'", attribute_name),
             ..Default::default()
           });
+
           continue;
         }
 
@@ -148,43 +154,33 @@ impl<'a> Analyzer<'a> {
             .find_child_by_kind(&attribute_node, "string")
             .is_some();
 
-        for attr in &attribute_matches {
-          if attr.parameters.is_some() && !has_parameters {
-            if attribute_matches.iter().any(|a| a.parameters.is_none()) {
-              continue;
-            }
-
-            diagnostics.push(lsp::Diagnostic {
-              range: attribute_node.get_range(),
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Attribute '{}' requires parameters",
-                attribute_name
-              ),
-              ..Default::default()
-            });
-            break;
+        let parameter_mismatch = matching_attributes.iter().all(|attr| {
+          if let Builtin::Attribute { parameters, .. } = attr {
+            (parameters.is_some() && !has_parameters)
+              || (parameters.is_none() && has_parameters)
+          } else {
+            false
           }
+        });
 
-          if attr.parameters.is_none() && has_parameters {
-            if attribute_matches.iter().any(|a| a.parameters.is_some()) {
-              continue;
-            }
+        if parameter_mismatch {
+          let param_error_msg = if matching_attributes.iter().any(|attr| {
+            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_some())
+          }) {
+            format!("Attribute '{}' requires parameters", attribute_name)
+          } else {
+            format!("Attribute '{}' doesn't accept parameters", attribute_name)
+          };
 
-            diagnostics.push(lsp::Diagnostic {
-              range: attribute_node.get_range(),
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Attribute '{}' doesn't accept parameters",
-                attribute_name
-              ),
-              ..Default::default()
-            });
+          diagnostics.push(lsp::Diagnostic {
+            range: attribute_node.get_range(),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: param_error_msg,
+            ..Default::default()
+          });
 
-            break;
-          }
+          continue;
         }
 
         if let Some(parent) = attribute_node.parent() {
@@ -209,21 +205,22 @@ impl<'a> Analyzer<'a> {
             }
           };
 
-          if !attribute_matches
-            .iter()
-            .any(|attr| attr.target.is_valid_for(target_type))
-          {
+          if !matching_attributes.iter().any(|attr| {
+            if let Builtin::Attribute { target, .. } = attr {
+              target.is_valid_for(target_type)
+            } else {
+              false
+            }
+          }) {
             diagnostics.push(lsp::Diagnostic {
-              range: attribute_node.get_range(),
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Attribute '{}' cannot be applied to {} target",
-                attribute_name,
-                target_type.as_str()
-              ),
-              ..Default::default()
-            });
+            range: attribute_node.get_range(),
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!(
+              "Attribute '{attribute_name}' cannot be applied to {target_type} target",
+            ),
+            ..Default::default()
+          });
           }
         }
       }
@@ -292,16 +289,22 @@ impl<'a> Analyzer<'a> {
       {
         let function_name = self.document.get_node_text(&name_node);
 
-        if let Some(function) = constants::FUNCTIONS
+        let builtin = builtins::BUILTINS
           .iter()
-          .find(|f| f.name == function_name)
+          .find(|f| matches!(f, Builtin::Function { name, .. } if *name == function_name));
+
+        if let Some(Builtin::Function {
+          required_args,
+          accepts_variadic,
+          ..
+        }) = builtin
         {
           let arguments =
             self.document.find_child_by_kind(&function_call, "sequence");
 
           let arg_count = arguments.map_or(0, |args| args.named_child_count());
 
-          if arg_count < function.required_args {
+          if arg_count < *required_args {
             diagnostics.push(
               lsp::Diagnostic {
                 range: function_call.get_range(),
@@ -309,20 +312,18 @@ impl<'a> Analyzer<'a> {
                 source: Some("just-lsp".to_string()),
                 message: format!(
                 "Function '{}' requires at least {} argument(s), but {} provided",
-                function_name, function.required_args, arg_count
+                function_name, required_args, arg_count
               ),
                 ..Default::default()
             });
-          } else if !function.accepts_variadic
-            && arg_count > function.required_args
-          {
+          } else if !accepts_variadic && arg_count > *required_args {
             diagnostics.push(lsp::Diagnostic {
               range: function_call.get_range(),
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
                 "Function '{}' accepts {} argument(s), but {} provided",
-                function_name, function.required_args, arg_count
+                function_name, required_args, arg_count
               ),
               ..Default::default()
             });
@@ -436,18 +437,18 @@ impl<'a> Analyzer<'a> {
       {
         let setting_name = self.document.get_node_text(&name_node);
 
-        let valid_setting = constants::SETTINGS
+        let builtin = builtins::BUILTINS
           .iter()
-          .find(|setting| setting.name == setting_name);
+          .find(|f| matches!(f, Builtin::Setting { name, .. } if *name == setting_name));
 
-        if let Some(setting) = valid_setting {
+        if let Some(Builtin::Setting { kind, .. }) = builtin {
           if let Some(setting_value_node) = setting_node.child(3) {
             let (setting_value_kind, setting_value) = (
               setting_value_node.kind(),
               self.document.get_node_text(&setting_value_node),
             );
 
-            match setting.kind {
+            match kind {
               SettingKind::Boolean => {
                 if setting_value_kind != "boolean" {
                   diagnostics.push(lsp::Diagnostic {
