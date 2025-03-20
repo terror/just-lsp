@@ -2,13 +2,14 @@ use {
   crate::{
     alias::Alias,
     analyzer::Analyzer,
-    builtin::{AttributeTarget, Builtin, SettingKind},
+    builtin::{AttributeTarget, Builtin},
     document::Document,
     node_ext::NodeExt,
     point_ext::PointExt,
     position_ext::PositionExt,
     recipe::Recipe,
     server::Server,
+    setting::{Setting, SettingKind},
   },
   lsp_text::RopeExt,
   lspower::{jsonrpc, lsp, Client, LanguageServer, LspService},
@@ -33,6 +34,7 @@ mod point_ext;
 mod position_ext;
 mod recipe;
 mod server;
+mod setting;
 
 type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 

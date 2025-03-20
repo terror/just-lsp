@@ -165,6 +165,19 @@ impl Document {
       .collect()
   }
 
+  pub(crate) fn get_settings(&self) -> Vec<Setting> {
+    self
+      .find_nodes_by_kind("setting")
+      .iter()
+      .filter_map(|setting_node| {
+        Setting::parse(
+          &self.get_node_text(setting_node),
+          setting_node.get_range(),
+        )
+      })
+      .collect()
+  }
+
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
@@ -528,6 +541,99 @@ mod tests {
             },
           }
         }
+      ]
+    );
+  }
+
+  #[test]
+  fn get_settings() {
+    let doc = document(indoc! {
+      "
+      set export := true
+      set export
+      set   shell :=   ['foo']
+
+      foo:
+        echo \"foo\"
+
+      set bar := 'wow!'
+      set baz := 'bar'
+      "
+    });
+
+    assert_eq!(
+      doc.get_settings(),
+      vec![
+        Setting {
+          name: "export".into(),
+          kind: SettingKind::Boolean,
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 0
+            },
+          }
+        },
+        Setting {
+          name: "export".into(),
+          kind: SettingKind::Boolean,
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 0
+            },
+            end: lsp::Position {
+              line: 2,
+              character: 0
+            },
+          }
+        },
+        Setting {
+          name: "shell".into(),
+          kind: SettingKind::Array,
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 2,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 3,
+              character: 0,
+            },
+          },
+        },
+        Setting {
+          name: "bar".into(),
+          kind: SettingKind::String,
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 7,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 8,
+              character: 0,
+            },
+          },
+        },
+        Setting {
+          name: "baz".into(),
+          kind: SettingKind::String,
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 8,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 9,
+              character: 0,
+            },
+          },
+        },
       ]
     );
   }

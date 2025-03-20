@@ -32,13 +32,6 @@ impl AttributeTarget {
 }
 
 #[derive(Debug)]
-pub(crate) enum SettingKind {
-  Array,
-  Boolean,
-  String,
-}
-
-#[derive(Debug)]
 pub(crate) enum Builtin<'a> {
   Attribute {
     name: &'a str,

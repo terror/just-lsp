@@ -428,103 +428,48 @@ impl<'a> Analyzer<'a> {
   fn analyze_settings(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let setting_nodes = self.document.find_nodes_by_kind("setting");
+    let settings = self.document.get_settings();
 
-    for setting_node in setting_nodes.clone() {
-      if let Some(name_node) = self
-        .document
-        .find_child_by_kind(&setting_node, "identifier")
-      {
-        let setting_name = self.document.get_node_text(&name_node);
+    for setting in &settings {
+      let builtin = builtins::BUILTINS.iter().find(
+        |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
+      );
 
-        let builtin = builtins::BUILTINS
-          .iter()
-          .find(|f| matches!(f, Builtin::Setting { name, .. } if *name == setting_name));
-
-        if let Some(Builtin::Setting { kind, .. }) = builtin {
-          if let Some(setting_value_node) = setting_node.child(3) {
-            let (setting_value_kind, setting_value) = (
-              setting_value_node.kind(),
-              self.document.get_node_text(&setting_value_node),
-            );
-
-            match kind {
-              SettingKind::Boolean => {
-                if setting_value_kind != "boolean" {
-                  diagnostics.push(lsp::Diagnostic {
-                    range: setting_value_node.get_range(),
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("just-lsp".to_string()),
-                    message: format!(
-                      "Setting '{}' expects a boolean value",
-                      setting_name
-                    ),
-                    ..Default::default()
-                  });
-                }
-              }
-              SettingKind::String => {
-                if setting_value_kind != "string" {
-                  diagnostics.push(lsp::Diagnostic {
-                    range: setting_value_node.get_range(),
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("just-lsp".to_string()),
-                    message: format!(
-                      "Setting '{}' expects a string value",
-                      setting_name
-                    ),
-                    ..Default::default()
-                  });
-                }
-              }
-              SettingKind::Array => {
-                if !setting_value.starts_with('[')
-                  || !setting_value.ends_with(']')
-                {
-                  diagnostics.push(lsp::Diagnostic {
-                    range: setting_value_node.get_range(),
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("just-lsp".to_string()),
-                    message: format!(
-                      "Setting '{}' expects an array value",
-                      setting_name
-                    ),
-                    ..Default::default()
-                  });
-                }
-              }
-            }
-          }
-        } else {
+      if let Some(Builtin::Setting { kind, .. }) = builtin {
+        if setting.kind != *kind {
           diagnostics.push(lsp::Diagnostic {
-            range: name_node.get_range(),
+            range: setting.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Unknown setting '{}'", setting_name),
+            message: format!(
+              "Setting '{}' expects a {kind} value",
+              setting.name,
+            ),
             ..Default::default()
           });
         }
+      } else {
+        diagnostics.push(lsp::Diagnostic {
+          range: setting.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Unknown setting '{}'", setting.name),
+          ..Default::default()
+        });
       }
     }
 
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
 
-    for setting_node in setting_nodes {
-      if let Some(name_node) = self
-        .document
-        .find_child_by_kind(&setting_node, "identifier")
-      {
-        let setting_name = self.document.get_node_text(&name_node);
-
-        if !seen.insert(setting_name.clone()) {
-          diagnostics.push(lsp::Diagnostic {
-            range: name_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Duplicate setting '{}'", setting_name),
-            ..Default::default()
-          });
-        }
+    for setting in settings {
+      if !seen.insert(setting.name.clone()) {
+        diagnostics.push(lsp::Diagnostic {
+          range: setting.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Duplicate setting '{}'", setting.name),
+          ..Default::default()
+        });
       }
     }
 
