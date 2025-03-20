@@ -208,7 +208,20 @@ impl Builtin<'_> {
           ..Default::default()
         })
       }
-      _ => None,
+      Self::Setting { name, .. } => Some(lsp::CompletionItem {
+        label: name.to_string(),
+        kind: Some(lsp::CompletionItemKind::PROPERTY),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: self.documentation(),
+          },
+        )),
+        insert_text: Some(format!("set {} := ", name)),
+        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+        sort_text: Some(format!("z{}", name)),
+        ..Default::default()
+      }),
     }
   }
 
@@ -319,7 +332,21 @@ impl Builtin<'_> {
 
         documentation
       }
-      _ => "".into(),
+      Self::Setting {
+        name,
+        kind,
+        description,
+        default,
+        ..
+      } => {
+        let mut documentation =
+          format!("**Setting**: {}\n{}", name, description);
+
+        documentation.push_str(&format!("\n**Type**: {:?}", kind));
+        documentation.push_str(&format!("\n**Default**: {}", default));
+
+        documentation
+      }
     }
   }
 }
