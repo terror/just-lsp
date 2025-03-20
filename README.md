@@ -93,6 +93,8 @@ if not configs.just_lsp then
   }
 end
 
+local lsp = require('lspconfig')
+
 lsp.just_lsp.setup({
   on_attach = on_attach,
   capabilities = capabilities,
