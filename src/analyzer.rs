@@ -294,6 +294,20 @@ impl<'a> Analyzer<'a> {
 
     let recipes = self.document.get_recipes();
 
+    let mut seen = HashSet::new();
+
+    for recipe in &recipes {
+      if !seen.insert(&recipe.name) {
+        diagnostics.push(lsp::Diagnostic {
+          range: recipe.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Duplicate recipe name '{}'", recipe.name),
+          ..Default::default()
+        });
+      }
+    }
+
     let recipe_names: HashSet<_> =
       recipes.iter().map(|recipe| recipe.name.clone()).collect();
 
