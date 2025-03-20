@@ -51,6 +51,8 @@ pub(crate) enum Builtin<'a> {
   Setting {
     name: &'a str,
     kind: SettingKind,
+    description: &'a str,
+    default: &'a str,
   },
 }
 
