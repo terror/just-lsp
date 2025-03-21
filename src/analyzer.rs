@@ -404,7 +404,16 @@ impl<'a> Analyzer<'a> {
         }
 
         for argument in &dependency.arguments {
-          if !argument.is_quoted() && !variables.contains(&argument.value) {
+          let parameters = recipe
+            .parameters
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<HashSet<_>>();
+
+          if !argument.is_quoted()
+            && !variables.contains(&argument.value)
+            && !parameters.contains(&argument.value)
+          {
             diagnostics.push(lsp::Diagnostic {
               range: argument.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -1390,5 +1399,23 @@ mod tests {
 
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].message, "Unknown setting 'unknown-setting'");
+  }
+
+  #[test]
+  fn should_recognize_recipe_parameters_in_dependency_arguments() {
+    let doc = document(indoc! {
+      "
+      other-recipe var=\"else\":
+        echo {{ var }}
+
+      test var=\"something\": (other-recipe var)
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 0);
   }
 }
