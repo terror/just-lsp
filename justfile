@@ -1,5 +1,7 @@
 set dotenv-load
 
+export RUSTFLAGS := '--deny warnings'
+
 default:
 	just --list
 
@@ -19,7 +21,7 @@ check:
 
 [group: 'check']
 clippy:
-  cargo clippy -- --deny warnings
+  cargo clippy --all --all-targets
 
 [group: 'format']
 fmt:

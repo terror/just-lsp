@@ -801,7 +801,7 @@ mod tests {
 
     let diagnostics = analyzer.analyze();
 
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+    assert!(!diagnostics.is_empty(), "Should have at least one diagnostic");
 
     assert!(
       diagnostics
@@ -824,7 +824,7 @@ mod tests {
 
     let diagnostics = analyzer.analyze();
 
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+    assert!(!diagnostics.is_empty(), "Should have at least one diagnostic");
 
     assert!(
       diagnostics
@@ -847,7 +847,7 @@ mod tests {
 
     let diagnostics = analyzer.analyze();
 
-    assert!(diagnostics.len() > 0, "Should have at least one diagnostic");
+    assert!(!diagnostics.is_empty(), "Should have at least one diagnostic");
 
     assert!(
       diagnostics
