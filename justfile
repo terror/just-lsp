@@ -1,5 +1,7 @@
 set dotenv-load
 
+export RUSTFLAGS := '--deny warnings'
+
 default:
 	just --list
 
@@ -9,14 +11,17 @@ alias t := test
 
 all: build test clippy fmt-check
 
+[group: 'misc']
 build:
   cargo build
 
+[group: 'check']
 check:
  cargo check
 
+[group: 'check']
 clippy:
-  cargo clippy -- --deny warnings
+  cargo clippy --all --all-targets
 
 [group: 'format']
 fmt:
@@ -26,6 +31,31 @@ fmt:
 fmt-check:
   cargo +nightly fmt --all -- --check
 
+[group: 'misc']
+install:
+  cargo install -f just-lsp
+
+[group: 'dev']
+install-dev-deps:
+  rustup install nightly
+  rustup update nightly
+  cargo install cargo-watch
+
+[group: 'release']
+publish:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  rm -rf tmp/release
+  git clone git@github.com:terror/just-lsp.git tmp/release
+  cd tmp/release
+  VERSION=`sed -En 's/version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' Cargo.toml | head -1`
+  git tag -a $VERSION -m "Release $VERSION"
+  git push origin $VERSION
+  cargo publish
+  cd ../..
+  rm -rf tmp/release
+
+[group: 'dev']
 run *args:
   cargo run -- --{{args}}
 
@@ -33,5 +63,6 @@ run *args:
 test:
   cargo test
 
+[group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
