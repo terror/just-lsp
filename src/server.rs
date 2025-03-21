@@ -379,7 +379,7 @@ impl Inner {
             let variables = document.get_variables();
 
             for variable in variables {
-              if variable.name == text {
+              if variable.name.value == text {
                 return Some(lsp::Hover {
                   contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                     kind: lsp::MarkupKind::PlainText,

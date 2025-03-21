@@ -146,8 +146,14 @@ impl Document {
           self.find_child_by_kind_at_position(alias_node, "identifier", 3)?;
 
         Some(Alias {
-          left: self.get_node_text(&left_node),
-          right: self.get_node_text(&right_node),
+          name: TextNode {
+            value: self.get_node_text(&left_node),
+            range: left_node.get_range(),
+          },
+          value: TextNode {
+            value: self.get_node_text(&right_node),
+            range: right_node.get_range(),
+          },
           range: alias_node.get_range(),
         })
       })
@@ -203,8 +209,9 @@ impl Document {
                 let arguments = self
                   .find_children_by_kind_recursive(&dependency_node, "value")
                   .iter()
-                  .map(|argument_node| DependencyArgument {
+                  .map(|argument_node| TextNode {
                     value: self.get_node_text(argument_node),
+                    range: argument_node.get_range(),
                   })
                   .collect::<Vec<_>>();
 
@@ -269,7 +276,10 @@ impl Document {
           self.find_child_by_kind(assignment_node, "identifier")?;
 
         Some(Variable {
-          name: self.get_node_text(&name_node),
+          name: TextNode {
+            value: self.get_node_text(&name_node),
+            range: name_node.get_range(),
+          },
           content: self.get_node_text(assignment_node).trim().to_string(),
           range: assignment_node.get_range(),
         })
@@ -555,8 +565,32 @@ mod tests {
     assert_eq!(
       aliases[0],
       Alias {
-        left: "a1".into(),
-        right: "foo".into(),
+        name: TextNode {
+          value: "a1".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 6
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 8
+            },
+          }
+        },
+        value: TextNode {
+          value: "foo".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 12
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 15
+            },
+          }
+        },
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -646,8 +680,32 @@ mod tests {
     assert_eq!(
       aliases[0],
       Alias {
-        left: "duplicate".into(),
-        right: "foo".into(),
+        name: TextNode {
+          value: "duplicate".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 6
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 15
+            },
+          }
+        },
+        value: TextNode {
+          value: "foo".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 19
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 22
+            },
+          }
+        },
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -664,8 +722,32 @@ mod tests {
     assert_eq!(
       aliases[1],
       Alias {
-        left: "duplicate".into(),
-        right: "bar".into(),
+        name: TextNode {
+          value: "duplicate".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 6
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 15
+            },
+          }
+        },
+        value: TextNode {
+          value: "bar".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 19
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 22
+            },
+          }
+        },
         range: lsp::Range {
           start: lsp::Position {
             line: 1,
@@ -695,8 +777,32 @@ mod tests {
     assert_eq!(
       aliases[0],
       Alias {
-        left: "a1".into(),
-        right: "foo".into(),
+        name: TextNode {
+          value: "a1".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 6
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 8
+            },
+          }
+        },
+        value: TextNode {
+          value: "foo".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 12
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 15
+            },
+          }
+        },
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -713,8 +819,32 @@ mod tests {
     assert_eq!(
       aliases[1],
       Alias {
-        left: "a2".into(),
-        right: "bar".into(),
+        name: TextNode {
+          value: "a2".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 6
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 8
+            },
+          }
+        },
+        value: TextNode {
+          value: "bar".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 12
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 15
+            },
+          }
+        },
         range: lsp::Range {
           start: lsp::Position {
             line: 1,
@@ -863,7 +993,19 @@ mod tests {
       doc.get_variables(),
       vec![
         Variable {
-          name: "tmpdir".into(),
+          name: TextNode {
+            value: "tmpdir".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 0,
+                character: 0,
+              },
+              end: lsp::Position {
+                line: 0,
+                character: 6,
+              },
+            },
+          },
           content: "tmpdir  := `mktemp -d`".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -877,7 +1019,19 @@ mod tests {
           },
         },
         Variable {
-          name: "version".into(),
+          name: TextNode {
+            value: "version".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 1,
+                character: 0,
+              },
+              end: lsp::Position {
+                line: 1,
+                character: 7,
+              },
+            },
+          },
           content: "version := \"0.2.7\"".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -891,7 +1045,19 @@ mod tests {
           },
         },
         Variable {
-          name: "tardir".into(),
+          name: TextNode {
+            value: "tardir".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 2,
+                character: 0,
+              },
+              end: lsp::Position {
+                line: 2,
+                character: 6,
+              },
+            },
+          },
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -905,7 +1071,19 @@ mod tests {
           },
         },
         Variable {
-          name: "tarball".into(),
+          name: TextNode {
+            value: "tarball".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 3,
+                character: 0,
+              },
+              end: lsp::Position {
+                line: 3,
+                character: 7,
+              },
+            },
+          },
           content: "tarball := tardir + \".tar.gz\"".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -919,7 +1097,19 @@ mod tests {
           },
         },
         Variable {
-          name: "config".into(),
+          name: TextNode {
+            value: "config".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 4,
+                character: 0,
+              },
+              end: lsp::Position {
+                line: 4,
+                character: 6,
+              },
+            },
+          },
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
           range: lsp::Range {
@@ -1151,11 +1341,31 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![
-            DependencyArgument {
-              value: "'value1'".into()
+            TextNode {
+              value: "'value1'".into(),
+              range: lsp::Range {
+                start: lsp::Position {
+                  line: 3,
+                  character: 10
+                },
+                end: lsp::Position {
+                  line: 3,
+                  character: 18
+                },
+              }
             },
-            DependencyArgument {
-              value: "'value2'".into()
+            TextNode {
+              value: "'value2'".into(),
+              range: lsp::Range {
+                start: lsp::Position {
+                  line: 3,
+                  character: 19
+                },
+                end: lsp::Position {
+                  line: 3,
+                  character: 27
+                },
+              }
             }
           ],
           range: lsp::Range {

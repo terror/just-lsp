@@ -85,12 +85,12 @@ impl<'a> Analyzer<'a> {
     let mut diagnostics = Vec::new();
 
     for alias in &aliases {
-      if !recipe_names.contains(&alias.right) {
+      if !recipe_names.contains(&alias.value.value) {
         diagnostics.push(lsp::Diagnostic {
-          range: alias.range,
+          range: alias.value.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Recipe '{}' not found", alias.right),
+          message: format!("Recipe '{}' not found", alias.value.value),
           ..Default::default()
         });
       }
@@ -99,12 +99,12 @@ impl<'a> Analyzer<'a> {
     let mut seen = HashSet::new();
 
     for alias in &aliases {
-      if !seen.insert(&alias.left) {
+      if !seen.insert(&alias.name.value) {
         diagnostics.push(lsp::Diagnostic {
           range: alias.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Duplicate alias '{}'", alias.left),
+          message: format!("Duplicate alias '{}'", alias.name.value),
           ..Default::default()
         });
       }
@@ -383,7 +383,7 @@ impl<'a> Analyzer<'a> {
       .document
       .get_variables()
       .iter()
-      .map(|variable| variable.name.clone())
+      .map(|variable| variable.name.value.clone())
       .collect::<HashSet<_>>();
 
     let recipe_parameters = recipes
@@ -406,7 +406,7 @@ impl<'a> Analyzer<'a> {
         for argument in &dependency.arguments {
           if !argument.is_quoted() && !variables.contains(&argument.value) {
             diagnostics.push(lsp::Diagnostic {
-              range: dependency.range,
+              range: argument.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!("Variable '{}' not found", argument.value),

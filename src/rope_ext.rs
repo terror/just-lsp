@@ -1,19 +1,19 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TextPosition {
-  pub char: usize,
-  pub byte: usize,
-  pub code: usize,
-  pub point: tree_sitter::Point,
+pub(crate) struct TextPosition {
+  byte: usize,
+  char: usize,
+  code: usize,
+  point: tree_sitter::Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TextEdit<'a> {
-  pub input_edit: tree_sitter::InputEdit,
-  pub start_char_idx: usize,
-  pub end_char_idx: usize,
-  pub text: &'a str,
+pub(crate) struct TextEdit<'a> {
+  end_char_idx: usize,
+  input_edit: tree_sitter::InputEdit,
+  start_char_idx: usize,
+  text: &'a str,
 }
 
 pub trait RopeExt {
@@ -43,7 +43,6 @@ impl RopeExt for Rope {
     let text = change.text.as_str();
     let text_end_byte_idx = text.len();
 
-    // Determine the range for the edit
     let range = change.range.unwrap_or_else(|| lsp::Range {
       start: self.byte_to_lsp_position(0),
       end: self.byte_to_lsp_position(text_end_byte_idx),
@@ -51,12 +50,14 @@ impl RopeExt for Rope {
 
     let start = self.lsp_position_to_core(range.start);
     let old_end = self.lsp_position_to_core(range.end);
+
     let new_end_byte = start.byte + text_end_byte_idx;
 
-    // Calculate new end position
     let new_end_position = if new_end_byte >= self.len_bytes() {
       let line_idx = text.lines().count();
+
       let line_byte_idx = ropey::str_utils::line_to_byte_idx(text, line_idx);
+
       tree_sitter::Point::new(
         self.len_lines() + line_idx,
         text_end_byte_idx - line_byte_idx,
@@ -65,7 +66,6 @@ impl RopeExt for Rope {
       self.byte_to_tree_sitter_point(new_end_byte)
     };
 
-    // Create the input edit
     let input_edit = tree_sitter::InputEdit {
       start_byte: start.byte,
       old_end_byte: old_end.byte,
@@ -86,7 +86,6 @@ impl RopeExt for Rope {
   fn byte_to_lsp_position(&self, byte_idx: usize) -> lsp::Position {
     let line_idx = self.byte_to_line(byte_idx);
 
-    // Calculate UTF-16 code unit indices
     let line_char_idx = self.line_to_char(line_idx);
     let line_utf16_cu_idx = self.char_to_utf16_cu(line_char_idx);
 
