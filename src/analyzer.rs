@@ -395,7 +395,7 @@ impl<'a> Analyzer<'a> {
       for dependency in &recipe.dependencies {
         if !recipe_names.contains(&dependency.name) {
           diagnostics.push(lsp::Diagnostic {
-            range: recipe.range,
+            range: dependency.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Recipe '{}' not found", dependency.name),
