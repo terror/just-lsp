@@ -79,6 +79,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-aarch64-linux-gnu libc6-dev-i386
 
+    - name: Install musl tools
+      if: ${{ matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'aarch64-unknown-linux-musl' || matrix.target == 'arm-unknown-linux-musleabihf' || matrix.target == 'armv7-unknown-linux-musleabihf' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+
     - name: Install ARM Toolchain
       if: ${{ matrix.target == 'arm-unknown-linux-musleabihf' || matrix.target == 'armv7-unknown-linux-musleabihf' }}
       run: |
