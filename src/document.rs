@@ -177,7 +177,8 @@ impl Document {
         let candidate_parent_kind = candidate_parent.kind();
 
         match identifier_parent_kind {
-          "alias" => candidate_parent_kind == "alias",
+          "alias" | "recipe_header" => ["alias", "dependency", "recipe_header"]
+            .contains(&candidate_parent_kind),
           "assignment" => {
             if candidate_parent_kind != "value" {
               return false;
@@ -210,8 +211,6 @@ impl Document {
               .contains(&candidate_parent_kind)
               && in_same_recipe(&identifier, candidate)
           }
-          "recipe_header" => ["alias", "dependency", "recipe_header"]
-            .contains(&candidate_parent_kind),
           "value" => {
             if candidate_parent_kind == "parameter"
               && in_same_recipe(&identifier, candidate)
