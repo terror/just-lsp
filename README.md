@@ -1,6 +1,6 @@
 ## just-lsp
 
-[![CI](https://github.com/terror/just-lsp/actions/workflows/ci.yml/badge.svg)](https://github.com/terror/just-lsp/actions/workflows/ci.yml)
+[![CI](https://github.com/terror/just-lsp/actions/workflows/ci.yaml/badge.svg)](https://github.com/terror/just-lsp/actions/workflows/ci.yaml)
 [![crates.io](https://shields.io/crates/v/just-lsp.svg)](https://crates.io/crates/just-lsp)
 [![dependency status](https://deps.rs/repo/github/terror/just-lsp/status.svg)](https://deps.rs/repo/github/terror/just-lsp)
 
