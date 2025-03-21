@@ -1,7 +1,7 @@
 use super::*;
 
 pub(crate) trait NodeExt {
-  fn find_child_by_kind<'a>(&self, kind: &'a str) -> Option<Node<'_>>;
+  fn find_child_by_kind(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self) -> lsp::Range;
 }
 
