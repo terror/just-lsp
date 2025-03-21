@@ -1402,7 +1402,7 @@ mod tests {
   }
 
   #[test]
-    fn should_recognize_recipe_parameters_in_dependency() {
+  fn should_recognize_recipe_parameters_in_dependency_arguments() {
     let doc = document(indoc! {
       "
       other-recipe var=\"else\":
