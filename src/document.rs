@@ -115,6 +115,32 @@ impl Document {
       .copied()
   }
 
+  pub(crate) fn find_parent_node<'a>(
+    &self,
+    node: &'a Node,
+    parent_kind: &str,
+  ) -> Option<Node<'a>> {
+    let mut current = *node;
+    while let Some(parent) = current.parent() {
+      if parent.kind() == parent_kind {
+        return Some(parent);
+      }
+      current = parent;
+    }
+    None
+  }
+
+  #[cfg(test)]
+  fn find_node<F>(&self, kind: &str, predicate: F) -> Option<Node>
+  where
+    F: Fn(&Node) -> bool,
+  {
+    self
+      .get_nodes_by_kind(kind)
+      .into_iter()
+      .find(|node| predicate(node))
+  }
+
   pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .get_recipes()
@@ -122,14 +148,117 @@ impl Document {
       .find(|recipe| recipe.name == name)
   }
 
-  pub(crate) fn find_references(&self, name: &str) -> Vec<lsp::Location> {
+  pub(crate) fn find_references(&self, identifier: Node) -> Vec<lsp::Location> {
+    let identifier_name = self.get_node_text(&identifier);
+
+    let identifier_parent_kind = match identifier.parent() {
+      Some(parent) => parent.kind(),
+      None => return Vec::new(),
+    };
+
     self
       .get_nodes_by_kind("identifier")
       .into_iter()
-      .filter(|identifier| self.get_node_text(identifier) == name)
-      .map(|identifier| lsp::Location {
+      .filter(|candidate| {
+        if candidate.id() == identifier.id() {
+          return true;
+        }
+
+        if self.get_node_text(candidate) != identifier_name {
+          return false;
+        }
+
+        let candidate_parent = match candidate.parent() {
+          Some(p) => p,
+          None => return false,
+        };
+
+        let in_same_recipe = |a: &Node, b: &Node| -> bool {
+          let original_recipe = self.find_parent_node(&a, "recipe");
+
+          let candidate_recipe = self.find_parent_node(&b, "recipe");
+
+          match (original_recipe, candidate_recipe) {
+            (Some(r1), Some(r2)) => r1.id() == r2.id(),
+            _ => false,
+          }
+        };
+
+        let candidate_parent_kind = candidate_parent.kind();
+
+        match identifier_parent_kind {
+          "alias" => candidate_parent_kind == "alias",
+          "assignment" => {
+            if candidate_parent_kind != "value" {
+              return false;
+            }
+
+            let candidate_recipe = self.find_recipe(
+              &self
+                .find_parent_node(&candidate_parent, "recipe")
+                .map_or_else(String::new, |recipe_header_node| {
+                  self
+                    .find_child_by_kind_recursive(
+                      &recipe_header_node,
+                      "identifier",
+                    )
+                    .map_or_else(String::new, |identifier_node| {
+                      self.get_node_text(&identifier_node)
+                    })
+                }),
+            );
+
+            candidate_recipe.map_or(false, |recipe| {
+              !recipe
+                .parameters
+                .iter()
+                .any(|param| param.name == identifier_name)
+            })
+          }
+          "parameter" | "variadic_parameter" => {
+            ["value", "parameter", "variadic_parameter"]
+              .contains(&candidate_parent_kind)
+              && in_same_recipe(&identifier, candidate)
+          }
+          "recipe_header" => ["alias", "dependency", "recipe_header"]
+            .contains(&candidate_parent_kind),
+          "value" => {
+            if candidate_parent_kind == "parameter"
+              && in_same_recipe(&identifier, candidate)
+            {
+              return true;
+            }
+
+            let identifier_recipe = self.find_recipe(
+              &self.find_parent_node(&identifier, "recipe").map_or_else(
+                String::new,
+                |recipe_header_node| {
+                  self
+                    .find_child_by_kind_recursive(
+                      &recipe_header_node,
+                      "identifier",
+                    )
+                    .map_or_else(String::new, |identifier_node| {
+                      self.get_node_text(&identifier_node)
+                    })
+                },
+              ),
+            );
+
+            identifier_recipe.map_or(false, |recipe| {
+              candidate_parent_kind == "assignment"
+                && !recipe
+                  .parameters
+                  .iter()
+                  .any(|param| param.name == identifier_name)
+            })
+          }
+          _ => false,
+        }
+      })
+      .map(|found| lsp::Location {
         uri: self.uri.clone(),
-        range: identifier.get_range(),
+        range: found.get_range(),
       })
       .collect()
   }
@@ -500,25 +629,142 @@ mod tests {
   }
 
   #[test]
-  fn find_references() {
+  fn find_recipe_references() {
     let doc = document(indoc! {
       "
       foo:
         echo \"foo\"
 
-      bar: foo
+      bar foo: foo
         echo \"bar\"
 
       alias baz := foo
       "
     });
 
-    let references = doc.find_references("foo");
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "foo"
+          && node.parent().unwrap().kind() == "recipe_header"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
 
     assert_eq!(references.len(), 3);
     assert_eq!(references[0].range.start.line, 0);
     assert_eq!(references[1].range.start.line, 3);
     assert_eq!(references[2].range.start.line, 6);
+  }
+
+  #[test]
+  fn find_recipe_parameter_references() {
+    let doc = document(indoc! {
+      "
+      foo := 'bar'
+
+      foo:
+        echo {{ foo }}
+
+      bar foo: foo
+        echo {{ foo }}
+        echo {{ foo }}
+
+      alias baz := foo
+      "
+    });
+
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "foo"
+          && node.parent().unwrap().kind() == "parameter"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
+
+    assert_eq!(references.len(), 3);
+    assert_eq!(references[0].range.start.line, 5);
+    assert_eq!(references[1].range.start.line, 6);
+    assert_eq!(references[2].range.start.line, 7);
+  }
+
+  #[test]
+  fn find_interpolation_references() {
+    let doc = document(indoc! {
+      "
+      foo := \"foo\"
+
+      foo foo:
+        echo {{ foo }}
+      "
+    });
+
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "foo"
+          && node.parent().unwrap().kind() == "value"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
+
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].range.start.line, 2);
+    assert_eq!(references[1].range.start.line, 3);
+
+    let doc = document(indoc! {
+      "
+      foo := \"foo\"
+
+      foo:
+        echo {{ foo }}
+      "
+    });
+
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "foo"
+          && node.parent().unwrap().kind() == "value"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
+
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].range.start.line, 0);
+    assert_eq!(references[1].range.start.line, 3);
+  }
+
+  #[test]
+  fn find_variable_references() {
+    let doc = document(indoc! {
+      "
+      foo := 'bar'
+
+      foo:
+        echo {{ foo }}
+
+      bar foo: foo
+        echo {{ foo }}
+        echo {{ foo }}
+
+      alias baz := foo
+      "
+    });
+
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "foo"
+          && node.parent().unwrap().kind() == "assignment"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
+
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].range.start.line, 0);
+    assert_eq!(references[1].range.start.line, 3);
   }
 
   #[test]
