@@ -174,9 +174,9 @@ impl Document {
         };
 
         let in_same_recipe = |a: &Node, b: &Node| -> bool {
-          let original_recipe = self.find_parent_node(&a, "recipe");
+          let original_recipe = self.find_parent_node(a, "recipe");
 
-          let candidate_recipe = self.find_parent_node(&b, "recipe");
+          let candidate_recipe = self.find_parent_node(b, "recipe");
 
           match (original_recipe, candidate_recipe) {
             (Some(r1), Some(r2)) => r1.id() == r2.id(),
@@ -208,7 +208,7 @@ impl Document {
                 }),
             );
 
-            candidate_recipe.map_or(false, |recipe| {
+            candidate_recipe.is_some_and(|recipe| {
               !recipe
                 .parameters
                 .iter()
@@ -245,7 +245,7 @@ impl Document {
               ),
             );
 
-            identifier_recipe.map_or(false, |recipe| {
+            identifier_recipe.is_some_and(|recipe| {
               candidate_parent_kind == "assignment"
                 && !recipe
                   .parameters

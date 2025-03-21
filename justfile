@@ -1,7 +1,5 @@
 set dotenv-load
 
-export RUSTFLAGS := '--deny warnings'
-
 default:
 	just --list
 
