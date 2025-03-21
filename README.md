@@ -20,7 +20,7 @@ cargo install just-lsp
 ## Features
 
 The server implements a decent amount of the
-language server protocol [specifiction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
+language server protocol [specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
 This section aims to document some of them.
 
 ### `textDocument/completion`
@@ -82,6 +82,8 @@ cargo build
 Add this to your editor configuration:
 
 ```lua
+local lsp = require('lspconfig')
+
 local configs = require('lspconfig.configs')
 
 if not configs.just_lsp then
@@ -97,7 +99,11 @@ if not configs.just_lsp then
   }
 end
 
-local lsp = require('lspconfig')
+local on_attach = function(client)
+  -- Add your implementation here
+end
+
+local capabilities = {} -- Define what functionality the LSP client is able to handle
 
 lsp.just_lsp.setup({
   on_attach = on_attach,
