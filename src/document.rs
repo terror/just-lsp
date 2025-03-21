@@ -177,7 +177,7 @@ impl Document {
         let candidate_parent_kind = candidate_parent.kind();
 
         match identifier_parent_kind {
-          "alias" => candidate_parent_kind == "alias",
+          "alias" => candidate_parent_kind == "recipe_header",
           "assignment" => {
             if candidate_parent_kind != "value" {
               return false;
