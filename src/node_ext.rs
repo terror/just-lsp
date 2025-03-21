@@ -6,7 +6,7 @@ pub(crate) trait NodeExt {
 }
 
 impl NodeExt for Node<'_> {
-  fn find_child_by_kind<'a>(&self, kind: &'a str) -> Option<Node<'_>> {
+  fn find_child_by_kind(&self, kind: &str) -> Option<Node<'_>> {
     (0..self.child_count())
       .filter_map(|i| self.child(i))
       .find(|child| child.kind() == kind)
