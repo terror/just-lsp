@@ -85,16 +85,6 @@ impl Document {
     nodes
   }
 
-  pub(crate) fn find_child_by_kind<'a>(
-    &'a self,
-    node: &'a Node,
-    kind: &str,
-  ) -> Option<Node<'a>> {
-    (0..node.child_count())
-      .filter_map(|i| node.child(i))
-      .find(|child| child.kind() == kind)
-  }
-
   pub(crate) fn find_child_by_kind_at_position<'a>(
     &'a self,
     node: &'a Node,
@@ -315,15 +305,13 @@ impl Document {
       .get_nodes_by_kind("recipe")
       .iter()
       .filter_map(|recipe_node| {
-        let recipe_header =
-          self.find_child_by_kind(recipe_node, "recipe_header")?;
+        let recipe_header = recipe_node.find_child_by_kind("recipe_header")?;
 
-        let recipe_name = self.get_node_text(
-          &self.find_child_by_kind(&recipe_header, "identifier")?,
-        );
+        let recipe_name =
+          self.get_node_text(&recipe_header.find_child_by_kind("identifier")?);
 
-        let dependencies = self
-          .find_child_by_kind(&recipe_header, "dependencies")
+        let dependencies = recipe_header
+          .find_child_by_kind("dependencies")
           .map(|dependencies_node| {
             self
               .find_children_by_kind_recursive(&dependencies_node, "dependency")
@@ -354,8 +342,8 @@ impl Document {
           })
           .unwrap_or_default();
 
-        let parameters = self
-          .find_child_by_kind(&recipe_header, "parameters")
+        let parameters = recipe_header
+          .find_child_by_kind("parameters")
           .map_or_else(Vec::new, |params_node| {
             (0..params_node.named_child_count())
               .filter_map(|i| params_node.named_child(i))
@@ -401,13 +389,13 @@ impl Document {
       .get_nodes_by_kind("assignment")
       .iter()
       .filter_map(|assignment_node| {
-        let name_node =
-          self.find_child_by_kind(assignment_node, "identifier")?;
+        let identifier_node =
+          assignment_node.find_child_by_kind("identifier")?;
 
         Some(Variable {
           name: TextNode {
-            value: self.get_node_text(&name_node),
-            range: name_node.get_range(),
+            value: self.get_node_text(&identifier_node),
+            range: identifier_node.get_range(),
           },
           content: self.get_node_text(assignment_node).trim().to_string(),
           range: assignment_node.get_range(),
@@ -512,28 +500,6 @@ mod tests {
     assert_eq!(doc.content.to_string(), content);
 
     assert!(doc.tree.is_some());
-  }
-
-  #[test]
-  fn find_child_by_kind() {
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-    "});
-
-    let recipes = doc.get_nodes_by_kind("recipe");
-    assert_eq!(recipes.len(), 1);
-
-    let recipe = &recipes[0];
-
-    let header = doc.find_child_by_kind(recipe, "recipe_header");
-    assert!(header.is_some());
-
-    let body = doc.find_child_by_kind(recipe, "recipe_body");
-    assert!(body.is_some());
-
-    let nonexistent = doc.find_child_by_kind(recipe, "nonexistent");
-    assert!(nonexistent.is_none());
   }
 
   #[test]
