@@ -244,7 +244,7 @@ impl Inner {
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
           document
-            .find_references(&document.get_node_text(&identifier))
+            .find_references(identifier)
             .into_iter()
             .map(|location| lsp::DocumentHighlight {
               range: location.range,
@@ -478,9 +478,7 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          document.find_references(&document.get_node_text(&identifier))
-        })
+        .map(|identifier| document.find_references(identifier))
     }))
   }
 
@@ -498,10 +496,8 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|node| {
-          let old_name = document.get_node_text(&node);
-
-          let references = document.find_references(&old_name);
+        .map(|identifier| {
+          let references = document.find_references(identifier);
 
           let text_edits: Vec<lsp::TextEdit> = references
             .iter()
