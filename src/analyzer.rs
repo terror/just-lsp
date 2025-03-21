@@ -119,10 +119,7 @@ impl<'a> Analyzer<'a> {
     let attribute_nodes = self.document.get_nodes_by_kind("attribute");
 
     for attribute_node in attribute_nodes {
-      if let Some(name_node) = self
-        .document
-        .find_child_by_kind(&attribute_node, "identifier")
-      {
+      if let Some(name_node) = attribute_node.find_child_by_kind("identifier") {
         let attribute_name = self.document.get_node_text(&name_node);
 
         let matching_attributes: Vec<_> = builtins::BUILTINS
@@ -143,10 +140,7 @@ impl<'a> Analyzer<'a> {
         }
 
         let has_parameters = attribute_node.child_count() > 2
-          && self
-            .document
-            .find_child_by_kind(&attribute_node, "string")
-            .is_some();
+          && attribute_node.find_child_by_kind("string").is_some();
 
         let parameter_mismatch = matching_attributes.iter().all(|attr| {
           if let Builtin::Attribute { parameters, .. } = attr {
@@ -230,11 +224,10 @@ impl<'a> Analyzer<'a> {
     let function_calls = self.document.get_nodes_by_kind("function_call");
 
     for function_call in function_calls {
-      if let Some(name_node) = self
-        .document
-        .find_child_by_kind(&function_call, "identifier")
+      if let Some(identifier_node) =
+        function_call.find_child_by_kind("identifier")
       {
-        let function_name = self.document.get_node_text(&name_node);
+        let function_name = self.document.get_node_text(&identifier_node);
 
         let builtin = builtins::BUILTINS
           .iter()
@@ -246,8 +239,7 @@ impl<'a> Analyzer<'a> {
           ..
         }) = builtin
         {
-          let arguments =
-            self.document.find_child_by_kind(&function_call, "sequence");
+          let arguments = function_call.find_child_by_kind("sequence");
 
           let arg_count = arguments.map_or(0, |args| args.named_child_count());
 
@@ -277,7 +269,7 @@ impl<'a> Analyzer<'a> {
           }
         } else {
           diagnostics.push(lsp::Diagnostic {
-            range: name_node.get_range(),
+            range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown function '{}'", function_name),
