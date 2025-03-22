@@ -178,6 +178,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let recipes = root.find_all("recipe");
+
     assert_eq!(recipes.len(), 2);
 
     assert_eq!(
@@ -268,12 +269,15 @@ mod tests {
     assert_eq!(recipe_header_identifiers.len(), 2);
 
     let second_recipe = root.find("recipe[1]").unwrap();
+
     let recipe_header = second_recipe.find("recipe_header");
+
     assert!(recipe_header.is_some());
 
     let recipe_header_node = recipe_header.unwrap();
 
     let parameters = recipe_header_node.find_all("parameters > parameter");
+
     assert_eq!(parameters.len(), 2);
   }
 
@@ -399,5 +403,24 @@ mod tests {
 
     let second_identifier = alias.find("identifier[1]");
     assert!(second_identifier.is_some());
+  }
+
+  #[test]
+  fn find_nested_child() {
+    let doc = document(indoc! {
+      "
+      foo: (bar baz):
+        echo foo
+      "
+    });
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier =
+      root.find("dependency_expression > expression > value > identifier");
+
+    assert!(identifier.is_some());
+
+    assert_eq!(doc.get_node_text(&identifier.unwrap()), "baz");
   }
 }
