@@ -143,7 +143,7 @@ impl Document {
     path: &str,
     start_node: Option<Node<'a>>,
   ) -> Option<Node<'a>> {
-    self.tree.as_ref().map_or(None, |tree| {
+    self.tree.as_ref().and_then(|tree| {
       let parts: Vec<&str> = path.split('>').map(|s| s.trim()).collect();
 
       if parts.is_empty() {
@@ -161,15 +161,13 @@ impl Document {
         Self::collect_nodes(&mut cursor, parts[0], &mut candidates);
       }
 
-      for i in 1..parts.len() {
-        let target_kind = parts[i];
-
+      for target_kind in parts.iter().skip(1) {
         let mut next_candidates = Vec::new();
 
         for node in candidates {
           for j in 0..node.named_child_count() {
             if let Some(child) = node.named_child(j) {
-              if child.kind() == target_kind {
+              if child.kind() == *target_kind {
                 next_candidates.push(child);
               }
             }
