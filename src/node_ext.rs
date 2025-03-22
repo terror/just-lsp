@@ -1,12 +1,13 @@
 use super::*;
 
 pub(crate) trait NodeExt {
-  fn find_child_by_kind(&self, kind: &str) -> Option<Node<'_>>;
+  fn find_child_by_kind(&self, kind: &str) -> Option<Node>;
   fn get_range(&self) -> lsp::Range;
+  fn search(&self, path: &str) -> Option<Node>;
 }
 
 impl NodeExt for Node<'_> {
-  fn find_child_by_kind(&self, kind: &str) -> Option<Node<'_>> {
+  fn find_child_by_kind(&self, kind: &str) -> Option<Node> {
     (0..self.child_count())
       .filter_map(|i| self.child(i))
       .find(|child| child.kind() == kind)
@@ -17,6 +18,62 @@ impl NodeExt for Node<'_> {
       start: self.start_position().position(),
       end: self.end_position().position(),
     }
+  }
+
+  fn search(&self, path: &str) -> Option<Node> {
+    let parts: Vec<&str> = path.split('>').map(str::trim).collect();
+
+    if parts.is_empty() {
+      return None;
+    }
+
+    fn collect<'a>(node: Node<'a>, kind: &str, results: &mut Vec<Node<'a>>) {
+      if node.kind() == kind {
+        results.push(node);
+      }
+
+      for i in 0..node.child_count() {
+        if let Some(child) = node.child(i) {
+          collect(child, kind, results);
+        }
+      }
+    }
+
+    let first_kind = parts[0];
+
+    let mut matches = Vec::new();
+
+    if self.kind() == first_kind {
+      matches.push(*self);
+    } else {
+      collect(*self, first_kind, &mut matches);
+    }
+
+    if matches.is_empty() {
+      return None;
+    }
+
+    for &target_kind in parts.iter().skip(1) {
+      let mut next_matches = Vec::with_capacity(matches.len());
+
+      for node in matches {
+        for j in 0..node.named_child_count() {
+          if let Some(child) = node.named_child(j) {
+            if child.kind() == target_kind {
+              next_matches.push(child);
+            }
+          }
+        }
+      }
+
+      if next_matches.is_empty() {
+        return None;
+      }
+
+      matches = next_matches;
+    }
+
+    matches.first().copied()
   }
 }
 
