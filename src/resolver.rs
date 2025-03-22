@@ -150,7 +150,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe_references() {
+  fn resolve_recipe() {
     let doc = document(indoc! {
       "
       foo:
@@ -178,7 +178,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe_parameter_references() {
+  fn resolve_recipe_parameter() {
     let doc = document(indoc! {
       "
       foo := 'bar'
@@ -209,7 +209,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_interpolation_references() {
+  fn resolve_interpolation() {
     let doc = document(indoc! {
       "
       foo := \"foo\"
@@ -254,7 +254,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_variable_references() {
+  fn resolve_variable() {
     let doc = document(indoc! {
       "
       foo := 'bar'
@@ -284,7 +284,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_dependency_argument_references() {
+  fn resolve_dependency_argument() {
     let doc = document(indoc! {
       "
       a := 'foo'
