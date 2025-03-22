@@ -96,7 +96,9 @@ impl<'a> Resolver<'a> {
               _ => false,
             };
 
-            if in_same_recipe && candidate_parent_kind == "parameter" {
+            if in_same_recipe
+              && ["parameter", "value"].contains(&candidate_parent_kind)
+            {
               return true;
             }
 
@@ -236,7 +238,7 @@ mod tests {
       foo := \"foo\"
 
       foo:
-        echo {{ foo }}
+        echo {{ foo / foo }}
       "
     });
 
@@ -248,7 +250,7 @@ mod tests {
 
     let references = resolver.resolve_identifier(&identifier);
 
-    assert_eq!(references.len(), 2);
+    assert_eq!(references.len(), 3);
     assert_eq!(references[0].range.start.line, 0);
     assert_eq!(references[1].range.start.line, 3);
   }
