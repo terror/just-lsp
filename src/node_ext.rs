@@ -7,6 +7,61 @@ pub(crate) trait NodeExt {
   fn get_range(&self) -> lsp::Range;
 }
 
+fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
+  let self_match = if node.kind() == kind {
+    vec![node]
+  } else {
+    Vec::new()
+  };
+
+  let children_matches = (0..node.child_count())
+    .filter_map(|i| node.child(i))
+    .flat_map(|child| collect_nodes_by_kind(child, kind))
+    .collect::<Vec<_>>();
+
+  [self_match, children_matches].concat()
+}
+
+fn collect_nodes_by_kind_recursive<'a>(
+  node: Node<'a>,
+  kind: &str,
+) -> Vec<Node<'a>> {
+  (0..node.child_count())
+    .filter_map(|i| node.child(i))
+    .flat_map(|child| {
+      let self_match = if child.kind() == kind {
+        vec![child]
+      } else {
+        Vec::new()
+      };
+
+      let descendants = collect_nodes_by_kind_recursive(child, kind);
+
+      [self_match, descendants].concat()
+    })
+    .collect()
+}
+
+fn collect_descendants_by_kind<'a>(
+  node: Node<'a>,
+  kind: &str,
+) -> Vec<Node<'a>> {
+  (0..node.child_count())
+    .filter_map(|i| node.child(i))
+    .flat_map(|child| {
+      let self_match = if child.kind() == kind {
+        vec![child]
+      } else {
+        Vec::new()
+      };
+
+      let descendants = collect_descendants_by_kind(child, kind);
+
+      [self_match, descendants].concat()
+    })
+    .collect()
+}
+
 impl NodeExt for Node<'_> {
   fn get_range(&self) -> lsp::Range {
     lsp::Range {
@@ -21,23 +76,19 @@ impl NodeExt for Node<'_> {
 
   fn find_all(&self, selector: &str) -> Vec<Node> {
     if selector.contains(',') {
-      let mut all_results = Vec::new();
-
-      for sub_selector in selector.split(',').map(str::trim) {
-        all_results.extend(self.find_all(sub_selector));
-      }
-
-      return all_results;
+      return selector
+        .split(',')
+        .map(str::trim)
+        .flat_map(|sub_selector| self.find_all(sub_selector))
+        .collect();
     }
 
     if let Some(position_str) = selector.strip_prefix('@') {
-      if let Ok(position) = position_str.parse::<usize>() {
-        return if let Some(child) = self.child(position) {
-          vec![child]
-        } else {
-          Vec::new()
-        };
-      }
+      return position_str
+        .parse::<usize>()
+        .ok()
+        .and_then(|position| self.child(position))
+        .map_or_else(Vec::new, |child| vec![child]);
     }
 
     if let Some(kind) = selector.strip_prefix('^') {
@@ -48,9 +99,7 @@ impl NodeExt for Node<'_> {
     }
 
     if let Some(kind) = selector.strip_suffix('*') {
-      let mut results = Vec::new();
-      collect_nodes_by_kind_recursive(*self, kind, &mut results);
-      return results;
+      return collect_nodes_by_kind_recursive(*self, kind);
     }
 
     if selector.contains('[') && selector.ends_with(']') {
@@ -61,12 +110,10 @@ impl NodeExt for Node<'_> {
 
         if let Ok(index) = index_str.parse::<usize>() {
           let all_of_kind = self.find_all(kind);
-
-          return if index < all_of_kind.len() {
-            vec![all_of_kind[index]]
-          } else {
-            Vec::new()
-          };
+          return all_of_kind
+            .get(index)
+            .copied()
+            .map_or_else(Vec::new, |node| vec![node]);
         }
       }
     }
@@ -74,100 +121,41 @@ impl NodeExt for Node<'_> {
     if selector.contains(" > ") {
       let parts: Vec<&str> = selector.split(" > ").collect();
 
-      let mut current_matches = self.find_all(parts[0]);
-
-      for part in parts.iter().skip(1) {
-        let mut next_matches = Vec::new();
-
-        for parent in current_matches {
-          for i in 0..parent.named_child_count() {
-            if let Some(child) = parent.named_child(i) {
-              if child.kind() == *part {
-                next_matches.push(child);
-              }
-            }
-          }
-        }
-
-        current_matches = next_matches;
-      }
-
-      return current_matches;
-    }
-
-    fn collect_nodes_by_kind<'a>(
-      node: Node<'a>,
-      kind: &str,
-      results: &mut Vec<Node<'a>>,
-    ) {
-      if node.kind() == kind {
-        results.push(node);
-      }
-
-      for i in 0..node.child_count() {
-        if let Some(child) = node.child(i) {
-          collect_nodes_by_kind(child, kind, results);
-        }
-      }
-    }
-
-    fn collect_nodes_by_kind_recursive<'a>(
-      node: Node<'a>,
-      kind: &str,
-      results: &mut Vec<Node<'a>>,
-    ) {
-      for i in 0..node.child_count() {
-        if let Some(child) = node.child(i) {
-          if child.kind() == kind {
-            results.push(child);
-          }
-
-          collect_nodes_by_kind_recursive(child, kind, results);
-        }
-      }
-    }
-
-    fn collect_descendants_by_kind<'a>(
-      node: Node<'a>,
-      kind: &str,
-      results: &mut Vec<Node<'a>>,
-    ) {
-      for i in 0..node.child_count() {
-        if let Some(child) = node.child(i) {
-          if child.kind() == kind {
-            results.push(child);
-          }
-
-          collect_descendants_by_kind(child, kind, results);
-        }
-      }
+      return parts.iter().skip(1).fold(
+        self.find_all(parts[0]),
+        |parents, &child_kind| {
+          parents
+            .iter()
+            .flat_map(|parent| {
+              (0..parent.named_child_count())
+                .filter_map(|i| parent.named_child(i))
+                .filter(|child| child.kind() == child_kind)
+                .collect::<Vec<_>>()
+            })
+            .collect()
+        },
+      );
     }
 
     if selector.contains(' ') {
       let parts: Vec<&str> = selector.split_whitespace().collect();
 
       if parts.len() >= 2 {
-        let mut current_matches = self.find_all(parts[0]);
-
-        for &part in &parts[1..] {
-          let mut next_matches = Vec::new();
-
-          for current_node in &current_matches {
-            let mut descendants = Vec::new();
-            collect_descendants_by_kind(*current_node, part, &mut descendants);
-            next_matches.extend(descendants);
-          }
-
-          current_matches = next_matches;
-        }
-
-        return current_matches;
+        return parts.iter().skip(1).fold(
+          self.find_all(parts[0]),
+          |ancestors, &descendant_kind| {
+            ancestors
+              .iter()
+              .flat_map(|&ancestor| {
+                collect_descendants_by_kind(ancestor, descendant_kind)
+              })
+              .collect()
+          },
+        );
       }
     }
 
-    let mut results = Vec::new();
-    collect_nodes_by_kind(*self, selector, &mut results);
-    results
+    collect_nodes_by_kind(*self, selector)
   }
 
   fn get_parent(&self, kind: &str) -> Option<Node> {
