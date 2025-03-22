@@ -239,12 +239,14 @@ impl Inner {
     let position = params.text_document_position_params.position;
 
     Ok(self.documents.get(&uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
-          document
-            .find_references(identifier)
+          resolver
+            .resolve_identifier(&identifier)
             .into_iter()
             .map(|location| lsp::DocumentHighlight {
               range: location.range,
@@ -475,10 +477,12 @@ impl Inner {
     let position = params.text_document_position.position;
 
     Ok(self.documents.get(&uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| document.find_references(identifier))
+        .map(|identifier| resolver.resolve_identifier(&identifier))
     }))
   }
 
@@ -493,11 +497,13 @@ impl Inner {
     let new_name = params.new_name;
 
     Ok(self.documents.get(&uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
-          let references = document.find_references(identifier);
+          let references = resolver.resolve_identifier(&identifier);
 
           let text_edits: Vec<lsp::TextEdit> = references
             .iter()
