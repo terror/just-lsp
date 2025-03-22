@@ -50,87 +50,6 @@ impl Document {
     Ok(())
   }
 
-  fn collect_nodes<'a>(
-    cursor: &mut TreeCursor<'a>,
-    kind: &str,
-    nodes: &mut Vec<Node<'a>>,
-  ) {
-    let node = cursor.node();
-
-    if node.kind() == kind {
-      nodes.push(node);
-    }
-
-    if cursor.goto_first_child() {
-      loop {
-        Self::collect_nodes(cursor, kind, nodes);
-
-        if !cursor.goto_next_sibling() {
-          break;
-        }
-      }
-
-      cursor.goto_parent();
-    }
-  }
-
-  fn find_children_by_kind_recursive<'a>(
-    &'a self,
-    start_node: &'a Node,
-    kind: &str,
-  ) -> Vec<Node<'a>> {
-    let mut nodes = Vec::new();
-    let mut cursor = start_node.walk();
-    Self::collect_nodes(&mut cursor, kind, &mut nodes);
-    nodes
-  }
-
-  pub(crate) fn find_child_by_kind_at_position<'a>(
-    &'a self,
-    node: &'a Node,
-    kind: &str,
-    position: usize,
-  ) -> Option<Node<'a>> {
-    node.child(position).filter(|child| child.kind() == kind)
-  }
-
-  fn find_child_by_kind_recursive<'a>(
-    &'a self,
-    start_node: &'a Node,
-    kind: &str,
-  ) -> Option<Node<'a>> {
-    self
-      .find_children_by_kind_recursive(start_node, kind)
-      .first()
-      .copied()
-  }
-
-  pub(crate) fn find_parent_node<'a>(
-    &self,
-    node: &'a Node,
-    parent_kind: &str,
-  ) -> Option<Node<'a>> {
-    let mut current = *node;
-    while let Some(parent) = current.parent() {
-      if parent.kind() == parent_kind {
-        return Some(parent);
-      }
-      current = parent;
-    }
-    None
-  }
-
-  #[cfg(test)]
-  fn find_node<F>(&self, kind: &str, predicate: F) -> Option<Node>
-  where
-    F: Fn(&Node) -> bool,
-  {
-    self
-      .get_nodes_by_kind(kind)
-      .into_iter()
-      .find(|node| predicate(node))
-  }
-
   pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .get_recipes()
@@ -146,8 +65,13 @@ impl Document {
       None => return Vec::new(),
     };
 
-    self
-      .get_nodes_by_kind("identifier")
+    let root = match &self.tree {
+      Some(tree) => tree.root_node(),
+      None => return Vec::new(),
+    };
+
+    root
+      .find_all("identifier*")
       .into_iter()
       .filter(|candidate| {
         if candidate.id() == identifier.id() {
@@ -164,9 +88,9 @@ impl Document {
         };
 
         let in_same_recipe = |a: &Node, b: &Node| -> bool {
-          let original_recipe = self.find_parent_node(a, "recipe");
+          let original_recipe = a.get_parent("recipe");
 
-          let candidate_recipe = self.find_parent_node(b, "recipe");
+          let candidate_recipe = b.get_parent("recipe");
 
           match (original_recipe, candidate_recipe) {
             (Some(r1), Some(r2)) => r1.id() == r2.id(),
@@ -185,15 +109,16 @@ impl Document {
             }
 
             let candidate_recipe = self.find_recipe(
-              &self
-                .find_parent_node(&candidate_parent, "recipe")
-                .map_or_else(String::new, |recipe_node| {
+              &candidate_parent.get_parent("recipe").map_or_else(
+                String::new,
+                |recipe_node| {
                   recipe_node
-                    .search("recipe_header > identifier")
+                    .find("recipe_header > identifier")
                     .map_or_else(String::new, |identifier_node| {
                       self.get_node_text(&identifier_node)
                     })
-                }),
+                },
+              ),
             );
 
             candidate_recipe.is_some_and(|recipe| {
@@ -215,18 +140,17 @@ impl Document {
               return true;
             }
 
-            let identifier_recipe = self.find_recipe(
-              &self.find_parent_node(&identifier, "recipe").map_or_else(
+            let identifier_recipe =
+              self.find_recipe(&identifier.get_parent("recipe").map_or_else(
                 String::new,
                 |recipe_node| {
                   recipe_node
-                    .search("recipe_header > identifier")
+                    .find("recipe_header > identifier")
                     .map_or_else(String::new, |identifier_node| {
                       self.get_node_text(&identifier_node)
                     })
                 },
-              ),
-            );
+              ));
 
             identifier_recipe.is_some_and(|recipe| {
               candidate_parent_kind == "assignment"
@@ -247,15 +171,18 @@ impl Document {
   }
 
   pub(crate) fn get_aliases(&self) -> Vec<Alias> {
-    self
-      .get_nodes_by_kind("alias")
+    let root = match &self.tree {
+      Some(tree) => tree.root_node(),
+      None => return Vec::new(),
+    };
+
+    root
+      .find_all("alias*")
       .iter()
       .filter_map(|alias_node| {
-        let left_node =
-          self.find_child_by_kind_at_position(alias_node, "identifier", 1)?;
+        let left_node = alias_node.find("identifier[0]")?;
 
-        let right_node =
-          self.find_child_by_kind_at_position(alias_node, "identifier", 3)?;
+        let right_node = alias_node.find("identifier[1]")?;
 
         Some(Alias {
           name: TextNode {
@@ -272,17 +199,6 @@ impl Document {
       .collect()
   }
 
-  pub(crate) fn get_nodes_by_kind(&self, kind: &str) -> Vec<Node> {
-    let mut nodes = Vec::new();
-
-    if let Some(tree) = &self.tree {
-      let mut cursor = tree.root_node().walk();
-      Self::collect_nodes(&mut cursor, kind, &mut nodes);
-    }
-
-    nodes
-  }
-
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
     self
       .content
@@ -294,30 +210,30 @@ impl Document {
   }
 
   pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
-    self
-      .get_nodes_by_kind("recipe")
+    let root = match &self.tree {
+      Some(tree) => tree.root_node(),
+      None => return Vec::new(),
+    };
+
+    root
+      .find_all("recipe*")
       .iter()
       .filter_map(|recipe_node| {
-        let recipe_header = recipe_node.find_child_by_kind("recipe_header")?;
-
         let recipe_name =
-          self.get_node_text(&recipe_header.find_child_by_kind("identifier")?);
+          self.get_node_text(&recipe_node.find("recipe_header > identifier")?);
 
-        let dependencies = recipe_header
-          .find_child_by_kind("dependencies")
+        let dependencies = recipe_node
+          .find("recipe_header > dependencies")
           .map(|dependencies_node| {
-            self
-              .find_children_by_kind_recursive(&dependencies_node, "dependency")
+            dependencies_node
+              .find_all("dependency*")
               .into_iter()
               .filter_map(|dependency_node| {
                 let dependency_name =
-                  self.get_node_text(&self.find_child_by_kind_recursive(
-                    &dependency_node,
-                    "identifier",
-                  )?);
+                  self.get_node_text(&dependency_node.find("identifier")?);
 
-                let arguments = self
-                  .find_children_by_kind_recursive(&dependency_node, "value")
+                let arguments = dependency_node
+                  .find_all("value*")
                   .iter()
                   .map(|argument_node| TextNode {
                     value: self.get_node_text(argument_node),
@@ -335,14 +251,13 @@ impl Document {
           })
           .unwrap_or_default();
 
-        let parameters = recipe_header
-          .find_child_by_kind("parameters")
+        let parameters = recipe_node
+          .find("recipe_header > parameters")
           .map_or_else(Vec::new, |params_node| {
             (0..params_node.named_child_count())
               .filter_map(|i| params_node.named_child(i))
               .filter(|param_node| {
-                param_node.kind() == "parameter"
-                  || param_node.kind() == "variadic_parameter"
+                ["parameter", "variadic_parameter"].contains(&param_node.kind())
               })
               .filter_map(|param_node| {
                 Parameter::parse(
@@ -365,8 +280,13 @@ impl Document {
   }
 
   pub(crate) fn get_settings(&self) -> Vec<Setting> {
-    self
-      .get_nodes_by_kind("setting")
+    let root = match &self.tree {
+      Some(tree) => tree.root_node(),
+      None => return Vec::new(),
+    };
+
+    root
+      .find_all("setting*")
       .iter()
       .filter_map(|setting_node| {
         Setting::parse(
@@ -378,12 +298,16 @@ impl Document {
   }
 
   pub(crate) fn get_variables(&self) -> Vec<Variable> {
-    self
-      .get_nodes_by_kind("assignment")
+    let root = match &self.tree {
+      Some(tree) => tree.root_node(),
+      None => return Vec::new(),
+    };
+
+    root
+      .find_all("assignment*")
       .iter()
       .filter_map(|assignment_node| {
-        let identifier_node =
-          assignment_node.find_child_by_kind("identifier")?;
+        let identifier_node = assignment_node.find("identifier")?;
 
         Some(Variable {
           name: TextNode {
@@ -496,33 +420,6 @@ mod tests {
   }
 
   #[test]
-  fn find_child_by_kind_at_position() {
-    let doc = document(indoc! {
-      "
-      alias foo := bar
-      "
-    });
-
-    let alias_nodes = doc.get_nodes_by_kind("alias");
-
-    assert_eq!(alias_nodes.len(), 2);
-
-    let alias_node = alias_nodes.first().unwrap();
-
-    let alias_name =
-      doc.find_child_by_kind_at_position(alias_node, "identifier", 1);
-
-    assert!(alias_name.is_some());
-    assert_eq!(doc.get_node_text(&alias_name.unwrap()), "foo");
-
-    let target_name =
-      doc.find_child_by_kind_at_position(alias_node, "identifier", 3);
-
-    assert!(target_name.is_some());
-    assert_eq!(doc.get_node_text(&target_name.unwrap()), "bar");
-  }
-
-  #[test]
   fn find_nonexistent_recipe() {
     let doc = document(indoc! {
       "
@@ -601,12 +498,9 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "foo"
-          && node.parent().unwrap().kind() == "recipe_header"
-      })
-      .unwrap();
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("recipe_header > identifier").unwrap();
 
     let references = doc.find_references(identifier);
 
@@ -633,12 +527,9 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "foo"
-          && node.parent().unwrap().kind() == "parameter"
-      })
-      .unwrap();
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("parameter > identifier").unwrap();
 
     let references = doc.find_references(identifier);
 
@@ -659,12 +550,9 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "foo"
-          && node.parent().unwrap().kind() == "value"
-      })
-      .unwrap();
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("value > identifier").unwrap();
 
     let references = doc.find_references(identifier);
 
@@ -681,12 +569,9 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "foo"
-          && node.parent().unwrap().kind() == "value"
-      })
-      .unwrap();
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("value > identifier").unwrap();
 
     let references = doc.find_references(identifier);
 
@@ -712,12 +597,9 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "foo"
-          && node.parent().unwrap().kind() == "assignment"
-      })
-      .unwrap();
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("assignment > identifier").unwrap();
 
     let references = doc.find_references(identifier);
 
@@ -740,11 +622,10 @@ mod tests {
       "
     });
 
-    let identifier = doc
-      .find_node("identifier", |node| {
-        doc.get_node_text(node) == "a"
-          && node.parent().unwrap().kind() == "value"
-      })
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root
+      .find("dependency_expression > expression > value > identifier")
       .unwrap();
 
     let references = doc.find_references(identifier);
@@ -1158,26 +1039,6 @@ mod tests {
         }
       }
     );
-  }
-
-  #[test]
-  fn get_nodes_by_kind() {
-    let doc = document(indoc! {"
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz:
-        echo \"baz\"
-    "});
-
-    let recipes = doc.get_nodes_by_kind("recipe");
-    assert_eq!(recipes.len(), 3);
-
-    let identifiers = doc.get_nodes_by_kind("identifier");
-    assert_eq!(identifiers.len(), 3);
   }
 
   #[test]
