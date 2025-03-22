@@ -138,6 +138,53 @@ impl Document {
       .find(|recipe| recipe.name == name)
   }
 
+  pub(crate) fn find_node_by_path<'a>(
+    &'a self,
+    path: &str,
+    start_node: Option<Node<'a>>,
+  ) -> Option<Node<'a>> {
+    self.tree.as_ref().and_then(|tree| {
+      let parts: Vec<&str> = path.split('>').map(|s| s.trim()).collect();
+
+      if parts.is_empty() {
+        return None;
+      }
+
+      let initial_node = start_node.unwrap_or_else(|| tree.root_node());
+
+      let mut candidates = Vec::new();
+
+      if initial_node.kind() == parts[0] {
+        candidates.push(initial_node);
+      } else {
+        let mut cursor = initial_node.walk();
+        Self::collect_nodes(&mut cursor, parts[0], &mut candidates);
+      }
+
+      for target_kind in parts.iter().skip(1) {
+        let mut next_candidates = Vec::new();
+
+        for node in candidates {
+          for j in 0..node.named_child_count() {
+            if let Some(child) = node.named_child(j) {
+              if child.kind() == *target_kind {
+                next_candidates.push(child);
+              }
+            }
+          }
+        }
+
+        if next_candidates.is_empty() {
+          return None;
+        }
+
+        candidates = next_candidates;
+      }
+
+      candidates.first().copied()
+    })
+  }
+
   pub(crate) fn find_references(&self, identifier: Node) -> Vec<lsp::Location> {
     let identifier_name = self.get_node_text(&identifier);
 
@@ -187,11 +234,11 @@ impl Document {
             let candidate_recipe = self.find_recipe(
               &self
                 .find_parent_node(&candidate_parent, "recipe")
-                .map_or_else(String::new, |recipe_header_node| {
+                .map_or_else(String::new, |recipe_node| {
                   self
-                    .find_child_by_kind_recursive(
-                      &recipe_header_node,
-                      "identifier",
+                    .find_node_by_path(
+                      "recipe_header > identifier",
+                      Some(recipe_node),
                     )
                     .map_or_else(String::new, |identifier_node| {
                       self.get_node_text(&identifier_node)
@@ -221,11 +268,11 @@ impl Document {
             let identifier_recipe = self.find_recipe(
               &self.find_parent_node(&identifier, "recipe").map_or_else(
                 String::new,
-                |recipe_header_node| {
+                |recipe_node| {
                   self
-                    .find_child_by_kind_recursive(
-                      &recipe_header_node,
-                      "identifier",
+                    .find_node_by_path(
+                      "recipe_header > identifier",
+                      Some(recipe_node),
                     )
                     .map_or_else(String::new, |identifier_node| {
                       self.get_node_text(&identifier_node)
@@ -722,6 +769,34 @@ mod tests {
       .find_node("identifier", |node| {
         doc.get_node_text(node) == "foo"
           && node.parent().unwrap().kind() == "assignment"
+      })
+      .unwrap();
+
+    let references = doc.find_references(identifier);
+
+    assert_eq!(references.len(), 2);
+    assert_eq!(references[0].range.start.line, 0);
+    assert_eq!(references[1].range.start.line, 3);
+  }
+
+  #[test]
+  fn find_dependency_argument_references() {
+    let doc = document(indoc! {
+      "
+      a := 'foo'
+
+      [group: 'test']
+      foo: (bar a)
+
+      bar a:
+        echo {{ a }}
+      "
+    });
+
+    let identifier = doc
+      .find_node("identifier", |node| {
+        doc.get_node_text(node) == "a"
+          && node.parent().unwrap().kind() == "value"
       })
       .unwrap();
 

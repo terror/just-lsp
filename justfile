@@ -14,8 +14,8 @@ build:
   cargo build
 
 [group: 'check']
-check arg:
- cargo check {{ arg }}
+check:
+ cargo check
 
 [group: 'check']
 clippy:
