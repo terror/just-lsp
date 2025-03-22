@@ -71,7 +71,7 @@ impl Document {
     };
 
     root
-      .find_all("identifier*")
+      .find_all("identifier")
       .into_iter()
       .filter(|candidate| {
         if candidate.id() == identifier.id() {
@@ -177,7 +177,7 @@ impl Document {
     };
 
     root
-      .find_all("alias*")
+      .find_all("alias")
       .iter()
       .filter_map(|alias_node| {
         let left_node = alias_node.find("identifier[0]")?;
@@ -216,7 +216,7 @@ impl Document {
     };
 
     root
-      .find_all("recipe*")
+      .find_all("recipe")
       .iter()
       .filter_map(|recipe_node| {
         let recipe_name =
@@ -226,14 +226,14 @@ impl Document {
           .find("recipe_header > dependencies")
           .map(|dependencies_node| {
             dependencies_node
-              .find_all("dependency*")
+              .find_all("dependency")
               .into_iter()
               .filter_map(|dependency_node| {
                 let dependency_name =
                   self.get_node_text(&dependency_node.find("identifier")?);
 
                 let arguments = dependency_node
-                  .find_all("value*")
+                  .find_all("value")
                   .iter()
                   .map(|argument_node| TextNode {
                     value: self.get_node_text(argument_node),
@@ -286,7 +286,7 @@ impl Document {
     };
 
     root
-      .find_all("setting*")
+      .find_all("setting")
       .iter()
       .filter_map(|setting_node| {
         Setting::parse(
@@ -304,7 +304,7 @@ impl Document {
     };
 
     root
-      .find_all("assignment*")
+      .find_all("assignment")
       .iter()
       .filter_map(|assignment_node| {
         let identifier_node = assignment_node.find("identifier")?;

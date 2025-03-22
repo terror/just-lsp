@@ -121,7 +121,7 @@ impl<'a> Analyzer<'a> {
       None => return diagnostics,
     };
 
-    let attribute_nodes = root.find_all("attribute*");
+    let attribute_nodes = root.find_all("attribute");
 
     for attribute_node in attribute_nodes {
       if let Some(name_node) = attribute_node.find("identifier") {
@@ -231,7 +231,7 @@ impl<'a> Analyzer<'a> {
       None => return diagnostics,
     };
 
-    let function_calls = root.find_all("function_call*");
+    let function_calls = root.find_all("function_call");
 
     for function_call in function_calls {
       if let Some(identifier_node) = function_call.find("identifier") {

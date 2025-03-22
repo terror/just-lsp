@@ -22,26 +22,6 @@ fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
   [self_match, children_matches].concat()
 }
 
-fn collect_nodes_by_kind_recursive<'a>(
-  node: Node<'a>,
-  kind: &str,
-) -> Vec<Node<'a>> {
-  (0..node.child_count())
-    .filter_map(|i| node.child(i))
-    .flat_map(|child| {
-      let self_match = if child.kind() == kind {
-        vec![child]
-      } else {
-        Vec::new()
-      };
-
-      let descendants = collect_nodes_by_kind_recursive(child, kind);
-
-      [self_match, descendants].concat()
-    })
-    .collect()
-}
-
 fn collect_descendants_by_kind<'a>(
   node: Node<'a>,
   kind: &str,
@@ -98,10 +78,6 @@ impl NodeExt for Node<'_> {
         .collect();
     }
 
-    if let Some(kind) = selector.strip_suffix('*') {
-      return collect_nodes_by_kind_recursive(*self, kind);
-    }
-
     if selector.contains('[') && selector.ends_with(']') {
       let parts: Vec<&str> = selector.split('[').collect();
 
@@ -140,19 +116,17 @@ impl NodeExt for Node<'_> {
     if selector.contains(' ') {
       let parts: Vec<&str> = selector.split_whitespace().collect();
 
-      if parts.len() >= 2 {
-        return parts.iter().skip(1).fold(
-          self.find_all(parts[0]),
-          |ancestors, &descendant_kind| {
-            ancestors
-              .iter()
-              .flat_map(|&ancestor| {
-                collect_descendants_by_kind(ancestor, descendant_kind)
-              })
-              .collect()
-          },
-        );
-      }
+      return parts.iter().skip(1).fold(
+        self.find_all(parts[0]),
+        |ancestors, &descendant_kind| {
+          ancestors
+            .iter()
+            .flat_map(|&ancestor| {
+              collect_descendants_by_kind(ancestor, descendant_kind)
+            })
+            .collect()
+        },
+      );
     }
 
     collect_nodes_by_kind(*self, selector)
