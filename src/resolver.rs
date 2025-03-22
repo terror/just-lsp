@@ -14,7 +14,7 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
-    let identifier_name = self.document.get_node_text(&identifier);
+    let identifier_name = self.document.get_node_text(identifier);
 
     let identifier_parent_kind = match identifier.parent() {
       Some(parent) => parent.kind(),
