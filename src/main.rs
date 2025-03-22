@@ -8,6 +8,7 @@ use {
     point_ext::PointExt,
     position_ext::PositionExt,
     recipe::{Dependency, Parameter, ParameterKind, Recipe},
+    resolver::Resolver,
     rope_ext::RopeExt,
     server::Server,
     setting::{Setting, SettingKind},
@@ -35,6 +36,7 @@ mod node_ext;
 mod point_ext;
 mod position_ext;
 mod recipe;
+mod resolver;
 mod rope_ext;
 mod server;
 mod setting;

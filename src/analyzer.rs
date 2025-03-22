@@ -116,10 +116,15 @@ impl<'a> Analyzer<'a> {
   fn analyze_attributes(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let attribute_nodes = self.document.get_nodes_by_kind("attribute");
+    let root = match &self.document.tree {
+      Some(tree) => tree.root_node(),
+      None => return diagnostics,
+    };
+
+    let attribute_nodes = root.find_all("attribute");
 
     for attribute_node in attribute_nodes {
-      if let Some(name_node) = attribute_node.find_child_by_kind("identifier") {
+      if let Some(name_node) = attribute_node.find("identifier") {
         let attribute_name = self.document.get_node_text(&name_node);
 
         let matching_attributes: Vec<_> = builtins::BUILTINS
@@ -140,7 +145,7 @@ impl<'a> Analyzer<'a> {
         }
 
         let has_parameters = attribute_node.child_count() > 2
-          && attribute_node.find_child_by_kind("string").is_some();
+          && attribute_node.find("string").is_some();
 
         let parameter_mismatch = matching_attributes.iter().all(|attr| {
           if let Builtin::Attribute { parameters, .. } = attr {
@@ -221,12 +226,15 @@ impl<'a> Analyzer<'a> {
   fn analyze_function_calls(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let function_calls = self.document.get_nodes_by_kind("function_call");
+    let root = match &self.document.tree {
+      Some(tree) => tree.root_node(),
+      None => return diagnostics,
+    };
+
+    let function_calls = root.find_all("function_call");
 
     for function_call in function_calls {
-      if let Some(identifier_node) =
-        function_call.find_child_by_kind("identifier")
-      {
+      if let Some(identifier_node) = function_call.find("identifier") {
         let function_name = self.document.get_node_text(&identifier_node);
 
         let builtin = builtins::BUILTINS
@@ -239,7 +247,7 @@ impl<'a> Analyzer<'a> {
           ..
         }) = builtin
         {
-          let arguments = function_call.find_child_by_kind("sequence");
+          let arguments = function_call.find("sequence");
 
           let arg_count = arguments.map_or(0, |args| args.named_child_count());
 
