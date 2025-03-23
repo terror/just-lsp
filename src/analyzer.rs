@@ -153,7 +153,7 @@ impl<'a> Analyzer<'a> {
           if let Builtin::Attribute { parameters, .. } = attr {
             (parameters.is_some() && !has_arguments)
               || (parameters.is_none() && has_arguments)
-              || (parameters.as_ref().map_or(0, |_| 1) < argument_count)
+              || (parameters.map_or(0, |_| 1) < argument_count)
           } else {
             false
           }
@@ -165,7 +165,7 @@ impl<'a> Analyzer<'a> {
           }) {
             format!("Attribute '{}' doesn't accept parameters", attribute_name)
           } else if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_some() && parameters.as_ref().map_or(1, |_| 1) < argument_count)
+            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.map_or(0, |_| 1) < argument_count)
           }) {
             format!(
               "Attribute '{}' got {} arguments but takes {} argument",
@@ -173,7 +173,7 @@ impl<'a> Analyzer<'a> {
               argument_count,
               matching_attributes.iter().find_map(|attr| {
                 if let Builtin::Attribute { parameters, .. } = attr {
-                  parameters.as_ref().map(|_| 1)
+                  parameters.map(|_| 1)
                 } else {
                   None
                 }
