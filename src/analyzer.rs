@@ -296,10 +296,8 @@ impl<'a> Analyzer<'a> {
         {
           add_diagnostic(format!("Variable '{}' not found", identifier_name));
         }
-      } else {
-        if !variables.contains(&identifier_name) {
-          add_diagnostic(format!("Variable '{}' not found", identifier_name));
-        }
+      } else if !variables.contains(&identifier_name) {
+        add_diagnostic(format!("Variable '{}' not found", identifier_name));
       }
     }
 
