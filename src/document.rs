@@ -40,23 +40,18 @@ impl Document {
       ..
     } = params;
 
-    // Update version
     self.version = version;
 
-    // Process each change incrementally
     for change in content_changes {
       let edit = self.content.build_edit(&change);
 
-      // Apply edit to the Rope
       self.content.apply_edit(&edit);
 
-      // Apply the same edit to the Tree-sitter tree
       if let Some(tree) = &mut self.tree {
         tree.edit(&edit.input_edit);
       }
     }
 
-    // Reparse with the current tree as a starting point
     self.parse_incremental()?;
 
     Ok(())
