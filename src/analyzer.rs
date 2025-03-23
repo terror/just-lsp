@@ -251,12 +251,20 @@ impl<'a> Analyzer<'a> {
 
     let identifiers = root.find_all("expression > value > identifier");
 
-    let variables = self
+    let mut variables = self
       .document
       .get_variables()
       .iter()
       .map(|variable| variable.name.value.clone())
       .collect::<HashSet<_>>();
+
+    variables.extend(builtins::BUILTINS.into_iter().filter_map(|builtin| {
+      if let Builtin::Constant { name, .. } = builtin {
+        Some(name.to_owned())
+      } else {
+        None
+      }
+    }));
 
     for identifier in identifiers {
       let recipe = self.document.find_recipe(
