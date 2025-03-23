@@ -123,8 +123,8 @@ impl NodeExt for Node<'_> {
           parents
             .iter()
             .flat_map(|parent| {
-              (0..parent.named_child_count())
-                .filter_map(|i| parent.named_child(i))
+              (0..parent.child_count())
+                .filter_map(|i| parent.child(i))
                 .filter(|child| child.kind() == child_kind)
                 .collect::<Vec<_>>()
             })

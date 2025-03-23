@@ -147,15 +147,13 @@ impl Document {
 
         let parameters = recipe_node
           .find("recipe_header > parameters")
-          .map_or_else(Vec::new, |params_node| {
-            (0..params_node.named_child_count())
-              .filter_map(|i| params_node.named_child(i))
-              .filter(|param_node| {
-                ["parameter", "variadic_parameter"].contains(&param_node.kind())
-              })
+          .map_or_else(Vec::new, |parameters_node| {
+            parameters_node
+              .find_all("^parameter, ^variadic_parameter")
+              .iter()
               .filter_map(|param_node| {
                 Parameter::parse(
-                  &self.get_node_text(&param_node),
+                  &self.get_node_text(param_node),
                   param_node.get_range(),
                 )
               })

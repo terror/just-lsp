@@ -266,7 +266,7 @@ impl<'a> Analyzer<'a> {
         {
           let arguments = function_call.find("sequence");
 
-          let arg_count = arguments.map_or(0, |args| args.named_child_count());
+          let arg_count = arguments.map_or(0, |args| args.child_count());
 
           if arg_count < *required_args {
             diagnostics.push(
@@ -275,9 +275,9 @@ impl<'a> Analyzer<'a> {
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
-                "Function '{}' requires at least {} argument(s), but {} provided",
-                function_name, required_args, arg_count
-              ),
+                  "Function '{}' requires at least {} argument(s), but {} provided",
+                  function_name, required_args, arg_count
+                ),
                 ..Default::default()
             });
           } else if !accepts_variadic && arg_count > *required_args {
@@ -427,10 +427,11 @@ impl<'a> Analyzer<'a> {
             .map(|p| p.name.clone())
             .collect::<HashSet<_>>();
 
-          if !argument.is_quoted()
+          let is_unreferenced = !argument.is_quoted()
             && !variables.contains(&argument.value)
-            && !parameters.contains(&argument.value)
-          {
+            && !parameters.contains(&argument.value);
+
+          if is_unreferenced {
             diagnostics.push(lsp::Diagnostic {
               range: argument.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
