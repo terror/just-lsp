@@ -177,6 +177,24 @@ impl Inner {
         });
       }
 
+      let variables = document.get_variables();
+
+      for variable in variables {
+        completion_items.push(lsp::CompletionItem {
+          label: variable.name.value.clone(),
+          kind: Some(lsp::CompletionItemKind::VARIABLE),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::PlainText,
+              value: variable.content,
+            },
+          )),
+          insert_text: Some(variable.name.value),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          ..Default::default()
+        });
+      }
+
       for builtin in builtins::BUILTINS {
         completion_items.push(builtin.completion_item());
       }
