@@ -3,6 +3,7 @@ use super::*;
 pub(crate) trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node>;
   fn find_all(&self, selector: &str) -> Vec<Node>;
+  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node>;
   fn get_parent(&self, kind: &str) -> Option<Node>;
   fn get_range(&self) -> lsp::Range;
 }
@@ -43,13 +44,6 @@ fn collect_descendants_by_kind<'a>(
 }
 
 impl NodeExt for Node<'_> {
-  fn get_range(&self) -> lsp::Range {
-    lsp::Range {
-      start: self.start_position().position(),
-      end: self.end_position().position(),
-    }
-  }
-
   fn find(&self, selector: &str) -> Option<Node> {
     self.find_all(selector).into_iter().next()
   }
@@ -152,6 +146,26 @@ impl NodeExt for Node<'_> {
     collect_nodes_by_kind(*self, selector)
   }
 
+  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node> {
+    let mut siblings = Vec::new();
+
+    let mut current = self.next_sibling();
+
+    while let Some(sibling) = current {
+      if sibling.kind() == until {
+        break;
+      }
+
+      if sibling.kind() == kind {
+        siblings.push(sibling);
+      }
+
+      current = sibling.next_sibling();
+    }
+
+    siblings
+  }
+
   fn get_parent(&self, kind: &str) -> Option<Node> {
     let mut current = *self;
 
@@ -164,6 +178,13 @@ impl NodeExt for Node<'_> {
     }
 
     None
+  }
+
+  fn get_range(&self) -> lsp::Range {
+    lsp::Range {
+      start: self.start_position().position(),
+      end: self.end_position().position(),
+    }
   }
 }
 

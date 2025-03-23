@@ -145,7 +145,9 @@ impl<'a> Analyzer<'a> {
           continue;
         }
 
-        let argument_count = attribute_node.find_all("string").len();
+        let argument_count = identifier_node
+          .find_siblings_until("string", "identifier")
+          .len();
 
         let has_arguments = argument_count > 0;
 
@@ -856,6 +858,23 @@ mod tests {
     assert_eq!(diagnostics.len(), 1);
 
     assert!(diagnostics[0].message.contains("Unknown attribute 'foo'"));
+  }
+
+  #[test]
+  fn attributes_inline_parameters_focused() {
+    let doc = document(indoc! {
+      "
+      [group: 'foo', no-cd]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 0);
   }
 
   #[test]
