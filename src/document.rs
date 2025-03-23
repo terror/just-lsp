@@ -23,7 +23,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
       version,
     };
 
-    document.parse()?;
+    document.parse_incremental()?;
 
     Ok(document)
   }
@@ -35,17 +35,24 @@ impl Document {
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
     let lsp::DidChangeTextDocumentParams {
-      content_changes, ..
+      content_changes,
+      text_document: lsp::VersionedTextDocumentIdentifier { version, .. },
+      ..
     } = params;
 
-    let edits = content_changes
-      .iter()
-      .map(|change| self.content.build_edit(change))
-      .collect::<Vec<_>>();
+    self.version = version;
 
-    edits.iter().for_each(|edit| self.content.apply_edit(edit));
+    for change in content_changes {
+      let edit = self.content.build_edit(&change);
 
-    self.parse()?;
+      self.content.apply_edit(&edit);
+
+      if let Some(tree) = &mut self.tree {
+        tree.edit(&edit.input_edit);
+      }
+    }
+
+    self.parse_incremental()?;
 
     Ok(())
   }
@@ -140,15 +147,13 @@ impl Document {
 
         let parameters = recipe_node
           .find("recipe_header > parameters")
-          .map_or_else(Vec::new, |params_node| {
-            (0..params_node.named_child_count())
-              .filter_map(|i| params_node.named_child(i))
-              .filter(|param_node| {
-                ["parameter", "variadic_parameter"].contains(&param_node.kind())
-              })
+          .map_or_else(Vec::new, |parameters_node| {
+            parameters_node
+              .find_all("^parameter, ^variadic_parameter")
+              .iter()
               .filter_map(|param_node| {
                 Parameter::parse(
-                  &self.get_node_text(&param_node),
+                  &self.get_node_text(param_node),
                   param_node.get_range(),
                 )
               })
@@ -220,14 +225,18 @@ impl Document {
     }
   }
 
-  pub(crate) fn parse(&mut self) -> Result {
+  pub(crate) fn parse_incremental(&mut self) -> Result {
     let mut parser = Parser::new();
 
     let language = unsafe { tree_sitter_just() };
 
     parser.set_language(&language)?;
 
-    self.tree = parser.parse(self.content.to_string(), None);
+    let old_tree = self.tree.take();
+
+    let source_code = self.content.to_string();
+
+    self.tree = parser.parse(&source_code, old_tree.as_ref());
 
     Ok(())
   }

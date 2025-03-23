@@ -2,18 +2,18 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TextPosition {
-  byte: usize,
-  char: usize,
-  code: usize,
-  point: tree_sitter::Point,
+  pub(crate) byte: usize,
+  pub(crate) char: usize,
+  pub(crate) code: usize,
+  pub(crate) point: tree_sitter::Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TextEdit<'a> {
-  end_char_idx: usize,
-  input_edit: tree_sitter::InputEdit,
-  start_char_idx: usize,
-  text: &'a str,
+  pub(crate) end_char_idx: usize,
+  pub(crate) input_edit: tree_sitter::InputEdit,
+  pub(crate) start_char_idx: usize,
+  pub(crate) text: &'a str,
 }
 
 pub trait RopeExt {
