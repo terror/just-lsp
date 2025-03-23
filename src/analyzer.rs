@@ -16,6 +16,7 @@ impl<'a> Analyzer<'a> {
       .into_iter()
       .chain(self.analyze_aliases())
       .chain(self.analyze_attributes())
+      .chain(self.analyze_expressions())
       .chain(self.analyze_function_calls())
       .chain(self.analyze_recipes())
       .chain(self.analyze_settings())
@@ -240,6 +241,71 @@ impl<'a> Analyzer<'a> {
     diagnostics
   }
 
+  fn analyze_expressions(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let root = match &self.document.tree {
+      Some(tree) => tree.root_node(),
+      None => return diagnostics,
+    };
+
+    let identifiers = root.find_all("expression > value > identifier");
+
+    let variables = self
+      .document
+      .get_variables()
+      .iter()
+      .map(|variable| variable.name.value.clone())
+      .collect::<HashSet<_>>();
+
+    for identifier in identifiers {
+      let recipe = self.document.find_recipe(
+        &identifier.get_parent("recipe").map_or_else(
+          String::new,
+          |recipe_node| {
+            recipe_node
+              .find("recipe_header > identifier")
+              .map_or_else(String::new, |identifier_node| {
+                self.document.get_node_text(&identifier_node)
+              })
+          },
+        ),
+      );
+
+      let identifier_name = self.document.get_node_text(&identifier);
+
+      let mut add_diagnostic = |message: String| {
+        diagnostics.push(lsp::Diagnostic {
+          range: identifier.get_range(),
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message,
+          ..Default::default()
+        });
+      };
+
+      if let Some(ref recipe) = recipe {
+        let recipe_parameters = recipe
+          .parameters
+          .iter()
+          .map(|p| p.name.clone())
+          .collect::<HashSet<_>>();
+
+        if !recipe_parameters.contains(&identifier_name)
+          && !variables.contains(&identifier_name)
+        {
+          add_diagnostic(format!("Variable '{}' not found", identifier_name));
+        }
+      } else {
+        if !variables.contains(&identifier_name) {
+          add_diagnostic(format!("Variable '{}' not found", identifier_name));
+        }
+      }
+    }
+
+    diagnostics
+  }
+
   fn analyze_function_calls(&self) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
@@ -396,13 +462,6 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    let variables = self
-      .document
-      .get_variables()
-      .iter()
-      .map(|variable| variable.name.value.clone())
-      .collect::<HashSet<_>>();
-
     let recipe_parameters = recipes
       .iter()
       .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
@@ -418,28 +477,6 @@ impl<'a> Analyzer<'a> {
             message: format!("Recipe '{}' not found", dependency.name),
             ..Default::default()
           });
-        }
-
-        for argument in &dependency.arguments {
-          let parameters = recipe
-            .parameters
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<HashSet<_>>();
-
-          let is_unreferenced = !argument.is_quoted()
-            && !variables.contains(&argument.value)
-            && !parameters.contains(&argument.value);
-
-          if is_unreferenced {
-            diagnostics.push(lsp::Diagnostic {
-              range: argument.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!("Variable '{}' not found", argument.value),
-              ..Default::default()
-            });
-          }
         }
 
         if let Some(params) = recipe_parameters.get(&dependency.name) {
@@ -1134,7 +1171,7 @@ mod tests {
     let doc = document(indoc! {
       "
       foo arg1:
-        echo \"{{arg1}} {{arg2}}\"
+        echo {{ arg1 }}
 
       bar: (foo wow)
         echo \"bar\"
@@ -1144,6 +1181,8 @@ mod tests {
     let analyzer = Analyzer::new(&doc);
 
     let diagnostics = analyzer.analyze();
+
+    dbg!(&diagnostics);
 
     assert_eq!(diagnostics.len(), 1);
 
@@ -1157,7 +1196,7 @@ mod tests {
       wow := 'foo'
 
       foo arg1:
-        echo \"{{arg1}} {{arg2}}\"
+        echo \"{{arg1}}\"
 
       bar: (foo wow)
         echo \"bar\"
@@ -1487,5 +1526,23 @@ mod tests {
     let diagnostics = analyzer.analyze();
 
     assert_eq!(diagnostics.len(), 0);
+  }
+
+  #[test]
+  fn unreferenced_variable_in_expression() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ var }}
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(diagnostics[0].message, "Variable 'var' not found");
   }
 }
