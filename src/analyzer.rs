@@ -773,12 +773,14 @@ mod tests {
   }
 
   #[test]
-  #[ignore]
   fn attributes_wrong_target() {
     let doc = document(indoc! {
       "
-      [linux]
-      set export := true
+      [group: 'foo']
+      alias f := foo
+
+      foo:
+        echo \"foo\"
       "
     });
 
@@ -790,7 +792,7 @@ mod tests {
 
     assert!(diagnostics[0]
       .message
-      .contains("cannot be applied to variable target"));
+      .contains("cannot be applied to alias target"));
   }
 
   #[test]

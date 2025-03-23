@@ -71,10 +71,30 @@ impl NodeExt for Node<'_> {
         .map_or_else(Vec::new, |child| vec![child]);
     }
 
-    if let Some(kind) = selector.strip_prefix('^') {
+    if let Some(rest) = selector.strip_prefix('^') {
+      if rest.contains('[') && rest.ends_with(']') {
+        let parts: Vec<&str> = rest.split('[').collect();
+
+        if parts.len() == 2 {
+          let (kind, index_str) = (parts[0], &parts[1][..parts[1].len() - 1]);
+
+          if let Ok(index) = index_str.parse::<usize>() {
+            let direct_children = (0..self.child_count())
+              .filter_map(|i| self.child(i))
+              .filter(|child| child.kind() == kind)
+              .collect::<Vec<_>>();
+
+            return direct_children
+              .get(index)
+              .copied()
+              .map_or_else(Vec::new, |node| vec![node]);
+          }
+        }
+      }
+
       return (0..self.child_count())
         .filter_map(|i| self.child(i))
-        .filter(|child| child.kind() == kind)
+        .filter(|child| child.kind() == rest)
         .collect();
     }
 
