@@ -144,13 +144,15 @@ impl<'a> Analyzer<'a> {
           continue;
         }
 
-        let has_parameters = attribute_node.child_count() > 2
-          && attribute_node.find("string").is_some();
+        let argument_count = attribute_node.find_all("string").len();
+
+        let has_arguments = argument_count > 0;
 
         let parameter_mismatch = matching_attributes.iter().all(|attr| {
           if let Builtin::Attribute { parameters, .. } = attr {
-            (parameters.is_some() && !has_parameters)
-              || (parameters.is_none() && has_parameters)
+            (parameters.is_some() && !has_arguments)
+              || (parameters.is_none() && has_arguments)
+              || (parameters.as_ref().map_or(0, |_| 1) < argument_count)
           } else {
             false
           }
@@ -158,11 +160,26 @@ impl<'a> Analyzer<'a> {
 
         if parameter_mismatch {
           let param_error_msg = if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_some())
+            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_none())
           }) {
-            format!("Attribute '{}' requires parameters", attribute_name)
-          } else {
             format!("Attribute '{}' doesn't accept parameters", attribute_name)
+          } else if matching_attributes.iter().any(|attr| {
+            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_some() && parameters.as_ref().map_or(1, |_| 1) < argument_count)
+          }) {
+            format!(
+              "Attribute '{}' got {} arguments but takes {} argument",
+              attribute_name,
+              argument_count,
+              matching_attributes.iter().find_map(|attr| {
+                if let Builtin::Attribute { parameters, .. } = attr {
+                  parameters.as_ref().map(|_| 1)
+                } else {
+                  None
+                }
+              }).unwrap_or(0),
+            )
+          } else {
+            format!("Attribute '{}' requires parameters", attribute_name)
           };
 
           diagnostics.push(lsp::Diagnostic {
@@ -774,6 +791,28 @@ mod tests {
     assert!(diagnostics[0]
       .message
       .contains("cannot be applied to variable target"));
+  }
+
+  #[test]
+  fn attributes_more_arguments_than_required() {
+    let doc = document(indoc! {
+      "
+      [group('foo', 'bar')]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(
+      diagnostics[0].message,
+      "Attribute 'group' got 2 arguments but takes 1 argument"
+    );
   }
 
   #[test]
