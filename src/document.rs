@@ -67,9 +67,9 @@ impl Document {
       .find_all("alias")
       .iter()
       .filter_map(|alias_node| {
-        let left_node = alias_node.find("identifier[0]")?;
+        let left_node = alias_node.find("^identifier[0]")?;
 
-        let right_node = alias_node.find("identifier[1]")?;
+        let right_node = alias_node.find("^identifier[1]")?;
 
         Some(Alias {
           name: TextNode {

@@ -124,8 +124,8 @@ impl<'a> Analyzer<'a> {
     let attribute_nodes = root.find_all("attribute");
 
     for attribute_node in attribute_nodes {
-      if let Some(name_node) = attribute_node.find("identifier") {
-        let attribute_name = self.document.get_node_text(&name_node);
+      for identifier_node in attribute_node.find_all("identifier") {
+        let attribute_name = self.document.get_node_text(&identifier_node);
 
         let matching_attributes: Vec<_> = builtins::BUILTINS
           .iter()
@@ -134,7 +134,7 @@ impl<'a> Analyzer<'a> {
 
         if matching_attributes.is_empty() {
           diagnostics.push(lsp::Diagnostic {
-            range: name_node.get_range(),
+            range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!("Unknown attribute '{}'", attribute_name),
@@ -773,12 +773,14 @@ mod tests {
   }
 
   #[test]
-  #[ignore]
   fn attributes_wrong_target() {
     let doc = document(indoc! {
       "
-      [linux]
-      set export := true
+      [group: 'foo']
+      alias f := foo
+
+      foo:
+        echo \"foo\"
       "
     });
 
@@ -790,7 +792,26 @@ mod tests {
 
     assert!(diagnostics[0]
       .message
-      .contains("cannot be applied to variable target"));
+      .contains("cannot be applied to alias target"));
+  }
+
+  #[test]
+  fn attributes_invalid_inline() {
+    let doc = document(indoc! {
+      "
+      [group: 'foo', foo]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert!(diagnostics[0].message.contains("Unknown attribute 'foo'"));
   }
 
   #[test]
