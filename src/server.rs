@@ -1737,8 +1737,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn hover_local_parameter(
-  ) -> Result {
+  async fn hover_local_parameter() -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
