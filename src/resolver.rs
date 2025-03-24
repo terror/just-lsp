@@ -10,7 +10,101 @@ impl<'a> Resolver<'a> {
     Self { document }
   }
 
-  pub(crate) fn resolve_identifier(
+  pub(crate) fn resolve_identifier_definition(
+    &self,
+    identifier: &Node,
+  ) -> Option<lsp::Location> {
+    let identifier_name = self.document.get_node_text(identifier);
+
+    let identifier_parent_kind = identifier.parent()?.kind();
+
+    if ["dependency", "alias"].contains(&identifier_parent_kind) {
+      if let Some(recipe) = self.document.find_recipe(&identifier_name) {
+        return Some(lsp::Location {
+          uri: self.document.uri.clone(),
+          range: recipe.range,
+        });
+      }
+    }
+
+    if identifier_parent_kind == "value" {
+      let recipe_node = identifier.get_parent("recipe")?;
+
+      let recipe = self.document.find_recipe(
+        &self
+          .document
+          .get_node_text(&recipe_node.find("recipe_header > identifier")?),
+      );
+
+      if let Some(recipe) = recipe {
+        for param in &recipe.parameters {
+          if param.name == identifier_name {
+            return Some(lsp::Location {
+              uri: self.document.uri.clone(),
+              range: param.range,
+            });
+          }
+        }
+      }
+    }
+
+    let variables = self.document.get_variables();
+
+    for variable in variables {
+      if variable.name.value == identifier_name {
+        return Some(lsp::Location {
+          uri: self.document.uri.clone(),
+          range: variable.range,
+        });
+      }
+    }
+
+    for builtin in builtins::BUILTINS {
+      match builtin {
+        Builtin::Constant { name, .. }
+        | Builtin::Function { name, .. }
+        | Builtin::Setting { name, .. }
+          if *name == identifier_name =>
+        {
+          return Some(lsp::Location {
+            uri: self.document.uri.clone(),
+            range: identifier.get_range(),
+          });
+        }
+        _ => {}
+      }
+    }
+
+    match identifier_parent_kind {
+      "recipe_header" => {
+        let recipe_node = identifier.parent()?.parent()?;
+
+        if recipe_node.kind() == "recipe" {
+          return Some(lsp::Location {
+            uri: self.document.uri.clone(),
+            range: recipe_node.get_range(),
+          });
+        }
+      }
+      "assignment" => {
+        return Some(lsp::Location {
+          uri: self.document.uri.clone(),
+          range: identifier.parent()?.get_range(),
+        });
+      }
+      "parameter" | "variadic_parameter" => {
+        return Some(lsp::Location {
+          uri: self.document.uri.clone(),
+          range: identifier.parent()?.get_range(),
+        });
+      }
+      _ => {}
+    }
+
+    None
+  }
+
+  pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
@@ -54,17 +148,16 @@ impl<'a> Resolver<'a> {
             }
 
             let candidate_recipe = self.document.find_recipe(
-              &candidate_parent.get_parent("recipe").map_or_else(
-                String::new,
-                |recipe_node| {
-                  recipe_node.find("recipe_header > identifier").map_or_else(
-                    String::new,
-                    |identifier_node| {
-                      self.document.get_node_text(&identifier_node)
-                    },
-                  )
-                },
-              ),
+              &candidate_parent
+                .get_parent("recipe")
+                .as_ref()
+                .and_then(|recipe_node| {
+                  recipe_node.find("recipe_header > identifier")
+                })
+                .map(|identifier_node| {
+                  self.document.get_node_text(&identifier_node)
+                })
+                .unwrap_or_else(String::new),
             );
 
             candidate_recipe.is_some_and(|recipe| {
@@ -103,17 +196,16 @@ impl<'a> Resolver<'a> {
             }
 
             let identifier_recipe = self.document.find_recipe(
-              &identifier.get_parent("recipe").map_or_else(
-                String::new,
-                |recipe_node| {
-                  recipe_node.find("recipe_header > identifier").map_or_else(
-                    String::new,
-                    |identifier_node| {
-                      self.document.get_node_text(&identifier_node)
-                    },
-                  )
-                },
-              ),
+              &identifier
+                .get_parent("recipe")
+                .as_ref()
+                .and_then(|recipe_node| {
+                  recipe_node.find("recipe_header > identifier")
+                })
+                .map(|identifier_node| {
+                  self.document.get_node_text(&identifier_node)
+                })
+                .unwrap_or_default(),
             );
 
             identifier_recipe.is_some_and(|recipe| {
@@ -152,7 +244,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe() {
+  fn resolve_recipe_references() {
     let doc = document(indoc! {
       "
       foo:
@@ -171,7 +263,7 @@ mod tests {
 
     let identifier = root.find("recipe_header > identifier").unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
     assert_eq!(references[0].range.start.line, 0);
@@ -180,7 +272,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe_parameter() {
+  fn resolve_recipe_parameter_references() {
     let doc = document(indoc! {
       "
       foo := 'bar'
@@ -202,7 +294,7 @@ mod tests {
 
     let identifier = root.find("parameter > identifier").unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
     assert_eq!(references[0].range.start.line, 5);
@@ -211,7 +303,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_interpolation() {
+  fn resolve_value_references() {
     let doc = document(indoc! {
       "
       foo := \"foo\"
@@ -227,7 +319,7 @@ mod tests {
 
     let identifier = root.find("value > identifier").unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 2);
     assert_eq!(references[0].range.start.line, 2);
@@ -248,7 +340,7 @@ mod tests {
 
     let identifier = root.find("value > identifier").unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
     assert_eq!(references[0].range.start.line, 0);
@@ -256,7 +348,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_variable() {
+  fn resolve_variable_references() {
     let doc = document(indoc! {
       "
       foo := 'bar'
@@ -265,6 +357,10 @@ mod tests {
         echo {{ foo }}
 
       bar foo: foo
+        echo {{ foo }}
+        echo {{ foo }}
+
+      quux:
         echo {{ foo }}
         echo {{ foo }}
 
@@ -278,15 +374,17 @@ mod tests {
 
     let identifier = root.find("assignment > identifier").unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
-    assert_eq!(references.len(), 2);
+    assert_eq!(references.len(), 4);
     assert_eq!(references[0].range.start.line, 0);
     assert_eq!(references[1].range.start.line, 3);
+    assert_eq!(references[2].range.start.line, 10);
+    assert_eq!(references[3].range.start.line, 11);
   }
 
   #[test]
-  fn resolve_dependency_argument() {
+  fn resolve_dependency_argument_references() {
     let doc = document(indoc! {
       "
       a := 'foo'
@@ -307,10 +405,171 @@ mod tests {
       .find("dependency_expression > expression > value > identifier")
       .unwrap();
 
-    let references = resolver.resolve_identifier(&identifier);
+    let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 2);
     assert_eq!(references[0].range.start.line, 0);
     assert_eq!(references[1].range.start.line, 3);
+  }
+
+  #[test]
+  fn resolve_recipe_definition() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let foo_dependency = root.find("dependency > identifier").unwrap();
+
+    let definition = resolver
+      .resolve_identifier_definition(&foo_dependency)
+      .unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 3,
+          character: 0
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_variable_definition() {
+    let doc = document(indoc! {
+      "
+      var := \"value\"
+
+      foo:
+        echo {{ var }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let var_usage = root.find("value > identifier").unwrap();
+
+    let definition =
+      resolver.resolve_identifier_definition(&var_usage).unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 1,
+          character: 0
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_parameter_definition() {
+    let doc = document(indoc! {
+      "
+      foo param=\"default\":
+        echo {{ param }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let param_usage = root.find("value > identifier").unwrap();
+
+    let definition = resolver
+      .resolve_identifier_definition(&param_usage)
+      .unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 4
+        },
+        end: lsp::Position {
+          line: 0,
+          character: 19
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_identifier() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let builtin_usage = root.find("function_call > identifier").unwrap();
+
+    let definition = resolver.resolve_identifier_definition(&builtin_usage);
+
+    assert!(definition.is_some());
+    assert_eq!(definition.unwrap().range, builtin_usage.get_range());
+  }
+
+  #[test]
+  fn resolve_self_definition() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let recipe_name = root.find("recipe_header > identifier").unwrap();
+
+    let definition = resolver
+      .resolve_identifier_definition(&recipe_name)
+      .unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 2,
+          character: 0
+        },
+      }
+    );
   }
 }

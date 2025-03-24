@@ -264,7 +264,7 @@ impl Inner {
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
           resolver
-            .resolve_identifier(&identifier)
+            .resolve_identifier_references(&identifier)
             .into_iter()
             .map(|location| lsp::DocumentHighlight {
               range: location.range,
@@ -327,23 +327,12 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|node| {
-          node
-            .parent()
-            .filter(|parent| {
-              parent.kind() == "dependency" || parent.kind() == "alias"
-            })
-            .map(|_| node)
-        })
-        .and_then(|node| {
-          let recipe_name = document.get_node_text(&node);
+        .and_then(|identifier| {
+          let resolver = Resolver::new(document);
 
-          document.find_recipe(&recipe_name).map(|recipe| {
-            lsp::GotoDefinitionResponse::Scalar(lsp::Location {
-              uri: uri.clone(),
-              range: recipe.range,
-            })
-          })
+          resolver
+            .resolve_identifier_definition(&identifier)
+            .map(lsp::GotoDefinitionResponse::Scalar)
         })
     }))
   }
@@ -500,7 +489,7 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| resolver.resolve_identifier(&identifier))
+        .map(|identifier| resolver.resolve_identifier_references(&identifier))
     }))
   }
 
@@ -521,7 +510,7 @@ impl Inner {
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
-          let references = resolver.resolve_identifier(&identifier);
+          let references = resolver.resolve_identifier_references(&identifier);
 
           let text_edits: Vec<lsp::TextEdit> = references
             .iter()

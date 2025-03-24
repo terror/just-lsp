@@ -6,7 +6,7 @@
 
 **just-lsp** is a server implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) for [just](https://github.com/casey/just), the command runner.
 
-<img width="1667" alt="demo" src="https://github.com/user-attachments/assets/4029f3eb-fae9-42f9-b1e7-a1b79f1dc426" />
+<img width="1667" alt="demo" src="https://github.com/user-attachments/assets/77ea8cff-3de4-46ee-b7fc-52b2b6805e5d" />
 
 ## Installation
 
@@ -30,7 +30,7 @@ functions, and constants.
 
 ### `textDocument/definition`
 
-You're able to go to a recipe definition from an identifier.
+You're able to go to a recipe, parameter or assignment definition from an identifier.
 
 ### `textDocument/documentHighlight`
 
