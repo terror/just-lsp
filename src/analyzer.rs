@@ -1306,4 +1306,23 @@ mod tests {
     .warning("Parameter 'bar' appears unused")
     .run()
   }
+
+  #[test]
+  fn duplicate_recipe_names() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo foo
+
+      foo:
+        echo foo
+
+      foo:
+        echo foo
+      "
+    })
+    .error("Duplicate recipe name 'foo'")
+    .error("Duplicate recipe name 'foo'")
+    .run()
+  }
 }
