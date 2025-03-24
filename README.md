@@ -30,7 +30,7 @@ functions, and constants.
 
 ### `textDocument/definition`
 
-You're able to go to a recipe definition from an identifier.
+You're able to go to a recipe, parameter or assignment definition from an identifier.
 
 ### `textDocument/documentHighlight`
 
