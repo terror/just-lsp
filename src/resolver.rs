@@ -46,25 +46,53 @@ impl<'a> Resolver<'a> {
           }
         }
       }
-    }
 
-    let variables = self.document.get_variables();
+      let variables = self.document.get_variables();
 
-    for variable in variables {
-      if variable.name.value == identifier_name {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: variable.range,
-        });
+      for variable in variables {
+        if variable.name.value == identifier_name {
+          return Some(lsp::Location {
+            uri: self.document.uri.clone(),
+            range: variable.range,
+          });
+        }
+      }
+
+      for builtin in builtins::BUILTINS {
+        match builtin {
+          Builtin::Constant { name, .. } if identifier_name == name => {
+            return Some(lsp::Location {
+              uri: self.document.uri.clone(),
+              range: identifier.get_range(),
+            })
+          }
+          _ => {}
+        }
       }
     }
 
     for builtin in builtins::BUILTINS {
       match builtin {
-        Builtin::Constant { name, .. }
-        | Builtin::Function { name, .. }
-        | Builtin::Setting { name, .. }
-          if *name == identifier_name =>
+        Builtin::Attribute { name, .. }
+          if identifier_name == name
+            && identifier_parent_kind == "attribute" =>
+        {
+          return Some(lsp::Location {
+            uri: self.document.uri.clone(),
+            range: identifier.get_range(),
+          });
+        }
+        Builtin::Function { name, .. }
+          if identifier_name == name
+            && identifier_parent_kind == "function_call" =>
+        {
+          return Some(lsp::Location {
+            uri: self.document.uri.clone(),
+            range: identifier.get_range(),
+          });
+        }
+        Builtin::Setting { name, .. }
+          if identifier_name == name && identifier_parent_kind == "setting" =>
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),

@@ -349,10 +349,10 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|node| {
-          let text = document.get_node_text(&node);
+        .and_then(|identifier| {
+          let text = document.get_node_text(&identifier);
 
-          let parent_kind = node.parent().map(|p| p.kind());
+          let parent_kind = identifier.parent().map(|p| p.kind());
 
           if let Some(recipe) = document.find_recipe(&text) {
             if parent_kind.is_some_and(|kind| {
@@ -363,15 +363,20 @@ impl Inner {
                   kind: lsp::MarkupKind::PlainText,
                   value: recipe.content,
                 }),
-                range: Some(node.get_range()),
+                range: Some(identifier.get_range()),
               });
             }
           }
 
           if parent_kind.is_some_and(|kind| kind == "value") {
-            let recipes = document.get_recipes();
+            let recipe_node = identifier.get_parent("recipe")?;
 
-            for recipe in recipes {
+            let recipe =
+              document.find_recipe(&document.get_node_text(
+                &recipe_node.find("recipe_header > identifier")?,
+              ));
+
+            if let Some(recipe) = recipe {
               for parameter in recipe.parameters {
                 if parameter.name == text {
                   return Some(lsp::Hover {
@@ -379,7 +384,7 @@ impl Inner {
                       kind: lsp::MarkupKind::PlainText,
                       value: parameter.content,
                     }),
-                    range: Some(node.get_range()),
+                    range: Some(identifier.get_range()),
                   });
                 }
               }
@@ -394,32 +399,54 @@ impl Inner {
                     kind: lsp::MarkupKind::PlainText,
                     value: variable.content,
                   }),
-                  range: Some(node.get_range()),
+                  range: Some(identifier.get_range()),
                 });
+              }
+            }
+
+            for builtin in builtins::BUILTINS {
+              match builtin {
+                Builtin::Constant { name, .. } if text == name => {
+                  return Some(lsp::Hover {
+                    contents: lsp::HoverContents::Markup(
+                      builtin.documentation(),
+                    ),
+                    range: Some(identifier.get_range()),
+                  });
+                }
+                _ => {}
               }
             }
           }
 
           for builtin in builtins::BUILTINS {
             match builtin {
-              Builtin::Attribute { name, .. } if text == name => {
-                if parent_kind.is_some_and(|kind| kind == "attribute") {
-                  return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(
-                      builtin.documentation(),
-                    ),
-                    range: Some(node.get_range()),
-                  });
-                }
-              }
-              Builtin::Constant { name, .. }
-              | Builtin::Function { name, .. }
-              | Builtin::Setting { name, .. }
-                if text == name =>
+              Builtin::Attribute { name, .. }
+                if text == name
+                  && parent_kind.is_some_and(|kind| kind == "attribute") =>
               {
                 return Some(lsp::Hover {
                   contents: lsp::HoverContents::Markup(builtin.documentation()),
-                  range: Some(node.get_range()),
+                  range: Some(identifier.get_range()),
+                });
+              }
+              Builtin::Function { name, .. }
+                if text == name
+                  && parent_kind
+                    .is_some_and(|kind| kind == "function_call") =>
+              {
+                return Some(lsp::Hover {
+                  contents: lsp::HoverContents::Markup(builtin.documentation()),
+                  range: Some(identifier.get_range()),
+                });
+              }
+              Builtin::Setting { name, .. }
+                if text == name
+                  && parent_kind.is_some_and(|kind| kind == "setting") =>
+              {
+                return Some(lsp::Hover {
+                  contents: lsp::HoverContents::Markup(builtin.documentation()),
+                  range: Some(identifier.get_range()),
                 });
               }
               _ => {}
@@ -1703,6 +1730,42 @@ mod tests {
         start_line: 3,
         start_char: 10,
         end_line: 3,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_local_parameter() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          bar arg='cooler':
+            echo {{ arg }}
+
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
         end_char: 13,
       })
       .run()

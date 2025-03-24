@@ -265,7 +265,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 132] = [
   Builtin::Function {
     name: "absolute_path",
     signature: "absolute_path(path: string) -> string",
-    description: "Get absolute path",
+    description: "Get the absolute path relative to `path` in the working directory.",
     required_args: 1,
     accepts_variadic: false
   },
@@ -307,7 +307,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 132] = [
   Builtin::Function {
     name: "canonicalize",
     signature: "canonicalize(path: string) -> string",
-    description: "Canonicalize path",
+    description: "Canonicalize `path` by resolving symlinks and removing `.`, `..`, and extra `/`s where possible.",
     required_args: 1,
     accepts_variadic: false
   },
