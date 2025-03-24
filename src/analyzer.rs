@@ -16,10 +16,10 @@ impl<'a> Analyzer<'a> {
       .into_iter()
       .chain(self.analyze_aliases())
       .chain(self.analyze_attributes())
-      .chain(self.analyze_expressions())
       .chain(self.analyze_function_calls())
       .chain(self.analyze_recipes())
       .chain(self.analyze_settings())
+      .chain(self.analyze_values())
       .collect()
   }
 
@@ -237,77 +237,6 @@ impl<'a> Analyzer<'a> {
           });
           }
         }
-      }
-    }
-
-    diagnostics
-  }
-
-  fn analyze_expressions(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let root = match &self.document.tree {
-      Some(tree) => tree.root_node(),
-      None => return diagnostics,
-    };
-
-    let identifiers = root.find_all("expression > value > identifier");
-
-    let mut variables = self
-      .document
-      .get_variables()
-      .iter()
-      .map(|variable| variable.name.value.clone())
-      .collect::<HashSet<_>>();
-
-    variables.extend(builtins::BUILTINS.into_iter().filter_map(|builtin| {
-      if let Builtin::Constant { name, .. } = builtin {
-        Some(name.to_owned())
-      } else {
-        None
-      }
-    }));
-
-    for identifier in identifiers {
-      let recipe = self.document.find_recipe(
-        &identifier.get_parent("recipe").map_or_else(
-          String::new,
-          |recipe_node| {
-            recipe_node
-              .find("recipe_header > identifier")
-              .map_or_else(String::new, |identifier_node| {
-                self.document.get_node_text(&identifier_node)
-              })
-          },
-        ),
-      );
-
-      let identifier_name = self.document.get_node_text(&identifier);
-
-      let mut add_diagnostic = |message: String| {
-        diagnostics.push(lsp::Diagnostic {
-          range: identifier.get_range(),
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message,
-          ..Default::default()
-        });
-      };
-
-      if let Some(ref recipe) = recipe {
-        let recipe_parameters = recipe
-          .parameters
-          .iter()
-          .map(|p| p.name.clone())
-          .collect::<HashSet<_>>();
-
-        if !recipe_parameters.contains(&identifier_name)
-          && !variables.contains(&identifier_name)
-        {
-          add_diagnostic(format!("Variable '{}' not found", identifier_name));
-        }
-      } else if !variables.contains(&identifier_name) {
-        add_diagnostic(format!("Variable '{}' not found", identifier_name));
       }
     }
 
@@ -578,6 +507,110 @@ impl<'a> Analyzer<'a> {
           source: Some("just-lsp".to_string()),
           message: format!("Duplicate setting '{}'", setting.name),
           ..Default::default()
+        });
+      }
+    }
+
+    diagnostics
+  }
+
+  fn analyze_values(&self) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let root = match self.document.tree {
+      Some(ref tree) => tree.root_node(),
+      None => return diagnostics,
+    };
+
+    let identifiers = root.find_all("expression > value > identifier");
+
+    let mut variables = self
+      .document
+      .get_variables()
+      .iter()
+      .map(|variable| variable.name.value.clone())
+      .collect::<HashSet<_>>();
+
+    variables.extend(builtins::BUILTINS.into_iter().filter_map(|builtin| {
+      match builtin {
+        Builtin::Constant { name, .. } => Some(name.to_owned()),
+        _ => None,
+      }
+    }));
+
+    let mut recipe_identifier_map = self.document.get_recipes().iter().fold(
+      HashMap::new(),
+      |mut acc, recipe| {
+        acc.insert(recipe.name.clone(), HashSet::new());
+        acc
+      },
+    );
+
+    for identifier in identifiers {
+      let recipe_name = identifier
+        .get_parent("recipe")
+        .as_ref()
+        .and_then(|recipe_node| recipe_node.find("recipe_header > identifier"))
+        .map_or_else(String::new, |identifier_node| {
+          self.document.get_node_text(&identifier_node)
+        });
+
+      let recipe = self.document.find_recipe(&recipe_name);
+
+      let identifier_name = self.document.get_node_text(&identifier);
+
+      let create_diagnostic = |message: String| lsp::Diagnostic {
+        range: identifier.get_range(),
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        source: Some("just-lsp".to_string()),
+        message,
+        ..Default::default()
+      };
+
+      match recipe {
+        Some(recipe) => {
+          recipe_identifier_map
+            .entry(recipe.name.clone())
+            .or_insert_with(HashSet::new)
+            .insert(identifier_name.clone());
+
+          let recipe_parameters = recipe
+            .parameters
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<HashSet<_>>();
+
+          if !recipe_parameters.contains(&identifier_name)
+            && !variables.contains(&identifier_name)
+          {
+            diagnostics.push(create_diagnostic(format!(
+              "Variable '{}' not found",
+              identifier_name
+            )));
+          }
+        }
+        None if !variables.contains(&identifier_name) => {
+          diagnostics.push(create_diagnostic(format!(
+            "Variable '{}' not found",
+            identifier_name
+          )));
+        }
+        _ => {}
+      }
+    }
+
+    for (recipe_name, identifiers) in recipe_identifier_map {
+      if let Some(recipe) = self.document.find_recipe(&recipe_name) {
+        recipe.parameters.iter().for_each(|parameter| {
+          if !identifiers.contains(&parameter.name) {
+            diagnostics.push(lsp::Diagnostic {
+              range: parameter.range,
+              severity: Some(lsp::DiagnosticSeverity::WARNING),
+              source: Some("just-lsp".to_string()),
+              message: format!("Parameter '{}' appears unused", parameter.name),
+              ..Default::default()
+            });
+          }
         });
       }
     }
@@ -1569,5 +1602,23 @@ mod tests {
     assert_eq!(diagnostics.len(), 1);
 
     assert_eq!(diagnostics[0].message, "Variable 'var' not found");
+  }
+
+  #[test]
+  fn warn_for_unused_recipe_parameters() {
+    let doc = document(indoc! {
+      "
+      foo bar:
+        echo foo
+      "
+    });
+
+    let analyzer = Analyzer::new(&doc);
+
+    let diagnostics = analyzer.analyze();
+
+    assert_eq!(diagnostics.len(), 1);
+
+    assert_eq!(diagnostics[0].message, "Parameter 'bar' appears unused");
   }
 }
