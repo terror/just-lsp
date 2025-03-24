@@ -205,7 +205,7 @@ impl<'a> Resolver<'a> {
                 .map(|identifier_node| {
                   self.document.get_node_text(&identifier_node)
                 })
-                .unwrap_or_else(String::new),
+                .unwrap_or_default(),
             );
 
             identifier_recipe.is_some_and(|recipe| {

@@ -328,11 +328,11 @@ impl Inner {
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          let resolver = Resolver::new(&document);
+          let resolver = Resolver::new(document);
 
           resolver
             .resolve_identifier_definition(&identifier)
-            .map(|location| lsp::GotoDefinitionResponse::Scalar(location))
+            .map(lsp::GotoDefinitionResponse::Scalar)
         })
     }))
   }
