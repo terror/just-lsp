@@ -1737,6 +1737,43 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn hover_local_parameter(
+  ) -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          bar arg='cooler':
+            echo {{ arg }}
+
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn document_highlight() -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
