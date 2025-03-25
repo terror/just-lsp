@@ -29,6 +29,21 @@ pub(crate) struct Parameter {
   pub(crate) range: lsp::Range,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub(crate) struct ParameterJson {
+  pub(crate) name: String,
+  pub(crate) default_value: Option<String>,
+}
+
+impl From<Parameter> for ParameterJson {
+  fn from(param: Parameter) -> Self {
+    ParameterJson {
+      name: param.name,
+      default_value: param.default_value,
+    }
+  }
+}
+
 impl Parameter {
   pub(crate) fn parse(text: &str, range: lsp::Range) -> Option<Self> {
     let parts: Vec<&str> = text.split('=').collect();

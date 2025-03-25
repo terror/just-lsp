@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct Server(Arc<tokio::sync::Mutex<Inner>>);
+pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
 
 impl Server {
   pub fn new(client: Client) -> Self {
@@ -9,23 +9,31 @@ impl Server {
   }
 
   pub async fn run() -> Result {
-    let (service, messages) = LspService::new(Server::new);
+    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
-    lspower::Server::new(tokio::io::stdin(), tokio::io::stdout())
-      .interleave(messages)
+    let (service, socket) = LspService::new(|client| Server::new(client));
+
+    tower_lsp::Server::new(stdin, stdout, socket)
       .serve(service)
       .await;
 
     Ok(())
   }
 
-  pub fn capabilities() -> lsp::ServerCapabilities {
+  pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
         ..Default::default()
       }),
+      code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(
+        true,
+      )),
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
+      execute_command_provider: Some(lsp::ExecuteCommandOptions {
+        commands: vec!["just-lsp.run_recipe".to_string()],
+        ..Default::default()
+      }),
       folding_range_provider: Some(
         lsp::FoldingRangeProviderCapability::Simple(true),
       ),
@@ -51,8 +59,15 @@ impl Server {
   }
 }
 
-#[lspower::async_trait]
+#[tower_lsp::async_trait]
 impl LanguageServer for Server {
+  async fn code_action(
+    &self,
+    params: lsp::CodeActionParams,
+  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
+    self.0.lock().await.code_action(params).await
+  }
+
   async fn completion(
     &self,
     params: lsp::CompletionParams,
@@ -81,6 +96,13 @@ impl LanguageServer for Server {
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
     self.0.lock().await.document_highlight(params).await
+  }
+
+  async fn execute_command(
+    &self,
+    params: lsp::ExecuteCommandParams,
+  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
+    self.0.lock().await.execute_command(params).await
   }
 
   async fn folding_range(
@@ -148,6 +170,46 @@ impl Inner {
       documents: BTreeMap::new(),
       initialized: false,
     }
+  }
+
+  async fn code_action(
+    &self,
+    params: lsp::CodeActionParams,
+  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    if let Some(document) = self.documents.get(uri) {
+      return Ok(Some(
+        document
+          .get_recipes()
+          .into_iter()
+          .map(|recipe| {
+            let parameters = recipe
+              .parameters
+              .into_iter()
+              .map(ParameterJson::from)
+              .collect::<Vec<ParameterJson>>();
+
+            lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+              title: recipe.name.clone(),
+              kind: Some(lsp::CodeActionKind::SOURCE),
+              command: Some(lsp::Command {
+                title: recipe.name.clone(),
+                command: "just-lsp.run_recipe".to_string(),
+                arguments: Some(vec![
+                  serde_json::to_value(recipe.name).unwrap(),
+                  serde_json::to_value(uri.clone()).unwrap(),
+                  serde_json::to_value(parameters).unwrap(),
+                ]),
+              }),
+              ..Default::default()
+            })
+          })
+          .collect(),
+      ));
+    }
+
+    Ok(None)
   }
 
   async fn completion(
@@ -273,6 +335,50 @@ impl Inner {
             .collect()
         })
     }))
+  }
+
+  async fn execute_command(
+    &self,
+    params: lsp::ExecuteCommandParams,
+  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
+    match params.command.as_str() {
+      "just-lsp.run_recipe" => {
+        if params.arguments.len() >= 3 {
+          if let (Some(recipe_name), Some(uri), parameters) = (
+            params.arguments[0].as_str(),
+            params.arguments[1]
+              .as_str()
+              .and_then(|s| lsp::Url::parse(s).ok()),
+            &params.arguments[2],
+          ) {
+            let parameters =
+              serde_json::from_value::<Vec<ParameterJson>>(parameters.clone())
+                .unwrap_or(Vec::new());
+
+            let path = uri
+              .to_file_path()
+              .ok()
+              .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+              .unwrap_or(PathBuf::new());
+
+            if parameters.is_empty() {
+              self.run_recipe(recipe_name, vec![], path).await;
+            }
+          }
+        }
+      }
+      _ => {
+        self
+          .client
+          .show_message(
+            lsp::MessageType::WARNING,
+            format!("Unknown command: {}", params.command),
+          )
+          .await;
+      }
+    }
+
+    Ok(None)
   }
 
   async fn folding_range(
@@ -555,6 +661,115 @@ impl Inner {
     }))
   }
 
+  async fn run_recipe(
+    &self,
+    recipe_name: &str,
+    recipe_args: Vec<String>,
+    directory: PathBuf,
+  ) {
+    let document_uri = lsp::Url::parse(&format!(
+      "just-recipe:/{}/{}",
+      directory.display(),
+      recipe_name
+    ))
+    .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
+
+    self
+      .client
+      .show_document(lsp::ShowDocumentParams {
+        uri: document_uri.clone(),
+        external: Some(false),
+        take_focus: Some(true),
+        selection: None,
+      })
+      .await
+      .ok();
+
+    let mut command = tokio::process::Command::new("just");
+
+    command.arg(recipe_name);
+
+    for arg in recipe_args {
+      command.arg(arg);
+    }
+
+    command
+      .current_dir(directory.clone())
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::piped());
+
+    let client = self.client.clone();
+
+    let recipe_name = recipe_name.to_string();
+
+    tokio::spawn(async move {
+      match command.output().await {
+        Ok(output) => {
+          let mut output_text = String::new();
+
+          if let Ok(stdout) = String::from_utf8(output.stdout) {
+            if !stdout.is_empty() {
+              output_text.push_str(stdout.trim());
+            }
+          }
+
+          let changes = HashMap::from([(
+            document_uri.clone(),
+            vec![lsp::TextEdit {
+              range: lsp::Range {
+                start: lsp::Position {
+                  line: 0,
+                  character: 0,
+                },
+                end: lsp::Position {
+                  line: 0,
+                  character: 0,
+                },
+              },
+              new_text: output_text,
+            }],
+          )]);
+
+          client
+            .apply_edit(lsp::WorkspaceEdit {
+              changes: Some(changes),
+              ..Default::default()
+            })
+            .await
+            .ok();
+        }
+        Err(error) => {
+          let changes = HashMap::from([(
+            document_uri.clone(),
+            vec![lsp::TextEdit {
+              range: lsp::Range {
+                start: lsp::Position {
+                  line: 0,
+                  character: 0,
+                },
+                end: lsp::Position {
+                  line: 0,
+                  character: 0,
+                },
+              },
+              new_text: format!(
+                "Failed to run recipe '{recipe_name}': {error}",
+              ),
+            }],
+          )]);
+
+          client
+            .apply_edit(lsp::WorkspaceEdit {
+              changes: Some(changes),
+              ..Default::default()
+            })
+            .await
+            .ok();
+        }
+      }
+    });
+  }
+
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
@@ -565,27 +780,25 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
-    lspower::{LspService, MessageStream},
     pretty_assertions::assert_eq,
     serde_json::{json, Value},
     std::env,
+    tower_lsp::LspService,
     tower_test::mock::Spawn,
   };
 
   #[derive(Debug)]
   struct Test {
-    _messages: MessageStream,
     requests: Vec<Value>,
     responses: Vec<Option<Value>>,
-    service: Spawn<LspService>,
+    service: Spawn<LspService<Server>>,
   }
 
   impl Test {
     fn new() -> Result<Self> {
-      let (service, messages) = LspService::new(Server::new);
+      let (service, _) = LspService::new(Server::new);
 
       Ok(Self {
-        _messages: messages,
         requests: Vec::new(),
         responses: Vec::new(),
         service: Spawn::new(service),
