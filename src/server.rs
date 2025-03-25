@@ -11,7 +11,7 @@ impl Server {
   pub async fn run() -> Result {
     let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
-    let (service, socket) = LspService::new(|client| Server::new(client));
+    let (service, socket) = LspService::new(Server::new);
 
     tower_lsp::Server::new(stdin, stdout, socket)
       .serve(service)
@@ -344,25 +344,77 @@ impl Inner {
     match params.command.as_str() {
       "just-lsp.run_recipe" => {
         if params.arguments.len() >= 3 {
-          if let (Some(recipe_name), Some(uri), parameters) = (
+          if let (Some(recipe_name), Some(uri), Some(parameters)) = (
             params.arguments[0].as_str(),
             params.arguments[1]
               .as_str()
               .and_then(|s| lsp::Url::parse(s).ok()),
-            &params.arguments[2],
+            params.arguments[2].as_array(),
           ) {
-            let parameters =
-              serde_json::from_value::<Vec<ParameterJson>>(parameters.clone())
-                .unwrap_or(Vec::new());
-
             let path = uri
               .to_file_path()
               .ok()
               .and_then(|path| path.parent().map(|p| p.to_path_buf()))
               .unwrap_or(PathBuf::new());
 
-            if parameters.is_empty() {
-              self.run_recipe(recipe_name, vec![], path).await;
+            // Convert parameters to a usable format
+            if let Ok(parameters) = serde_json::from_value::<Vec<ParameterJson>>(
+              params.arguments[2].clone(),
+            ) {
+              if parameters.is_empty() {
+                self.run_recipe(recipe_name, vec![], path).await;
+              } else {
+                let mut recipe_args = Vec::new();
+
+                for param in &parameters {
+                  let param_title = if let Some(default) = &param.default_value
+                  {
+                    format!("{} (default: {})", param.name, default)
+                  } else {
+                    param.name.clone()
+                  };
+
+                  let items = vec![lsp::MessageActionItem {
+                    title: param_title.clone(),
+                    properties: HashMap::new(),
+                  }];
+
+                  if let Some(result) = self
+                    .client
+                    .show_message_request(
+                      lsp::MessageType::INFO,
+                      format!("Enter value for '{}' parameter:", param.name),
+                      Some(items),
+                    )
+                    .await
+                    .unwrap_or_default()
+                  {
+                    // Extract the user input from the result
+                    // If using the default, extract it from the param
+                    let arg_value = if result.title == param_title
+                      && param.default_value.is_some()
+                    {
+                      param.default_value.clone().unwrap()
+                    } else {
+                      // If custom input mechanism is needed, could be updated here
+                      result.title.clone()
+                    };
+
+                    recipe_args.push(arg_value);
+                  }
+                }
+
+                // Run the recipe with all collected arguments
+                self.run_recipe(recipe_name, recipe_args, path).await;
+              }
+            } else {
+              self
+                .client
+                .show_message(
+                  lsp::MessageType::ERROR,
+                  "Failed to parse recipe parameters",
+                )
+                .await;
             }
           }
         }
