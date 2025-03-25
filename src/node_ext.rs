@@ -366,10 +366,15 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let recipes_and_assignments = root.find_all("recipe, assignment");
+
     assert_eq!(recipes_and_assignments.len(), 3);
-    assert_eq!(recipes_and_assignments[0].kind(), "recipe");
-    assert_eq!(recipes_and_assignments[1].kind(), "recipe");
-    assert_eq!(recipes_and_assignments[2].kind(), "assignment");
+
+    let kinds = recipes_and_assignments
+      .iter()
+      .map(Node::kind)
+      .collect::<Vec<_>>();
+
+    assert_eq!(kinds, ["recipe", "recipe", "assignment"]);
 
     let identifiers =
       root.find_all("recipe_header > identifier, function_call > identifier");

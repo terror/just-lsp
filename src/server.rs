@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct Server(Arc<tokio::sync::Mutex<Inner>>);
+pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
 
 impl Server {
   pub fn new(client: Client) -> Self {
@@ -9,23 +9,31 @@ impl Server {
   }
 
   pub async fn run() -> Result {
-    let (service, messages) = LspService::new(Server::new);
+    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
-    lspower::Server::new(tokio::io::stdin(), tokio::io::stdout())
-      .interleave(messages)
+    let (service, socket) = LspService::new(Server::new);
+
+    tower_lsp::Server::new(stdin, stdout, socket)
       .serve(service)
       .await;
 
     Ok(())
   }
 
-  pub fn capabilities() -> lsp::ServerCapabilities {
+  pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
         ..Default::default()
       }),
+      code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(
+        true,
+      )),
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
+      execute_command_provider: Some(lsp::ExecuteCommandOptions {
+        commands: Command::all(),
+        ..Default::default()
+      }),
       folding_range_provider: Some(
         lsp::FoldingRangeProviderCapability::Simple(true),
       ),
@@ -51,8 +59,15 @@ impl Server {
   }
 }
 
-#[lspower::async_trait]
+#[tower_lsp::async_trait]
 impl LanguageServer for Server {
+  async fn code_action(
+    &self,
+    params: lsp::CodeActionParams,
+  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
+    self.0.lock().await.code_action(params).await
+  }
+
   async fn completion(
     &self,
     params: lsp::CompletionParams,
@@ -61,8 +76,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    if let Err(error) = self.0.lock().await.did_change(params).await {
-      log::debug!("error: {error}");
+    let mut inner = self.0.lock().await;
+
+    if let Err(error) = inner.did_change(params).await {
+      inner
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
   }
 
@@ -71,8 +91,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    if let Err(error) = self.0.lock().await.did_open(params).await {
-      log::debug!("error: {error}");
+    let mut inner = self.0.lock().await;
+
+    if let Err(error) = inner.did_open(params).await {
+      inner
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
   }
 
@@ -81,6 +106,13 @@ impl LanguageServer for Server {
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
     self.0.lock().await.document_highlight(params).await
+  }
+
+  async fn execute_command(
+    &self,
+    params: lsp::ExecuteCommandParams,
+  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
+    self.0.lock().await.execute_command(params).await
   }
 
   async fn folding_range(
@@ -148,6 +180,49 @@ impl Inner {
       documents: BTreeMap::new(),
       initialized: false,
     }
+  }
+
+  async fn code_action(
+    &self,
+    params: lsp::CodeActionParams,
+  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    if let Some(document) = self.documents.get(uri) {
+      let mut actions = Vec::new();
+
+      for recipe in document.get_recipes() {
+        let parameters = recipe
+          .parameters
+          .into_iter()
+          .map(ParameterJson::from)
+          .collect::<Vec<ParameterJson>>();
+
+        let recipe_name = serde_json::to_value(&recipe.name)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let uri = serde_json::to_value(uri)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let parameters = serde_json::to_value(parameters)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+          title: recipe.name.clone(),
+          kind: Some(lsp::CodeActionKind::SOURCE),
+          command: Some(lsp::Command {
+            title: recipe.name.clone(),
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(vec![recipe_name, uri, parameters]),
+          }),
+          ..Default::default()
+        }));
+      }
+
+      return Ok(Some(actions));
+    }
+
+    Ok(None)
   }
 
   async fn completion(
@@ -273,6 +348,62 @@ impl Inner {
             .collect()
         })
     }))
+  }
+
+  async fn execute_command(
+    &self,
+    params: lsp::ExecuteCommandParams,
+  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
+    match Command::try_from(params.command.as_str()) {
+      Ok(Command::RunRecipe) => {
+        let recipe_name = params
+          .arguments
+          .first()
+          .and_then(|recipe_name| recipe_name.as_str());
+
+        let uri = params
+          .arguments
+          .get(1)
+          .and_then(|arguments| arguments.as_str())
+          .and_then(|arguments| lsp::Url::parse(arguments).ok());
+
+        let parameters = params.arguments.get(2).and_then(|parameters| {
+          serde_json::from_value::<Vec<ParameterJson>>(parameters.clone()).ok()
+        });
+
+        if let (Some(recipe_name), Some(uri), Some(parameters)) =
+          (recipe_name, uri, parameters)
+        {
+          let path = uri
+            .to_file_path()
+            .ok()
+            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+            .unwrap_or(PathBuf::new());
+
+          let recipe_arguments = Vec::new();
+
+          if !parameters.is_empty() {
+            self.client.show_message(
+              lsp::MessageType::WARNING,
+              "Running a recipe code action with parameters is not yet supported."
+            )
+            .await;
+
+            return Ok(None);
+          }
+
+          self.run_recipe(recipe_name, recipe_arguments, path).await;
+        }
+      }
+      Err(error) => {
+        self
+          .client
+          .show_message(lsp::MessageType::ERROR, error)
+          .await;
+      }
+    }
+
+    Ok(None)
   }
 
   async fn folding_range(
@@ -476,7 +607,7 @@ impl Inner {
   async fn initialized(&mut self, _: lsp::InitializedParams) {
     self
       .client
-      .show_message(
+      .log_message(
         lsp::MessageType::INFO,
         &format!("{} initialized", env!("CARGO_PKG_NAME")),
       )
@@ -486,19 +617,21 @@ impl Inner {
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if self.initialized {
-      if let Some(document) = self.documents.get(uri) {
-        let analyzer = Analyzer::new(document);
+    if !self.initialized {
+      return;
+    }
 
-        self
-          .client
-          .publish_diagnostics(
-            uri.clone(),
-            analyzer.analyze(),
-            Some(document.version),
-          )
-          .await;
-      }
+    if let Some(document) = self.documents.get(uri) {
+      let analyzer = Analyzer::new(document);
+
+      self
+        .client
+        .publish_diagnostics(
+          uri.clone(),
+          analyzer.analyze(),
+          Some(document.version),
+        )
+        .await;
     }
   }
 
@@ -531,12 +664,12 @@ impl Inner {
     let new_name = params.new_name;
 
     Ok(self.documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
-
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
+          let resolver = Resolver::new(document);
+
           let references = resolver.resolve_identifier_references(&identifier);
 
           let text_edits = references
@@ -555,6 +688,205 @@ impl Inner {
     }))
   }
 
+  async fn run_recipe(
+    &self,
+    recipe_name: &str,
+    recipe_arguments: Vec<String>,
+    directory: PathBuf,
+  ) {
+    let document_uri = lsp::Url::parse(&format!(
+      "just-recipe:/{}/{}",
+      directory.display(),
+      recipe_name
+    ))
+    .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
+
+    let mut command = tokio::process::Command::new("just");
+
+    command.arg(recipe_name);
+
+    for argument in recipe_arguments {
+      command.arg(argument);
+    }
+
+    command
+      .current_dir(directory.clone())
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::piped());
+
+    let client = self.client.clone();
+
+    client
+      .show_document(lsp::ShowDocumentParams {
+        uri: document_uri.clone(),
+        external: Some(false),
+        take_focus: Some(true),
+        selection: None,
+      })
+      .await
+      .ok();
+
+    let changes = HashMap::from([(
+      document_uri.clone(),
+      vec![lsp::TextEdit {
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: u32::MAX,
+            character: 0,
+          },
+        },
+        new_text: String::new(),
+      }],
+    )]);
+
+    client
+      .apply_edit(lsp::WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+      })
+      .await
+      .ok();
+
+    let recipe_name = recipe_name.to_string();
+
+    tokio::spawn(async move {
+      match command.spawn() {
+        Ok(mut child) => {
+          let stdout_lines = LinesStream::new(
+            tokio::io::BufReader::new(
+              child.stdout.take().expect("Failed to capture stdout"),
+            )
+            .lines(),
+          );
+
+          let stderr_lines = LinesStream::new(
+            tokio::io::BufReader::new(
+              child.stderr.take().expect("Failed to capture stderr"),
+            )
+            .lines(),
+          );
+
+          let mut merged_stream = StreamExt::merge(stdout_lines, stderr_lines);
+
+          let mut buffer = String::new();
+          let mut current_line = 0;
+          let mut last_update = std::time::Instant::now();
+
+          while let Some(line_result) = merged_stream.next().await {
+            match line_result {
+              Ok(line) => {
+                buffer.push_str(&line);
+
+                buffer.push('\n');
+
+                let now = std::time::Instant::now();
+
+                if (now.duration_since(last_update).as_millis() > 50
+                  || buffer.len() > 1024)
+                  && !buffer.is_empty()
+                {
+                  let changes = HashMap::from([(
+                    document_uri.clone(),
+                    vec![lsp::TextEdit {
+                      range: lsp::Range {
+                        start: lsp::Position {
+                          line: current_line,
+                          character: 0,
+                        },
+                        end: lsp::Position {
+                          line: current_line,
+                          character: 0,
+                        },
+                      },
+                      new_text: buffer.trim().into(),
+                    }],
+                  )]);
+
+                  client
+                    .apply_edit(lsp::WorkspaceEdit {
+                      changes: Some(changes),
+                      ..Default::default()
+                    })
+                    .await
+                    .ok();
+
+                  let newlines = buffer.matches('\n').count() as u32;
+
+                  current_line += newlines;
+                  buffer.clear();
+                  last_update = now;
+                }
+              }
+              Err(error) => {
+                buffer.push_str(&format!("Error reading output: {}\n", error));
+              }
+            }
+          }
+
+          if !buffer.is_empty() {
+            let changes = HashMap::from([(
+              document_uri.clone(),
+              vec![lsp::TextEdit {
+                range: lsp::Range {
+                  start: lsp::Position {
+                    line: current_line,
+                    character: 0,
+                  },
+                  end: lsp::Position {
+                    line: current_line,
+                    character: 0,
+                  },
+                },
+                new_text: buffer.trim().into(),
+              }],
+            )]);
+
+            client
+              .apply_edit(lsp::WorkspaceEdit {
+                changes: Some(changes),
+                ..Default::default()
+              })
+              .await
+              .ok();
+          }
+
+          match child.wait().await {
+            Ok(status) => {
+              if !status.success() {
+                client
+                  .show_message(
+                    lsp::MessageType::WARNING,
+                    format!("Recipe '{recipe_name}' completed with non-zero exit code: {}", status),
+                  )
+                  .await;
+              }
+            }
+            Err(error) => {
+              client
+                .show_message(
+                  lsp::MessageType::ERROR,
+                  format!("Error waiting for recipe '{recipe_name}': {error}"),
+                )
+                .await;
+            }
+          }
+        }
+        Err(error) => {
+          client
+            .show_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to run recipe '{recipe_name}': {error}"),
+            )
+            .await;
+        }
+      }
+    });
+  }
+
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
@@ -565,27 +897,25 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
-    lspower::{LspService, MessageStream},
     pretty_assertions::assert_eq,
     serde_json::{json, Value},
     std::env,
+    tower_lsp::LspService,
     tower_test::mock::Spawn,
   };
 
   #[derive(Debug)]
   struct Test {
-    _messages: MessageStream,
     requests: Vec<Value>,
     responses: Vec<Option<Value>>,
-    service: Spawn<LspService>,
+    service: Spawn<LspService<Server>>,
   }
 
   impl Test {
     fn new() -> Result<Self> {
-      let (service, messages) = LspService::new(Server::new);
+      let (service, _) = LspService::new(Server::new);
 
       Ok(Self {
-        _messages: messages,
         requests: Vec::new(),
         responses: Vec::new(),
         service: Spawn::new(service),
@@ -1047,6 +1377,16 @@ mod tests {
     highlights: Vec<Highlight<'a>>,
   }
 
+  impl IntoValue for DocumentHighlightResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.highlights.into_value()
+      })
+    }
+  }
+
   #[derive(Debug)]
   struct Highlight<'a> {
     start_line: u32,
@@ -1088,16 +1428,6 @@ mod tests {
     }
   }
 
-  impl IntoValue for DocumentHighlightResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.highlights.into_value()
-      })
-    }
-  }
-
   #[derive(Debug)]
   struct FoldingRange<'a> {
     start_line: u32,
@@ -1112,6 +1442,12 @@ mod tests {
         "endLine": self.end_line,
         "kind": self.kind
       })
+    }
+  }
+
+  impl IntoValue for Vec<FoldingRange<'_>> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|range| range.into_value()).collect()
     }
   }
 
@@ -1152,9 +1488,97 @@ mod tests {
     }
   }
 
-  impl IntoValue for Vec<FoldingRange<'_>> {
+  #[derive(Debug)]
+  struct CodeActionRequest {
+    id: i64,
+    uri: &'static str,
+    range: lsp::Range,
+  }
+
+  impl IntoValue for CodeActionRequest {
     fn into_value(self) -> Value {
-      self.into_iter().map(|range| range.into_value()).collect()
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/codeAction",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "range": {
+            "start": {
+              "line": self.range.start.line,
+              "character": self.range.start.character
+            },
+            "end": {
+              "line": self.range.end.line,
+              "character": self.range.end.character
+            }
+          },
+          "context": {
+            "diagnostics": []
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct CodeActionResponse {
+    id: i64,
+    actions: Vec<CodeAction>,
+  }
+
+  impl IntoValue for CodeActionResponse {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.actions.into_value()
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct CodeAction {
+    title: &'static str,
+    kind: &'static str,
+    command: Command,
+    arguments: Vec<ParameterJson>,
+  }
+
+  impl IntoValue for Vec<ParameterJson> {
+    fn into_value(self) -> Value {
+      self
+        .into_iter()
+        .map(|p| serde_json::to_value(p).unwrap())
+        .collect()
+    }
+  }
+
+  impl IntoValue for CodeAction {
+    fn into_value(self) -> Value {
+      let recipe_name = json!(self.title);
+
+      let uri = json!("file:///test.just");
+
+      let parameters = json!(self.arguments.into_value());
+
+      json!({
+        "title": self.title,
+        "kind": self.kind,
+        "command": {
+          "title": self.title,
+          "command": self.command.to_string(),
+          "arguments": [recipe_name, uri, parameters]
+        }
+      })
+    }
+  }
+
+  impl IntoValue for Vec<CodeAction> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|a| a.into_value()).collect()
     }
   }
 
@@ -1832,13 +2256,13 @@ mod tests {
         uri: "file:///test.just",
         text: indoc! {
           "
-        foo:
-          echo \"foo\"
-          echo \"another line\"
+          foo:
+            echo \"foo\"
+            echo \"another line\"
 
-        bar:
-          echo \"bar\"
-        "
+          bar:
+            echo \"bar\"
+          "
         },
       })
       .request(FoldingRangeRequest {
@@ -1857,6 +2281,99 @@ mod tests {
             start_line: 4,
             end_line: 5,
             kind: "region",
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_empty_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///empty.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+        },
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_with_recipes() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          bar arg1 arg2='default':
+            echo bar
+          "
+        },
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+        },
+      })
+      .response(CodeActionResponse {
+        id: 2,
+        actions: vec![
+          CodeAction {
+            title: "foo",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![],
+          },
+          CodeAction {
+            title: "bar",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![
+              ParameterJson {
+                name: "arg1".into(),
+                default_value: None,
+              },
+              ParameterJson {
+                name: "arg2".into(),
+                default_value: Some("'default'".to_string()),
+              },
+            ],
           },
         ],
       })

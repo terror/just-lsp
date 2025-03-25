@@ -9,7 +9,7 @@ pub struct Document {
 }
 
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
-  type Error = Box<dyn std::error::Error>;
+  type Error = Error;
 
   fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
     let lsp::TextDocumentItem {
@@ -23,7 +23,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
       version,
     };
 
-    document.parse_incremental()?;
+    document.parse()?;
 
     Ok(document)
   }
@@ -52,7 +52,7 @@ impl Document {
       }
     }
 
-    self.parse_incremental()?;
+    self.parse()?;
 
     Ok(())
   }
@@ -65,32 +65,30 @@ impl Document {
   }
 
   pub(crate) fn get_aliases(&self) -> Vec<Alias> {
-    let root = match &self.tree {
-      Some(tree) => tree.root_node(),
-      None => return Vec::new(),
-    };
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("alias")
+        .iter()
+        .filter_map(|alias_node| {
+          let left_node = alias_node.find("^identifier[0]")?;
 
-    root
-      .find_all("alias")
-      .iter()
-      .filter_map(|alias_node| {
-        let left_node = alias_node.find("^identifier[0]")?;
+          let right_node = alias_node.find("^identifier[1]")?;
 
-        let right_node = alias_node.find("^identifier[1]")?;
-
-        Some(Alias {
-          name: TextNode {
-            value: self.get_node_text(&left_node),
-            range: left_node.get_range(),
-          },
-          value: TextNode {
-            value: self.get_node_text(&right_node),
-            range: right_node.get_range(),
-          },
-          range: alias_node.get_range(),
+          Some(Alias {
+            name: TextNode {
+              value: self.get_node_text(&left_node),
+              range: left_node.get_range(),
+            },
+            value: TextNode {
+              value: self.get_node_text(&right_node),
+              range: right_node.get_range(),
+            },
+            range: alias_node.get_range(),
+          })
         })
-      })
-      .collect()
+        .collect()
+    })
   }
 
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
@@ -104,113 +102,107 @@ impl Document {
   }
 
   pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
-    let root = match &self.tree {
-      Some(tree) => tree.root_node(),
-      None => return Vec::new(),
-    };
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("recipe")
+        .iter()
+        .filter_map(|recipe_node| {
+          let recipe_name = self
+            .get_node_text(&recipe_node.find("recipe_header > identifier")?);
 
-    root
-      .find_all("recipe")
-      .iter()
-      .filter_map(|recipe_node| {
-        let recipe_name =
-          self.get_node_text(&recipe_node.find("recipe_header > identifier")?);
+          let dependencies = recipe_node
+            .find("recipe_header > dependencies")
+            .map(|dependencies_node| {
+              dependencies_node
+                .find_all("dependency")
+                .into_iter()
+                .filter_map(|dependency_node| {
+                  let dependency_name =
+                    self.get_node_text(&dependency_node.find("identifier")?);
 
-        let dependencies = recipe_node
-          .find("recipe_header > dependencies")
-          .map(|dependencies_node| {
-            dependencies_node
-              .find_all("dependency")
-              .into_iter()
-              .filter_map(|dependency_node| {
-                let dependency_name =
-                  self.get_node_text(&dependency_node.find("identifier")?);
+                  let arguments = dependency_node
+                    .find_all("value")
+                    .iter()
+                    .map(|argument_node| TextNode {
+                      value: self.get_node_text(argument_node),
+                      range: argument_node.get_range(),
+                    })
+                    .collect::<Vec<_>>();
 
-                let arguments = dependency_node
-                  .find_all("value")
-                  .iter()
-                  .map(|argument_node| TextNode {
-                    value: self.get_node_text(argument_node),
-                    range: argument_node.get_range(),
+                  Some(Dependency {
+                    name: dependency_name,
+                    arguments,
+                    range: dependency_node.get_range(),
                   })
-                  .collect::<Vec<_>>();
-
-                Some(Dependency {
-                  name: dependency_name,
-                  arguments,
-                  range: dependency_node.get_range(),
                 })
-              })
-              .collect::<Vec<_>>()
+                .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+          let parameters = recipe_node
+            .find("recipe_header > parameters")
+            .map_or_else(Vec::new, |parameters_node| {
+              parameters_node
+                .find_all("^parameter, ^variadic_parameter")
+                .iter()
+                .filter_map(|param_node| {
+                  Parameter::parse(
+                    &self.get_node_text(param_node),
+                    param_node.get_range(),
+                  )
+                })
+                .collect()
+            });
+
+          Some(Recipe {
+            name: recipe_name,
+            dependencies,
+            content: self.get_node_text(recipe_node).trim().to_string(),
+            parameters,
+            range: recipe_node.get_range(),
           })
-          .unwrap_or_default();
-
-        let parameters = recipe_node
-          .find("recipe_header > parameters")
-          .map_or_else(Vec::new, |parameters_node| {
-            parameters_node
-              .find_all("^parameter, ^variadic_parameter")
-              .iter()
-              .filter_map(|param_node| {
-                Parameter::parse(
-                  &self.get_node_text(param_node),
-                  param_node.get_range(),
-                )
-              })
-              .collect()
-          });
-
-        Some(Recipe {
-          name: recipe_name,
-          dependencies,
-          content: self.get_node_text(recipe_node).trim().to_string(),
-          parameters,
-          range: recipe_node.get_range(),
         })
-      })
-      .collect()
+        .collect()
+    })
   }
 
   pub(crate) fn get_settings(&self) -> Vec<Setting> {
-    let root = match &self.tree {
-      Some(tree) => tree.root_node(),
-      None => return Vec::new(),
-    };
-
-    root
-      .find_all("setting")
-      .iter()
-      .filter_map(|setting_node| {
-        Setting::parse(
-          &self.get_node_text(setting_node),
-          setting_node.get_range(),
-        )
-      })
-      .collect()
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("setting")
+        .iter()
+        .filter_map(|setting_node| {
+          Setting::parse(
+            &self.get_node_text(setting_node),
+            setting_node.get_range(),
+          )
+        })
+        .collect()
+    })
   }
 
   pub(crate) fn get_variables(&self) -> Vec<Variable> {
-    let root = match &self.tree {
-      Some(tree) => tree.root_node(),
-      None => return Vec::new(),
-    };
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("assignment")
+        .iter()
+        .filter_map(|assignment_node| {
+          let identifier_node = assignment_node.find("identifier")?;
 
-    root
-      .find_all("assignment")
-      .iter()
-      .filter_map(|assignment_node| {
-        let identifier_node = assignment_node.find("identifier")?;
-
-        Some(Variable {
-          name: TextNode {
-            value: self.get_node_text(&identifier_node),
-            range: identifier_node.get_range(),
-          },
-          content: self.get_node_text(assignment_node).trim().to_string(),
-          range: assignment_node.get_range(),
+          Some(Variable {
+            name: TextNode {
+              value: self.get_node_text(&identifier_node),
+              range: identifier_node.get_range(),
+            },
+            content: self.get_node_text(assignment_node).trim().to_string(),
+            range: assignment_node.get_range(),
+          })
         })
-      })
-      .collect()
+        .collect()
+    })
   }
 
   pub(crate) fn node_at_position(
@@ -225,18 +217,14 @@ impl Document {
     }
   }
 
-  pub(crate) fn parse_incremental(&mut self) -> Result {
+  pub(crate) fn parse(&mut self) -> Result {
     let mut parser = Parser::new();
 
-    let language = unsafe { tree_sitter_just() };
-
-    parser.set_language(&language)?;
+    parser.set_language(&unsafe { tree_sitter_just() })?;
 
     let old_tree = self.tree.take();
 
-    let source_code = self.content.to_string();
-
-    self.tree = parser.parse(&source_code, old_tree.as_ref());
+    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
 
     Ok(())
   }

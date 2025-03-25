@@ -21,11 +21,15 @@ include = [
 ]
 
 [dependencies]
+anyhow = "1.0.97"
 env_logger = "0.9.3"
-log = "0.4.26"
-lspower = "1.5.0"
+log = "0.4.27"
 ropey = "1.6.1"
-tokio = { version = "1.44.1", features = ["full"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tokio = { version = "1.44.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.17", features = ["io-util"] }
+tower-lsp = "0.20.0"
 tree-sitter = "0.25.3"
 
 [dev-dependencies]
@@ -35,4 +39,4 @@ serde_json = "1.0.140"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.16"
+cc = "1.2.17"
