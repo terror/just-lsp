@@ -31,10 +31,7 @@ impl Server {
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
       execute_command_provider: Some(lsp::ExecuteCommandOptions {
-        commands: Command::all()
-          .into_iter()
-          .map(|command| command.to_string())
-          .collect(),
+        commands: Command::all(),
         ..Default::default()
       }),
       folding_range_provider: Some(

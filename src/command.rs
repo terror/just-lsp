@@ -6,22 +6,20 @@ pub(crate) enum Command {
 }
 
 impl Command {
-  pub(crate) fn all() -> Vec<Command> {
-    vec![Command::RunRecipe]
+  pub(crate) fn all() -> Vec<String> {
+    vec![Command::RunRecipe.to_string()]
   }
 }
 
 impl Display for Command {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    write!(f, "{}", self)
-  }
-}
-
-impl Into<&str> for Command {
-  fn into(self) -> &'static str {
-    match self {
-      Command::RunRecipe => "just-lsp.run_recipe",
-    }
+    write!(
+      f,
+      "{}",
+      match self {
+        Command::RunRecipe => "just-lsp.run_recipe",
+      }
+    )
   }
 }
 
