@@ -9,7 +9,7 @@ pub struct Document {
 }
 
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
-  type Error = Box<dyn std::error::Error>;
+  type Error = Error;
 
   fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
     let lsp::TextDocumentItem {

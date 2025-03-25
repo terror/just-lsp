@@ -31,7 +31,10 @@ impl Server {
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
       execute_command_provider: Some(lsp::ExecuteCommandOptions {
-        commands: vec!["just-lsp.run_recipe".to_string()],
+        commands: Command::all()
+          .into_iter()
+          .map(|command| command.to_string())
+          .collect(),
         ..Default::default()
       }),
       folding_range_provider: Some(
@@ -76,8 +79,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    if let Err(error) = self.0.lock().await.did_change(params).await {
-      log::debug!("error: {error}");
+    let mut inner = self.0.lock().await;
+
+    if let Err(error) = inner.did_change(params).await {
+      inner
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
   }
 
@@ -86,8 +94,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    if let Err(error) = self.0.lock().await.did_open(params).await {
-      log::debug!("error: {error}");
+    let mut inner = self.0.lock().await;
+
+    if let Err(error) = inner.did_open(params).await {
+      inner
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
   }
 
@@ -179,34 +192,37 @@ impl Inner {
     let uri = &params.text_document.uri;
 
     if let Some(document) = self.documents.get(uri) {
-      return Ok(Some(
-        document
-          .get_recipes()
-          .into_iter()
-          .map(|recipe| {
-            let parameters = recipe
-              .parameters
-              .into_iter()
-              .map(ParameterJson::from)
-              .collect::<Vec<ParameterJson>>();
+      let mut actions = Vec::new();
 
-            lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-              title: recipe.name.clone(),
-              kind: Some(lsp::CodeActionKind::SOURCE),
-              command: Some(lsp::Command {
-                title: recipe.name.clone(),
-                command: "just-lsp.run_recipe".to_string(),
-                arguments: Some(vec![
-                  serde_json::to_value(recipe.name).unwrap(),
-                  serde_json::to_value(uri.clone()).unwrap(),
-                  serde_json::to_value(parameters).unwrap(),
-                ]),
-              }),
-              ..Default::default()
-            })
-          })
-          .collect(),
-      ));
+      for recipe in document.get_recipes() {
+        let parameters = recipe
+          .parameters
+          .into_iter()
+          .map(ParameterJson::from)
+          .collect::<Vec<ParameterJson>>();
+
+        let recipe_name = serde_json::to_value(&recipe.name)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let uri = serde_json::to_value(uri)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let parameters = serde_json::to_value(parameters)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+          title: recipe.name.clone(),
+          kind: Some(lsp::CodeActionKind::SOURCE),
+          command: Some(lsp::Command {
+            title: recipe.name.clone(),
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(vec![recipe_name, uri, parameters]),
+          }),
+          ..Default::default()
+        }));
+      }
+
+      return Ok(Some(actions));
     }
 
     Ok(None)
@@ -341,91 +357,66 @@ impl Inner {
     &self,
     params: lsp::ExecuteCommandParams,
   ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    match params.command.as_str() {
-      "just-lsp.run_recipe" => {
-        if params.arguments.len() >= 3 {
-          if let (Some(recipe_name), Some(uri), Some(_parameters)) = (
-            params.arguments[0].as_str(),
-            params.arguments[1]
-              .as_str()
-              .and_then(|s| lsp::Url::parse(s).ok()),
-            params.arguments[2].as_array(),
-          ) {
-            let path = uri
-              .to_file_path()
-              .ok()
-              .and_then(|path| path.parent().map(|p| p.to_path_buf()))
-              .unwrap_or(PathBuf::new());
+    match Command::try_from(params.command.as_str()) {
+      Ok(Command::RunRecipe) => {
+        let recipe_name = params
+          .arguments
+          .get(0)
+          .and_then(|recipe_name| recipe_name.as_str());
 
-            // Convert parameters to a usable format
-            if let Ok(parameters) = serde_json::from_value::<Vec<ParameterJson>>(
-              params.arguments[2].clone(),
-            ) {
-              if parameters.is_empty() {
-                self.run_recipe(recipe_name, vec![], path).await;
-              } else {
-                let mut recipe_args = Vec::new();
+        let uri = params
+          .arguments
+          .get(1)
+          .and_then(|arguments| arguments.as_str())
+          .and_then(|arguments| lsp::Url::parse(arguments).ok());
 
-                for param in &parameters {
-                  let param_title = if let Some(default) = &param.default_value
-                  {
-                    format!("{} (default: {})", param.name, default)
-                  } else {
-                    param.name.clone()
-                  };
+        let parameters = params.arguments.get(2).and_then(|parameters| {
+          serde_json::from_value::<Vec<ParameterJson>>(parameters.clone()).ok()
+        });
 
-                  let items = vec![lsp::MessageActionItem {
-                    title: param_title.clone(),
-                    properties: HashMap::new(),
-                  }];
+        if let (Some(recipe_name), Some(uri), Some(parameters)) =
+          (recipe_name, uri, parameters)
+        {
+          let path = uri
+            .to_file_path()
+            .ok()
+            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+            .unwrap_or(PathBuf::new());
 
-                  if let Some(result) = self
-                    .client
-                    .show_message_request(
-                      lsp::MessageType::INFO,
-                      format!("Enter value for '{}' parameter:", param.name),
-                      Some(items),
-                    )
-                    .await
-                    .unwrap_or_default()
-                  {
-                    // Extract the user input from the result
-                    // If using the default, extract it from the param
-                    let arg_value = if result.title == param_title
-                      && param.default_value.is_some()
-                    {
-                      param.default_value.clone().unwrap()
-                    } else {
-                      // If custom input mechanism is needed, could be updated here
-                      result.title.clone()
-                    };
+          let mut recipe_arguments = Vec::new();
 
-                    recipe_args.push(arg_value);
-                  }
-                }
-
-                // Run the recipe with all collected arguments
-                self.run_recipe(recipe_name, recipe_args, path).await;
-              }
+          for param in &parameters {
+            let title = if let Some(default) = &param.default_value {
+              format!("{} (default: {})", param.name, default)
             } else {
-              self
-                .client
-                .show_message(
-                  lsp::MessageType::ERROR,
-                  "Failed to parse recipe parameters",
-                )
-                .await;
+              param.name.clone()
+            };
+
+            let items = vec![lsp::MessageActionItem {
+              title,
+              properties: HashMap::new(),
+            }];
+
+            if let Ok(Some(result)) = self
+              .client
+              .show_message_request(
+                lsp::MessageType::INFO,
+                format!("Enter value for '{}' parameter:", param.name),
+                Some(items),
+              )
+              .await
+            {
+              recipe_arguments.push(result.title);
             }
           }
+
+          self.run_recipe(recipe_name, recipe_arguments, path).await;
         }
       }
-      _ => {
+      Err(error) => {
         self
           .client
-          .show_message(
-            lsp::MessageType::WARNING,
-            format!("Unknown command: {}", params.command),
-          )
+          .show_message(lsp::MessageType::ERROR, error)
           .await;
       }
     }
@@ -634,7 +625,7 @@ impl Inner {
   async fn initialized(&mut self, _: lsp::InitializedParams) {
     self
       .client
-      .show_message(
+      .log_message(
         lsp::MessageType::INFO,
         &format!("{} initialized", env!("CARGO_PKG_NAME")),
       )
@@ -644,19 +635,21 @@ impl Inner {
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if self.initialized {
-      if let Some(document) = self.documents.get(uri) {
-        let analyzer = Analyzer::new(document);
+    if !self.initialized {
+      return;
+    }
 
-        self
-          .client
-          .publish_diagnostics(
-            uri.clone(),
-            analyzer.analyze(),
-            Some(document.version),
-          )
-          .await;
-      }
+    if let Some(document) = self.documents.get(uri) {
+      let analyzer = Analyzer::new(document);
+
+      self
+        .client
+        .publish_diagnostics(
+          uri.clone(),
+          analyzer.analyze(),
+          Some(document.version),
+        )
+        .await;
     }
   }
 
@@ -689,12 +682,12 @@ impl Inner {
     let new_name = params.new_name;
 
     Ok(self.documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
-
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
+          let resolver = Resolver::new(document);
+
           let references = resolver.resolve_identifier_references(&identifier);
 
           let text_edits = references
@@ -716,7 +709,7 @@ impl Inner {
   async fn run_recipe(
     &self,
     recipe_name: &str,
-    recipe_args: Vec<String>,
+    recipe_arguments: Vec<String>,
     directory: PathBuf,
   ) {
     let document_uri = lsp::Url::parse(&format!(
@@ -741,7 +734,7 @@ impl Inner {
 
     command.arg(recipe_name);
 
-    for arg in recipe_args {
+    for arg in recipe_arguments {
       command.arg(arg);
     }
 
@@ -2097,13 +2090,13 @@ mod tests {
         uri: "file:///test.just",
         text: indoc! {
           "
-        foo:
-          echo \"foo\"
-          echo \"another line\"
+          foo:
+            echo \"foo\"
+            echo \"another line\"
 
-        bar:
-          echo \"bar\"
-        "
+          bar:
+            echo \"bar\"
+          "
         },
       })
       .request(FoldingRangeRequest {

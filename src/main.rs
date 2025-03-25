@@ -3,6 +3,7 @@ use {
     alias::Alias,
     analyzer::Analyzer,
     builtin::{AttributeTarget, Builtin},
+    command::Command,
     document::Document,
     node_ext::NodeExt,
     point_ext::PointExt,
@@ -15,6 +16,7 @@ use {
     text_node::TextNode,
     variable::Variable,
   },
+  anyhow::{anyhow, Error},
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
@@ -33,6 +35,7 @@ mod alias;
 mod analyzer;
 mod builtin;
 mod builtins;
+mod command;
 mod document;
 mod node_ext;
 mod point_ext;
@@ -45,7 +48,7 @@ mod setting;
 mod text_node;
 mod variable;
 
-type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
+type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 extern "C" {
   pub(crate) fn tree_sitter_just() -> Language;
