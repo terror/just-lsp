@@ -380,31 +380,16 @@ impl Inner {
             .and_then(|path| path.parent().map(|p| p.to_path_buf()))
             .unwrap_or(PathBuf::new());
 
-          let mut recipe_arguments = Vec::new();
+          let recipe_arguments = Vec::new();
 
-          for param in &parameters {
-            let title = if let Some(default) = &param.default_value {
-              format!("{} (default: {})", param.name, default)
-            } else {
-              param.name.clone()
-            };
+          if !parameters.is_empty() {
+            self.client.show_message(
+              lsp::MessageType::WARNING,
+              "Running a recipe code action with parameters is not yet supported."
+            )
+            .await;
 
-            let items = vec![lsp::MessageActionItem {
-              title,
-              properties: HashMap::new(),
-            }];
-
-            if let Ok(Some(result)) = self
-              .client
-              .show_message_request(
-                lsp::MessageType::INFO,
-                format!("Enter value for '{}' parameter:", param.name),
-                Some(items),
-              )
-              .await
-            {
-              recipe_arguments.push(result.title);
-            }
+            return Ok(None);
           }
 
           self.run_recipe(recipe_name, recipe_arguments, path).await;
