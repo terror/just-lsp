@@ -344,7 +344,7 @@ impl Inner {
     match params.command.as_str() {
       "just-lsp.run_recipe" => {
         if params.arguments.len() >= 3 {
-          if let (Some(recipe_name), Some(uri), Some(parameters)) = (
+          if let (Some(recipe_name), Some(uri), Some(_parameters)) = (
             params.arguments[0].as_str(),
             params.arguments[1]
               .as_str()
