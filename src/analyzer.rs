@@ -550,6 +550,14 @@ impl<'a> Analyzer<'a> {
       },
     );
 
+    let mut variable_usage_map = self.document.get_variables().iter().fold(
+      HashMap::new(),
+      |mut acc, variable| {
+        acc.insert(variable.name.value.clone(), false);
+        acc
+      },
+    );
+
     for identifier in identifiers {
       let recipe_name = identifier
         .get_parent("recipe")
@@ -584,22 +592,50 @@ impl<'a> Analyzer<'a> {
             .map(|p| p.name.clone())
             .collect::<HashSet<_>>();
 
-          if !recipe_parameters.contains(&identifier_name)
-            && !variables.contains(&identifier_name)
-          {
+          if !recipe_parameters.contains(&identifier_name) {
+            if variable_usage_map.contains_key(&identifier_name) {
+              variable_usage_map.insert(identifier_name.clone(), true);
+            }
+
+            if !variables.contains(&identifier_name) {
+              diagnostics.push(create_diagnostic(format!(
+                "Variable '{}' not found",
+                identifier_name
+              )));
+            }
+          }
+        }
+        None => {
+          if variable_usage_map.contains_key(&identifier_name) {
+            variable_usage_map.insert(identifier_name.clone(), true);
+          }
+
+          if !variables.contains(&identifier_name) {
             diagnostics.push(create_diagnostic(format!(
               "Variable '{}' not found",
               identifier_name
             )));
           }
         }
-        None if !variables.contains(&identifier_name) => {
-          diagnostics.push(create_diagnostic(format!(
-            "Variable '{}' not found",
-            identifier_name
-          )));
+      }
+    }
+
+    for (variable_name, is_used) in variable_usage_map {
+      if !is_used {
+        if let Some(variable) = self
+          .document
+          .get_variables()
+          .iter()
+          .find(|v| v.name.value == variable_name)
+        {
+          diagnostics.push(lsp::Diagnostic {
+            range: variable.name.range,
+            severity: Some(lsp::DiagnosticSeverity::WARNING),
+            source: Some("just-lsp".to_string()),
+            message: format!("Variable '{}' appears unused", variable_name),
+            ..Default::default()
+          });
         }
-        _ => {}
       }
     }
 
@@ -1323,6 +1359,113 @@ mod tests {
     })
     .error("Duplicate recipe name 'foo'")
     .error("Duplicate recipe name 'foo'")
+    .run()
+  }
+
+  #[test]
+  fn warn_for_unused_variables() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      bar := \"used value\"
+
+      recipe:
+        echo {{ bar }}
+      "
+    })
+    .warning("Variable 'foo' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn used_variables_no_warnings() {
+    Test::new(indoc! {
+      "
+      foo := \"used in recipe\"
+      bar := \"used as dependency arg\"
+
+      another arg:
+        echo {{ arg }}
+
+      recipe: (another bar)
+        echo {{ foo }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn variables_used_in_recipe_parameters() {
+    Test::new(indoc! {
+      "
+      param_value := \"value\"
+      unused := \"unused\"
+
+      recipe arg=\"default\": (another param_value)
+        echo {{ arg }}
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning("Variable 'unused' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn variables_used_in_dependency_args() {
+    Test::new(indoc! {
+      "
+      used_arg := \"value\"
+      unused_var := \"not used\"
+
+      recipe: (another used_arg)
+        echo \"something\"
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning("Variable 'unused_var' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn variables_and_parameters_same_name() {
+    Test::new(indoc! {
+      "
+      param := \"variable value\"
+      other := \"other value\"
+
+      recipe param:
+        # This should reference the parameter, not the variable
+        echo {{ param }}
+        echo {{ other }}
+      "
+    })
+    .warning("Variable 'param' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn variables_used_in_multiple_recipes() {
+    Test::new(indoc! {
+      "
+      shared := \"shared value\"
+      only_in_first := \"first value\"
+      only_in_second := \"second value\"
+      never_used := \"unused\"
+
+      first:
+        echo {{ shared }}
+        echo {{ only_in_first }}
+
+      second:
+        echo {{ shared }}
+        echo {{ only_in_second }}
+      "
+    })
+    .warning("Variable 'never_used' appears unused")
     .run()
   }
 }
