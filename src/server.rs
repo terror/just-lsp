@@ -802,7 +802,7 @@ impl Inner {
                           character: 0,
                         },
                       },
-                      new_text: buffer.clone(),
+                      new_text: buffer.trim().into(),
                     }],
                   )]);
 
@@ -841,7 +841,7 @@ impl Inner {
                     character: 0,
                   },
                 },
-                new_text: buffer,
+                new_text: buffer.trim().into(),
               }],
             )]);
 
