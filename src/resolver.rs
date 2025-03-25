@@ -294,9 +294,47 @@ mod tests {
     let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
-    assert_eq!(references[0].range.start.line, 0);
-    assert_eq!(references[1].range.start.line, 3);
-    assert_eq!(references[2].range.start.line, 6);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 3
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 9
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 12
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 6,
+            character: 13
+          },
+          end: lsp::Position {
+            line: 6,
+            character: 16
+          },
+        },
+      ]
+    );
   }
 
   #[test]
@@ -325,9 +363,47 @@ mod tests {
     let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
-    assert_eq!(references[0].range.start.line, 5);
-    assert_eq!(references[1].range.start.line, 6);
-    assert_eq!(references[2].range.start.line, 7);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 5,
+            character: 4
+          },
+          end: lsp::Position {
+            line: 5,
+            character: 7
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 6,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 6,
+            character: 13
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 7,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 7,
+            character: 13
+          },
+        },
+      ]
+    );
   }
 
   #[test]
@@ -349,9 +425,38 @@ mod tests {
 
     let references = resolver.resolve_identifier_references(&identifier);
 
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
     assert_eq!(references.len(), 2);
-    assert_eq!(references[0].range.start.line, 2);
-    assert_eq!(references[1].range.start.line, 3);
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 2,
+            character: 4
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 7
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 13
+          },
+        },
+      ]
+    );
 
     let doc = document(indoc! {
       "
@@ -371,8 +476,47 @@ mod tests {
     let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 3);
-    assert_eq!(references[0].range.start.line, 0);
-    assert_eq!(references[1].range.start.line, 3);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 3
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 13
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 16
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 19
+          },
+        },
+      ]
+    );
   }
 
   #[test]
@@ -405,10 +549,57 @@ mod tests {
     let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 4);
-    assert_eq!(references[0].range.start.line, 0);
-    assert_eq!(references[1].range.start.line, 3);
-    assert_eq!(references[2].range.start.line, 10);
-    assert_eq!(references[3].range.start.line, 11);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 3
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 13
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 10,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 10,
+            character: 13
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 11,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 11,
+            character: 13
+          },
+        },
+      ]
+    );
   }
 
   #[test]
@@ -436,8 +627,37 @@ mod tests {
     let references = resolver.resolve_identifier_references(&identifier);
 
     assert_eq!(references.len(), 2);
-    assert_eq!(references[0].range.start.line, 0);
-    assert_eq!(references[1].range.start.line, 3);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 1
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 10
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 11
+          },
+        },
+      ]
+    );
   }
 
   #[test]
@@ -547,7 +767,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_builtin_identifier() {
+  fn resolve_builtin_identifier_definition() {
     let doc = document(indoc! {
       "
       foo:
@@ -561,10 +781,11 @@ mod tests {
 
     let builtin_usage = root.find("function_call > identifier").unwrap();
 
-    let definition = resolver.resolve_identifier_definition(&builtin_usage);
+    let definition = resolver
+      .resolve_identifier_definition(&builtin_usage)
+      .unwrap();
 
-    assert!(definition.is_some());
-    assert_eq!(definition.unwrap().range, builtin_usage.get_range());
+    assert_eq!(definition.range, builtin_usage.get_range());
   }
 
   #[test]

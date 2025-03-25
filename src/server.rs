@@ -358,7 +358,7 @@ impl Inner {
       Ok(Command::RunRecipe) => {
         let recipe_name = params
           .arguments
-          .get(0)
+          .first()
           .and_then(|recipe_name| recipe_name.as_str());
 
         let uri = params
@@ -731,8 +731,8 @@ impl Inner {
 
     command.arg(recipe_name);
 
-    for arg in recipe_arguments {
-      command.arg(arg);
+    for argument in recipe_arguments {
+      command.arg(argument);
     }
 
     command
