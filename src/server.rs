@@ -539,20 +539,16 @@ impl Inner {
         .map(|identifier| {
           let references = resolver.resolve_identifier_references(&identifier);
 
-          let text_edits: Vec<lsp::TextEdit> = references
+          let text_edits = references
             .iter()
             .map(|location| lsp::TextEdit {
               range: location.range,
               new_text: new_name.clone(),
             })
-            .collect();
-
-          let mut changes = std::collections::HashMap::new();
-
-          changes.insert(uri.clone(), text_edits);
+            .collect::<Vec<lsp::TextEdit>>();
 
           lsp::WorkspaceEdit {
-            changes: Some(changes),
+            changes: Some(HashMap::from([(uri.clone(), text_edits)])),
             ..Default::default()
           }
         })
