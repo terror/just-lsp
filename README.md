@@ -23,6 +23,11 @@ The server implements a decent amount of the
 language server protocol [specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
 This section aims to document some of them.
 
+### `textDocument/codeAction`
+
+We provide a code action for each recipe. These code actions run the selected
+recipe using `just`, populating a buffer with its output (stderr + stdout).
+
 ### `textDocument/completion`
 
 Completions are provided to you as you type. We currently show recipes, built-in
