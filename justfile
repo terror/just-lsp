@@ -61,6 +61,13 @@ run *args:
 test:
   cargo test
 
+[group: 'test']
+test-release-workflow:
+  -git tag -d test-release
+  -git push origin :test-release
+  git tag test-release
+  git push origin test-release
+
 [group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
