@@ -168,8 +168,10 @@ impl<'a> Resolver<'a> {
         let candidate_parent_kind = candidate_parent.kind();
 
         match identifier_parent_kind {
-          "alias" | "recipe_header" => ["alias", "dependency", "recipe_header"]
-            .contains(&candidate_parent_kind),
+          "alias" | "dependency" | "recipe_header" => {
+            ["alias", "dependency", "recipe_header"]
+              .contains(&candidate_parent_kind)
+          }
           "assignment" => {
             if candidate_parent_kind != "value" {
               return false;
@@ -596,6 +598,59 @@ mod tests {
           end: lsp::Position {
             line: 11,
             character: 13
+          },
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_references() {
+    let doc = document(indoc! {
+      "
+      all: foo
+
+      foo:
+        echo foo
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("dependency > identifier").unwrap();
+
+    let references = resolver.resolve_identifier_references(&identifier);
+
+    assert_eq!(references.len(), 2);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 5
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 8
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 2,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 3
           },
         },
       ]
