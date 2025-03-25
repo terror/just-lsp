@@ -795,45 +795,45 @@ impl Inner {
             match line_result {
               Ok(line) => {
                 buffer.push_str(&line);
+
                 buffer.push('\n');
 
                 let now = std::time::Instant::now();
 
-                if now.duration_since(last_update).as_millis() > 50
-                  || buffer.len() > 1024
+                if (now.duration_since(last_update).as_millis() > 50
+                  || buffer.len() > 1024)
+                  && !buffer.is_empty()
                 {
-                  if !buffer.is_empty() {
-                    let changes = HashMap::from([(
-                      document_uri.clone(),
-                      vec![lsp::TextEdit {
-                        range: lsp::Range {
-                          start: lsp::Position {
-                            line: current_line,
-                            character: 0,
-                          },
-                          end: lsp::Position {
-                            line: current_line,
-                            character: 0,
-                          },
+                  let changes = HashMap::from([(
+                    document_uri.clone(),
+                    vec![lsp::TextEdit {
+                      range: lsp::Range {
+                        start: lsp::Position {
+                          line: current_line,
+                          character: 0,
                         },
-                        new_text: buffer.clone(),
-                      }],
-                    )]);
+                        end: lsp::Position {
+                          line: current_line,
+                          character: 0,
+                        },
+                      },
+                      new_text: buffer.clone(),
+                    }],
+                  )]);
 
-                    client
-                      .apply_edit(lsp::WorkspaceEdit {
-                        changes: Some(changes),
-                        ..Default::default()
-                      })
-                      .await
-                      .ok();
+                  client
+                    .apply_edit(lsp::WorkspaceEdit {
+                      changes: Some(changes),
+                      ..Default::default()
+                    })
+                    .await
+                    .ok();
 
-                    let newlines = buffer.matches('\n').count() as u32;
+                  let newlines = buffer.matches('\n').count() as u32;
 
-                    current_line += newlines;
-                    buffer.clear();
-                    last_update = now;
-                  }
+                  current_line += newlines;
+                  buffer.clear();
+                  last_update = now;
                 }
               }
               Err(error) => {

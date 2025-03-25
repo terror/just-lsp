@@ -224,7 +224,7 @@ impl Document {
 
     let old_tree = self.tree.take();
 
-    self.tree = parser.parse(&self.content.to_string(), old_tree.as_ref());
+    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
 
     Ok(())
   }
