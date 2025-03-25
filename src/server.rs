@@ -1392,6 +1392,16 @@ mod tests {
     highlights: Vec<Highlight<'a>>,
   }
 
+  impl IntoValue for DocumentHighlightResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.highlights.into_value()
+      })
+    }
+  }
+
   #[derive(Debug)]
   struct Highlight<'a> {
     start_line: u32,
@@ -1433,16 +1443,6 @@ mod tests {
     }
   }
 
-  impl IntoValue for DocumentHighlightResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.highlights.into_value()
-      })
-    }
-  }
-
   #[derive(Debug)]
   struct FoldingRange<'a> {
     start_line: u32,
@@ -1457,6 +1457,12 @@ mod tests {
         "endLine": self.end_line,
         "kind": self.kind
       })
+    }
+  }
+
+  impl IntoValue for Vec<FoldingRange<'_>> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|range| range.into_value()).collect()
     }
   }
 
@@ -1497,9 +1503,97 @@ mod tests {
     }
   }
 
-  impl IntoValue for Vec<FoldingRange<'_>> {
+  #[derive(Debug)]
+  struct CodeActionRequest {
+    id: i64,
+    uri: &'static str,
+    range: lsp::Range,
+  }
+
+  impl IntoValue for CodeActionRequest {
     fn into_value(self) -> Value {
-      self.into_iter().map(|range| range.into_value()).collect()
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/codeAction",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "range": {
+            "start": {
+              "line": self.range.start.line,
+              "character": self.range.start.character
+            },
+            "end": {
+              "line": self.range.end.line,
+              "character": self.range.end.character
+            }
+          },
+          "context": {
+            "diagnostics": []
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct CodeActionResponse {
+    id: i64,
+    actions: Vec<CodeAction>,
+  }
+
+  impl IntoValue for CodeActionResponse {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": self.actions.into_value()
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct CodeAction {
+    title: &'static str,
+    kind: &'static str,
+    command: Command,
+    arguments: Vec<ParameterJson>,
+  }
+
+  impl IntoValue for Vec<ParameterJson> {
+    fn into_value(self) -> Value {
+      self
+        .into_iter()
+        .map(|p| serde_json::to_value(p).unwrap())
+        .collect()
+    }
+  }
+
+  impl IntoValue for CodeAction {
+    fn into_value(self) -> Value {
+      let recipe_name = json!(self.title);
+
+      let uri = json!("file:///test.just");
+
+      let parameters = json!(self.arguments.into_value());
+
+      json!({
+        "title": self.title,
+        "kind": self.kind,
+        "command": {
+          "title": self.title,
+          "command": self.command.to_string(),
+          "arguments": [recipe_name, uri, parameters]
+        }
+      })
+    }
+  }
+
+  impl IntoValue for Vec<CodeAction> {
+    fn into_value(self) -> Value {
+      self.into_iter().map(|a| a.into_value()).collect()
     }
   }
 
@@ -2202,6 +2296,99 @@ mod tests {
             start_line: 4,
             end_line: 5,
             kind: "region",
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_empty_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///empty.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+        },
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_with_recipes() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          bar arg1 arg2='default':
+            echo bar
+          "
+        },
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+        },
+      })
+      .response(CodeActionResponse {
+        id: 2,
+        actions: vec![
+          CodeAction {
+            title: "foo",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![],
+          },
+          CodeAction {
+            title: "bar",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![
+              ParameterJson {
+                name: "arg1".into(),
+                default_value: None,
+              },
+              ParameterJson {
+                name: "arg2".into(),
+                default_value: Some("'default'".to_string()),
+              },
+            ],
           },
         ],
       })
