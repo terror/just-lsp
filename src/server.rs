@@ -716,17 +716,6 @@ impl Inner {
     ))
     .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
 
-    self
-      .client
-      .show_document(lsp::ShowDocumentParams {
-        uri: document_uri.clone(),
-        external: Some(false),
-        take_focus: Some(true),
-        selection: None,
-      })
-      .await
-      .ok();
-
     let mut command = tokio::process::Command::new("just");
 
     command.arg(recipe_name);
@@ -742,71 +731,172 @@ impl Inner {
 
     let client = self.client.clone();
 
+    client
+      .show_document(lsp::ShowDocumentParams {
+        uri: document_uri.clone(),
+        external: Some(false),
+        take_focus: Some(true),
+        selection: None,
+      })
+      .await
+      .ok();
+
+    let changes = HashMap::from([(
+      document_uri.clone(),
+      vec![lsp::TextEdit {
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: u32::MAX,
+            character: 0,
+          },
+        },
+        new_text: String::new(),
+      }],
+    )]);
+
+    client
+      .apply_edit(lsp::WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+      })
+      .await
+      .ok();
+
     let recipe_name = recipe_name.to_string();
 
     tokio::spawn(async move {
-      match command.output().await {
-        Ok(output) => {
-          let mut output_text = String::new();
+      match command.spawn() {
+        Ok(mut child) => {
+          let stdout_lines = LinesStream::new(
+            tokio::io::BufReader::new(
+              child.stdout.take().expect("Failed to capture stdout"),
+            )
+            .lines(),
+          );
 
-          if let Ok(stdout) = String::from_utf8(output.stdout) {
-            if !stdout.is_empty() {
-              output_text.push_str(stdout.trim());
+          let stderr_lines = LinesStream::new(
+            tokio::io::BufReader::new(
+              child.stderr.take().expect("Failed to capture stderr"),
+            )
+            .lines(),
+          );
+
+          let mut merged_stream = StreamExt::merge(stdout_lines, stderr_lines);
+
+          let mut buffer = String::new();
+          let mut current_line = 0;
+          let mut last_update = std::time::Instant::now();
+
+          while let Some(line_result) = merged_stream.next().await {
+            match line_result {
+              Ok(line) => {
+                buffer.push_str(&line);
+                buffer.push('\n');
+
+                let now = std::time::Instant::now();
+
+                if now.duration_since(last_update).as_millis() > 50
+                  || buffer.len() > 1024
+                {
+                  if !buffer.is_empty() {
+                    let changes = HashMap::from([(
+                      document_uri.clone(),
+                      vec![lsp::TextEdit {
+                        range: lsp::Range {
+                          start: lsp::Position {
+                            line: current_line,
+                            character: 0,
+                          },
+                          end: lsp::Position {
+                            line: current_line,
+                            character: 0,
+                          },
+                        },
+                        new_text: buffer.clone(),
+                      }],
+                    )]);
+
+                    client
+                      .apply_edit(lsp::WorkspaceEdit {
+                        changes: Some(changes),
+                        ..Default::default()
+                      })
+                      .await
+                      .ok();
+
+                    let newlines = buffer.matches('\n').count() as u32;
+
+                    current_line += newlines;
+                    buffer.clear();
+                    last_update = now;
+                  }
+                }
+              }
+              Err(error) => {
+                buffer.push_str(&format!("Error reading output: {}\n", error));
+              }
             }
           }
 
-          let changes = HashMap::from([(
-            document_uri.clone(),
-            vec![lsp::TextEdit {
-              range: lsp::Range {
-                start: lsp::Position {
-                  line: 0,
-                  character: 0,
+          if !buffer.is_empty() {
+            let changes = HashMap::from([(
+              document_uri.clone(),
+              vec![lsp::TextEdit {
+                range: lsp::Range {
+                  start: lsp::Position {
+                    line: current_line,
+                    character: 0,
+                  },
+                  end: lsp::Position {
+                    line: current_line,
+                    character: 0,
+                  },
                 },
-                end: lsp::Position {
-                  line: 0,
-                  character: 0,
-                },
-              },
-              new_text: output_text,
-            }],
-          )]);
+                new_text: buffer,
+              }],
+            )]);
 
-          client
-            .apply_edit(lsp::WorkspaceEdit {
-              changes: Some(changes),
-              ..Default::default()
-            })
-            .await
-            .ok();
+            client
+              .apply_edit(lsp::WorkspaceEdit {
+                changes: Some(changes),
+                ..Default::default()
+              })
+              .await
+              .ok();
+          }
+
+          match child.wait().await {
+            Ok(status) => {
+              if !status.success() {
+                client
+                  .show_message(
+                    lsp::MessageType::WARNING,
+                    format!("Recipe '{recipe_name}' completed with non-zero exit code: {}", status),
+                  )
+                  .await;
+              }
+            }
+            Err(error) => {
+              client
+                .show_message(
+                  lsp::MessageType::ERROR,
+                  format!("Error waiting for recipe '{recipe_name}': {error}"),
+                )
+                .await;
+            }
+          }
         }
         Err(error) => {
-          let changes = HashMap::from([(
-            document_uri.clone(),
-            vec![lsp::TextEdit {
-              range: lsp::Range {
-                start: lsp::Position {
-                  line: 0,
-                  character: 0,
-                },
-                end: lsp::Position {
-                  line: 0,
-                  character: 0,
-                },
-              },
-              new_text: format!(
-                "Failed to run recipe '{recipe_name}': {error}",
-              ),
-            }],
-          )]);
-
           client
-            .apply_edit(lsp::WorkspaceEdit {
-              changes: Some(changes),
-              ..Default::default()
-            })
-            .await
-            .ok();
+            .show_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to run recipe '{recipe_name}': {error}"),
+            )
+            .await;
         }
       }
     });

@@ -27,6 +27,8 @@ use {
     process,
     sync::Arc,
   },
+  tokio::io::AsyncBufReadExt,
+  tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
 };
