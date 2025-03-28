@@ -23,6 +23,7 @@ use {
     collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
+    hash::{Hash, Hasher},
     path::PathBuf,
     process,
     sync::Arc,
