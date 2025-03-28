@@ -197,6 +197,7 @@ impl Document {
               value: self.get_node_text(&identifier_node),
               range: identifier_node.get_range(),
             },
+            export: identifier_node.get_parent("export").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
             range: assignment_node.get_range(),
           })
@@ -813,6 +814,7 @@ mod tests {
       tardir  := tmpdir / \"awesomesauce-\" + version
       tarball := tardir + \".tar.gz\"
       config  := quote(config_dir() / \".project-config\")
+      export EDITOR := 'nvim'
       "
     });
 
@@ -833,6 +835,7 @@ mod tests {
               },
             },
           },
+          export: false,
           content: "tmpdir  := `mktemp -d`".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -859,6 +862,7 @@ mod tests {
               },
             },
           },
+          export: false,
           content: "version := \"0.2.7\"".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -885,6 +889,7 @@ mod tests {
               },
             },
           },
+          export: false,
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -911,6 +916,7 @@ mod tests {
               },
             },
           },
+          export: false,
           content: "tarball := tardir + \".tar.gz\"".into(),
           range: lsp::Range {
             start: lsp::Position {
@@ -937,6 +943,7 @@ mod tests {
               },
             },
           },
+          export: false,
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
           range: lsp::Range {
@@ -946,6 +953,33 @@ mod tests {
             },
             end: lsp::Position {
               line: 5,
+              character: 0,
+            },
+          },
+        },
+        Variable {
+          name: TextNode {
+            value: "EDITOR".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 5,
+                character: 7,
+              },
+              end: lsp::Position {
+                line: 5,
+                character: 13,
+              },
+            },
+          },
+          export: true,
+          content: "EDITOR := 'nvim'".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 5,
+              character: 7,
+            },
+            end: lsp::Position {
+              line: 6,
               character: 0,
             },
           },

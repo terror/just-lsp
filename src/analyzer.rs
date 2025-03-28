@@ -553,7 +553,7 @@ impl<'a> Analyzer<'a> {
     let mut variable_usage_map = self.document.get_variables().iter().fold(
       HashMap::new(),
       |mut acc, variable| {
-        acc.insert(variable.name.value.clone(), false);
+        acc.insert(variable.name.value.clone(), (false, variable.export));
         acc
       },
     );
@@ -594,7 +594,12 @@ impl<'a> Analyzer<'a> {
 
           if !recipe_parameters.contains(&identifier_name) {
             if variable_usage_map.contains_key(&identifier_name) {
-              variable_usage_map.insert(identifier_name.clone(), true);
+              if let Some((_, export)) =
+                variable_usage_map.get(&identifier_name)
+              {
+                variable_usage_map
+                  .insert(identifier_name.clone(), (true, *export));
+              }
             }
 
             if !variables.contains(&identifier_name) {
@@ -607,7 +612,11 @@ impl<'a> Analyzer<'a> {
         }
         None => {
           if variable_usage_map.contains_key(&identifier_name) {
-            variable_usage_map.insert(identifier_name.clone(), true);
+            if let Some((_, export)) = variable_usage_map.get(&identifier_name)
+            {
+              variable_usage_map
+                .insert(identifier_name.clone(), (true, *export));
+            }
           }
 
           if !variables.contains(&identifier_name) {
@@ -620,8 +629,8 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    for (variable_name, is_used) in variable_usage_map {
-      if !is_used {
+    for (variable_name, (is_used, is_exported)) in variable_usage_map {
+      if !is_used && !is_exported {
         if let Some(variable) = self
           .document
           .get_variables()
@@ -1466,6 +1475,22 @@ mod tests {
       "
     })
     .warning("Variable 'never_used' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn exported_variables_not_warned() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      export bar := \"exported but unused\"
+      baz := \"used value\"
+
+      recipe:
+        echo {{ baz }}
+      "
+    })
+    .warning("Variable 'foo' appears unused")
     .run()
   }
 }
