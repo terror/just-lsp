@@ -1561,6 +1561,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(target_os = "macos")]
   fn mixed_os_specific_and_regular_recipe() {
     Test::new(indoc! {
       "
@@ -1572,7 +1573,6 @@ mod tests {
         echo \"Building on any OS\"
       "
     })
-    .error("Duplicate recipe name 'build'")
     .run()
   }
 

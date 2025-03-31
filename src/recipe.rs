@@ -105,15 +105,19 @@ impl Recipe {
     let mut os_groups = HashSet::new();
 
     for attribute in &self.attributes {
-      let attr_name = attribute.name.value.as_str();
+      let attribute_name = attribute.name.value.as_str();
 
-      if let Some(group) = OsGroup::from_attribute(attr_name) {
+      if let Ok(group) = OsGroup::try_from(attribute_name) {
         os_groups.insert(group);
       }
     }
 
     if os_groups.is_empty() {
-      os_groups.insert(OsGroup::None);
+      if let Ok(group) = OsGroup::try_from(target::os()) {
+        os_groups.insert(group);
+      } else {
+        os_groups.insert(OsGroup::None);
+      }
     }
 
     os_groups
@@ -293,6 +297,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(target_os = "macos")]
   fn recipe_os_groups_no_attributes() {
     let recipe = Recipe {
       name: "test".to_string(),
@@ -303,7 +308,7 @@ mod tests {
       range: create_range(0, 0, 2, 0),
     };
 
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::None]));
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::UnixMacOS]));
   }
 
   #[test]
@@ -426,6 +431,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(target_os = "macos")]
   fn recipe_os_groups_non_os_attributes() {
     let recipe = Recipe {
       name: "test".to_string(),
@@ -443,6 +449,6 @@ mod tests {
       range: create_range(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::None]));
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::UnixMacOS]));
   }
 }

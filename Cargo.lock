@@ -489,6 +489,7 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
+ "target",
  "tokio",
  "tokio-stream",
  "tower-lsp",
@@ -836,6 +837,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "target"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e8f05f774b2db35bdad5a8237a90be1102669f8ea013fea9777b366d34ab145"
 
 [[package]]
 name = "termcolor"
