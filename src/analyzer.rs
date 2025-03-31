@@ -406,12 +406,8 @@ impl<'a> Analyzer<'a> {
         continue;
       }
 
-      for i in 0..group.len() {
-        let (recipe1, os_groups1) = &group[i];
-
-        for j in 0..i {
-          let (_, os_groups2) = &group[j];
-
+      for (i, (recipe1, os_groups1)) in group.iter().enumerate() {
+        for (_, (_, os_groups2)) in group.iter().enumerate().take(i) {
           let has_conflict = os_groups1.iter().any(|group1| {
             os_groups2
               .iter()

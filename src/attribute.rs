@@ -2,10 +2,10 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum OsGroup {
-  Windows,      // Windows OS
-  UnixMacOS,    // Unix or macOS
-  LinuxOpenBSD, // Linux or OpenBSD
-  None,         // No OS attribute
+  Windows,
+  UnixMacOS,
+  LinuxOpenBSD,
+  None,
 }
 
 impl OsGroup {
@@ -23,10 +23,7 @@ impl OsGroup {
       return true;
     }
 
-    match (self, other) {
-      (OsGroup::None, _) | (_, OsGroup::None) => true,
-      _ => false,
-    }
+    matches!((self, other), (OsGroup::None, _) | (_, OsGroup::None))
   }
 }
 
