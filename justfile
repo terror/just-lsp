@@ -18,6 +18,11 @@ check:
  cargo check
 
 [group: 'check']
+ci: test clippy forbid
+  cargo fmt --all -- --check
+  cargo update --locked --package just-lsp
+
+[group: 'check']
 clippy:
   cargo clippy --all --all-targets
 
@@ -28,6 +33,10 @@ fmt:
 [group: 'format']
 fmt-check:
   cargo +nightly fmt --all -- --check
+
+[group: 'check']
+forbid:
+  ./bin/forbid
 
 [group: 'misc']
 install:

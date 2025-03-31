@@ -8,4 +8,5 @@ which rg
   --color always \
   --ignore-case \
   --glob !bin/forbid \
+  --glob !vendor \
   'dbg!|fixme|todo|xxx'
