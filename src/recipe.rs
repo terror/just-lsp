@@ -91,10 +91,10 @@ impl Parameter {
   }
 }
 
-#[derive(Debug, PartialEq)]
-#[allow(unused)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Recipe {
   pub(crate) name: String,
+  pub(crate) attributes: Vec<Attribute>,
   pub(crate) dependencies: Vec<Dependency>,
   pub(crate) parameters: Vec<Parameter>,
   pub(crate) content: String,

@@ -322,23 +322,8 @@ impl<'a> Analyzer<'a> {
 
     let recipes = self.document.get_recipes();
 
-    let mut recipe_names = HashSet::new();
-
-    for recipe in &recipes {
-      if !recipe_names.insert(&recipe.name) {
-        diagnostics.push(lsp::Diagnostic {
-          range: recipe.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Duplicate recipe name '{}'", recipe.name),
-          ..Default::default()
-        });
-      }
-    }
-
     for recipe in &recipes {
       let mut seen = HashSet::new();
-
       let (mut passed_default, mut passed_variadic) = (false, false);
 
       for (index, param) in recipe.parameters.iter().enumerate() {
@@ -376,12 +361,12 @@ impl<'a> Analyzer<'a> {
           && !matches!(param.kind, ParameterKind::Variadic(_))
         {
           diagnostics.push(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
-            ..Default::default()
-          });
+          range: param.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
+          ..Default::default()
+        });
         }
 
         if passed_variadic && index < recipe.parameters.len() - 1 {
@@ -402,6 +387,86 @@ impl<'a> Analyzer<'a> {
         }
       }
     }
+
+    let mut recipe_groups: HashMap<String, Vec<(Recipe, OsGroup)>> =
+      HashMap::new();
+
+    for recipe in &recipes {
+      let mut os_group = OsGroup::None;
+
+      for attribute in &recipe.attributes {
+        let attr_name = attribute.name.value.as_str();
+
+        if let Some(group) = OsGroup::from_attribute(attr_name) {
+          os_group = group;
+          break;
+        }
+      }
+
+      recipe_groups
+        .entry(recipe.name.clone())
+        .or_default()
+        .push((recipe.clone(), os_group));
+    }
+
+    for (recipe_name, group) in &recipe_groups {
+      if group.len() <= 1 {
+        continue;
+      }
+
+      let mut os_group_counts: HashMap<OsGroup, usize> = HashMap::new();
+
+      for (_, os_group) in group {
+        *os_group_counts.entry(os_group.clone()).or_insert(0) += 1;
+      }
+
+      for i in 0..group.len() {
+        let (recipe, os_group) = &group[i];
+
+        if os_group_counts.get(os_group).unwrap_or(&0) > &1 {
+          let mut seen_so_far = 0;
+
+          for j in 0..i {
+            if &group[j].1 == os_group {
+              seen_so_far += 1;
+            }
+          }
+
+          if seen_so_far > 0 {
+            diagnostics.push(lsp::Diagnostic {
+              range: recipe.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!("Duplicate recipe name '{}'", recipe_name),
+              ..Default::default()
+            });
+          }
+        }
+
+        for j in 0..i {
+          let (_, os_group2) = &group[j];
+
+          if os_group == os_group2 {
+            continue;
+          }
+
+          if os_group.conflicts_with(os_group2) {
+            diagnostics.push(lsp::Diagnostic {
+              range: recipe.range,
+              severity: Some(lsp::DiagnosticSeverity::ERROR),
+              source: Some("just-lsp".to_string()),
+              message: format!("Duplicate recipe name '{}'", recipe_name),
+              ..Default::default()
+            });
+
+            break;
+          }
+        }
+      }
+    }
+
+    let recipe_names: HashSet<_> =
+      recipes.iter().map(|r| r.name.clone()).collect();
 
     let recipe_parameters = recipes
       .iter()
@@ -1491,6 +1556,145 @@ mod tests {
       "
     })
     .warning("Variable 'foo' appears unused")
+    .run()
+  }
+
+  #[test]
+  fn os_specific_duplicate_recipes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [windows]
+      build:
+        echo \"Building on Windows\"
+
+      [unix]
+      build:
+        echo \"Building on Unix\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn duplicate_recipes_with_same_os_attribute() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux version 1\"
+
+      [linux]
+      build:
+        echo \"Building on Linux version 2\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn mixed_os_specific_and_regular_recipe() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      build:
+        echo \"Building on any OS\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn unix_macos_conflicts() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [macos]
+      build:
+        echo \"Building on macOS specifically\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn linux_openbsd_conflicts() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn linux_unix_no_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn openbsd_macos_no_conflict() {
+    Test::new(indoc! {
+      "
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn all_four_os_groups_no_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+
+      [windows]
+      build:
+        echo \"Building on Windows\"
+      "
+    })
     .run()
   }
 }

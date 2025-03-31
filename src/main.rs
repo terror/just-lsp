@@ -2,6 +2,7 @@ use {
   crate::{
     alias::Alias,
     analyzer::Analyzer,
+    attribute::{Attribute, OsGroup},
     builtin::{AttributeTarget, Builtin},
     command::Command,
     document::Document,
@@ -36,6 +37,7 @@ use {
 
 mod alias;
 mod analyzer;
+mod attribute;
 mod builtin;
 mod builtins;
 mod command;

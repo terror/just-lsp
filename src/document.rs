@@ -111,6 +111,32 @@ impl Document {
           let recipe_name = self
             .get_node_text(&recipe_node.find("recipe_header > identifier")?);
 
+          let attributes = recipe_node
+            .find_all("attribute")
+            .iter()
+            .filter_map(|attribute_node| {
+              let identifier = attribute_node.find("identifier")?;
+
+              let arguments = attribute_node
+                .find_all("string")
+                .iter()
+                .map(|argument_node| TextNode {
+                  value: self.get_node_text(argument_node),
+                  range: argument_node.get_range(),
+                })
+                .collect::<Vec<_>>();
+
+              Some(Attribute {
+                name: TextNode {
+                  value: self.get_node_text(&identifier),
+                  range: identifier.get_range(),
+                },
+                arguments,
+                range: attribute_node.get_range(),
+              })
+            })
+            .collect::<Vec<_>>();
+
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
             .map(|dependencies_node| {
@@ -157,6 +183,7 @@ impl Document {
 
           Some(Recipe {
             name: recipe_name,
+            attributes,
             dependencies,
             content: self.get_node_text(recipe_node).trim().to_string(),
             parameters,
@@ -330,6 +357,7 @@ mod tests {
       doc.find_recipe("foo").unwrap(),
       Recipe {
         name: "foo".into(),
+        attributes: vec![],
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         parameters: vec![],
@@ -350,6 +378,7 @@ mod tests {
       doc.find_recipe("bar").unwrap(),
       Recipe {
         name: "bar".into(),
+        attributes: vec![],
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
         parameters: vec![],
@@ -1004,6 +1033,7 @@ mod tests {
       doc.find_recipe("foo"),
       Some(Recipe {
         name: "foo".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
@@ -1024,6 +1054,7 @@ mod tests {
       doc.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "bar:\n  echo \"bar\"".into(),
@@ -1085,6 +1116,7 @@ mod tests {
       doc.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![
           Parameter {
@@ -1153,6 +1185,7 @@ mod tests {
       doc.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
+        attributes: vec![],
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![],
@@ -1199,6 +1232,7 @@ mod tests {
       doc.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
+        attributes: vec![],
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![
@@ -1275,6 +1309,7 @@ mod tests {
       doc.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
+        attributes: vec![],
         dependencies: vec![
           Dependency {
             name: "foo".into(),
@@ -1334,6 +1369,7 @@ mod tests {
       doc.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![
           Parameter {
@@ -1397,6 +1433,7 @@ mod tests {
       doc.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![
           Parameter {
@@ -1462,6 +1499,7 @@ mod tests {
       doc.find_recipe("foo"),
       Some(Recipe {
         name: "foo".into(),
+        attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
@@ -1476,6 +1514,152 @@ mod tests {
           },
         }
       })
+    );
+  }
+
+  #[test]
+  fn recipe_with_attributes() {
+    let doc = document(indoc! {
+      "
+      [private]
+      [description: \"This is a test recipe\"]
+      [tags(\"test\", \"example\")]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let recipe = doc.find_recipe("foo").unwrap();
+
+    assert_eq!(recipe.attributes.len(), 3);
+
+    assert_eq!(
+      recipe.attributes[0],
+      Attribute {
+        name: TextNode {
+          value: "private".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 1
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 8
+            },
+          }
+        },
+        arguments: vec![],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 1,
+            character: 0
+          },
+        }
+      }
+    );
+
+    assert_eq!(
+      recipe.attributes[1],
+      Attribute {
+        name: TextNode {
+          value: "description".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 1
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 12
+            },
+          }
+        },
+        arguments: vec![TextNode {
+          value: "\"This is a test recipe\"".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 1,
+              character: 14
+            },
+            end: lsp::Position {
+              line: 1,
+              character: 37
+            },
+          }
+        }],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 1,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 0
+          },
+        }
+      }
+    );
+
+    assert_eq!(
+      recipe.attributes[2],
+      Attribute {
+        name: TextNode {
+          value: "tags".into(),
+          range: lsp::Range {
+            start: lsp::Position {
+              line: 2,
+              character: 1
+            },
+            end: lsp::Position {
+              line: 2,
+              character: 5
+            },
+          }
+        },
+        arguments: vec![
+          TextNode {
+            value: "\"test\"".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 2,
+                character: 6
+              },
+              end: lsp::Position {
+                line: 2,
+                character: 12
+              },
+            }
+          },
+          TextNode {
+            value: "\"example\"".into(),
+            range: lsp::Range {
+              start: lsp::Position {
+                line: 2,
+                character: 14
+              },
+              end: lsp::Position {
+                line: 2,
+                character: 23
+              },
+            }
+          }
+        ],
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 2,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 0
+          },
+        }
+      }
     );
   }
 }
