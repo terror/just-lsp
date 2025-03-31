@@ -35,7 +35,7 @@ Otherwise, see below for the complete package list:
     <tr>
       <td><a href=https://www.rust-lang.org>Cargo</a></td>
       <td><a href=https://crates.io/crates/just-lsp>just-lsp</a></td>
-      <td><code>cargo install just</code></td>
+      <td><code>cargo install just-lsp</code></td>
     </tr>
   </tbody>
 </table>
