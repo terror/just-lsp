@@ -10,12 +10,63 @@
 
 ## Installation
 
-You can install the server using the [cargo](https://doc.rust-lang.org/cargo/index.html)
-package manager:
+`just-lsp` should run on any system, including Linux, MacOS, and the BSDs.
+
+The easiest way to install it is by using [cargo](https://doc.rust-lang.org/cargo/index.html),
+the Rust package manager:
 
 ```bash
 cargo install just-lsp
 ```
+
+Otherwise, see below for the complete package list:
+
+#### Cross-platform
+
+<table>
+  <thead>
+    <tr>
+      <th>Package Manager</th>
+      <th>Package</th>
+      <th>Command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href=https://www.rust-lang.org>Cargo</a></td>
+      <td><a href=https://crates.io/crates/just-lsp>just-lsp</a></td>
+      <td><code>cargo install just</code></td>
+    </tr>
+  </tbody>
+</table>
+
+#### Linux
+
+<table>
+  <thead>
+    <tr>
+      <th>Operating System</th>
+      <th>Package Manager</th>
+      <th>Package</th>
+      <th>Command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href=https://www.archlinux.org>Arch</a></td>
+      <td><a href=https://wiki.archlinux.org/title/Pacman>pacman</a></td>
+      <td><a href=https://archlinux.org/packages/extra/x86_64/just-lsp/>just-lsp</a></td>
+      <td><code>pacman -S just-lsp</code></td>
+    </tr>
+  </tbody>
+</table>
+
+![just-lsp package version table](https://repology.org/badge/vertical-allrepos/just-lsp.svg)
+
+### Pre-built binaries
+
+Pre-built binaries for Linux, MacOS, and Windows can be found on [the releases
+page](https://github.com/terror/just-lsp/releases).
 
 ## Features
 
