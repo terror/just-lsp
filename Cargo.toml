@@ -22,7 +22,7 @@ include = [
 
 [dependencies]
 anyhow = "1.0.97"
-env_logger = "0.9.3"
+env_logger = "0.11.7"
 log = "0.4.27"
 ropey = "1.6.1"
 serde = { version = "1.0.219", features = ["derive"] }
