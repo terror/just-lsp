@@ -1016,9 +1016,7 @@ mod tests {
     );
 
     let dependency = root.find("dependency > identifier").unwrap();
-    let hover = resolver
-      .resolve_identifier_hover(&dependency)
-      .unwrap();
+    let hover = resolver.resolve_identifier_hover(&dependency).unwrap();
 
     assert_eq!(
       hover.contents,
@@ -1045,9 +1043,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("alias > identifier[1]").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("alias > identifier[1]").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1073,9 +1069,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1101,9 +1095,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1129,9 +1121,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1159,9 +1149,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1189,9 +1177,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1245,9 +1231,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
@@ -1273,9 +1257,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("attribute > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("attribute > identifier").unwrap())
       .unwrap();
 
     assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
@@ -1303,9 +1285,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("setting > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("setting > identifier").unwrap())
       .unwrap();
 
     assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
@@ -1333,9 +1313,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1376,9 +1354,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover(
-        &root.find("value > identifier").unwrap(),
-      )
+      .resolve_identifier_hover(&root.find("value > identifier").unwrap())
       .unwrap();
 
     assert_eq!(
@@ -1423,8 +1399,6 @@ mod tests {
 
     let nonexistent = root.find("value > identifier").unwrap();
 
-    assert!(resolver
-      .resolve_identifier_hover(&nonexistent)
-      .is_none());
+    assert!(resolver.resolve_identifier_hover(&nonexistent).is_none());
   }
 }

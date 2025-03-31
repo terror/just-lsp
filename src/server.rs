@@ -482,9 +482,7 @@ impl Inner {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| {
-          resolver.resolve_identifier_hover(&identifier)
-        })
+        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier))
     }))
   }
 
