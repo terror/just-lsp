@@ -324,6 +324,7 @@ impl<'a> Analyzer<'a> {
 
     for recipe in &recipes {
       let mut seen = HashSet::new();
+
       let (mut passed_default, mut passed_variadic) = (false, false);
 
       for (index, param) in recipe.parameters.iter().enumerate() {
@@ -388,25 +389,27 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    let mut recipe_groups: HashMap<String, Vec<(Recipe, OsGroup)>> =
+    let mut recipe_groups: HashMap<String, Vec<(Recipe, HashSet<OsGroup>)>> =
       HashMap::new();
 
     for recipe in &recipes {
-      let mut os_group = OsGroup::None;
+      let mut os_groups = HashSet::new();
 
       for attribute in &recipe.attributes {
         let attr_name = attribute.name.value.as_str();
-
         if let Some(group) = OsGroup::from_attribute(attr_name) {
-          os_group = group;
-          break;
+          os_groups.insert(group);
         }
+      }
+
+      if os_groups.is_empty() {
+        os_groups.insert(OsGroup::None);
       }
 
       recipe_groups
         .entry(recipe.name.clone())
         .or_default()
-        .push((recipe.clone(), os_group));
+        .push((recipe.clone(), os_groups));
     }
 
     for (recipe_name, group) in &recipe_groups {
@@ -414,45 +417,21 @@ impl<'a> Analyzer<'a> {
         continue;
       }
 
-      let mut os_group_counts: HashMap<OsGroup, usize> = HashMap::new();
-
-      for (_, os_group) in group {
-        *os_group_counts.entry(os_group.clone()).or_insert(0) += 1;
-      }
-
       for i in 0..group.len() {
-        let (recipe, os_group) = &group[i];
-
-        if os_group_counts.get(os_group).unwrap_or(&0) > &1 {
-          let mut seen_so_far = 0;
-
-          for j in 0..i {
-            if &group[j].1 == os_group {
-              seen_so_far += 1;
-            }
-          }
-
-          if seen_so_far > 0 {
-            diagnostics.push(lsp::Diagnostic {
-              range: recipe.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!("Duplicate recipe name '{}'", recipe_name),
-              ..Default::default()
-            });
-          }
-        }
+        let (recipe1, os_groups1) = &group[i];
 
         for j in 0..i {
-          let (_, os_group2) = &group[j];
+          let (_, os_groups2) = &group[j];
 
-          if os_group == os_group2 {
-            continue;
-          }
+          let has_conflict = os_groups1.iter().any(|group1| {
+            os_groups2
+              .iter()
+              .any(|group2| group1.conflicts_with(group2))
+          });
 
-          if os_group.conflicts_with(os_group2) {
+          if has_conflict {
             diagnostics.push(lsp::Diagnostic {
-              range: recipe.range,
+              range: recipe1.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!("Duplicate recipe name '{}'", recipe_name),
@@ -1693,6 +1672,65 @@ mod tests {
       [windows]
       build:
         echo \"Building on Windows\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn recipe_with_multiple_os_attributes() {
+    Test::new(indoc! {
+      "
+      [windows]
+      [linux]
+      build:
+        echo \"Building on Linux or Windows\"
+
+      [linux]
+      build:
+        echo \"Building on macOS\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn recipe_with_conflicting_multiple_os_attributes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      [openbsd]
+      build:
+        echo \"Building on Linux and OpenBSD\"
+
+      [linux]
+      build:
+        echo \"Building on Linux again\"
+      "
+    })
+    .error("Duplicate recipe name 'build'")
+    .run()
+  }
+
+  #[test]
+  fn recipe_with_all_os_attributes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      [windows]
+      [unix]
+      [macos]
+      [openbsd]
+      build:
+        echo \"Building everywhere\"
+
+      test:
+        echo \"Testing\"
       "
     })
     .run()
