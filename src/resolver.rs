@@ -132,11 +132,11 @@ impl<'a> Resolver<'a> {
     None
   }
 
-  pub(crate) fn resolve_identifier_hover_content(
+  pub(crate) fn resolve_identifier_hover(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Hover> {
-    let text = self.document.get_node_text(&identifier);
+    let text = self.document.get_node_text(identifier);
 
     let parent_kind = identifier.parent().map(|p| p.kind());
 
@@ -1002,7 +1002,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("recipe_header > identifier").unwrap(),
       )
       .unwrap();
@@ -1017,7 +1017,7 @@ mod tests {
 
     let dependency = root.find("dependency > identifier").unwrap();
     let hover = resolver
-      .resolve_identifier_hover_content(&dependency)
+      .resolve_identifier_hover(&dependency)
       .unwrap();
 
     assert_eq!(
@@ -1045,7 +1045,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("alias > identifier[1]").unwrap(),
       )
       .unwrap();
@@ -1073,7 +1073,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1101,7 +1101,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1129,7 +1129,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1159,7 +1159,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1189,7 +1189,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1217,7 +1217,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("function_call > identifier").unwrap(),
       )
       .unwrap();
@@ -1245,7 +1245,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1273,7 +1273,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("attribute > identifier").unwrap(),
       )
       .unwrap();
@@ -1303,7 +1303,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("setting > identifier").unwrap(),
       )
       .unwrap();
@@ -1333,7 +1333,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1347,7 +1347,7 @@ mod tests {
     );
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("function_call > identifier").unwrap(),
       )
       .unwrap();
@@ -1376,7 +1376,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
-      .resolve_identifier_hover_content(
+      .resolve_identifier_hover(
         &root.find("value > identifier").unwrap(),
       )
       .unwrap();
@@ -1404,7 +1404,7 @@ mod tests {
     let root = doc.tree.as_ref().unwrap().root_node();
 
     assert!(resolver
-      .resolve_identifier_hover_content(&root.find("text").unwrap())
+      .resolve_identifier_hover(&root.find("text").unwrap())
       .is_none());
   }
 
@@ -1424,7 +1424,7 @@ mod tests {
     let nonexistent = root.find("value > identifier").unwrap();
 
     assert!(resolver
-      .resolve_identifier_hover_content(&nonexistent)
+      .resolve_identifier_hover(&nonexistent)
       .is_none());
   }
 }

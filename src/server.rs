@@ -477,13 +477,13 @@ impl Inner {
     let position = params.text_document_position_params.position;
 
     Ok(self.documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(&document);
+      let resolver = Resolver::new(document);
 
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          resolver.resolve_identifier_hover_content(&identifier)
+          resolver.resolve_identifier_hover(&identifier)
         })
     }))
   }
