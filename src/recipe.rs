@@ -312,6 +312,36 @@ mod tests {
   }
 
   #[test]
+  #[cfg(target_os = "linux")]
+  fn recipe_os_groups_no_attributes() {
+    let recipe = Recipe {
+      name: "test".to_string(),
+      attributes: vec![],
+      dependencies: vec![],
+      parameters: vec![],
+      content: "test:\n  echo test".to_string(),
+      range: create_range(0, 0, 2, 0),
+    };
+
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::LinuxOpenBSD]));
+  }
+
+  #[test]
+  #[cfg(target_os = "windows")]
+  fn recipe_os_groups_no_attributes() {
+    let recipe = Recipe {
+      name: "test".to_string(),
+      attributes: vec![],
+      dependencies: vec![],
+      parameters: vec![],
+      content: "test:\n  echo test".to_string(),
+      range: create_range(0, 0, 2, 0),
+    };
+
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::Windows]));
+  }
+
+  #[test]
   fn recipe_os_groups_single_attribute() {
     let recipe = Recipe {
       name: "test".to_string(),
