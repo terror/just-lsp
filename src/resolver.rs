@@ -132,6 +132,114 @@ impl<'a> Resolver<'a> {
     None
   }
 
+  pub(crate) fn resolve_identifier_hover_content(
+    &self,
+    identifier: &Node,
+  ) -> Option<lsp::Hover> {
+    let text = self.document.get_node_text(&identifier);
+
+    let parent_kind = identifier.parent().map(|p| p.kind());
+
+    if let Some(recipe) = self.document.find_recipe(&text) {
+      if parent_kind.is_some_and(|kind| {
+        ["alias", "dependency", "recipe_header"].contains(&kind)
+      }) {
+        return Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: recipe.content,
+          }),
+          range: Some(identifier.get_range()),
+        });
+      }
+    }
+
+    if parent_kind.is_some_and(|kind| kind == "value") {
+      let recipe_node = identifier.get_parent("recipe")?;
+
+      let recipe = self.document.find_recipe(
+        &self
+          .document
+          .get_node_text(&recipe_node.find("recipe_header > identifier")?),
+      );
+
+      if let Some(recipe) = recipe {
+        for parameter in recipe.parameters {
+          if parameter.name == text {
+            return Some(lsp::Hover {
+              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: parameter.content,
+              }),
+              range: Some(identifier.get_range()),
+            });
+          }
+        }
+      }
+
+      let variables = self.document.get_variables();
+
+      for variable in variables {
+        if variable.name.value == text {
+          return Some(lsp::Hover {
+            contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+              kind: lsp::MarkupKind::PlainText,
+              value: variable.content,
+            }),
+            range: Some(identifier.get_range()),
+          });
+        }
+      }
+
+      for builtin in builtins::BUILTINS {
+        match builtin {
+          Builtin::Constant { name, .. } if text == name => {
+            return Some(lsp::Hover {
+              contents: lsp::HoverContents::Markup(builtin.documentation()),
+              range: Some(identifier.get_range()),
+            });
+          }
+          _ => {}
+        }
+      }
+    }
+
+    for builtin in builtins::BUILTINS {
+      match builtin {
+        Builtin::Attribute { name, .. }
+          if text == name
+            && parent_kind.is_some_and(|kind| kind == "attribute") =>
+        {
+          return Some(lsp::Hover {
+            contents: lsp::HoverContents::Markup(builtin.documentation()),
+            range: Some(identifier.get_range()),
+          });
+        }
+        Builtin::Function { name, .. }
+          if text == name
+            && parent_kind.is_some_and(|kind| kind == "function_call") =>
+        {
+          return Some(lsp::Hover {
+            contents: lsp::HoverContents::Markup(builtin.documentation()),
+            range: Some(identifier.get_range()),
+          });
+        }
+        Builtin::Setting { name, .. }
+          if text == name
+            && parent_kind.is_some_and(|kind| kind == "setting") =>
+        {
+          return Some(lsp::Hover {
+            contents: lsp::HoverContents::Markup(builtin.documentation()),
+            range: Some(identifier.get_range()),
+          });
+        }
+        _ => {}
+      }
+    }
+
+    None
+  }
+
   pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
@@ -875,5 +983,448 @@ mod tests {
         },
       }
     );
+  }
+
+  #[test]
+  fn resolve_recipe_hover() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("recipe_header > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "foo:\n  echo \"foo\"".to_string(),
+      })
+    );
+
+    let dependency = root.find("dependency > identifier").unwrap();
+    let hover = resolver
+      .resolve_identifier_hover_content(&dependency)
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "foo:\n  echo \"foo\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_recipe_hover_in_alias() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      alias f := foo
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("alias > identifier[1]").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "foo:\n  echo \"foo\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_parameter_hover() {
+    let doc = document(indoc! {
+      "
+      foo param=\"default\":
+        echo {{ param }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "param=\"default\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_variadic_parameter_hover() {
+    let doc = document(indoc! {
+      "
+      foo +args:
+        echo {{ args }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "+args".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_export_parameter_hover() {
+    let doc = document(indoc! {
+      "
+      foo $env_var:
+        echo {{ env_var }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "$env_var".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_variable_hover() {
+    let doc = document(indoc! {
+      "
+      var := \"value\"
+
+      foo:
+        echo {{ var }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "var := \"value\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_export_variable_hover() {
+    let doc = document(indoc! {
+      "
+      export VERSION := \"1.0.0\"
+
+      foo:
+        echo {{ VERSION }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "VERSION := \"1.0.0\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_function_hover() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("function_call > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
+
+    if let lsp::HoverContents::Markup(content) = hover.contents {
+      assert_eq!(content.kind, lsp::MarkupKind::Markdown);
+      assert!(content.value.contains("arch"));
+      assert!(content.value.contains("Instruction set architecture"));
+    }
+  }
+
+  #[test]
+  fn resolve_builtin_constant_hover() {
+    let doc = document(indoc! {
+      "
+    foo:
+      echo {{ RED }}
+    "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
+
+    if let lsp::HoverContents::Markup(content) = hover.contents {
+      assert_eq!(content.kind, lsp::MarkupKind::Markdown);
+      assert!(content.value.contains("Red text"));
+    }
+  }
+
+  #[test]
+  fn resolve_builtin_attribute_hover() {
+    let doc = document(indoc! {
+      "
+      [no-cd]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("attribute > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
+
+    if let lsp::HoverContents::Markup(content) = hover.contents {
+      assert_eq!(content.kind, lsp::MarkupKind::Markdown);
+      assert!(content.value.contains("no-cd"));
+      assert!(content.value.contains("Don't change directory"));
+    }
+  }
+
+  #[test]
+  fn resolve_builtin_setting_hover() {
+    let doc = document(indoc! {
+      "
+      set export
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("setting > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
+
+    if let lsp::HoverContents::Markup(content) = hover.contents {
+      assert_eq!(content.kind, lsp::MarkupKind::Markdown);
+      assert!(content.value.contains("export"));
+    }
+  }
+
+  #[test]
+  fn resolve_same_name_confusion() {
+    let doc = document(indoc! {
+      "
+      arch := \"custom_arch\"
+
+      foo:
+        echo {{ arch }}
+        echo {{ arch() }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "arch := \"custom_arch\"".to_string(),
+      })
+    );
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("function_call > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert!(matches!(hover.contents, lsp::HoverContents::Markup(_)));
+
+    if let lsp::HoverContents::Markup(content) = hover.contents {
+      assert_eq!(content.kind, lsp::MarkupKind::Markdown);
+      assert!(content.value.contains("Instruction set architecture"));
+    }
+  }
+
+  #[test]
+  fn resolve_parameter_over_variable() {
+    let doc = document(indoc! {
+      "
+      param := \"global value\"
+
+      foo param=\"local value\":
+        echo {{ param }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let hover = resolver
+      .resolve_identifier_hover_content(
+        &root.find("value > identifier").unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "param=\"local value\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_hover_non_identifier() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    assert!(resolver
+      .resolve_identifier_hover_content(&root.find("text").unwrap())
+      .is_none());
+  }
+
+  #[test]
+  fn resolve_hover_nonexistent_variable() {
+    let doc = document(indoc! {
+      "
+      foo:
+        echo {{ nonexistent }}
+      "
+    });
+
+    let resolver = Resolver::new(&doc);
+
+    let root = doc.tree.as_ref().unwrap().root_node();
+
+    let nonexistent = root.find("value > identifier").unwrap();
+
+    assert!(resolver
+      .resolve_identifier_hover_content(&nonexistent)
+      .is_none());
   }
 }

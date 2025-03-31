@@ -477,114 +477,13 @@ impl Inner {
     let position = params.text_document_position_params.position;
 
     Ok(self.documents.get(&uri).and_then(|document| {
+      let resolver = Resolver::new(&document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          let text = document.get_node_text(&identifier);
-
-          let parent_kind = identifier.parent().map(|p| p.kind());
-
-          if let Some(recipe) = document.find_recipe(&text) {
-            if parent_kind.is_some_and(|kind| {
-              ["alias", "dependency", "recipe_header"].contains(&kind)
-            }) {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::PlainText,
-                  value: recipe.content,
-                }),
-                range: Some(identifier.get_range()),
-              });
-            }
-          }
-
-          if parent_kind.is_some_and(|kind| kind == "value") {
-            let recipe_node = identifier.get_parent("recipe")?;
-
-            let recipe =
-              document.find_recipe(&document.get_node_text(
-                &recipe_node.find("recipe_header > identifier")?,
-              ));
-
-            if let Some(recipe) = recipe {
-              for parameter in recipe.parameters {
-                if parameter.name == text {
-                  return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                      kind: lsp::MarkupKind::PlainText,
-                      value: parameter.content,
-                    }),
-                    range: Some(identifier.get_range()),
-                  });
-                }
-              }
-            }
-
-            let variables = document.get_variables();
-
-            for variable in variables {
-              if variable.name.value == text {
-                return Some(lsp::Hover {
-                  contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                    kind: lsp::MarkupKind::PlainText,
-                    value: variable.content,
-                  }),
-                  range: Some(identifier.get_range()),
-                });
-              }
-            }
-
-            for builtin in builtins::BUILTINS {
-              match builtin {
-                Builtin::Constant { name, .. } if text == name => {
-                  return Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(
-                      builtin.documentation(),
-                    ),
-                    range: Some(identifier.get_range()),
-                  });
-                }
-                _ => {}
-              }
-            }
-          }
-
-          for builtin in builtins::BUILTINS {
-            match builtin {
-              Builtin::Attribute { name, .. }
-                if text == name
-                  && parent_kind.is_some_and(|kind| kind == "attribute") =>
-              {
-                return Some(lsp::Hover {
-                  contents: lsp::HoverContents::Markup(builtin.documentation()),
-                  range: Some(identifier.get_range()),
-                });
-              }
-              Builtin::Function { name, .. }
-                if text == name
-                  && parent_kind
-                    .is_some_and(|kind| kind == "function_call") =>
-              {
-                return Some(lsp::Hover {
-                  contents: lsp::HoverContents::Markup(builtin.documentation()),
-                  range: Some(identifier.get_range()),
-                });
-              }
-              Builtin::Setting { name, .. }
-                if text == name
-                  && parent_kind.is_some_and(|kind| kind == "setting") =>
-              {
-                return Some(lsp::Hover {
-                  contents: lsp::HoverContents::Markup(builtin.documentation()),
-                  range: Some(identifier.get_range()),
-                });
-              }
-              _ => {}
-            }
-          }
-
-          None
+          resolver.resolve_identifier_hover_content(&identifier)
         })
     }))
   }
