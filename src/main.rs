@@ -2,10 +2,12 @@ use {
   crate::{
     alias::Alias,
     analyzer::Analyzer,
+    attribute::Attribute,
     builtin::{AttributeTarget, Builtin},
     command::Command,
     document::Document,
     node_ext::NodeExt,
+    os_group::OsGroup,
     point_ext::PointExt,
     position_ext::PositionExt,
     recipe::{Dependency, Parameter, ParameterJson, ParameterKind, Recipe},
@@ -36,11 +38,13 @@ use {
 
 mod alias;
 mod analyzer;
+mod attribute;
 mod builtin;
 mod builtins;
 mod command;
 mod document;
 mod node_ext;
+mod os_group;
 mod point_ext;
 mod position_ext;
 mod recipe;
