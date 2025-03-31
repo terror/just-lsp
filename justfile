@@ -19,7 +19,7 @@ check:
 
 [group: 'check']
 ci: test clippy forbid
-  cargo fmt --all -- --check
+  cargo +nightly fmt --all -- --check
   cargo update --locked --package just-lsp
 
 [group: 'check']
