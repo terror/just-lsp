@@ -362,12 +362,12 @@ impl<'a> Analyzer<'a> {
           && !matches!(param.kind, ParameterKind::Variadic(_))
         {
           diagnostics.push(lsp::Diagnostic {
-          range: param.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
-          ..Default::default()
-        });
+            range: param.range,
+            severity: Some(lsp::DiagnosticSeverity::ERROR),
+            source: Some("just-lsp".to_string()),
+            message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
+            ..Default::default()
+          });
         }
 
         if passed_variadic && index < recipe.parameters.len() - 1 {
@@ -393,18 +393,7 @@ impl<'a> Analyzer<'a> {
       HashMap::new();
 
     for recipe in &recipes {
-      let mut os_groups = HashSet::new();
-
-      for attribute in &recipe.attributes {
-        let attr_name = attribute.name.value.as_str();
-        if let Some(group) = OsGroup::from_attribute(attr_name) {
-          os_groups.insert(group);
-        }
-      }
-
-      if os_groups.is_empty() {
-        os_groups.insert(OsGroup::None);
-      }
+      let os_groups = recipe.os_groups();
 
       recipe_groups
         .entry(recipe.name.clone())
