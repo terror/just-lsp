@@ -1016,6 +1016,7 @@ mod tests {
     );
 
     let dependency = root.find("dependency > identifier").unwrap();
+
     let hover = resolver.resolve_identifier_hover(&dependency).unwrap();
 
     assert_eq!(
