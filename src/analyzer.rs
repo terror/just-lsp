@@ -557,19 +557,19 @@ impl<'a> Analyzer<'a> {
 
     let identifiers = root.find_all("expression > value > identifier");
 
-    let mut variables = self
+    let mut variable_names = self
       .document
       .get_variables()
       .iter()
       .map(|variable| variable.name.value.clone())
       .collect::<HashSet<_>>();
 
-    variables.extend(builtins::BUILTINS.into_iter().filter_map(|builtin| {
-      match builtin {
+    variable_names.extend(builtins::BUILTINS.into_iter().filter_map(
+      |builtin| match builtin {
         Builtin::Constant { name, .. } => Some(name.to_owned()),
         _ => None,
-      }
-    }));
+      },
+    ));
 
     let mut recipe_identifier_map = self.document.get_recipes().iter().fold(
       HashMap::new(),
@@ -582,7 +582,7 @@ impl<'a> Analyzer<'a> {
     let mut variable_usage_map = self.document.get_variables().iter().fold(
       HashMap::new(),
       |mut acc, variable| {
-        acc.insert(variable.name.value.clone(), (false, variable.export));
+        acc.insert(variable.name.value.clone(), false);
         acc
       },
     );
@@ -623,15 +623,10 @@ impl<'a> Analyzer<'a> {
 
           if !recipe_parameters.contains(&identifier_name) {
             if variable_usage_map.contains_key(&identifier_name) {
-              if let Some((_, export)) =
-                variable_usage_map.get(&identifier_name)
-              {
-                variable_usage_map
-                  .insert(identifier_name.clone(), (true, *export));
-              }
+              variable_usage_map.insert(identifier_name.clone(), true);
             }
 
-            if !variables.contains(&identifier_name) {
+            if !variable_names.contains(&identifier_name) {
               diagnostics.push(create_diagnostic(format!(
                 "Variable '{}' not found",
                 identifier_name
@@ -641,14 +636,10 @@ impl<'a> Analyzer<'a> {
         }
         None => {
           if variable_usage_map.contains_key(&identifier_name) {
-            if let Some((_, export)) = variable_usage_map.get(&identifier_name)
-            {
-              variable_usage_map
-                .insert(identifier_name.clone(), (true, *export));
-            }
+            variable_usage_map.insert(identifier_name.clone(), true);
           }
 
-          if !variables.contains(&identifier_name) {
+          if !variable_names.contains(&identifier_name) {
             diagnostics.push(create_diagnostic(format!(
               "Variable '{}' not found",
               identifier_name
@@ -658,28 +649,25 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    for (variable_name, (is_used, is_exported)) in variable_usage_map {
-      if !is_used && !is_exported {
-        if let Some(variable) = self
-          .document
-          .get_variables()
-          .iter()
-          .find(|v| v.name.value == variable_name)
-        {
-          diagnostics.push(lsp::Diagnostic {
-            range: variable.name.range,
-            severity: Some(lsp::DiagnosticSeverity::WARNING),
-            source: Some("just-lsp".to_string()),
-            message: format!("Variable '{}' appears unused", variable_name),
-            ..Default::default()
-          });
+    for (variable_name, is_used) in variable_usage_map {
+      if !is_used {
+        if let Some(variable) = self.document.find_variable(&variable_name) {
+          if !variable.export {
+            diagnostics.push(lsp::Diagnostic {
+              range: variable.name.range,
+              severity: Some(lsp::DiagnosticSeverity::WARNING),
+              source: Some("just-lsp".to_string()),
+              message: format!("Variable '{}' appears unused", variable_name),
+              ..Default::default()
+            });
+          }
         }
       }
     }
 
     for (recipe_name, identifiers) in recipe_identifier_map {
       if let Some(recipe) = self.document.find_recipe(&recipe_name) {
-        recipe.parameters.iter().for_each(|parameter| {
+        for parameter in recipe.parameters {
           if !identifiers.contains(&parameter.name) {
             diagnostics.push(lsp::Diagnostic {
               range: parameter.range,
@@ -689,7 +677,7 @@ impl<'a> Analyzer<'a> {
               ..Default::default()
             });
           }
-        });
+        }
       }
     }
 

@@ -64,6 +64,13 @@ impl Document {
       .find(|recipe| recipe.name == name)
   }
 
+  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
+    self
+      .get_variables()
+      .into_iter()
+      .find(|var| var.name.value == name)
+  }
+
   pub(crate) fn get_aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
