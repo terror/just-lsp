@@ -68,6 +68,26 @@ Otherwise, see below for the complete package list:
 Pre-built binaries for Linux, MacOS, and Windows can be found on [the releases
 page](https://github.com/terror/just-lsp/releases).
 
+## Usage
+
+`just-lsp` can be used with any LSP client, this section documents integration
+with some of the more popular ones.
+
+### Neovim
+
+You can use the release build of `just-lsp` by setting up the `just` server on
+[`lspconfig`](https://github.com/neovim/nvim-lspconfig), so somewhere in your config:
+
+```lua
+local lsp = require('lspconfig')
+
+lsp.just.setup({
+  -- ...
+})
+```
+
+This assumes `just-lsp` is installed on your system and is in your `$PATH`.
+
 ## Features
 
 The server implements a decent amount of the
