@@ -116,6 +116,10 @@ Like references, but highlights them inside the document.
 
 Code folding for recipes.
 
+### `textDocument/formatting`
+
+You're able to format your justfile. This just calls `just --fmt --unstable`.
+
 ### `textDocument/hover`
 
 You can request hover information for syntactic elements like recipes, built-in
