@@ -118,7 +118,8 @@ Code folding for recipes.
 
 ### `textDocument/formatting`
 
-You're able to format your justfile. This just calls `just --fmt --unstable`.
+You're able to format your justfile. This calls `just --fmt --unstable` and
+writes the result to your buffer.
 
 ### `textDocument/hover`
 
