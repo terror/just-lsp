@@ -429,8 +429,38 @@ impl<'a> Analyzer<'a> {
       }
     }
 
-    let recipe_names: HashSet<_> =
-      recipes.iter().map(|r| r.name.clone()).collect();
+    let mut dependency_graph = HashMap::new();
+
+    for recipe in &recipes {
+      dependency_graph.insert(
+        recipe.name.clone(),
+        recipe
+          .dependencies
+          .iter()
+          .map(|dep| dep.name.clone())
+          .collect::<Vec<String>>(),
+      );
+    }
+
+    for recipe in &recipes {
+      let mut visited = HashSet::new();
+
+      let mut path = Vec::new();
+
+      Self::detect_recipe_dependency_cycle(
+        &recipe.name,
+        &dependency_graph,
+        &mut visited,
+        &mut path,
+        &mut diagnostics,
+        &recipes,
+      );
+    }
+
+    let recipe_names = recipes
+      .iter()
+      .map(|r| r.name.clone())
+      .collect::<HashSet<_>>();
 
     let recipe_parameters = recipes
       .iter()
@@ -494,6 +524,75 @@ impl<'a> Analyzer<'a> {
     }
 
     diagnostics
+  }
+
+  fn detect_recipe_dependency_cycle(
+    recipe_name: &str,
+    graph: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    path: &mut Vec<String>,
+    diagnostics: &mut Vec<lsp::Diagnostic>,
+    recipes: &[Recipe],
+  ) {
+    if visited.contains(recipe_name) {
+      return;
+    }
+
+    if path.contains(&recipe_name.to_string()) {
+      let cycle_start_idx = path.iter().position(|r| r == recipe_name).unwrap();
+
+      let mut cycle = path[cycle_start_idx..].to_vec();
+      cycle.push(recipe_name.to_string());
+
+      if let Some(recipe) =
+        recipes.iter().find(|r| r.name == *path.first().unwrap())
+      {
+        let message = if cycle.len() == 2 && cycle[0] == cycle[1] {
+          format!("Recipe '{}' depends on itself", cycle[0])
+        } else if cycle[0] == recipe_name {
+          format!(
+            "Recipe '{}' has circular dependency '{}'",
+            recipe_name,
+            cycle.join(" -> ")
+          )
+        } else {
+          return path.push(recipe_name.to_string());
+        };
+
+        diagnostics.push(lsp::Diagnostic {
+          range: recipe.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          source: Some("just-lsp".to_string()),
+          message,
+          ..Default::default()
+        });
+      }
+
+      return;
+    }
+
+    if !graph.contains_key(recipe_name) {
+      return;
+    }
+
+    path.push(recipe_name.to_string());
+
+    if let Some(dependencies) = graph.get(recipe_name) {
+      for dependency in dependencies {
+        Self::detect_recipe_dependency_cycle(
+          dependency,
+          graph,
+          visited,
+          path,
+          diagnostics,
+          recipes,
+        );
+      }
+    }
+
+    visited.insert(recipe_name.to_string());
+
+    path.pop();
   }
 
   fn analyze_settings(&self) -> Vec<lsp::Diagnostic> {
@@ -1706,6 +1805,105 @@ mod tests {
         echo \"Testing\"
       "
     })
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_self() {
+    Test::new(indoc! {
+      "
+      foo: foo
+        echo \"foo\"
+      "
+    })
+    .error("Recipe 'foo' depends on itself")
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_simple() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    })
+    .error("Recipe 'foo' has circular dependency 'foo -> bar -> foo'")
+    .error("Recipe 'bar' has circular dependency 'bar -> foo -> bar'")
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_long_chain() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+
+      baz: foo
+        echo \"baz\"
+      "
+    })
+    .error("Recipe 'foo' has circular dependency 'foo -> bar -> baz -> foo'")
+    .error("Recipe 'bar' has circular dependency 'bar -> baz -> foo -> bar'")
+    .error("Recipe 'baz' has circular dependency 'baz -> foo -> bar -> baz'")
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_with_multiple_dependencies() {
+    Test::new(indoc! {
+      "
+      foo: bar baz
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: qux
+        echo \"baz\"
+
+      qux: foo
+        echo \"qux\"
+      "
+    })
+    .error("Recipe 'foo' has circular dependency 'foo -> baz -> qux -> foo'")
+    .error("Recipe 'baz' has circular dependency 'baz -> qux -> foo -> baz'")
+    .error("Recipe 'qux' has circular dependency 'qux -> foo -> baz -> qux'")
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_multiple_cycles() {
+    Test::new(indoc! {
+      "
+      a: b
+        echo \"a\"
+
+      b: a
+        echo \"b\"
+
+      x: y
+        echo \"x\"
+
+      y: z
+        echo \"y\"
+
+      z: x
+        echo \"z\"
+      "
+    })
+    .error("Recipe 'a' has circular dependency 'a -> b -> a'")
+    .error("Recipe 'b' has circular dependency 'b -> a -> b'")
+    .error("Recipe 'x' has circular dependency 'x -> y -> z -> x'")
+    .error("Recipe 'y' has circular dependency 'y -> z -> x -> y'")
+    .error("Recipe 'z' has circular dependency 'z -> x -> y -> z'")
     .run()
   }
 }
