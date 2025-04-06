@@ -29,6 +29,7 @@ impl Server {
         true,
       )),
       definition_provider: Some(lsp::OneOf::Left(true)),
+      document_formatting_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
       execute_command_provider: Some(lsp::ExecuteCommandOptions {
         commands: Command::all(),
@@ -120,6 +121,13 @@ impl LanguageServer for Server {
     params: lsp::FoldingRangeParams,
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     self.0.lock().await.folding_range(params).await
+  }
+
+  async fn formatting(
+    &self,
+    params: lsp::DocumentFormattingParams,
+  ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
+    self.0.lock().await.formatting(params).await
   }
 
   async fn goto_definition(
@@ -444,6 +452,71 @@ impl Inner {
     }
 
     Ok(None)
+  }
+
+  async fn formatting(
+    &self,
+    params: lsp::DocumentFormattingParams,
+  ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    if let Some(document) = self.documents.get(uri) {
+      let content = document.content.to_string();
+
+      match self.format_document(&content).await {
+        Ok(formatted) => {
+          if formatted != content {
+            return Ok(Some(vec![lsp::TextEdit {
+              range: lsp::Range {
+                start: lsp::Position::new(0, 0),
+                end: document
+                  .content
+                  .byte_to_lsp_position(document.content.len_bytes()),
+              },
+              new_text: formatted,
+            }]));
+          }
+
+          return Ok(Some(vec![]));
+        }
+        Err(error) => {
+          self
+            .client
+            .show_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to format document: {}", error),
+            )
+            .await;
+        }
+      }
+    }
+
+    Ok(None)
+  }
+
+  async fn format_document(&self, content: &str) -> Result<String> {
+    let tempdir = tempdir()?;
+
+    let file = tempdir.path().join("justfile");
+
+    fs::write(&file, content.as_bytes())?;
+
+    let mut command = tokio::process::Command::new("just");
+
+    command.arg("--fmt").arg("--unstable").arg("--quiet");
+
+    command.current_dir(tempdir.path());
+
+    let output = command.output().await?;
+
+    if !output.status.success() {
+      bail!(
+        "just formatting failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+    }
+
+    Ok(fs::read_to_string(&file)?)
   }
 
   async fn goto_definition(
