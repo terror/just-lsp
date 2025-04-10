@@ -20,6 +20,9 @@ include = [
   "/vendor/*-src/**/**.h"
 ]
 
+[workspace]
+members = [".", "crates/*"]
+
 [dependencies]
 anyhow = "1.0.97"
 env_logger = "0.11.8"
