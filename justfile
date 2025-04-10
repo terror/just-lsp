@@ -77,6 +77,11 @@ test-release-workflow:
   git tag test-release
   git push origin test-release
 
+[group: 'release']
+update-changelog:
+  echo >> CHANGELOG.md
+  git log --pretty='format:- %s' >> CHANGELOG.md
+
 [group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
