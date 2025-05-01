@@ -64,6 +64,15 @@ Otherwise, see below for the complete package list:
 
 ![just-lsp package version table](https://repology.org/badge/vertical-allrepos/just-lsp.svg)
 
+### Mason
+
+You can also install the server via [mason](https://github.com/williamboman/mason.nvim),
+the Neovim plugin that allows you to easily manage external editor tooling such as LSP servers,
+DAP servers, etc.
+
+Simple invoke `:Mason` in your editor, and find `just-lsp` in the dropdown to
+install it.
+
 ### Pre-built binaries
 
 Pre-built binaries for Linux, MacOS, and Windows can be found on [the releases
