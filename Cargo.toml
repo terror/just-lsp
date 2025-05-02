@@ -8,7 +8,7 @@ homepage = "https://github.com/terror/just-lsp"
 repository = "https://github.com/terror/just-lsp"
 edition = "2021"
 categories = ["development-tools"]
-keywords = ["productivity", "compilers", "languager-servers", "just", "tree-sitter"]
+keywords = ["productivity", "compilers", "language-servers", "just", "tree-sitter"]
 resolver = "2"
 
 include = [
