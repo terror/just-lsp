@@ -116,7 +116,7 @@ jobs:
     - name: Configure compiler for Linux targets
       run: |
         set_compiler_env() {
-          local compiler=$2
+          local compiler=$1
           {
             echo "CC=$compiler"
             echo "CC_${{ matrix.target }}=$compiler"
@@ -124,8 +124,6 @@ jobs:
           } >> "$GITHUB_ENV"
         }
 
-        if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" || "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
-          set_compiler_env "gcc"
         if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" || "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
           set_compiler_env "gcc"
         elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" || "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
