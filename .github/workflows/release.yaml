@@ -211,7 +211,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: >-
         gh release download
-        --repo 39bytes/just-lsp
+        --repo terror/just-lsp
         --pattern '*'
         --dir release
         ${{ github.ref_name }}
