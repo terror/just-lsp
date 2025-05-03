@@ -157,15 +157,10 @@ development build of this server to test out my changes instantly. This section
 describes a development setup using Neovim as the LSP client, for other clients
 you would need to look up their respective documentation.
 
-First, clone the repository:
+First, clone the repository and build the project:
 
 ```
 git clone https://github.com/terror/just-lsp
-```
-
-Build the project:
-
-```
 cd just-lsp
 cargo build
 ```
@@ -206,18 +201,14 @@ lsp.just_lsp.setup({
 the actual absolute path to the binary.
 
 `on_attach` is a function that gets called after an LSP client gets attached
-to a buffer, mine just sets up a few mappings:
+to a buffer, [mine](https://github.com/terror/dotfiles/blob/0cc595de761d27d99367ad0ea98920b7718be4fb/etc/nvim/lua/config.lua#L207) just sets up a few mappings:
 
 ```lua
 local on_attach = function(client)
-  client.server_capabilities.semanticTokensProvider = nil
-
+  -- ...
   map('n', '<leader>ar', '<cmd>lua vim.lsp.buf.rename()<CR>')
   map('n', '<leader>s', '<cmd>lua vim.lsp.buf.format({ async = true })<CR>')
-  map('n', 'K', '<cmd>lua vim.lsp.buf.hover()<CR>')
-  map('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<CR>')
-  map('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>')
-  map('n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>')
+  -- ...
 end
 ```
 
