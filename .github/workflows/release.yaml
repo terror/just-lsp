@@ -120,10 +120,22 @@ jobs:
             echo "CC_x86_64_unknown_linux_musl=gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
+        if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
+          {
+            echo "CC=gcc"
+            echo "CC_x86_64_unknown_linux_gnu=gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
         elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
           {
             echo "CC=aarch64-linux-gnu-gcc"
             echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
+        elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+          {
+            echo "CC=aarch64-linux-gnu-gcc"
+            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
         elif [[ "${{ matrix.target }}" == "arm-unknown-linux-musleabihf" ]]; then
@@ -200,7 +212,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: >-
         gh release download
-        --repo terror/just-lsp
+        --repo 39bytes/just-lsp
         --pattern '*'
         --dir release
         ${{ github.ref_name }}
