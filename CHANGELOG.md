@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1](https://github.com/terror/just-lsp/releases/tag/0.2.1) - 2025-05-02
+
+### Misc
+
+- Fix typo in Cargo.toml keywords ([#61](https://github.com/terror/just-lsp/pull/61) by [39bytes](https://github.com/39bytes))
+- Add `glibc` targets for linux in release workflow ([#63](https://github.com/terror/just-lsp/pull/63) by [39bytes](https://github.com/39bytes))
+- Truncate code sections in development instructions ([#62](https://github.com/terror/just-lsp/pull/62) by [terror](https://github.com/terror))
+- Add mason to readme installation section ([#57](https://github.com/terror/just-lsp/pull/57) by [terror](https://github.com/terror))
+- Add release badge to readme ([#56](https://github.com/terror/just-lsp/pull/56) by [terror](https://github.com/terror))
+- Add changelog document ([#54](https://github.com/terror/just-lsp/pull/54) by [terror](https://github.com/terror))
+
 ## [0.2.0](https://github.com/terror/just-lsp/releases/tag/0.2.0) - 2025-04-07
 
 ### Added
