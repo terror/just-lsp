@@ -120,7 +120,7 @@ jobs:
             echo "CC_x86_64_unknown_linux_musl=gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
-        if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
+        elif [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
           {
             echo "CC=gcc"
             echo "CC_x86_64_unknown_linux_gnu=gcc"
@@ -156,7 +156,6 @@ jobs:
             echo "CC_armv7_unknown_linux_musleabihf=arm-linux-gnueabihf-gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
-        fi
         elif [[ "${{ matrix.target }}" == "armv7-unknown-linux-gnueabihf" ]]; then
           {
             echo "CC=arm-linux-gnueabihf-gcc"
