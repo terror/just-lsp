@@ -767,7 +767,9 @@ impl<'a> Analyzer<'a> {
     for (recipe_name, identifiers) in recipe_identifier_map {
       if let Some(recipe) = self.document.find_recipe(&recipe_name) {
         for parameter in recipe.parameters {
-          if !identifiers.contains(&parameter.name) {
+          if !identifiers.contains(&parameter.name)
+            && parameter.kind != ParameterKind::Export
+          {
             diagnostics.push(lsp::Diagnostic {
               range: parameter.range,
               severity: Some(lsp::DiagnosticSeverity::WARNING),
@@ -1457,7 +1459,7 @@ mod tests {
   }
 
   #[test]
-  fn warn_for_unused_recipe_parameters() {
+  fn warn_for_unused_non_exported_recipe_parameters() {
     Test::new(indoc! {
       "
       foo bar:
@@ -1465,6 +1467,14 @@ mod tests {
       "
     })
     .warning("Parameter 'bar' appears unused")
+    .run();
+
+    Test::new(indoc! {
+      "
+      foo $bar:
+        echo foo
+      "
+    })
     .run()
   }
 
