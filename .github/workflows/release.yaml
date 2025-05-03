@@ -41,6 +41,10 @@ jobs:
         - x86_64-pc-windows-msvc
         - aarch64-pc-windows-msvc
         - x86_64-unknown-linux-musl
+        - x86_64-unknown-linux-gnu
+        - aarch64-unknown-linux-gnu
+        - arm-unknown-linux-gnueabihf
+        - armv7-unknown-linux-gnueabihf
         include:
         - target: aarch64-apple-darwin
           os: macos-latest
@@ -48,10 +52,19 @@ jobs:
         - target: aarch64-unknown-linux-musl
           os: ubuntu-latest
           target_rustflags: '--codegen linker=aarch64-linux-gnu-gcc'
+        - target: aarch64-unknown-linux-gnu
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=aarch64-linux-gnu-gcc'
         - target: arm-unknown-linux-musleabihf
           os: ubuntu-latest
           target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+        - target: arm-unknown-linux-gnueabihf
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
         - target: armv7-unknown-linux-musleabihf
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+        - target: armv7-unknown-linux-gnueabihf
           os: ubuntu-latest
           target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
         - target: x86_64-apple-darwin
@@ -63,6 +76,9 @@ jobs:
           os: windows-latest
           target_rustflags: ''
         - target: x86_64-unknown-linux-musl
+          os: ubuntu-latest
+          target_rustflags: ''
+        - target: x86_64-unknown-linux-gnu
           os: ubuntu-latest
           target_rustflags: ''
 
@@ -86,7 +102,7 @@ jobs:
         sudo apt-get install -y musl-tools
 
     - name: Install ARM Toolchain
-      if: ${{ matrix.target == 'arm-unknown-linux-musleabihf' || matrix.target == 'armv7-unknown-linux-musleabihf' }}
+      if: ${{ contains(matrix.target, "eabihf") }}
       run: |
         sudo apt-get update
         sudo apt-get install gcc-arm-linux-gnueabihf
@@ -96,13 +112,18 @@ jobs:
       run: |
         rustup target add aarch64-pc-windows-msvc
 
-    - name: Configure compiler for musl targets
-      if: ${{ contains(matrix.target, 'musl') }}
+    - name: Configure compiler for Linux targets
       run: |
         if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
           {
             echo "CC=gcc"
             echo "CC_x86_64_unknown_linux_musl=gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
+        if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
+          {
+            echo "CC=gcc"
+            echo "CC_x86_64_unknown_linux_gnu=gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
         elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
@@ -111,16 +132,35 @@ jobs:
             echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
+        elif [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+          {
+            echo "CC=aarch64-linux-gnu-gcc"
+            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
         elif [[ "${{ matrix.target }}" == "arm-unknown-linux-musleabihf" ]]; then
           {
             echo "CC=arm-linux-gnueabihf-gcc"
             echo "CC_arm_unknown_linux_musleabihf=arm-linux-gnueabihf-gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
+        elif [[ "${{ matrix.target }}" == "arm-unknown-linux-gnueabihf" ]]; then
+          {
+            echo "CC=arm-linux-gnueabihf-gcc"
+            echo "CC_arm_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
         elif [[ "${{ matrix.target }}" == "armv7-unknown-linux-musleabihf" ]]; then
           {
             echo "CC=arm-linux-gnueabihf-gcc"
             echo "CC_armv7_unknown_linux_musleabihf=arm-linux-gnueabihf-gcc"
+            echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
+          } >> "$GITHUB_ENV"
+        fi
+        elif [[ "${{ matrix.target }}" == "armv7-unknown-linux-gnueabihf" ]]; then
+          {
+            echo "CC=arm-linux-gnueabihf-gcc"
+            echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc"
             echo "CFLAGS=-D_FORTIFY_SOURCE=0 -O2"
           } >> "$GITHUB_ENV"
         fi
