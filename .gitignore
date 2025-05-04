@@ -2,3 +2,21 @@
 /.env
 /notes
 target/
+
+# VS Code extension
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+dist/
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.idea/
+.vscode/
+*.log
+bin/just-lsp
