@@ -1,9 +1,10 @@
 use super::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) enum SettingKind {
   Array,
-  Boolean,
+  Boolean(bool),
   String,
 }
 
@@ -11,9 +12,20 @@ impl Display for SettingKind {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       SettingKind::Array => write!(f, "array"),
-      SettingKind::Boolean => write!(f, "boolean"),
+      SettingKind::Boolean(_) => write!(f, "boolean"),
       SettingKind::String => write!(f, "string"),
     }
+  }
+}
+
+impl PartialEq for SettingKind {
+  fn eq(&self, other: &Self) -> bool {
+    matches!(
+      (self, other),
+      (SettingKind::Array, SettingKind::Array)
+        | (SettingKind::Boolean(_), SettingKind::Boolean(_))
+        | (SettingKind::String, SettingKind::String)
+    )
   }
 }
 
@@ -41,7 +53,7 @@ impl Setting {
 
       return Some(Setting {
         name: name.to_string(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range,
       });
     }
@@ -65,7 +77,7 @@ impl Setting {
     }
 
     let kind = if value_part == "true" || value_part == "false" {
-      SettingKind::Boolean
+      SettingKind::Boolean(value_part == "true")
     } else if value_part.starts_with("[") && value_part.ends_with("]") {
       SettingKind::Array
     } else {
@@ -114,7 +126,7 @@ mod tests {
       setting,
       Setting {
         name: "foo".to_string(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range,
       }
     );
@@ -132,7 +144,7 @@ mod tests {
       setting,
       Setting {
         name: "export".to_string(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range,
       }
     );

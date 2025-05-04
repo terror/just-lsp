@@ -764,11 +764,18 @@ impl<'a> Analyzer<'a> {
       }
     }
 
+    let settings = self.document.get_settings();
+
+    let exported = settings.iter().any(|setting| {
+      setting.name == "export" && setting.kind == SettingKind::Boolean(true)
+    });
+
     for (recipe_name, identifiers) in recipe_identifier_map {
       if let Some(recipe) = self.document.find_recipe(&recipe_name) {
         for parameter in recipe.parameters {
           if !identifiers.contains(&parameter.name)
             && parameter.kind != ParameterKind::Export
+            && !exported
           {
             diagnostics.push(lsp::Diagnostic {
               range: parameter.range,
@@ -1472,6 +1479,16 @@ mod tests {
     Test::new(indoc! {
       "
       foo $bar:
+        echo foo
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      set export
+
+      foo bar:
         echo foo
       "
     })

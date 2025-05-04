@@ -2011,7 +2011,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Setting**: export\nExport all variables as environment variables.\n**Type**: Boolean\n**Default**: false",
+        content: "**Setting**: export\nExport all variables as environment variables.\n**Type**: boolean\n**Default**: false",
         kind: "markdown",
         start_line: 0,
         start_char: 4,

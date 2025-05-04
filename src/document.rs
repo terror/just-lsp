@@ -504,7 +504,7 @@ mod tests {
       settings[0],
       Setting {
         name: "export".into(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -534,7 +534,7 @@ mod tests {
       settings[0],
       Setting {
         name: "export".into(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -760,7 +760,7 @@ mod tests {
       settings[0],
       Setting {
         name: "export".into(),
-        kind: SettingKind::Boolean,
+        kind: SettingKind::Boolean(true),
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
