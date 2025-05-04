@@ -100,6 +100,7 @@ pub(crate) struct Recipe {
   pub(crate) content: String,
   pub(crate) range: lsp::Range,
 }
+
 impl Recipe {
   pub(crate) fn os_groups(&self) -> HashSet<OsGroup> {
     let mut os_groups = HashSet::new();

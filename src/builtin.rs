@@ -337,7 +337,7 @@ impl Builtin<'_> {
         let mut documentation =
           format!("**Setting**: {}\n{}", name, description);
 
-        documentation.push_str(&format!("\n**Type**: {:?}", kind));
+        documentation.push_str(&format!("\n**Type**: {}", kind));
         documentation.push_str(&format!("\n**Default**: {}", default));
 
         lsp::MarkupContent {
