@@ -101,7 +101,7 @@ This assumes `just-lsp` is installed on your system and is in your `$PATH`.
 ### Zed
 
 A third-party **zed** extension is maintained over at https://github.com/sectore/zed-just-ls,
-written by. [sectore](https://github.com/sectore). Follow the instructions in that
+written by [@sectore](https://github.com/sectore). Follow the instructions in that
 repository to get it setup on your system.
 
 ## Features
