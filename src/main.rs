@@ -5,6 +5,7 @@ use {
     attribute::Attribute,
     builtin::{AttributeTarget, Builtin},
     command::Command,
+    count::Count,
     document::Document,
     node_ext::NodeExt,
     os_group::OsGroup,
@@ -43,6 +44,7 @@ mod attribute;
 mod builtin;
 mod builtins;
 mod command;
+mod count;
 mod document;
 mod node_ext;
 mod os_group;

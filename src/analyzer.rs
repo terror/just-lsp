@@ -91,7 +91,7 @@ impl<'a> Analyzer<'a> {
           range: alias.value.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Recipe '{}' not found", alias.value.value),
+          message: format!("Recipe `{}` not found", alias.value.value),
           ..Default::default()
         });
       }
@@ -105,7 +105,7 @@ impl<'a> Analyzer<'a> {
           range: alias.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Duplicate alias '{}'", alias.name.value),
+          message: format!("Duplicate alias `{}`", alias.name.value),
           ..Default::default()
         });
       }
@@ -138,7 +138,7 @@ impl<'a> Analyzer<'a> {
             range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Unknown attribute '{}'", attribute_name),
+            message: format!("Unknown attribute `{attribute_name}`"),
             ..Default::default()
           });
 
@@ -162,38 +162,28 @@ impl<'a> Analyzer<'a> {
         });
 
         if parameter_mismatch {
-          let param_error_msg = if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_none())
-          }) {
-            format!("Attribute '{}' doesn't accept parameters", attribute_name)
-          } else if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.map_or(0, |_| 1) < argument_count)
-          }) {
-            format!(
-              "Attribute '{}' got {} arguments but takes {} argument",
-              attribute_name,
-              argument_count,
-              matching_attributes.iter().find_map(|attr| {
-                if let Builtin::Attribute { parameters, .. } = attr {
-                  parameters.map(|_| 1)
-                } else {
-                  None
-                }
-              }).unwrap_or(0),
-            )
-          } else {
-            format!("Attribute '{}' requires parameters", attribute_name)
-          };
+          let required_argument_count = matching_attributes
+            .iter()
+            .find_map(|attr| {
+              if let Builtin::Attribute { parameters, .. } = attr {
+                parameters.map(|_| 1)
+              } else {
+                None
+              }
+            })
+            .unwrap_or(0);
 
           diagnostics.push(lsp::Diagnostic {
             range: attribute_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: param_error_msg,
+            message: format!(
+              "Attribute `{attribute_name}` got {argument_count} {} but takes {required_argument_count} {}",
+              Count("argument", argument_count),
+              Count("argument", required_argument_count),
+            ),
             ..Default::default()
           });
-
-          continue;
         }
 
         if let Some(parent) = attribute_node.parent() {
@@ -207,8 +197,7 @@ impl<'a> Analyzer<'a> {
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
-                  "Attribute '{}' applied to invalid target",
-                  attribute_name
+                  "Attribute `{attribute_name}` applied to invalid target",
                 ),
                 ..Default::default()
               });
@@ -238,7 +227,7 @@ impl<'a> Analyzer<'a> {
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!(
-              "Attribute '{attribute_name}' cannot be applied to {target_type} target",
+              "Attribute `{attribute_name}` cannot be applied to {target_type} target",
             ),
             ..Default::default()
           });
@@ -285,8 +274,8 @@ impl<'a> Analyzer<'a> {
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
-                  "Function '{}' requires at least {} argument(s), but {} provided",
-                  function_name, required_args, arg_count
+                  "Function `{function_name}` requires at least {required_args} {}, but {arg_count} provided",
+                  Count("argument", *required_args)
                 ),
                 ..Default::default()
             });
@@ -296,8 +285,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Function '{}' accepts {} argument(s), but {} provided",
-                function_name, required_args, arg_count
+                "Function `{function_name}` accepts {required_args} {}, but {arg_count} provided",
+                Count("argument", *required_args)
               ),
               ..Default::default()
             });
@@ -307,7 +296,7 @@ impl<'a> Analyzer<'a> {
             range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Unknown function '{}'", function_name),
+            message: format!("Unknown function `{function_name}`"),
             ..Default::default()
           });
         }
@@ -333,7 +322,7 @@ impl<'a> Analyzer<'a> {
             range: param.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Duplicate parameter '{}'", param.name),
+            message: format!("Duplicate parameter `{}`", param.name),
             ..Default::default()
           });
         }
@@ -347,7 +336,7 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Variadic parameter '{}' must be the last parameter",
+                "Variadic parameter `{}` must be the last parameter",
                 param.name
               ),
               ..Default::default()
@@ -365,7 +354,7 @@ impl<'a> Analyzer<'a> {
             range: param.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Required parameter '{}' follows a parameter with a default value", param.name),
+            message: format!("Required parameter `{}` follows a parameter with a default value", param.name),
             ..Default::default()
           });
         }
@@ -376,7 +365,7 @@ impl<'a> Analyzer<'a> {
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!(
-              "Parameter '{}' follows a variadic parameter",
+              "Parameter `{}` follows a variadic parameter",
               param.name
             ),
             ..Default::default()
@@ -419,7 +408,7 @@ impl<'a> Analyzer<'a> {
               range: recipe1.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
-              message: format!("Duplicate recipe name '{}'", recipe_name),
+              message: format!("Duplicate recipe name `{}`", recipe_name),
               ..Default::default()
             });
 
@@ -474,7 +463,7 @@ impl<'a> Analyzer<'a> {
             range: dependency.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Recipe '{}' not found", dependency.name),
+            message: format!("Recipe `{}` not found", dependency.name),
             ..Default::default()
           });
         }
@@ -502,8 +491,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Dependency '{}' requires {} argument(s), but {} provided",
-                dependency.name, required_params, arg_count
+                "Dependency `{}` requires {required_params} {}, but {arg_count} provided",
+                dependency.name, Count("argument", required_params)
               ),
               ..Default::default()
             });
@@ -513,8 +502,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Dependency '{}' accepts {} argument(s), but {} provided",
-                dependency.name, total_params, arg_count
+                "Dependency `{}` accepts {total_params} {}, but {arg_count} provided",
+                dependency.name, Count("argument", total_params)
               ),
               ..Default::default()
             });
@@ -548,10 +537,10 @@ impl<'a> Analyzer<'a> {
         recipes.iter().find(|r| r.name == *path.first().unwrap())
       {
         let message = if cycle.len() == 2 && cycle[0] == cycle[1] {
-          format!("Recipe '{}' depends on itself", cycle[0])
+          format!("Recipe `{}` depends on itself", cycle[0])
         } else if cycle[0] == recipe_name {
           format!(
-            "Recipe '{}' has circular dependency '{}'",
+            "Recipe `{}` has circular dependency `{}`",
             recipe_name,
             cycle.join(" -> ")
           )
@@ -612,7 +601,7 @@ impl<'a> Analyzer<'a> {
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
             message: format!(
-              "Setting '{}' expects a {kind} value",
+              "Setting `{}` expects a {kind} value",
               setting.name,
             ),
             ..Default::default()
@@ -623,7 +612,7 @@ impl<'a> Analyzer<'a> {
           range: setting.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Unknown setting '{}'", setting.name),
+          message: format!("Unknown setting `{}`", setting.name),
           ..Default::default()
         });
       }
@@ -637,7 +626,7 @@ impl<'a> Analyzer<'a> {
           range: setting.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           source: Some("just-lsp".to_string()),
-          message: format!("Duplicate setting '{}'", setting.name),
+          message: format!("Duplicate setting `{}`", setting.name),
           ..Default::default()
         });
       }
@@ -727,8 +716,7 @@ impl<'a> Analyzer<'a> {
 
             if !variable_names.contains(&identifier_name) {
               diagnostics.push(create_diagnostic(format!(
-                "Variable '{}' not found",
-                identifier_name
+                "Variable `{identifier_name}` not found",
               )));
             }
           }
@@ -740,8 +728,7 @@ impl<'a> Analyzer<'a> {
 
           if !variable_names.contains(&identifier_name) {
             diagnostics.push(create_diagnostic(format!(
-              "Variable '{}' not found",
-              identifier_name
+              "Variable `{identifier_name}` not found",
             )));
           }
         }
@@ -756,7 +743,7 @@ impl<'a> Analyzer<'a> {
               range: variable.name.range,
               severity: Some(lsp::DiagnosticSeverity::WARNING),
               source: Some("just-lsp".to_string()),
-              message: format!("Variable '{}' appears unused", variable_name),
+              message: format!("Variable `{variable_name}` appears unused"),
               ..Default::default()
             });
           }
@@ -781,7 +768,7 @@ impl<'a> Analyzer<'a> {
               range: parameter.range,
               severity: Some(lsp::DiagnosticSeverity::WARNING),
               source: Some("just-lsp".to_string()),
-              message: format!("Parameter '{}' appears unused", parameter.name),
+              message: format!("Parameter `{}` appears unused", parameter.name),
               ..Default::default()
             });
           }
@@ -879,8 +866,8 @@ mod tests {
       alias bar := foo
       "
     })
-    .error("Duplicate alias 'bar'")
-    .error("Duplicate alias 'bar'")
+    .error("Duplicate alias `bar`")
+    .error("Duplicate alias `bar`")
     .run()
   }
 
@@ -894,7 +881,7 @@ mod tests {
       alias bar := baz
       "
     })
-    .error("Recipe 'baz' not found")
+    .error("Recipe `baz` not found")
     .run()
   }
 
@@ -911,8 +898,8 @@ mod tests {
       alias baz := nonexistent
       "
     })
-    .error("Recipe 'nonexistent' not found")
-    .error("Recipe 'missing' not found")
+    .error("Recipe `nonexistent` not found")
+    .error("Recipe `missing` not found")
     .run()
   }
 
@@ -935,7 +922,7 @@ mod tests {
   }
 
   #[test]
-  fn attributes_extra_parameters() {
+  fn attributes_extra_arguments() {
     Test::new(indoc! {
       "
       [linux('invalid')]
@@ -943,12 +930,12 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute 'linux' doesn't accept parameters")
+    .error("Attribute `linux` got 1 argument but takes 0 arguments")
     .run()
   }
 
   #[test]
-  fn attributes_missing_parameters() {
+  fn attributes_missing_arguments() {
     Test::new(indoc! {
       "
       [doc]
@@ -956,7 +943,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute 'doc' requires parameters")
+    .error("Attribute `doc` got 0 arguments but takes 1 argument")
     .run()
   }
 
@@ -990,7 +977,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Unknown attribute 'unknown_attribute'")
+    .error("Unknown attribute `unknown_attribute`")
     .run()
   }
 
@@ -1005,7 +992,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute 'group' cannot be applied to alias target")
+    .error("Attribute `group` cannot be applied to alias target")
     .run()
   }
 
@@ -1018,7 +1005,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Unknown attribute 'foo'")
+    .error("Unknown attribute `foo`")
     .run()
   }
 
@@ -1043,7 +1030,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute 'group' got 2 arguments but takes 1 argument")
+    .error("Attribute `group` got 2 arguments but takes 1 argument")
     .run()
   }
 
@@ -1067,7 +1054,7 @@ mod tests {
         echo {{ replace() }}
       "
     })
-    .error("Function 'replace' requires at least 3 argument(s), but 0 provided")
+    .error("Function `replace` requires at least 3 arguments, but 0 provided")
     .run()
   }
 
@@ -1079,7 +1066,7 @@ mod tests {
         echo {{ uppercase(\"hello\", \"extra\") }}
       "
     })
-    .error("Function 'uppercase' accepts 1 argument(s), but 2 provided")
+    .error("Function `uppercase` accepts 1 argument, but 2 provided")
     .run()
   }
 
@@ -1091,7 +1078,7 @@ mod tests {
         echo {{ unknown_function() }}
       "
     })
-    .error("Unknown function 'unknown_function'")
+    .error("Unknown function `unknown_function`")
     .run()
   }
 
@@ -1143,7 +1130,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Recipe 'baz' not found")
+    .error("Recipe `baz` not found")
     .run()
   }
 
@@ -1158,8 +1145,8 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Recipe 'missing1' not found")
-    .error("Recipe 'missing2' not found")
+    .error("Recipe `missing1` not found")
+    .error("Recipe `missing2` not found")
     .run()
   }
 
@@ -1170,7 +1157,7 @@ mod tests {
       foo arg1 arg2=\"default\":
         echo \"{{arg1}} {{arg2}}\"
 
-      bar: (foo 'value1')
+      bar: (foo `value1`)
         echo \"bar\"
       "
     })
@@ -1188,7 +1175,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Dependency 'foo' requires 2 argument(s), but 0 provided")
+    .error("Dependency `foo` requires 2 arguments, but 0 provided")
     .run()
   }
 
@@ -1199,11 +1186,11 @@ mod tests {
       foo arg1 arg2:
         echo \"{{arg1}} {{arg2}}\"
 
-      bar: (foo 'value1')
+      bar: (foo `value1`)
         echo \"bar\"
       "
     })
-    .error("Dependency 'foo' requires 2 argument(s), but 1 provided")
+    .error("Dependency `foo` requires 2 arguments, but 1 provided")
     .run()
   }
 
@@ -1214,11 +1201,11 @@ mod tests {
       foo arg1:
         echo \"{{arg1}}\"
 
-      bar: (foo 'value1' 'value2' 'value3')
+      bar: (foo `value1` `value2` `value3`)
         echo \"bar\"
       "
     })
-    .error("Dependency 'foo' accepts 1 argument(s), but 3 provided")
+    .error("Dependency `foo` accepts 1 argument, but 3 provided")
     .run()
   }
 
@@ -1233,7 +1220,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Variable 'wow' not found")
+    .error("Variable `wow` not found")
     .run()
   }
 
@@ -1241,7 +1228,7 @@ mod tests {
   fn recipe_invocation_valid_variable() {
     Test::new(indoc! {
       "
-      wow := 'foo'
+      wow := `foo`
 
       foo arg1:
         echo \"{{arg1}}\"
@@ -1286,7 +1273,7 @@ mod tests {
         echo \"{{arg1}}\"
       "
     })
-    .error("Duplicate parameter 'arg1'")
+    .error("Duplicate parameter `arg1`")
     .run()
   }
 
@@ -1298,7 +1285,7 @@ mod tests {
         echo \"{{arg1}} {{arg2}}\"
       "
     })
-    .error("Required parameter 'arg2' follows a parameter with a default value")
+    .error("Required parameter `arg2` follows a parameter with a default value")
     .run()
   }
 
@@ -1361,7 +1348,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Setting 'export' expects a boolean value")
+    .error("Setting `export` expects a boolean value")
     .run()
   }
 
@@ -1377,7 +1364,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Duplicate setting 'export'")
+    .error("Duplicate setting `export`")
     .run()
   }
 
@@ -1394,8 +1381,8 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Unknown setting 'unknown-setting'")
-    .error("Duplicate setting 'export'")
+    .error("Unknown setting `unknown-setting`")
+    .error("Duplicate setting `export`")
     .run()
   }
 
@@ -1422,7 +1409,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Setting 'dotenv-path' expects a string value")
+    .error("Setting `dotenv-path` expects a string value")
     .run()
   }
 
@@ -1436,7 +1423,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Unknown setting 'unknown-setting'")
+    .error("Unknown setting `unknown-setting`")
     .run()
   }
 
@@ -1461,7 +1448,7 @@ mod tests {
         echo {{ var }}
       "
     })
-    .error("Variable 'var' not found")
+    .error("Variable `var` not found")
     .run()
   }
 
@@ -1473,7 +1460,7 @@ mod tests {
         echo foo
       "
     })
-    .warning("Parameter 'bar' appears unused")
+    .warning("Parameter `bar` appears unused")
     .run();
 
     Test::new(indoc! {
@@ -1509,8 +1496,8 @@ mod tests {
         echo foo
       "
     })
-    .error("Duplicate recipe name 'foo'")
-    .error("Duplicate recipe name 'foo'")
+    .error("Duplicate recipe name `foo`")
+    .error("Duplicate recipe name `foo`")
     .run()
   }
 
@@ -1525,7 +1512,7 @@ mod tests {
         echo {{ bar }}
       "
     })
-    .warning("Variable 'foo' appears unused")
+    .warning("Variable `foo` appears unused")
     .run()
   }
 
@@ -1560,7 +1547,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning("Variable 'unused' appears unused")
+    .warning("Variable `unused` appears unused")
     .run()
   }
 
@@ -1578,7 +1565,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning("Variable 'unused_var' appears unused")
+    .warning("Variable `unused_var` appears unused")
     .run()
   }
 
@@ -1595,7 +1582,7 @@ mod tests {
         echo {{ other }}
       "
     })
-    .warning("Variable 'param' appears unused")
+    .warning("Variable `param` appears unused")
     .run()
   }
 
@@ -1617,7 +1604,7 @@ mod tests {
         echo {{ only_in_second }}
       "
     })
-    .warning("Variable 'never_used' appears unused")
+    .warning("Variable `never_used` appears unused")
     .run()
   }
 
@@ -1633,7 +1620,7 @@ mod tests {
         echo {{ baz }}
       "
     })
-    .warning("Variable 'foo' appears unused")
+    .warning("Variable `foo` appears unused")
     .run()
   }
 
@@ -1670,7 +1657,7 @@ mod tests {
         echo \"Building on Linux version 2\"
       "
     })
-    .error("Duplicate recipe name 'build'")
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1703,7 +1690,7 @@ mod tests {
         echo \"Building on macOS specifically\"
       "
     })
-    .error("Duplicate recipe name 'build'")
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1720,7 +1707,7 @@ mod tests {
         echo \"Building on OpenBSD\"
       "
     })
-    .error("Duplicate recipe name 'build'")
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1794,7 +1781,7 @@ mod tests {
         echo \"Building on macOS\"
       "
     })
-    .error("Duplicate recipe name 'build'")
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1812,7 +1799,7 @@ mod tests {
         echo \"Building on Linux again\"
       "
     })
-    .error("Duplicate recipe name 'build'")
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1843,7 +1830,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Recipe 'foo' depends on itself")
+    .error("Recipe `foo` depends on itself")
     .run()
   }
 
@@ -1858,8 +1845,8 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Recipe 'foo' has circular dependency 'foo -> bar -> foo'")
-    .error("Recipe 'bar' has circular dependency 'bar -> foo -> bar'")
+    .error("Recipe `foo` has circular dependency `foo -> bar -> foo`")
+    .error("Recipe `bar` has circular dependency `bar -> foo -> bar`")
     .run()
   }
 
@@ -1877,9 +1864,9 @@ mod tests {
         echo \"baz\"
       "
     })
-    .error("Recipe 'foo' has circular dependency 'foo -> bar -> baz -> foo'")
-    .error("Recipe 'bar' has circular dependency 'bar -> baz -> foo -> bar'")
-    .error("Recipe 'baz' has circular dependency 'baz -> foo -> bar -> baz'")
+    .error("Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`")
+    .error("Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`")
+    .error("Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`")
     .run()
   }
 
@@ -1900,9 +1887,9 @@ mod tests {
         echo \"qux\"
       "
     })
-    .error("Recipe 'foo' has circular dependency 'foo -> baz -> qux -> foo'")
-    .error("Recipe 'baz' has circular dependency 'baz -> qux -> foo -> baz'")
-    .error("Recipe 'qux' has circular dependency 'qux -> foo -> baz -> qux'")
+    .error("Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`")
+    .error("Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`")
+    .error("Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`")
     .run()
   }
 
@@ -1926,11 +1913,11 @@ mod tests {
         echo \"z\"
       "
     })
-    .error("Recipe 'a' has circular dependency 'a -> b -> a'")
-    .error("Recipe 'b' has circular dependency 'b -> a -> b'")
-    .error("Recipe 'x' has circular dependency 'x -> y -> z -> x'")
-    .error("Recipe 'y' has circular dependency 'y -> z -> x -> y'")
-    .error("Recipe 'z' has circular dependency 'z -> x -> y -> z'")
+    .error("Recipe `a` has circular dependency `a -> b -> a`")
+    .error("Recipe `b` has circular dependency `b -> a -> b`")
+    .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
+    .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
+    .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
     .run()
   }
 }
