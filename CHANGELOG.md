@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-05-09
+
+### Fixed
+
+- Remove warnings for default exported recipe parameters ([#70](https://github.com/terror/just-lsp/pull/70) by [terror](https://github.com/terror))
+- Don't warn for exported recipe parameters ([#66](https://github.com/terror/just-lsp/pull/66) by [terror](https://github.com/terror))
+
+### Misc
+
+- Use backticks where applicable in analyzer error messages ([#74](https://github.com/terror/just-lsp/pull/74) by [terror](https://github.com/terror))
+- Add zed extension to usage section ([#73](https://github.com/terror/just-lsp/pull/73) by [terror](https://github.com/terror))
+
 ## [0.2.1](https://github.com/terror/just-lsp/releases/tag/0.2.1) - 2025-05-02
 
 ### Misc
