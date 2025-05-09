@@ -138,7 +138,7 @@ impl<'a> Analyzer<'a> {
             range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Unknown attribute `{}`", attribute_name),
+            message: format!("Unknown attribute `{attribute_name}`"),
             ..Default::default()
           });
 
@@ -162,38 +162,28 @@ impl<'a> Analyzer<'a> {
         });
 
         if parameter_mismatch {
-          let param_error_msg = if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.is_none())
-          }) {
-            format!("Attribute `{}` doesn`t accept parameters", attribute_name)
-          } else if matching_attributes.iter().any(|attr| {
-            matches!(attr, Builtin::Attribute { parameters, .. } if parameters.map_or(0, |_| 1) < argument_count)
-          }) {
-            format!(
-              "Attribute `{}` got {} arguments but takes {} argument",
-              attribute_name,
-              argument_count,
-              matching_attributes.iter().find_map(|attr| {
-                if let Builtin::Attribute { parameters, .. } = attr {
-                  parameters.map(|_| 1)
-                } else {
-                  None
-                }
-              }).unwrap_or(0),
-            )
-          } else {
-            format!("Attribute `{}` requires parameters", attribute_name)
-          };
+          let required_argument_count = matching_attributes
+            .iter()
+            .find_map(|attr| {
+              if let Builtin::Attribute { parameters, .. } = attr {
+                parameters.map(|_| 1)
+              } else {
+                None
+              }
+            })
+            .unwrap_or(0);
 
           diagnostics.push(lsp::Diagnostic {
             range: attribute_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: param_error_msg,
+            message: format!(
+              "Attribute `{attribute_name}` got {argument_count} {} but takes {required_argument_count} {}",
+              Count("argument", argument_count),
+              Count("argument", required_argument_count),
+            ),
             ..Default::default()
           });
-
-          continue;
         }
 
         if let Some(parent) = attribute_node.parent() {
@@ -207,8 +197,7 @@ impl<'a> Analyzer<'a> {
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
-                  "Attribute `{}` applied to invalid target",
-                  attribute_name
+                  "Attribute `{attribute_name}` applied to invalid target",
                 ),
                 ..Default::default()
               });
@@ -285,8 +274,8 @@ impl<'a> Analyzer<'a> {
                 severity: Some(lsp::DiagnosticSeverity::ERROR),
                 source: Some("just-lsp".to_string()),
                 message: format!(
-                  "Function `{}` requires at least {} argument(s), but {} provided",
-                  function_name, required_args, arg_count
+                  "Function `{function_name}` requires at least {required_args} {}, but {arg_count} provided",
+                  Count("argument", *required_args)
                 ),
                 ..Default::default()
             });
@@ -296,8 +285,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Function `{}` accepts {} argument(s), but {} provided",
-                function_name, required_args, arg_count
+                "Function `{function_name}` accepts {required_args} {}, but {arg_count} provided",
+                Count("argument", *required_args)
               ),
               ..Default::default()
             });
@@ -307,7 +296,7 @@ impl<'a> Analyzer<'a> {
             range: identifier_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
             source: Some("just-lsp".to_string()),
-            message: format!("Unknown function `{}`", function_name),
+            message: format!("Unknown function `{function_name}`"),
             ..Default::default()
           });
         }
@@ -502,8 +491,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Dependency `{}` requires {} argument(s), but {} provided",
-                dependency.name, required_params, arg_count
+                "Dependency `{}` requires {required_params} {}, but {arg_count} provided",
+                dependency.name, Count("argument", required_params)
               ),
               ..Default::default()
             });
@@ -513,8 +502,8 @@ impl<'a> Analyzer<'a> {
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
               message: format!(
-                "Dependency `{}` accepts {} argument(s), but {} provided",
-                dependency.name, total_params, arg_count
+                "Dependency `{}` accepts {total_params} {}, but {arg_count} provided",
+                dependency.name, Count("argument", total_params)
               ),
               ..Default::default()
             });
@@ -727,8 +716,7 @@ impl<'a> Analyzer<'a> {
 
             if !variable_names.contains(&identifier_name) {
               diagnostics.push(create_diagnostic(format!(
-                "Variable `{}` not found",
-                identifier_name
+                "Variable `{identifier_name}` not found",
               )));
             }
           }
@@ -740,8 +728,7 @@ impl<'a> Analyzer<'a> {
 
           if !variable_names.contains(&identifier_name) {
             diagnostics.push(create_diagnostic(format!(
-              "Variable `{}` not found",
-              identifier_name
+              "Variable `{identifier_name}` not found",
             )));
           }
         }
@@ -756,7 +743,7 @@ impl<'a> Analyzer<'a> {
               range: variable.name.range,
               severity: Some(lsp::DiagnosticSeverity::WARNING),
               source: Some("just-lsp".to_string()),
-              message: format!("Variable `{}` appears unused", variable_name),
+              message: format!("Variable `{variable_name}` appears unused"),
               ..Default::default()
             });
           }
@@ -935,7 +922,7 @@ mod tests {
   }
 
   #[test]
-  fn attributes_extra_parameters() {
+  fn attributes_extra_arguments() {
     Test::new(indoc! {
       "
       [linux('invalid')]
@@ -943,12 +930,12 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute `linux` doesn`t accept parameters")
+    .error("Attribute `linux` got 1 argument but takes 0 arguments")
     .run()
   }
 
   #[test]
-  fn attributes_missing_parameters() {
+  fn attributes_missing_arguments() {
     Test::new(indoc! {
       "
       [doc]
@@ -956,7 +943,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Attribute `doc` requires parameters")
+    .error("Attribute `doc` got 0 arguments but takes 1 argument")
     .run()
   }
 
@@ -1067,7 +1054,7 @@ mod tests {
         echo {{ replace() }}
       "
     })
-    .error("Function `replace` requires at least 3 argument(s), but 0 provided")
+    .error("Function `replace` requires at least 3 arguments, but 0 provided")
     .run()
   }
 
@@ -1079,7 +1066,7 @@ mod tests {
         echo {{ uppercase(\"hello\", \"extra\") }}
       "
     })
-    .error("Function `uppercase` accepts 1 argument(s), but 2 provided")
+    .error("Function `uppercase` accepts 1 argument, but 2 provided")
     .run()
   }
 
@@ -1188,7 +1175,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Dependency `foo` requires 2 argument(s), but 0 provided")
+    .error("Dependency `foo` requires 2 arguments, but 0 provided")
     .run()
   }
 
@@ -1203,7 +1190,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Dependency `foo` requires 2 argument(s), but 1 provided")
+    .error("Dependency `foo` requires 2 arguments, but 1 provided")
     .run()
   }
 
@@ -1218,7 +1205,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Dependency `foo` accepts 1 argument(s), but 3 provided")
+    .error("Dependency `foo` accepts 1 argument, but 3 provided")
     .run()
   }
 
