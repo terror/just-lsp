@@ -1260,7 +1260,7 @@ mod tests {
       foo arg1 +args:
         echo \"{{arg1}} {{args}}\"
 
-      bar: (foo `value1` `value2` `value3`)
+      bar: (foo 'value1' 'value2' 'value3')
         echo \"bar\"
       "
     })
