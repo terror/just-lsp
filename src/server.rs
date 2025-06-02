@@ -462,6 +462,7 @@ impl Inner {
 
     if let Some(document) = self.documents.get(uri) {
       let content = document.content.to_string();
+
       let filename = uri
         .to_file_path()
         .map_err(|()| jsonrpc::Error::invalid_params("Justfile URI was not file path"))?;
