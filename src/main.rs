@@ -20,9 +20,11 @@ use {
     variable::Variable,
   },
   anyhow::{anyhow, bail, Error},
+  env_logger::Env,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
+    backtrace::BacktraceStatus,
     collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
@@ -64,10 +66,29 @@ extern "C" {
 
 #[tokio::main]
 async fn main() {
-  env_logger::init();
+  let env = Env::default().default_filter_or("info");
+
+  env_logger::Builder::from_env(env).init();
 
   if let Err(error) = Server::run().await {
-    println!("error: {error}");
+    eprintln!("error: {error}");
+
+    for (i, error) in error.chain().skip(1).enumerate() {
+      if i == 0 {
+        eprintln!();
+        eprintln!("because:");
+      }
+
+      eprintln!("- {error}");
+    }
+
+    let backtrace = error.backtrace();
+
+    if backtrace.status() == BacktraceStatus::Captured {
+      eprintln!("backtrace:");
+      eprintln!("{backtrace}");
+    }
+
     process::exit(1);
   }
 }
