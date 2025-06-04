@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.3](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-06-03
+
+### Fixed
+
+- Fix formatting by using `just --dump` instead of `just --fmt` ([#77](https://github.com/terror/just-lsp/pull/77) by [DoctorDalek1963](https://github.com/DoctorDalek1963))
+
+### Misc
+
+- Add backtraces to server error messages ([#79](https://github.com/terror/just-lsp/pull/79) by [terror](https://github.com/terror))
+- Update dependencies ([#78](https://github.com/terror/just-lsp/pull/78) by [terror](https://github.com/terror))
+
 ## [0.2.2](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-05-09
 
 ### Fixed
