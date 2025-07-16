@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 132] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 133] = [
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",
@@ -75,6 +75,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 132] = [
     name: "openbsd",
     description: "Enable recipe on OpenBSD.",
     version: "1.38.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: None,
+  },
+  Builtin::Attribute {
+    name: "parallel",
+    description: "Run this recipe's dependencies in parallel.",
+    version: "1.42.0",
     targets: &[AttributeTarget::Recipe],
     parameters: None,
   },
