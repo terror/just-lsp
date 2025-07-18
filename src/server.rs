@@ -488,7 +488,7 @@ impl Inner {
             .client
             .show_message(
               lsp::MessageType::ERROR,
-              format!("Failed to format document: {}", error),
+              format!("Failed to format document: {error}"),
             )
             .await;
         }
@@ -788,7 +788,7 @@ impl Inner {
                 }
               }
               Err(error) => {
-                buffer.push_str(&format!("Error reading output: {}\n", error));
+                buffer.push_str(&format!("Error reading output: {error}\n"));
               }
             }
           }
@@ -826,7 +826,7 @@ impl Inner {
                 client
                   .show_message(
                     lsp::MessageType::WARNING,
-                    format!("Recipe '{recipe_name}' completed with non-zero exit code: {}", status),
+                    format!("Recipe '{recipe_name}' completed with non-zero exit code: {status}"),
                   )
                   .await;
               }

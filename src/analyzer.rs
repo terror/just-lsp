@@ -408,7 +408,7 @@ impl<'a> Analyzer<'a> {
               range: recipe1.range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               source: Some("just-lsp".to_string()),
-              message: format!("Duplicate recipe name `{}`", recipe_name),
+              message: format!("Duplicate recipe name `{recipe_name}`"),
               ..Default::default()
             });
 
