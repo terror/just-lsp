@@ -463,11 +463,7 @@ impl Inner {
     if let Some(document) = self.documents.get(uri) {
       let content = document.content.to_string();
 
-      let filename = uri.to_file_path().map_err(|()| {
-        jsonrpc::Error::invalid_params("Justfile URI was not file path")
-      })?;
-
-      match self.format_document(filename).await {
+      match self.format_document(&content).await {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
@@ -498,10 +494,18 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(&self, filename: PathBuf) -> Result<String> {
+  async fn format_document(&self, content: &str) -> Result<String> {
+    let tempdir = tempdir()?;
+
+    let file = tempdir.path().join("justfile");
+
+    fs::write(&file, content.as_bytes())?;
+
     let mut command = tokio::process::Command::new("just");
 
-    command.arg("--dump").arg("--justfile").arg(filename);
+    command.arg("--fmt").arg("--unstable").arg("--quiet");
+
+    command.current_dir(tempdir.path());
 
     let output = command.output().await?;
 
@@ -512,7 +516,7 @@ impl Inner {
       );
     }
 
-    Ok(String::from_utf8(output.stdout)?)
+    Ok(fs::read_to_string(&file)?)
   }
 
   async fn goto_definition(
