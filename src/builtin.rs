@@ -65,9 +65,9 @@ impl Builtin<'_> {
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
-        insert_text: Some(format!("[{}]", name)),
+        insert_text: Some(format!("[{name}]")),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        sort_text: Some(format!("z{}", name)),
+        sort_text: Some(format!("z{name}")),
         ..Default::default()
       },
       Self::Constant { name, .. } => lsp::CompletionItem {
@@ -78,14 +78,14 @@ impl Builtin<'_> {
         )),
         insert_text: Some(name.to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        sort_text: Some(format!("z{}", name)),
+        sort_text: Some(format!("z{name}")),
         ..Default::default()
       },
       Self::Function { name, .. } => {
         let snippet = match *name {
-          "absolute_path" => format!("{}(${{1:path:string}})", name),
+          "absolute_path" => format!("{name}(${{1:path:string}})"),
           "append" => {
-            format!("{}(${{1:suffix:string}}, ${{2:s:string}})", name)
+            format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
           }
           "arch"
           | "num_cpus"
@@ -107,84 +107,80 @@ impl Builtin<'_> {
           | "data_directory"
           | "data_local_directory"
           | "executable_directory"
-          | "home_directory" => format!("{}()", name),
-          "blake3" => format!("{}(${{1:string:string}})", name),
-          "blake3_file" => format!("{}(${{1:path:string}})", name),
-          "canonicalize" => format!("{}(${{1:path:string}})", name),
-          "capitalize" => format!("{}(${{1:s:string}})", name),
+          | "home_directory" => format!("{name}()"),
+          "blake3" => format!("{name}(${{1:string:string}})"),
+          "blake3_file" => format!("{name}(${{1:path:string}})"),
+          "canonicalize" => format!("{name}(${{1:path:string}})"),
+          "capitalize" => format!("{name}(${{1:s:string}})"),
           "choose" => {
-            format!("{}(${{1:n:string}}, ${{2:alphabet:string}})", name)
+            format!("{name}(${{1:n:string}}, ${{2:alphabet:string}})")
           }
-          "clean" => format!("{}(${{1:path:string}})", name),
-          "datetime" => format!("{}(${{1:format:string}})", name),
-          "datetime_utc" => format!("{}(${{1:format:string}})", name),
-          "encode_uri_component" => format!("{}(${{1:s:string}})", name),
+          "clean" => format!("{name}(${{1:path:string}})"),
+          "datetime" => format!("{name}(${{1:format:string}})"),
+          "datetime_utc" => format!("{name}(${{1:format:string}})"),
+          "encode_uri_component" => format!("{name}(${{1:s:string}})"),
           "env" => {
-            format!("{}(${{1:key:string}}${{2:, default:string}})", name)
+            format!("{name}(${{1:key:string}}${{2:, default:string}})")
           }
-          "error" => format!("{}(${{1:message:string}})", name),
-          "extension" => format!("{}(${{1:path:string}})", name),
-          "file_name" => format!("{}(${{1:path:string}})", name),
-          "file_stem" => format!("{}(${{1:path:string}})", name),
+          "error" => format!("{name}(${{1:message:string}})"),
+          "extension" => format!("{name}(${{1:path:string}})"),
+          "file_name" => format!("{name}(${{1:path:string}})"),
+          "file_stem" => format!("{name}(${{1:path:string}})"),
           "join" => format!(
-            "{}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
-            name
+            "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
           ),
-          "kebabcase" => format!("{}(${{1:s:string}})", name),
-          "lowercase" => format!("{}(${{1:s:string}})", name),
-          "lowercamelcase" => format!("{}(${{1:s:string}})", name),
-          "parent_directory" => format!("{}(${{1:path:string}})", name),
-          "path_exists" => format!("{}(${{1:path:string}})", name),
+          "kebabcase" => format!("{name}(${{1:s:string}})"),
+          "lowercase" => format!("{name}(${{1:s:string}})"),
+          "lowercamelcase" => format!("{name}(${{1:s:string}})"),
+          "parent_directory" => format!("{name}(${{1:path:string}})"),
+          "path_exists" => format!("{name}(${{1:path:string}})"),
           "prepend" => {
-            format!("{}(${{1:prefix:string}}, ${{2:s:string}})", name)
+            format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
           }
-          "quote" => format!("{}(${{1:s:string}})", name),
-          "read" => format!("{}(${{1:path:string}})", name),
+          "quote" => format!("{name}(${{1:s:string}})"),
+          "read" => format!("{name}(${{1:path:string}})"),
           "replace" => format!(
-            "{}(${{1:s:string}}, ${{2:from:string}}, ${{3:to:string}})",
-            name
+            "{name}(${{1:s:string}}, ${{2:from:string}}, ${{3:to:string}})",
           ),
           "replace_regex" => format!(
-          "{}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})",
-          name
+          "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})",
         ),
-          "require" => format!("{}(${{1:name:string}})", name),
+          "require" => format!("{name}(${{1:name:string}})"),
           "semver_matches" => {
             format!(
-              "{}(${{1:version:string}}, ${{2:requirement:string}})",
-              name
+              "{name}(${{1:version:string}}, ${{2:requirement:string}})",
             )
           }
-          "sha256" => format!("{}(${{1:string:string}})", name),
-          "sha256_file" => format!("{}(${{1:path:string}})", name),
+          "sha256" => format!("{name}(${{1:string:string}})"),
+          "sha256_file" => format!("{name}(${{1:path:string}})"),
           "shell" => {
-            format!("{}(${{1:command:string}}${{2:, args:string...}})", name)
+            format!("{name}(${{1:command:string}}${{2:, args:string...}})")
           }
-          "shoutykebabcase" => format!("{}(${{1:s:string}})", name),
-          "shoutysnakecase" => format!("{}(${{1:s:string}})", name),
-          "snakecase" => format!("{}(${{1:s:string}})", name),
-          "style" => format!("{}(${{1:name:string}})", name),
-          "titlecase" => format!("{}(${{1:s:string}})", name),
-          "trim" => format!("{}(${{1:s:string}})", name),
-          "trim_end" => format!("{}(${{1:s:string}})", name),
+          "shoutykebabcase" => format!("{name}(${{1:s:string}})"),
+          "shoutysnakecase" => format!("{name}(${{1:s:string}})"),
+          "snakecase" => format!("{name}(${{1:s:string}})"),
+          "style" => format!("{name}(${{1:name:string}})"),
+          "titlecase" => format!("{name}(${{1:s:string}})"),
+          "trim" => format!("{name}(${{1:s:string}})"),
+          "trim_end" => format!("{name}(${{1:s:string}})"),
           "trim_end_match" => {
-            format!("{}(${{1:s:string}}, ${{2:substring:string}})", name)
+            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
           }
           "trim_end_matches" => {
-            format!("{}(${{1:s:string}}, ${{2:substring:string}})", name)
+            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
           }
-          "trim_start" => format!("{}(${{1:s:string}})", name),
+          "trim_start" => format!("{name}(${{1:s:string}})"),
           "trim_start_match" => {
-            format!("{}(${{1:s:string}}, ${{2:substring:string}})", name)
+            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
           }
           "trim_start_matches" => {
-            format!("{}(${{1:s:string}}, ${{2:substring:string}})", name)
+            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
           }
-          "uppercamelcase" => format!("{}(${{1:s:string}})", name),
-          "uppercase" => format!("{}(${{1:s:string}})", name),
-          "which" => format!("{}(${{1:name:string}})", name),
-          "without_extension" => format!("{}(${{1:path:string}})", name),
-          _ => format!("{}(${{1:}})", name),
+          "uppercamelcase" => format!("{name}(${{1:s:string}})"),
+          "uppercase" => format!("{name}(${{1:s:string}})"),
+          "which" => format!("{name}(${{1:name:string}})"),
+          "without_extension" => format!("{name}(${{1:path:string}})"),
+          _ => format!("{name}(${{1:}})"),
         };
 
         lsp::CompletionItem {
@@ -195,7 +191,7 @@ impl Builtin<'_> {
           )),
           insert_text: Some(snippet),
           insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some(format!("z{}", name)),
+          sort_text: Some(format!("z{name}")),
           ..Default::default()
         }
       }
@@ -205,9 +201,9 @@ impl Builtin<'_> {
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
-        insert_text: Some(format!("set {} := ", name)),
+        insert_text: Some(format!("set {name} := ")),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        sort_text: Some(format!("z{}", name)),
+        sort_text: Some(format!("z{name}")),
         ..Default::default()
       },
     }
@@ -223,14 +219,13 @@ impl Builtin<'_> {
         parameters,
       } => {
         let mut documentation =
-          format!("**Attribute**: [{}]\n{}", name, description);
+          format!("**Attribute**: [{name}]\n{description}");
 
         if let Some(params) = parameters {
-          documentation
-            .push_str(&format!("\n**Syntax**: [{}({})]", name, params));
+          documentation.push_str(&format!("\n**Syntax**: [{name}({params})]"));
         }
 
-        documentation.push_str(&format!("\n**Introduced in**: {}", version));
+        documentation.push_str(&format!("\n**Introduced in**: {version}"));
 
         let targets = targets
           .iter()
@@ -249,7 +244,7 @@ impl Builtin<'_> {
         description, value, ..
       } => lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: format!("{}\n{}", description, value),
+        value: format!("{description}\n{value}"),
       },
       Self::Function {
         name,
@@ -314,7 +309,7 @@ impl Builtin<'_> {
 
         documentation.push_str(description);
 
-        documentation.push_str(format!("\n```\n{}\n```", signature).as_str());
+        documentation.push_str(format!("\n```\n{signature}\n```").as_str());
 
         if !example.is_empty() {
           documentation.push_str("\n**Examples:**\n```\n");
@@ -334,11 +329,10 @@ impl Builtin<'_> {
         default,
         ..
       } => {
-        let mut documentation =
-          format!("**Setting**: {}\n{}", name, description);
+        let mut documentation = format!("**Setting**: {name}\n{description}");
 
-        documentation.push_str(&format!("\n**Type**: {}", kind));
-        documentation.push_str(&format!("\n**Default**: {}", default));
+        documentation.push_str(&format!("\n**Type**: {kind}"));
+        documentation.push_str(&format!("\n**Default**: {default}"));
 
         lsp::MarkupContent {
           kind: lsp::MarkupKind::Markdown,

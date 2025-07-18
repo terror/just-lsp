@@ -1,5 +1,7 @@
 set dotenv-load
 
+export CARGO_MSG_LIMIT := '1'
+
 default:
 	just --list
 
