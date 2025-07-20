@@ -2,15 +2,15 @@
 
 ## [0.2.4](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-07-18
 
-## Added
+### Added
 
 - Add `parallel` to builtin attributes ([#83](https://github.com/terror/just-lsp/pull/83) by [dpassen](https://github.com/dpassen))
 
-## Fixed
+### Fixed
 
 - Revert back to using `just --fmt` on format ([#85](https://github.com/terror/just-lsp/pull/85) by [terror](https://github.com/terror))
 
-## Misc
+### Misc
 
 - Interpolate in format strings directly ([#84](https://github.com/terror/just-lsp/pull/84) by [terror](https://github.com/terror))
 
