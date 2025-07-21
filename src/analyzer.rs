@@ -263,7 +263,15 @@ impl<'a> Analyzer<'a> {
           ..
         }) = builtin
         {
-          let arguments = function_call.find_all("expression > value");
+          let arguments = if let Some(sequence) = function_call.find("sequence")
+          {
+            (0..sequence.child_count())
+              .filter_map(|i| sequence.child(i))
+              .filter(|child| child.kind() == "expression")
+              .collect::<Vec<_>>()
+          } else {
+            Vec::new()
+          };
 
           let arg_count = arguments.len();
 
@@ -1918,6 +1926,17 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
+    .run()
+  }
+
+  #[test]
+  fn function_calls_nested() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
+      "
+    })
     .run()
   }
 }
