@@ -1222,9 +1222,9 @@ mod tests {
   fn resolve_builtin_constant_hover() {
     let doc = document(indoc! {
       "
-    foo:
-      echo {{ RED }}
-    "
+      foo:
+        echo {{ RED }}
+      "
     });
 
     let resolver = Resolver::new(&doc);
