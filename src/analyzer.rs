@@ -263,15 +263,15 @@ impl<'a> Analyzer<'a> {
           ..
         }) = builtin
         {
-          let arguments = if let Some(sequence) = function_call.find("sequence")
-          {
-            (0..sequence.child_count())
-              .filter_map(|i| sequence.child(i))
-              .filter(|child| child.kind() == "expression")
-              .collect::<Vec<_>>()
-          } else {
-            Vec::new()
-          };
+          let arguments = function_call
+            .find("sequence")
+            .map(|sequence| {
+              (0..sequence.child_count())
+                .filter_map(|i| sequence.child(i))
+                .filter(|child| child.kind() == "expression")
+                .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
           let arg_count = arguments.len();
 
