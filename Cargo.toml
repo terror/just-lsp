@@ -1,6 +1,6 @@
 [package]
 name = "just-lsp-ng"
-version = "0.3.0"
+version = "0.3.1"
 description = "A language server for just"
 authors = [
   "Liam <liam@scalzulli.com>",

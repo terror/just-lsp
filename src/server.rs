@@ -268,6 +268,7 @@ pub(crate) struct Inner {
   client: Client,
   documents: BTreeMap<lsp::Url, Document>,
   initialized: bool,
+  shutdown_received: bool,
   debug_logger: DebugLogger,
 }
 
@@ -277,6 +278,7 @@ impl Inner {
       client,
       documents: BTreeMap::new(),
       initialized: false,
+      shutdown_received: false,
       debug_logger,
     }
   }
@@ -966,9 +968,13 @@ impl Inner {
     });
   }
 
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+  async fn shutdown(&mut self) -> Result<(), jsonrpc::Error> {
+    self.debug_logger.log("RECEIVED: shutdown request").await;
+    self.shutdown_received = true;
     Ok(())
   }
+
+  
 }
 
 #[cfg(test)]
