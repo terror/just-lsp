@@ -14,7 +14,7 @@ use {
     recipe::{Dependency, Parameter, ParameterJson, ParameterKind, Recipe},
     resolver::Resolver,
     rope_ext::RopeExt,
-    server::Server,
+    server::{Server, SHUTDOWN_REQUESTED},
     setting::{Setting, SettingKind},
     text_node::TextNode,
     variable::Variable,
@@ -25,14 +25,15 @@ use {
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
-    backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap, HashSet},
-    env,
-    fmt::{self, Display, Formatter},
-    fs,
-    path::PathBuf,
-    process,
-    sync::Arc,
+      backtrace::BacktraceStatus,
+      collections::{BTreeMap, HashMap, HashSet},
+      env,
+      fmt::{self, Display, Formatter},
+      fs,
+      path::PathBuf,
+      process,
+      sync::Arc,
+      sync::atomic::Ordering,
   },
   tempfile::tempdir,
   tokio::io::AsyncBufReadExt,
@@ -74,7 +75,7 @@ struct Args {
   /// Output raw JSON without Content-Length headers (for debugging)
   #[clap(long)]
   raw: bool,
-  
+
   /// Enable debug logging to specified file
   #[clap(long)]
   log: Option<PathBuf>,
@@ -83,7 +84,7 @@ struct Args {
 #[tokio::main]
 async fn main() {
   let args = Args::parse();
-  
+
   let env = Env::default().default_filter_or("info");
 
   env_logger::Builder::from_env(env).init();
@@ -107,6 +108,10 @@ async fn main() {
       eprintln!("{backtrace}");
     }
 
+    process::exit(1);
+  }
+
+  if !SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
     process::exit(1);
   }
 }

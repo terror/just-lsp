@@ -3,6 +3,9 @@ use tokio::fs::OpenOptions;
 use tokio::io::{AsyncRead, AsyncWriteExt, ReadBuf};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub(crate) static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
 pub(crate) struct DebugLogger {
@@ -971,6 +974,7 @@ impl Inner {
   async fn shutdown(&mut self) -> Result<(), jsonrpc::Error> {
     self.debug_logger.log("RECEIVED: shutdown request").await;
     self.shutdown_received = true;
+    SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
     Ok(())
   }
 

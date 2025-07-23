@@ -156,6 +156,13 @@ dependencies, recipes, and more.
 
 Workspace-wide symbol renaming is supported.
 
+### `shutdown` and `exit`
+
+The server implements graceful shutdown handling according to the LSP specification:
+- Responds to `shutdown` requests and stops processing new requests
+- Handles `exit` notifications for clean termination
+- Exits with appropriate status codes (0 after shutdown, 1 without prior shutdown)
+
 ## Development
 
 I use [Neovim](https://neovim.io/) to work on this project, and I load the
