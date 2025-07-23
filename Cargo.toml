@@ -1,8 +1,11 @@
 [package]
-name = "just-lsp"
-version = "0.2.4"
+name = "just-lsp-ng"
+version = "0.3.0"
 description = "A language server for just"
-authors = ["Liam <liam@scalzulli.com>"]
+authors = [
+  "Liam <liam@scalzulli.com>",
+  "Brian <brianh@promptexecution.com>"
+  ]
 license = "CC0-1.0"
 homepage = "https://github.com/terror/just-lsp"
 repository = "https://github.com/terror/just-lsp"
@@ -25,6 +28,8 @@ members = [".", "crates/*"]
 
 [dependencies]
 anyhow = "1.0.98"
+chrono = { version = "0.4.38", features = ["serde"] }
+clap = { version = "4.5.41", features = ["derive"] }
 env_logger = "0.11.8"
 log = "0.4.27"
 ropey = "1.6.1"
@@ -32,7 +37,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 target = "2.1.0"
 tempfile = "3.19.1"
-tokio = { version = "1.45.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio = { version = "1.45.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread", "fs"] }
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
 tower-lsp = "0.20.0"
 tree-sitter = "0.25.5"

@@ -1,22 +1,111 @@
 use super::*;
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncRead, AsyncWriteExt, ReadBuf};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+#[derive(Debug, Clone)]
+pub(crate) struct DebugLogger {
+  log_path: Option<PathBuf>,
+}
+
+impl DebugLogger {
+  fn new(log_path: Option<PathBuf>) -> Self {
+    Self { log_path }
+  }
+  
+  async fn log(&self, message: &str) {
+    if let Some(path) = &self.log_path {
+      let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
+      let log_line = format!("[{}] {}\n", timestamp, message);
+      
+      if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .await
+      {
+        let _ = file.write_all(log_line.as_bytes()).await;
+        let _ = file.flush().await;
+      }
+    }
+  }
+}
+
+struct LoggingReader<R> {
+  inner: R,
+  logger: DebugLogger,
+}
+
+impl<R> LoggingReader<R> {
+  fn new(inner: R, logger: DebugLogger) -> Self {
+    Self { inner, logger }
+  }
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for LoggingReader<R> {
+  fn poll_read(
+    mut self: Pin<&mut Self>,
+    cx: &mut Context<'_>,
+    buf: &mut ReadBuf<'_>,
+  ) -> Poll<tokio::io::Result<()>> {
+    let before_len = buf.filled().len();
+    let result = Pin::new(&mut self.inner).poll_read(cx, buf);
+    
+    if let Poll::Ready(Ok(())) = &result {
+      let new_data = &buf.filled()[before_len..];
+      if !new_data.is_empty() {
+        let logger = self.logger.clone();
+        let data_str = String::from_utf8_lossy(new_data).to_string();
+        tokio::spawn(async move {
+          logger.log(&format!("RAW_INPUT: {}", data_str.trim())).await;
+        });
+      }
+    }
+    
+    result
+  }
+}
 
 #[derive(Debug)]
 pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
 
 impl Server {
+  #[allow(dead_code)]
   pub fn new(client: Client) -> Self {
-    Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client))))
+    Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client, DebugLogger::new(None)))))
+  }
+  
+  pub fn new_with_logger(client: Client, logger: DebugLogger) -> Self {
+    Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client, logger))))
   }
 
-  pub async fn run() -> Result {
+  pub async fn run(_raw_mode: bool, log_path: Option<std::path::PathBuf>) -> Result {
+    let debug_logger = DebugLogger::new(log_path);
+    
+    debug_logger.log("SERVER: Starting just-lsp server").await;
+    
     let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
-    let (service, socket) = LspService::new(Server::new);
+    // Wrap stdin to log all incoming data
+    let logging_stdin = LoggingReader::new(stdin, debug_logger.clone());
 
-    tower_lsp::Server::new(stdin, stdout, socket)
+    let logger_clone = debug_logger.clone();
+    let (service, socket) = LspService::new(move |client| {
+      let logger = logger_clone.clone();
+      tokio::spawn(async move {
+        logger.log("SERVER: Creating new server instance for client").await;
+      });
+      Server::new_with_logger(client, logger_clone.clone())
+    });
+
+    debug_logger.log("SERVER: LSP service created, starting to serve requests").await;
+
+    tower_lsp::Server::new(logging_stdin, stdout, socket)
       .serve(service)
       .await;
 
+    debug_logger.log("SERVER: Just-lsp server stopped").await;
     Ok(())
   }
 
@@ -179,14 +268,16 @@ pub(crate) struct Inner {
   client: Client,
   documents: BTreeMap<lsp::Url, Document>,
   initialized: bool,
+  debug_logger: DebugLogger,
 }
 
 impl Inner {
-  fn new(client: Client) -> Self {
+  fn new(client: Client, debug_logger: DebugLogger) -> Self {
     Self {
       client,
       documents: BTreeMap::new(),
       initialized: false,
+      debug_logger,
     }
   }
 
@@ -319,6 +410,8 @@ impl Inner {
     &mut self,
     params: lsp::DidOpenTextDocumentParams,
   ) -> Result {
+    self.debug_logger.log(&format!("RECEIVED: didOpen for document: {}", params.text_document.uri)).await;
+    
     let uri = params.text_document.uri.clone();
 
     self.documents.insert(
@@ -327,6 +420,8 @@ impl Inner {
     );
 
     self.publish_diagnostics(&uri).await;
+
+    self.debug_logger.log(&format!("PROCESSED: didOpen for document: {} (published diagnostics)", uri)).await;
 
     Ok(())
   }
@@ -546,32 +641,46 @@ impl Inner {
     params: lsp::HoverParams,
   ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
     let uri = params.text_document_position_params.text_document.uri;
-
     let position = params.text_document_position_params.position;
+    
+    self.debug_logger.log(&format!("RECEIVED: hover request for {}:{}:{}", uri, position.line, position.character)).await;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let result = self.documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| resolver.resolve_identifier_hover(&identifier))
-    }))
+    });
+    
+    self.debug_logger.log(&format!("SENDING: hover response: {}", 
+      if result.is_some() { "found hover info" } else { "no hover info" })).await;
+    
+    Ok(result)
   }
 
   async fn initialize(
     &self,
-    _params: lsp::InitializeParams,
+    params: lsp::InitializeParams,
   ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
+    self.debug_logger.log(&format!("RECEIVED: initialize request with params: {}", 
+      serde_json::to_string(&params).unwrap_or_else(|_| "failed to serialize".to_string()))).await;
+    
     log::info!("Starting just language server...");
 
-    Ok(lsp::InitializeResult {
+    let result = lsp::InitializeResult {
       capabilities: Server::capabilities(),
       server_info: Some(lsp::ServerInfo {
         name: env!("CARGO_PKG_NAME").to_string(),
         version: Some(env!("CARGO_PKG_VERSION").to_string()),
       }),
-    })
+    };
+    
+    self.debug_logger.log(&format!("SENDING: initialize response: {}", 
+      serde_json::to_string(&result).unwrap_or_else(|_| "failed to serialize".to_string()))).await;
+    
+    Ok(result)
   }
 
   async fn initialized(&mut self, _: lsp::InitializedParams) {
