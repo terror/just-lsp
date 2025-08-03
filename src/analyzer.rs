@@ -729,15 +729,23 @@ impl<'a> Analyzer<'a> {
             }
           }
 
-          let recipe_parameter_default_values = recipe
-            .parameters
-            .into_iter()
-            .filter_map(|p| p.default_value)
-            .collect::<HashSet<_>>();
-
-          for default_value in recipe_parameter_default_values {
-            if variable_usage_map.contains_key(&default_value) {
-              variable_usage_map.insert(default_value, true);
+          for parameter in recipe.parameters {
+            if let Some(default_value) = parameter.default_value {
+              if variable_usage_map.contains_key(&default_value) {
+                variable_usage_map.insert(default_value, true);
+              } else {
+                if !default_value.starts_with('\'')
+                  && !default_value.starts_with('"')
+                {
+                  diagnostics.push(lsp::Diagnostic {
+                    range: parameter.range,
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("just-lsp".to_string()),
+                    message: format!("Variable `{default_value}` not found"),
+                    ..Default::default()
+                  });
+                }
+              }
             }
           }
         }
@@ -1583,7 +1591,7 @@ mod tests {
   }
 
   #[test]
-  fn variables_used_in_recipe_parameters() {
+  fn variables_used_in_recipe_default_parameters() {
     Test::new(indoc! {
       "
       param_value := \"value\"
@@ -1592,6 +1600,18 @@ mod tests {
         echo {{ arg }}
       "
     })
+    .run()
+  }
+
+  #[test]
+  fn unknown_default_recipe_parameter_reference() {
+    Test::new(indoc! {
+      "
+      recipe arg=foo:
+        echo {{ arg }}
+      "
+    })
+    .error("Variable `foo` not found")
     .run()
   }
 
