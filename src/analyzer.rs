@@ -711,13 +711,13 @@ impl<'a> Analyzer<'a> {
             .or_insert_with(HashSet::new)
             .insert(identifier_name.clone());
 
-          let recipe_parameters = recipe
+          let recipe_parameter_names = recipe
             .parameters
             .iter()
             .map(|p| p.name.clone())
             .collect::<HashSet<_>>();
 
-          if !recipe_parameters.contains(&identifier_name) {
+          if !recipe_parameter_names.contains(&identifier_name) {
             if variable_usage_map.contains_key(&identifier_name) {
               variable_usage_map.insert(identifier_name.clone(), true);
             }
@@ -726,6 +726,18 @@ impl<'a> Analyzer<'a> {
               diagnostics.push(create_diagnostic(format!(
                 "Variable `{identifier_name}` not found",
               )));
+            }
+          }
+
+          let recipe_parameter_default_values = recipe
+            .parameters
+            .into_iter()
+            .filter_map(|p| p.default_value)
+            .collect::<HashSet<_>>();
+
+          for default_value in recipe_parameter_default_values {
+            if variable_usage_map.contains_key(&default_value) {
+              variable_usage_map.insert(default_value.clone(), true);
             }
           }
         }
@@ -1087,6 +1099,17 @@ mod tests {
       "
     })
     .error("Unknown function `unknown_function`")
+    .run()
+  }
+
+  #[test]
+  fn function_calls_nested() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
+      "
+    })
     .run()
   }
 
@@ -1542,7 +1565,7 @@ mod tests {
   }
 
   #[test]
-  fn variables_used_in_recipe_parameters() {
+  fn variables_used_in_recipe_dependencies() {
     Test::new(indoc! {
       "
       param_value := \"value\"
@@ -1556,6 +1579,19 @@ mod tests {
       "
     })
     .warning("Variable `unused` appears unused")
+    .run()
+  }
+
+  #[test]
+  fn variables_used_in_recipe_parameters() {
+    Test::new(indoc! {
+      "
+      param_value := \"value\"
+
+      recipe arg=param_value:
+        echo {{ arg }}
+      "
+    })
     .run()
   }
 
@@ -1926,17 +1962,6 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
-    .run()
-  }
-
-  #[test]
-  fn function_calls_nested() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
-      "
-    })
     .run()
   }
 }
