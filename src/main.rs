@@ -25,7 +25,7 @@ use {
   serde::{Deserialize, Serialize},
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
     fs,

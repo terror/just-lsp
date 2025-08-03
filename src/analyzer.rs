@@ -718,8 +718,10 @@ impl<'a> Analyzer<'a> {
             .collect::<HashSet<_>>();
 
           if !recipe_parameter_names.contains(&identifier_name) {
-            if variable_usage_map.contains_key(&identifier_name) {
-              variable_usage_map.insert(identifier_name.clone(), true);
+            if let Entry::Occupied(mut entry) =
+              variable_usage_map.entry(identifier_name.clone())
+            {
+              entry.insert(true);
             }
 
             if !variable_names.contains(&identifier_name) {
@@ -731,27 +733,29 @@ impl<'a> Analyzer<'a> {
 
           for parameter in recipe.parameters {
             if let Some(default_value) = parameter.default_value {
-              if variable_usage_map.contains_key(&default_value) {
-                variable_usage_map.insert(default_value, true);
-              } else {
-                if !default_value.starts_with('\'')
-                  && !default_value.starts_with('"')
-                {
-                  diagnostics.push(lsp::Diagnostic {
-                    range: parameter.range,
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("just-lsp".to_string()),
-                    message: format!("Variable `{default_value}` not found"),
-                    ..Default::default()
-                  });
-                }
+              if let Entry::Occupied(mut entry) =
+                variable_usage_map.entry(default_value.clone())
+              {
+                entry.insert(true);
+              } else if !default_value.starts_with('\'')
+                && !default_value.starts_with('"')
+              {
+                diagnostics.push(lsp::Diagnostic {
+                  range: parameter.range,
+                  severity: Some(lsp::DiagnosticSeverity::ERROR),
+                  source: Some("just-lsp".to_string()),
+                  message: format!("Variable `{default_value}` not found"),
+                  ..Default::default()
+                });
               }
             }
           }
         }
         None => {
-          if variable_usage_map.contains_key(&identifier_name) {
-            variable_usage_map.insert(identifier_name.clone(), true);
+          if let std::collections::hash_map::Entry::Occupied(mut entry) =
+            variable_usage_map.entry(identifier_name.clone())
+          {
+            entry.insert(true);
           }
 
           if !variable_names.contains(&identifier_name) {
