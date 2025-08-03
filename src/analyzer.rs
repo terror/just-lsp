@@ -711,15 +711,17 @@ impl<'a> Analyzer<'a> {
             .or_insert_with(HashSet::new)
             .insert(identifier_name.clone());
 
-          let recipe_parameters = recipe
+          let recipe_parameter_names = recipe
             .parameters
             .iter()
             .map(|p| p.name.clone())
             .collect::<HashSet<_>>();
 
-          if !recipe_parameters.contains(&identifier_name) {
-            if variable_usage_map.contains_key(&identifier_name) {
-              variable_usage_map.insert(identifier_name.clone(), true);
+          if !recipe_parameter_names.contains(&identifier_name) {
+            if let Entry::Occupied(mut entry) =
+              variable_usage_map.entry(identifier_name.clone())
+            {
+              entry.insert(true);
             }
 
             if !variable_names.contains(&identifier_name) {
@@ -728,10 +730,32 @@ impl<'a> Analyzer<'a> {
               )));
             }
           }
+
+          for parameter in recipe.parameters {
+            if let Some(default_value) = parameter.default_value {
+              if let Entry::Occupied(mut entry) =
+                variable_usage_map.entry(default_value.clone())
+              {
+                entry.insert(true);
+              } else if !default_value.starts_with('\'')
+                && !default_value.starts_with('"')
+              {
+                diagnostics.push(lsp::Diagnostic {
+                  range: parameter.range,
+                  severity: Some(lsp::DiagnosticSeverity::ERROR),
+                  source: Some("just-lsp".to_string()),
+                  message: format!("Variable `{default_value}` not found"),
+                  ..Default::default()
+                });
+              }
+            }
+          }
         }
         None => {
-          if variable_usage_map.contains_key(&identifier_name) {
-            variable_usage_map.insert(identifier_name.clone(), true);
+          if let std::collections::hash_map::Entry::Occupied(mut entry) =
+            variable_usage_map.entry(identifier_name.clone())
+          {
+            entry.insert(true);
           }
 
           if !variable_names.contains(&identifier_name) {
@@ -1087,6 +1111,17 @@ mod tests {
       "
     })
     .error("Unknown function `unknown_function`")
+    .run()
+  }
+
+  #[test]
+  fn function_calls_nested() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
+      "
+    })
     .run()
   }
 
@@ -1542,7 +1577,7 @@ mod tests {
   }
 
   #[test]
-  fn variables_used_in_recipe_parameters() {
+  fn variables_used_in_recipe_dependencies() {
     Test::new(indoc! {
       "
       param_value := \"value\"
@@ -1556,6 +1591,31 @@ mod tests {
       "
     })
     .warning("Variable `unused` appears unused")
+    .run()
+  }
+
+  #[test]
+  fn variables_used_in_recipe_default_parameters() {
+    Test::new(indoc! {
+      "
+      param_value := \"value\"
+
+      recipe arg=param_value:
+        echo {{ arg }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn unknown_default_recipe_parameter_reference() {
+    Test::new(indoc! {
+      "
+      recipe arg=foo:
+        echo {{ arg }}
+      "
+    })
+    .error("Variable `foo` not found")
     .run()
   }
 
@@ -1926,17 +1986,6 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
-    .run()
-  }
-
-  #[test]
-  fn function_calls_nested() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
-      "
-    })
     .run()
   }
 }
