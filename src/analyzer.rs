@@ -737,7 +737,7 @@ impl<'a> Analyzer<'a> {
 
           for default_value in recipe_parameter_default_values {
             if variable_usage_map.contains_key(&default_value) {
-              variable_usage_map.insert(default_value.clone(), true);
+              variable_usage_map.insert(default_value, true);
             }
           }
         }
