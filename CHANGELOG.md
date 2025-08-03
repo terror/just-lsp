@@ -1,6 +1,18 @@
 # Changelog
 
-## [0.2.4](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-07-18
+## [0.2.5](https://github.com/terror/just-lsp/releases/tag/0.2.5) - 2025-08-02
+
+### Fixed
+
+- Detect variable usage in default recipe parameters ([#94](https://github.com/terror/just-lsp/pull/94) by [terror](https://github.com/terror))
+- Fix nested function call argument parsing ([#89](https://github.com/terror/just-lsp/pull/89) by [terror](https://github.com/terror))
+
+### Misc
+
+- Update dependencies ([#95](https://github.com/terror/just-lsp/pull/95) by [terror](https://github.com/terror))
+- Reduce headings in most recent changelog entry ([#87](https://github.com/terror/just-lsp/pull/87) by [terror](https://github.com/terror))
+
+## [0.2.4](https://github.com/terror/just-lsp/releases/tag/0.2.4) - 2025-07-18
 
 ### Added
 
@@ -14,7 +26,7 @@
 
 - Interpolate in format strings directly ([#84](https://github.com/terror/just-lsp/pull/84) by [terror](https://github.com/terror))
 
-## [0.2.3](https://github.com/terror/just-lsp/releases/tag/0.2.2) - 2025-06-03
+## [0.2.3](https://github.com/terror/just-lsp/releases/tag/0.2.3) - 2025-06-03
 
 ### Fixed
 
