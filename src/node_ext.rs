@@ -1,10 +1,10 @@
 use super::*;
 
 pub(crate) trait NodeExt {
-  fn find(&self, selector: &str) -> Option<Node>;
-  fn find_all(&self, selector: &str) -> Vec<Node>;
-  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node>;
-  fn get_parent(&self, kind: &str) -> Option<Node>;
+  fn find(&self, selector: &str) -> Option<Node<'_>>;
+  fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
+  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>>;
+  fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self) -> lsp::Range;
 }
 
@@ -44,11 +44,11 @@ fn collect_descendants_by_kind<'a>(
 }
 
 impl NodeExt for Node<'_> {
-  fn find(&self, selector: &str) -> Option<Node> {
+  fn find(&self, selector: &str) -> Option<Node<'_>> {
     self.find_all(selector).into_iter().next()
   }
 
-  fn find_all(&self, selector: &str) -> Vec<Node> {
+  fn find_all(&self, selector: &str) -> Vec<Node<'_>> {
     if selector.contains(',') {
       return selector
         .split(',')
@@ -146,7 +146,7 @@ impl NodeExt for Node<'_> {
     collect_nodes_by_kind(*self, selector)
   }
 
-  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node> {
+  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>> {
     let mut siblings = Vec::new();
 
     let mut current = self.next_sibling();
@@ -166,7 +166,7 @@ impl NodeExt for Node<'_> {
     siblings
   }
 
-  fn get_parent(&self, kind: &str) -> Option<Node> {
+  fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
     let mut current = *self;
 
     while let Some(parent) = current.parent() {

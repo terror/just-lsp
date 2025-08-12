@@ -243,7 +243,7 @@ impl Document {
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
-  ) -> Option<Node> {
+  ) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
       let point = position.point();
       Some(tree.root_node().descendant_for_point_range(point, point)?)
