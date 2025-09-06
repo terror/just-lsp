@@ -189,6 +189,7 @@ impl<'a> Analyzer<'a> {
         if let Some(parent) = attribute_node.parent() {
           let target_type = match parent.kind() {
             "alias" => AttributeTarget::Alias,
+            "assignment" => AttributeTarget::Assignment,
             "module" => AttributeTarget::Module,
             "recipe" => AttributeTarget::Recipe,
             _ => {
@@ -1986,6 +1987,27 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
+    .run()
+  }
+
+  #[test]
+  fn private_attribute_on_assignments() {
+    Test::new(indoc! {
+      "
+      [private]
+      secret := \"secret value\"
+
+      [private]
+      _db_url := \"postgres://user:pass@host:port/db\"
+
+      public_var := \"public value\"
+
+      test:
+        echo {{ secret }}
+        echo {{ _db_url }}
+        echo {{ public_var }}
+      "
+    })
     .run()
   }
 }

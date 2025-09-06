@@ -109,6 +109,13 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
           "type": "FIELD",
           "name": "left",
           "content": {
@@ -1759,5 +1766,6 @@
     "_raw_string_indented",
     "_expression_recurse"
   ],
-  "supertypes": []
+  "supertypes": [],
+  "reserved": {}
 }

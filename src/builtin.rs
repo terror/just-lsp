@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AttributeTarget {
   Alias,
+  Assignment,
   Module,
   Recipe,
 }
@@ -14,6 +15,7 @@ impl Display for AttributeTarget {
       "{}",
       match self {
         AttributeTarget::Alias => "alias",
+        AttributeTarget::Assignment => "assignment",
         AttributeTarget::Module => "module",
         AttributeTarget::Recipe => "recipe",
       }

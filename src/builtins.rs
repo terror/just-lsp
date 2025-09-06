@@ -96,7 +96,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 133] = [
     name: "private",
     description: "Make recipe, alias, or variable private.",
     version: "1.10.0",
-    targets: &[AttributeTarget::Alias, AttributeTarget::Recipe],
+    targets: &[AttributeTarget::Alias, AttributeTarget::Assignment, AttributeTarget::Recipe],
     parameters: None,
   },
   Builtin::Attribute {
