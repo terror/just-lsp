@@ -98,9 +98,10 @@ module.exports = grammar({
         ":=",
         field("right", $.identifier),
       ),
-    // assignment    : NAME ':=' expression _eol
+    // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) =>
       seq(
+        repeat($.attribute),
         field("left", $.identifier),
         ":=",
         field("right", $.expression),

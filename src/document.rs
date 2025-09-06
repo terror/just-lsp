@@ -224,7 +224,7 @@ impl Document {
         .find_all("assignment")
         .iter()
         .filter_map(|assignment_node| {
-          let identifier_node = assignment_node.find("identifier")?;
+          let identifier_node = assignment_node.child_by_field_name("left")?;
 
           Some(Variable {
             name: TextNode {
