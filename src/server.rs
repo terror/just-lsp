@@ -681,8 +681,8 @@ impl Inner {
 
     command
       .current_dir(directory.clone())
-      .stdout(std::process::Stdio::piped())
-      .stderr(std::process::Stdio::piped());
+      .stdout(process::Stdio::piped())
+      .stderr(process::Stdio::piped());
 
     let client = self.client.clone();
 
@@ -744,7 +744,7 @@ impl Inner {
 
           let mut buffer = String::new();
           let mut current_line = 0;
-          let mut last_update = std::time::Instant::now();
+          let mut last_update = Instant::now();
 
           while let Some(line_result) = merged_stream.next().await {
             match line_result {
@@ -753,7 +753,7 @@ impl Inner {
 
                 buffer.push('\n');
 
-                let now = std::time::Instant::now();
+                let now = Instant::now();
 
                 if (now.duration_since(last_update).as_millis() > 50
                   || buffer.len() > 1024)

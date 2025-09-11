@@ -32,6 +32,7 @@ use {
     path::PathBuf,
     process,
     sync::Arc,
+    time::Instant,
   },
   tempfile::tempdir,
   tokio::io::AsyncBufReadExt,
