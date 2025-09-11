@@ -949,6 +949,10 @@ mod tests {
       [doc('Recipe documentation')]
       bar:
         echo \"bar\"
+
+      [default]
+      baz:
+        echo \"baz\"
       "
     })
     .run()
@@ -964,6 +968,16 @@ mod tests {
       "
     })
     .error("Attribute `linux` got 1 argument but takes 0 arguments")
+    .run();
+
+    Test::new(indoc! {
+      "
+      [default('invalid')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error("Attribute `default` got 1 argument but takes 0 arguments")
     .run()
   }
 
@@ -994,6 +1008,15 @@ mod tests {
     Test::new(indoc! {
       "
       [confirm]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      [default]
       foo:
         echo \"foo\"
       "
@@ -1064,6 +1087,27 @@ mod tests {
       "
     })
     .error("Attribute `group` got 2 arguments but takes 1 argument")
+    .run()
+  }
+
+  #[test]
+  fn attributes_on_assignments() {
+    Test::new(indoc! {
+      "
+      [private]
+      secret := \"secret value\"
+
+      [private]
+      _db_url := \"postgres://user:pass@host:port/db\"
+
+      public_var := \"public value\"
+
+      test:
+        echo {{ secret }}
+        echo {{ _db_url }}
+        echo {{ public_var }}
+      "
+    })
     .run()
   }
 
@@ -1987,27 +2031,6 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
-    .run()
-  }
-
-  #[test]
-  fn private_attribute_on_assignments() {
-    Test::new(indoc! {
-      "
-      [private]
-      secret := \"secret value\"
-
-      [private]
-      _db_url := \"postgres://user:pass@host:port/db\"
-
-      public_var := \"public value\"
-
-      test:
-        echo {{ secret }}
-        echo {{ _db_url }}
-        echo {{ public_var }}
-      "
-    })
     .run()
   }
 }
