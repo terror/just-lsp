@@ -753,7 +753,7 @@ impl<'a> Analyzer<'a> {
           }
         }
         None => {
-          if let std::collections::hash_map::Entry::Occupied(mut entry) =
+          if let Entry::Occupied(mut entry) =
             variable_usage_map.entry(identifier_name.clone())
           {
             entry.insert(true);
