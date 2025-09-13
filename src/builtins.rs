@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 133] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",
@@ -14,6 +14,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 133] = [
     version: "1.23.0",
     targets: &[AttributeTarget::Recipe],
     parameters: Some("'PROMPT'"),
+  },
+  Builtin::Attribute {
+    name: "default",
+    description: "Use recipe as module's default recipe.",
+    version: "master",
+    targets: &[AttributeTarget::Recipe],
+    parameters: None,
   },
   Builtin::Attribute {
     name: "doc",
