@@ -87,8 +87,3 @@ update-changelog:
 [group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
-
-recipe-a a b:
-    echo {{ a }} {{ b }}
-
-recipe-b param: (recipe-a "1" "2")
