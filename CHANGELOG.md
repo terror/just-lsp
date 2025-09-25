@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.6](https://github.com/terror/just-lsp/releases/tag/0.2.5) - 2025-09-25
+
+### Added
+
+- Add `default` built-in attribute ([#103](https://github.com/terror/just-lsp/pull/103) by [terror](https://github.com/terror))
+- Add support for attributes on variables ([#100](https://github.com/terror/just-lsp/pull/100) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Properly handle dependency arguments ([#105](https://github.com/terror/just-lsp/pull/105) by [terror](https://github.com/terror))
+
+### Misc
+
+- Remove unnecessary full import path qualifiers ([#102](https://github.com/terror/just-lsp/pull/102) by [terror](https://github.com/terror))
+- Fix typo in readme ([#101](https://github.com/terror/just-lsp/pull/101) by [terror](https://github.com/terror))
+- Be more explicit about `Node` lifetime elision ([#98](https://github.com/terror/just-lsp/pull/98) by [terror](https://github.com/terror))
+- Add downloads badge to readme ([#97](https://github.com/terror/just-lsp/pull/97) by [terror](https://github.com/terror))
+
 ## [0.2.5](https://github.com/terror/just-lsp/releases/tag/0.2.5) - 2025-08-02
 
 ### Fixed
