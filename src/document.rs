@@ -154,14 +154,20 @@ impl Document {
                   let dependency_name =
                     self.get_node_text(&dependency_node.find("identifier")?);
 
-                  let arguments = dependency_node
-                    .find_all("value")
-                    .iter()
-                    .map(|argument_node| TextNode {
-                      value: self.get_node_text(argument_node),
-                      range: argument_node.get_range(),
-                    })
-                    .collect::<Vec<_>>();
+                  let arguments = if let Some(dep_expr_node) =
+                    dependency_node.find("dependency_expression")
+                  {
+                    dep_expr_node
+                      .find_all("^expression")
+                      .iter()
+                      .map(|argument_node| TextNode {
+                        value: self.get_node_text(argument_node),
+                        range: argument_node.get_range(),
+                      })
+                      .collect::<Vec<_>>()
+                  } else {
+                    vec![]
+                  };
 
                   Some(Dependency {
                     name: dependency_name,

@@ -1343,6 +1343,34 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_with_expressions() {
+    Test::new(indoc! {
+      "
+      recipe-a param:
+        echo {{param}}
+
+      recipe-b param: (recipe-a (\"##\" + param + \"##\"))
+        echo \"recipe-b called with {{param}}\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn recipe_dependencies_with_multiple_expression_arguments() {
+    Test::new(indoc! {
+      "
+      recipe-a a b:
+        echo {{a}} {{b}}
+
+      recipe-b param: (recipe-a (\"1\") (\"2\"))
+        echo \"recipe-b called with {{param}}\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn recipe_parameters_defaults_all() {
     Test::new(indoc! {
       "
