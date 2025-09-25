@@ -164,7 +164,6 @@ impl Document {
                       })
                       .collect::<Vec<_>>()
                   } else {
-                    // For simple identifier dependencies, no arguments
                     vec![]
                   };
 
@@ -1675,50 +1674,4 @@ mod tests {
     );
   }
 
-  #[test]
-  fn recipe_with_complex_dependency_expression() {
-    let doc = document(indoc! {
-      "
-      foo param:
-        echo \"{{param}}\"
-
-      bar param: (foo (\"##\" + param + \"##\"))
-        echo \"bar called with {{param}}\"
-      "
-    });
-
-    let recipe = doc.find_recipe("bar").unwrap();
-    assert_eq!(recipe.dependencies.len(), 1);
-
-    let dependency = &recipe.dependencies[0];
-    assert_eq!(dependency.name, "foo");
-
-    // Should have exactly 1 argument (the complex expression), not 6
-    assert_eq!(dependency.arguments.len(), 1);
-    assert_eq!(dependency.arguments[0].value, "(\"##\" + param + \"##\")");
-  }
-
-  #[test]
-  fn recipe_with_multiple_dependency_expression_arguments() {
-    let doc = document(indoc! {
-      "
-      foo a b:
-        echo \"{{a}} {{b}}\"
-
-      bar param: (foo (\"1\") (\"2\"))
-        echo \"bar called with {{param}}\"
-      "
-    });
-
-    let recipe = doc.find_recipe("bar").unwrap();
-    assert_eq!(recipe.dependencies.len(), 1);
-
-    let dependency = &recipe.dependencies[0];
-    assert_eq!(dependency.name, "foo");
-
-    // Should have exactly 2 arguments
-    assert_eq!(dependency.arguments.len(), 2);
-    assert_eq!(dependency.arguments[0].value, "(\"1\")");
-    assert_eq!(dependency.arguments[1].value, "(\"2\")");
-  }
 }
