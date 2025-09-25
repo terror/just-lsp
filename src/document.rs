@@ -154,7 +154,9 @@ impl Document {
                   let dependency_name =
                     self.get_node_text(&dependency_node.find("identifier")?);
 
-                  let arguments = if let Some(dep_expr_node) = dependency_node.find("dependency_expression") {
+                  let arguments = if let Some(dep_expr_node) =
+                    dependency_node.find("dependency_expression")
+                  {
                     dep_expr_node
                       .find_all("^expression")
                       .iter()
@@ -1673,5 +1675,4 @@ mod tests {
       }
     );
   }
-
 }
