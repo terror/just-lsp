@@ -18,7 +18,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
   Builtin::Attribute {
     name: "default",
     description: "Use recipe as module's default recipe.",
-    version: "master",
+    version: "1.43.0",
     targets: &[AttributeTarget::Recipe],
     parameters: None,
   },
