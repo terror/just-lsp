@@ -114,9 +114,10 @@ module.exports = grammar({
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
 
-    // module        : 'mod' '?'? string?
+    // module        : attribute* 'mod' '?'? string?
     module: ($) =>
       seq(
+        repeat($.attribute),
         "mod",
         optional("?"),
         field("name", $.identifier),
