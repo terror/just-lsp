@@ -1031,6 +1031,22 @@ mod tests {
   }
 
   #[test]
+  fn private_exported_variable_is_marked_exported() {
+    let doc = document(indoc! {
+      "
+      [private]
+      export PATH := '/usr/local/bin'
+      "
+    });
+
+    let variables = doc.get_variables();
+
+    assert!(variables[0].export);
+
+    assert_eq!(variables.len(), 1);
+  }
+
+  #[test]
   fn multiple_recipes() {
     let doc = document(indoc! {
       "
