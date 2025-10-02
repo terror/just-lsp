@@ -85,5 +85,11 @@ update-changelog:
   git log --pretty='format:- %s' >> CHANGELOG.md
 
 [group: 'dev']
+update-parser:
+  cd vendor/tree-sitter-just && npx tree-sitter generate
+  cd vendor/tree-sitter-just && npx tree-sitter test
+  cargo test
+
+[group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
