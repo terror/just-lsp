@@ -1078,6 +1078,17 @@ mod tests {
   }
 
   #[test]
+  fn module_attributes_group() {
+    Test::new(indoc! {
+      "
+      [group: 'tools']
+      mod foo
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn attributes_more_arguments_than_required() {
     Test::new(indoc! {
       "
