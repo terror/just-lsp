@@ -231,6 +231,24 @@ local capabilities = require('cmp_nvim_lsp').default_capabilities()
 **n.b.** This will require you to have the [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig)
 (and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp)) plugin installed.
 
+### Extending the parser
+
+`just-lsp` vendors the [`tree-sitter-just`](https://github.com/justfile/tree-sitter-just) grammar in
+`vendor/tree-sitter-just`. After changing the grammar or query files, rebuild and
+test the parser with the following commands:
+
+```bash
+`cd vendor/tree-sitter-just && npx tree-sitter generate`
+`cd vendor/tree-sitter-just && npx tree-sitter test`
+`cargo test`
+```
+
+**n.b.** `just update-parser` will run all of the above for you.
+
+The generate step updates the parser artifacts under `vendor/tree-sitter-just/src/`. Commit
+those files together with any updated corpora in `vendor/tree-sitter-just/test/corpus` so
+downstream tooling sees your changes.
+
 ## Prior Art
 
 Check out [just](https://github.com/casey/just), the command runner.
