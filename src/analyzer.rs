@@ -1679,6 +1679,20 @@ mod tests {
   }
 
   #[test]
+  fn variables_used_after_hash_in_command() {
+    Test::new(indoc! {
+      "
+      flake := \"testflake\"
+      output := \"testoutput\"
+
+      test:
+        darwin-rebuild switch --flake {{ flake }}#{{ output }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn variables_used_in_recipe_default_parameters() {
     Test::new(indoc! {
       "

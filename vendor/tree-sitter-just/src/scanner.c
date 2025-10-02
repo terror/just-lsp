@@ -257,6 +257,9 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
           if (lexer->lookahead == '!') {
             return false;
           }
+
+          advanced_once = true;
+          continue;
         }
 
         advance(lexer);
