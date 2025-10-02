@@ -190,6 +190,7 @@ impl<'a> Analyzer<'a> {
           let target_type = match parent.kind() {
             "alias" => AttributeTarget::Alias,
             "assignment" => AttributeTarget::Assignment,
+            "export" => AttributeTarget::Assignment,
             "module" => AttributeTarget::Module,
             "recipe" => AttributeTarget::Recipe,
             _ => {
@@ -1117,6 +1118,17 @@ mod tests {
         echo {{ secret }}
         echo {{ _db_url }}
         echo {{ public_var }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn attributes_on_exported_assignments() {
+    Test::new(indoc! {
+      "
+      [private]
+      export PATH := '/usr/local/bin'
       "
     })
     .run()

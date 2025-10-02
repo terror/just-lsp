@@ -108,8 +108,8 @@ module.exports = grammar({
         $._newline,
       ),
 
-    // export        : 'export' assignment
-    export: ($) => seq("export", $.assignment),
+    // export        : attribute* 'export' assignment
+    export: ($) => seq(repeat($.attribute), "export", $.assignment),
 
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
