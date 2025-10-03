@@ -4,7 +4,6 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import type {
-  Language,
   Position,
   SyntaxNode,
   TreeNode as TreeNodeType,
@@ -45,15 +44,14 @@ const App = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   const [parser, setParser] = useState<Parser | undefined>(undefined);
+  const [justLanguage, setJustLanguage] = useState<TSLanguage | undefined>(
+    undefined
+  );
   const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
 
   const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
     undefined
   );
-
-  const [loadedLanguages, setLoadedLanguages] = useState<
-    Partial<Record<Language, TSLanguage>>
-  >({});
 
   const [expandedNodes, setExpandedNodes] = useState<Set<SyntaxNode>>(
     new Set()
@@ -70,6 +68,8 @@ const App = () => {
     useEditorSettings();
 
   useEffect(() => {
+    let parserInstance: Parser | undefined;
+
     const initialize = async () => {
       try {
         setLoading(true);
@@ -80,7 +80,12 @@ const App = () => {
           },
         });
 
-        setParser(new Parser());
+        parserInstance = new Parser();
+
+        const language = await TSLanguage.load('tree-sitter-just.wasm');
+
+        setParser(parserInstance);
+        setJustLanguage(language);
       } catch (err) {
         setError(
           `Failed to initialize parser: ${err instanceof Error ? err.message : String(err)}`
@@ -93,8 +98,8 @@ const App = () => {
     initialize();
 
     return () => {
-      if (parser) {
-        parser.delete();
+      if (parserInstance) {
+        parserInstance.delete();
       }
 
       if (editorViewRef.current) {
@@ -131,17 +136,10 @@ const App = () => {
 
   const onEditorUpdate = useCallback(
     (update: ViewUpdate) => {
-      if (
-        update.docChanged &&
-        parser &&
-        loadedLanguages[editorSettings.language]
-      ) {
+      if (update.docChanged && parser && justLanguage) {
         const newCode = update.state.doc.toString();
-        const language = loadedLanguages[editorSettings.language];
 
-        if (!language) return;
-
-        const newTree = parse({ parser, language, code: newCode });
+        const newTree = parse({ parser, language: justLanguage, code: newCode });
 
         if (newTree) {
           const { formattedTree, nodePositionMap, allNodes } = processTree(
@@ -155,14 +153,7 @@ const App = () => {
         }
       }
     },
-    [
-      parser,
-      loadedLanguages,
-      editorSettings.language,
-      setFormattedTree,
-      setNodePositionMap,
-      setExpandedNodes,
-    ]
+    [parser, justLanguage, setFormattedTree, setNodePositionMap, setExpandedNodes]
   );
 
   const createEditorTheme = useCallback(
@@ -269,52 +260,25 @@ const App = () => {
     };
   }, [parser, editorExtensions]);
 
-  const loadLanguage = useCallback(
-    async (languageName: Language) => {
-      if (!parser || loadedLanguages[languageName]) return;
-
-      try {
-        setLoading(true);
-
-        const language = await TSLanguage.load('tree-sitter-just.wasm');
-
-        setLoadedLanguages((prev) => ({
-          ...prev,
-          [languageName]: language,
-        }));
-
-        if (languageName === editorSettings.language && editorViewRef.current) {
-          const code = editorViewRef.current.state.doc.toString();
-
-          const newTree = parse({ parser, language, code });
-
-          if (newTree) {
-            const { formattedTree, nodePositionMap, allNodes } = processTree(
-              newTree,
-              editorViewRef.current.state.doc
-            );
-
-            setFormattedTree(formattedTree);
-            setNodePositionMap(nodePositionMap);
-            setExpandedNodes(allNodes);
-          }
-        }
-      } catch (err) {
-        setError(
-          `Failed to load language ${languageName}: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [parser, loadedLanguages, editorSettings.language]
-  );
-
   useEffect(() => {
-    loadLanguage(editorSettings.language);
-  }, [loadLanguage, editorSettings.language]);
+    if (!parser || !justLanguage || !editorViewRef.current) {
+      return;
+    }
+
+    const code = editorViewRef.current.state.doc.toString();
+    const newTree = parse({ parser, language: justLanguage, code });
+
+    if (newTree) {
+      const { formattedTree, nodePositionMap, allNodes } = processTree(
+        newTree,
+        editorViewRef.current.state.doc
+      );
+
+      setFormattedTree(formattedTree);
+      setNodePositionMap(nodePositionMap);
+      setExpandedNodes(allNodes);
+    }
+  }, [parser, justLanguage]);
 
   const expandNode = useCallback((node: SyntaxNode) => {
     setExpandedNodes((prevExpandedNodes) => {
@@ -335,16 +299,16 @@ const App = () => {
     [formattedTree, expandedNodes]
   );
 
-  if (loading && !parser) {
+  if (error) {
+    return <div className='p-4'>error: {error}</div>;
+  }
+
+  if (loading || !parser || !justLanguage) {
     return (
       <div className='flex h-screen items-center justify-center'>
         <Loader2 className='text-muted-foreground h-8 w-8 animate-spin' />
       </div>
     );
-  }
-
-  if (error) {
-    return <div className='p-4'>error: {error}</div>;
   }
 
   return (

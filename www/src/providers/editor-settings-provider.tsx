@@ -1,11 +1,9 @@
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { Language } from '@/lib/types';
 import { ReactNode, createContext, useContext } from 'react';
 
 export interface EditorSettings {
   fontSize: number;
   keybindings: 'default' | 'vim';
-  language: Language;
   lineNumbers: boolean;
   lineWrapping: boolean;
   tabSize: number;
@@ -14,7 +12,6 @@ export interface EditorSettings {
 const defaultSettings: EditorSettings = {
   fontSize: 14,
   keybindings: 'default',
-  language: 'javascript',
   lineNumbers: true,
   lineWrapping: true,
   tabSize: 2,
