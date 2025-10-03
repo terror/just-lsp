@@ -56,54 +56,50 @@ impl Analyze {
 
     let source_len = document.content.len_chars();
 
-    diagnostics
-      .into_iter()
-      .try_for_each(|diagnostic| -> Result<()> {
-        let message = diagnostic.message.trim().to_string();
+    for diagnostic in diagnostics {
+      let message = diagnostic.message.trim().to_string();
 
-        let severity = diagnostic
-          .severity
-          .ok_or_else(|| anyhow!("diagnostic missing severity"))?;
+      let severity = diagnostic
+        .severity
+        .ok_or_else(|| anyhow!("diagnostic missing severity"))?;
 
-        let (kind, color) = Self::severity_to_style(severity)?;
+      let (kind, color) = Self::severity_to_style(severity)?;
 
-        let start = document
-          .content
-          .lsp_position_to_core(diagnostic.range.start)
-          .char
-          .min(source_len);
+      let start = document
+        .content
+        .lsp_position_to_core(diagnostic.range.start)
+        .char
+        .min(source_len);
 
-        let end = document
-          .content
-          .lsp_position_to_core(diagnostic.range.end)
-          .char
-          .min(source_len);
+      let end = document
+        .content
+        .lsp_position_to_core(diagnostic.range.end)
+        .char
+        .min(source_len);
 
-        let (start, end) = (start.min(end), start.max(end));
+      let (start, end) = (start.min(end), start.max(end));
 
-        let span = (source_id.clone(), start..end);
+      let span = (source_id.clone(), start..end);
 
-        let report = Report::build(kind, span.clone())
-          .with_message(&message)
-          .with_label(
-            Label::new(span.clone())
-              .with_message(&message)
-              .with_color(color),
-          );
+      let report = Report::build(kind, span.clone())
+        .with_message(&message)
+        .with_label(
+          Label::new(span.clone())
+            .with_message(&message)
+            .with_color(color),
+        );
 
-        let report = match diagnostic.code.as_ref() {
-          Some(lsp::NumberOrString::Number(n)) => {
-            report.with_code(n.to_string())
-          }
-          Some(lsp::NumberOrString::String(s)) => report.with_code(s.clone()),
-          None => report,
-        }
-        .finish();
+      let report = match diagnostic.code.as_ref() {
+        Some(lsp::NumberOrString::Number(n)) => report.with_code(n.to_string()),
+        Some(lsp::NumberOrString::String(s)) => report.with_code(s.clone()),
+        None => report,
+      }
+      .finish();
 
-        report
-          .print(&mut cache)
-          .map_err(|error| anyhow!("failed to render diagnostic: {error}"))
-      })?;
+      report
+        .print(&mut cache)
+        .map_err(|error| anyhow!("failed to render diagnostic: {error}"))?;
+    }
 
     if any_error {
       process::exit(1);
