@@ -31,7 +31,7 @@ export const EditorSettingsDialog = () => {
         size='icon'
         onClick={() => setSettingsOpen(true)}
         title='Settings'
-        className='h-7 w-7 cursor-pointer'
+        className='ml-auto h-7 w-7 cursor-pointer'
       >
         <Settings className='h-4 w-4' />
       </Button>

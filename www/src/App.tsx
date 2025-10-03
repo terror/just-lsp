@@ -44,10 +44,11 @@ const App = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   const [parser, setParser] = useState<Parser | undefined>(undefined);
+  const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
+
   const [justLanguage, setJustLanguage] = useState<TSLanguage | undefined>(
     undefined
   );
-  const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
 
   const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
     undefined
