@@ -1,28 +1,27 @@
 use {
-  crate::{
-    alias::Alias,
-    analyzer::Analyzer,
-    attribute::Attribute,
-    builtin::{AttributeTarget, Builtin},
-    command::Command,
-    count::Count,
-    document::Document,
-    node_ext::NodeExt,
-    os_group::OsGroup,
-    point_ext::PointExt,
-    position_ext::PositionExt,
-    recipe::{Dependency, Parameter, ParameterJson, ParameterKind, Recipe},
-    resolver::Resolver,
-    rope_ext::RopeExt,
-    server::Server,
-    setting::{Setting, SettingKind},
-    text_node::TextNode,
-    variable::Variable,
-  },
+  alias::Alias,
+  analyzer::Analyzer,
   anyhow::{anyhow, bail, Error},
+  arguments::Arguments,
+  ariadne::{sources, Color, Label, Report, ReportKind},
+  attribute::Attribute,
+  builtin::{AttributeTarget, Builtin},
+  clap::Parser as Clap,
+  command::Command,
+  count::Count,
+  document::Document,
   env_logger::Env,
+  node_ext::NodeExt,
+  os_group::OsGroup,
+  point_ext::PointExt,
+  position_ext::PositionExt,
+  recipe::{Dependency, Parameter, ParameterJson, ParameterKind, Recipe},
+  resolver::Resolver,
+  rope_ext::RopeExt,
   ropey::Rope,
   serde::{Deserialize, Serialize},
+  server::Server,
+  setting::{Setting, SettingKind},
   std::{
     backtrace::BacktraceStatus,
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
@@ -34,15 +33,19 @@ use {
     sync::Arc,
     time::Instant,
   },
+  subcommand::Subcommand,
   tempfile::tempdir,
+  text_node::TextNode,
   tokio::io::AsyncBufReadExt,
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
   tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
+  variable::Variable,
 };
 
 mod alias;
 mod analyzer;
+mod arguments;
 mod attribute;
 mod builtin;
 mod builtins;
@@ -58,6 +61,7 @@ mod resolver;
 mod rope_ext;
 mod server;
 mod setting;
+mod subcommand;
 mod text_node;
 mod variable;
 
@@ -73,7 +77,7 @@ async fn main() {
 
   env_logger::Builder::from_env(env).init();
 
-  if let Err(error) = Server::run().await {
+  if let Err(error) = Arguments::parse().run().await {
     eprintln!("error: {error}");
 
     for (i, error) in error.chain().skip(1).enumerate() {
