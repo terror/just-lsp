@@ -30,6 +30,7 @@ import { Loader2, TentTree } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
+import defaultJustfile from '../../justfile?raw';
 import { EditorSettingsDialog } from './components/editor-settings-dialog';
 import { TreeNode } from './components/tree-node';
 import {
@@ -38,6 +39,9 @@ import {
   removeHighlightEffect,
 } from './lib/cm-highlight-extension';
 import { useEditorSettings } from './providers/editor-settings-provider';
+
+const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
+const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 
 const App = () => {
   const [error, setError] = useState<string | undefined>(undefined);
@@ -67,6 +71,30 @@ const App = () => {
 
   const { settings: editorSettings } =
     useEditorSettings();
+
+  const initialEditorDoc = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const storedDoc = window.localStorage.getItem(EDITOR_STORAGE_KEY);
+
+      if (storedDoc && storedDoc.length > 0) {
+        return storedDoc;
+      }
+    }
+
+    return defaultJustfile;
+  }, [defaultJustfile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const existingDoc = window.localStorage.getItem(EDITOR_STORAGE_KEY);
+
+    if (!existingDoc) {
+      window.localStorage.setItem(EDITOR_STORAGE_KEY, initialEditorDoc);
+    }
+  }, [initialEditorDoc]);
 
   useEffect(() => {
     let parserInstance: Parser | undefined;
@@ -139,6 +167,10 @@ const App = () => {
     (update: ViewUpdate) => {
       if (update.docChanged && parser && justLanguage) {
         const newCode = update.state.doc.toString();
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(EDITOR_STORAGE_KEY, newCode);
+        }
 
         const newTree = parse({ parser, language: justLanguage, code: newCode });
 
@@ -245,7 +277,7 @@ const App = () => {
     if (!editorRef.current) return;
 
     const state = EditorState.create({
-      doc: '',
+      doc: initialEditorDoc,
       extensions: editorExtensions,
     });
 
@@ -259,7 +291,7 @@ const App = () => {
     return () => {
       view.destroy();
     };
-  }, [parser, editorExtensions]);
+  }, [parser, editorExtensions, initialEditorDoc]);
 
   useEffect(() => {
     if (!parser || !justLanguage || !editorViewRef.current) {
@@ -323,10 +355,15 @@ const App = () => {
 
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
+          autoSaveId={PANEL_LAYOUT_STORAGE_KEY}
           direction='horizontal'
           className='h-full rounded border'
         >
-          <ResizablePanel defaultSize={50} minSize={30}>
+          <ResizablePanel
+            id='editor-panel'
+            defaultSize={50}
+            minSize={30}
+          >
             <div className='flex h-full min-h-0 flex-col overflow-hidden'>
               <div className='flex items-center justify-between border-b bg-gray-50 px-2 py-1'>
                 <EditorSettingsDialog />
@@ -337,7 +374,11 @@ const App = () => {
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={50} minSize={30}>
+          <ResizablePanel
+            id='tree-panel'
+            defaultSize={50}
+            minSize={30}
+          >
             <div className='h-full overflow-auto'>
               {loading ? (
                 <div className='flex h-full items-center justify-center'>
