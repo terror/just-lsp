@@ -81,7 +81,7 @@ const App = () => {
       }
     }
 
-    return defaultJustfile;
+    return defaultJustfile.trim();
   }, [defaultJustfile]);
 
   useEffect(() => {
