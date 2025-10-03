@@ -11,11 +11,9 @@ alias t := test
 
 all: build test clippy fmt-check
 
-[group: 'misc']
 build:
   cargo build
 
-[group: 'check']
 check:
  cargo check
 
