@@ -46,7 +46,6 @@ const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 const App = () => {
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(true);
-
   const [parser, setParser] = useState<Parser | undefined>(undefined);
   const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
 
