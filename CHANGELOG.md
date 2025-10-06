@@ -1,6 +1,23 @@
 # Changelog
 
-## [0.2.6](https://github.com/terror/just-lsp/releases/tag/0.2.5) - 2025-09-25
+## [0.2.7](https://github.com/terror/just-lsp/releases/tag/0.2.7) - 2025-09-25
+
+### Added
+
+- Add `analyze` subcommand ([#116](https://github.com/terror/just-lsp/pull/116) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Allow attributes on exported assignments ([#115](https://github.com/terror/just-lsp/pull/115) by [terror](https://github.com/terror))
+- Fix parser to handle variables after hash in recipe commands ([#114](https://github.com/terror/just-lsp/pull/114) by [terror](https://github.com/terror))
+- Add parser extension workflow to readme ([#113](https://github.com/terror/just-lsp/pull/113) by [terror](https://github.com/terror))
+- Extend parser to allow attributes on modules ([#112](https://github.com/terror/just-lsp/pull/112) by [terror](https://github.com/terror))
+
+### Misc
+
+- Add release version to `default` attribute ([#110](https://github.com/terror/just-lsp/pull/110) by [dpassen](https://github.com/dpassen))
+
+## [0.2.6](https://github.com/terror/just-lsp/releases/tag/0.2.6) - 2025-09-25
 
 ### Added
 
