@@ -38,6 +38,7 @@ import {
   highlightExtension,
   removeHighlightEffect,
 } from './lib/cm-highlight-extension';
+import { createJustSyntaxHighlightingExtension } from './lib/just-syntax-highlighting';
 import { useEditorSettings } from './providers/editor-settings-provider';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
@@ -250,6 +251,8 @@ const App = () => {
       syntaxHighlighting(defaultHighlightStyle),
     ];
 
+    extensions.push(...createJustSyntaxHighlightingExtension(justLanguage));
+
     if (editorSettings.keybindings === 'vim') {
       extensions.push(vim());
     }
@@ -270,6 +273,7 @@ const App = () => {
     editorSettings.lineWrapping,
     onEditorUpdate,
     createEditorTheme,
+    justLanguage,
   ]);
 
   useEffect(() => {

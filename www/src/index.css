@@ -38,6 +38,16 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --just-hl-keyword: oklch(0.55 0.22 265);
+  --just-hl-function: oklch(0.56 0.21 320);
+  --just-hl-variable: oklch(0.56 0.15 160);
+  --just-hl-string: oklch(0.67 0.17 70);
+  --just-hl-comment: oklch(0.6 0.02 260);
+  --just-hl-operator: oklch(0.47 0.04 260);
+  --just-hl-punctuation: oklch(0.45 0.02 260);
+  --just-hl-boolean: oklch(0.58 0.16 200);
+  --just-hl-attribute: oklch(0.6 0.17 50);
+  --just-hl-error: oklch(0.56 0.27 25);
 }
 
 .dark {
@@ -73,6 +83,16 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --just-hl-keyword: oklch(0.75 0.22 265);
+  --just-hl-function: oklch(0.73 0.2 320);
+  --just-hl-variable: oklch(0.76 0.14 160);
+  --just-hl-string: oklch(0.78 0.2 70);
+  --just-hl-comment: oklch(0.68 0.02 260);
+  --just-hl-operator: oklch(0.72 0.04 260);
+  --just-hl-punctuation: oklch(0.65 0.02 260);
+  --just-hl-boolean: oklch(0.74 0.14 200);
+  --just-hl-attribute: oklch(0.75 0.18 50);
+  --just-hl-error: oklch(0.7 0.25 25);
 }
 
 @theme inline {
@@ -127,6 +147,56 @@
   background-color: rgba(59, 130, 246, 0.15);
   outline: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 2px;
+}
+
+.cm-just-keyword {
+  color: var(--just-hl-keyword);
+  font-weight: 600;
+}
+
+.cm-just-function {
+  color: var(--just-hl-function);
+}
+
+.cm-just-namespace {
+  color: var(--just-hl-function);
+  font-weight: 600;
+}
+
+.cm-just-variable {
+  color: var(--just-hl-variable);
+}
+
+.cm-just-string {
+  color: var(--just-hl-string);
+}
+
+.cm-just-comment {
+  color: var(--just-hl-comment);
+  font-style: italic;
+}
+
+.cm-just-operator {
+  color: var(--just-hl-operator);
+}
+
+.cm-just-punctuation {
+  color: var(--just-hl-punctuation);
+}
+
+.cm-just-boolean {
+  color: var(--just-hl-boolean);
+  font-weight: 600;
+}
+
+.cm-just-attribute {
+  color: var(--just-hl-attribute);
+}
+
+.cm-just-error {
+  color: var(--just-hl-error);
+  text-decoration: underline;
+  text-decoration-style: wavy;
 }
 
 .cm-editor {
