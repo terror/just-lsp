@@ -26,7 +26,7 @@ import {
   lineNumbers,
 } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
-import { Loader2, TentTree } from 'lucide-react';
+import { Bot, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
@@ -346,7 +346,7 @@ const App = () => {
   return (
     <div className='flex h-screen max-w-full flex-col'>
       <div className='flex items-center gap-x-2 px-4 py-4'>
-        <TentTree className='h-4 w-4' />
+        <Bot className='h-4 w-4' />
         <a href='/' className='font-semibold'>
           just
         </a>
