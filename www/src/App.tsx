@@ -28,12 +28,12 @@ import {
 import { vim } from '@replit/codemirror-vim';
 import { Bot, Loader2 } from 'lucide-react';
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
@@ -76,8 +76,7 @@ const App = () => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | undefined>(undefined);
 
-  const { settings: editorSettings } =
-    useEditorSettings();
+  const { settings: editorSettings } = useEditorSettings();
 
   const initialEditorDoc = useMemo(() => {
     if (typeof window !== 'undefined') {
@@ -179,7 +178,11 @@ const App = () => {
           window.localStorage.setItem(EDITOR_STORAGE_KEY, newCode);
         }
 
-        const newTree = parse({ parser, language: justLanguage, code: newCode });
+        const newTree = parse({
+          parser,
+          language: justLanguage,
+          code: newCode,
+        });
 
         if (newTree) {
           const { formattedTree, nodePositionMap, allNodes } = processTree(
@@ -193,7 +196,13 @@ const App = () => {
         }
       }
     },
-    [parser, justLanguage, setFormattedTree, setNodePositionMap, setExpandedNodes]
+    [
+      parser,
+      justLanguage,
+      setFormattedTree,
+      setNodePositionMap,
+      setExpandedNodes,
+    ]
   );
 
   const editorContainerStyle = useMemo(
@@ -329,11 +338,7 @@ const App = () => {
           direction='horizontal'
           className='h-full rounded border'
         >
-          <ResizablePanel
-            id='editor-panel'
-            defaultSize={50}
-            minSize={30}
-          >
+          <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
             <div className='flex h-full min-h-0 flex-col overflow-hidden'>
               <div className='flex items-center justify-between border-b bg-gray-50 px-2 py-1'>
                 <EditorSettingsDialog />
@@ -348,11 +353,7 @@ const App = () => {
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel
-            id='tree-panel'
-            defaultSize={50}
-            minSize={30}
-          >
+          <ResizablePanel id='tree-panel' defaultSize={50} minSize={30}>
             <div className='h-full overflow-auto'>
               {loading ? (
                 <div className='flex h-full items-center justify-center'>

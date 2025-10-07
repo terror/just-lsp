@@ -1,4 +1,4 @@
-import { RangeSetBuilder, type Extension } from '@codemirror/state';
+import { type Extension, RangeSetBuilder } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -29,11 +29,7 @@ const captureNameToClasses = (name: string): string[] => {
   return BASE_CAPTURE_TO_CLASSES[base] ?? [];
 };
 
-const buildDecorations = (
-  parser: Parser,
-  query: Query,
-  content: string
-) => {
+const buildDecorations = (parser: Parser, query: Query, content: string) => {
   const tree = parser.parse(content);
 
   if (!tree) {
@@ -71,7 +67,7 @@ const buildDecorations = (
       const [from, to] = key.split(':').map(Number);
       return { from, to, className: Array.from(classSet).join(' ') };
     })
-    .sort((a, b) => (a.from - b.from) || (a.to - b.to))
+    .sort((a, b) => a.from - b.from || a.to - b.to)
     .forEach(({ from, to, className }) => {
       builder.add(from, to, Decoration.mark({ class: className }));
     });

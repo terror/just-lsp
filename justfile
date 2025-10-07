@@ -38,6 +38,10 @@ fmt:
   cargo +nightly fmt
 
 [group: 'format']
+fmt-web:
+  cd www && bun run format
+
+[group: 'format']
 fmt-check:
   cargo +nightly fmt --all -- --check
 

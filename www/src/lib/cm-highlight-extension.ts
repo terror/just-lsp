@@ -43,8 +43,8 @@ export const highlightExtension = ViewPlugin.fromClass(
   },
   {
     provide: (plugin) =>
-      EditorView.outerDecorations.of((view) =>
-        view.plugin(plugin)?.decorations ?? Decoration.none
+      EditorView.outerDecorations.of(
+        (view) => view.plugin(plugin)?.decorations ?? Decoration.none
       ),
   }
 );
