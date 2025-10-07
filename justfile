@@ -11,9 +11,14 @@ alias t := test
 
 all: build test clippy fmt-check
 
-[group: 'misc']
+[group: 'dev']
 build:
   cargo build
+
+[group: 'dev']
+build-wasm:
+  just -f vendor/tree-sitter-just/justfile build-wasm
+  cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
 
 [group: 'check']
 check:
@@ -33,6 +38,10 @@ fmt:
   cargo +nightly fmt
 
 [group: 'format']
+fmt-web:
+  cd www && bun run format
+
+[group: 'format']
 fmt-check:
   cargo +nightly fmt --all -- --check
 
@@ -40,7 +49,7 @@ fmt-check:
 forbid:
   ./bin/forbid
 
-[group: 'misc']
+[group: 'dev']
 install:
   cargo install -f just-lsp
 
