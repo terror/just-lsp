@@ -634,6 +634,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "just-lsp-wasm"
+version = "0.0.0"
+
+[[package]]
 name = "libc"
 version = "0.2.174"
 source = "registry+https://github.com/rust-lang/crates.io-index"
