@@ -15,6 +15,11 @@ all: build test clippy fmt-check
 build:
   cargo build
 
+[group: 'dev']
+build-wasm:
+  just -f vendor/tree-sitter-just/justfile build-wasm
+  cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
+
 [group: 'check']
 check:
  cargo check
