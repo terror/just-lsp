@@ -233,8 +233,8 @@ local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
 ### Extending the parser
 
-`just-lsp` vendors the [`tree-sitter-just`](https://github.com/justfile/tree-sitter-just) grammar in
-`vendor/tree-sitter-just`. After changing the grammar or query files, rebuild and
+`just-lsp` vendors the [`tree-sitter-just`](https://github.com/terror/just-lsp/tree/master/vendor/tree-sitter-just)
+parser in `vendor/tree-sitter-just`. After changing the grammar or query files, rebuild and
 test the parser with the following commands:
 
 ```bash
