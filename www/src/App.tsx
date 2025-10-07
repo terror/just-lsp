@@ -27,7 +27,14 @@ import {
 } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
 import { Bot, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
 import defaultJustfile from '../../justfile?raw';
@@ -189,50 +196,12 @@ const App = () => {
     [parser, justLanguage, setFormattedTree, setNodePositionMap, setExpandedNodes]
   );
 
-  const createEditorTheme = useCallback(
+  const editorContainerStyle = useMemo(
     () =>
-      EditorView.theme({
-        '&': {
-          height: '100%',
-          fontSize: `${editorSettings.fontSize}px`,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-        '&.cm-editor': {
-          height: '100%',
-        },
-        '.cm-scroller': {
-          overflow: 'auto',
-          flex: '1 1 auto',
-          fontFamily:
-            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        },
-        '.cm-content': {
-          padding: '10px 0',
-        },
-        '.cm-line': {
-          padding: '0 10px',
-        },
-        '.cm-gutters': {
-          backgroundColor: 'transparent',
-          borderRight: 'none',
-          paddingRight: '8px',
-        },
-        '.cm-activeLineGutter': {
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        },
-        '.cm-activeLine': {
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        },
-        '.cm-fat-cursor': {
-          backgroundColor: 'rgba(59, 130, 246, 0.5)',
-          borderLeft: 'none',
-          width: '0.6em',
-        },
-        '.cm-cursor-secondary': {
-          backgroundColor: 'rgba(59, 130, 246, 0.3)',
-        },
-      }),
+      ({
+        fontSize: `${editorSettings.fontSize}px`,
+        '--editor-font-size': `${editorSettings.fontSize}px`,
+      }) as CSSProperties,
     [editorSettings.fontSize]
   );
 
@@ -241,7 +210,6 @@ const App = () => {
       EditorState.tabSize.of(editorSettings.tabSize),
       EditorView.updateListener.of(onEditorUpdate),
       bracketMatching(),
-      createEditorTheme(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
       highlightExtension,
@@ -272,7 +240,6 @@ const App = () => {
     editorSettings.lineNumbers,
     editorSettings.lineWrapping,
     onEditorUpdate,
-    createEditorTheme,
     justLanguage,
   ]);
 
@@ -371,7 +338,11 @@ const App = () => {
               <div className='flex items-center justify-between border-b bg-gray-50 px-2 py-1'>
                 <EditorSettingsDialog />
               </div>
-              <div ref={editorRef} className='w-full flex-1 overflow-hidden' />
+              <div
+                ref={editorRef}
+                className='editor-host w-full flex-1 overflow-hidden'
+                style={editorContainerStyle}
+              />
             </div>
           </ResizablePanel>
 

@@ -2,6 +2,7 @@ import { StateEffect } from '@codemirror/state';
 import {
   Decoration,
   DecorationSet,
+  EditorView,
   ViewPlugin,
   ViewUpdate,
 } from '@codemirror/view';
@@ -41,6 +42,9 @@ export const highlightExtension = ViewPlugin.fromClass(
     }
   },
   {
-    decorations: (v) => v.decorations,
+    provide: (plugin) =>
+      EditorView.outerDecorations.of((view) =>
+        view.plugin(plugin)?.decorations ?? Decoration.none
+      ),
   }
 );
