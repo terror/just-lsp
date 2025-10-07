@@ -11,7 +11,7 @@ alias t := test
 
 all: build test clippy fmt-check
 
-[group: 'misc']
+[group: 'dev']
 build:
   cargo build
 
@@ -49,7 +49,7 @@ fmt-check:
 forbid:
   ./bin/forbid
 
-[group: 'misc']
+[group: 'dev']
 install:
   cargo install -f just-lsp
 
