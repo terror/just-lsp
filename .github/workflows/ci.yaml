@@ -125,7 +125,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    needs: build
+    needs: build-web
 
     steps:
       - name: Deploy to GitHub Pages
