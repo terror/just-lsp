@@ -24,7 +24,7 @@ use {
   setting::{Setting, SettingKind},
   std::{
     backtrace::BacktraceStatus,
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
@@ -39,7 +39,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
-  tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
+  tree_sitter::{Language, Node, Parser, Point, Tree},
   variable::Variable,
 };
 
