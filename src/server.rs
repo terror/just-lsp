@@ -481,8 +481,10 @@ impl Inner {
 
     let snapshot = {
       let documents = self.documents.read().await;
+
       documents.get(uri).map(|document| {
         let content = document.content.to_string();
+
         let end = document
           .content
           .byte_to_lsp_position(document.content.len_bytes());
