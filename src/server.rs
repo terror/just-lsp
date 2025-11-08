@@ -1,11 +1,16 @@
 use super::*;
 
-#[derive(Debug)]
-pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
+pub(crate) struct Server(Arc<Inner>);
+
+impl Debug for Server {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Server").finish()
+  }
+}
 
 impl Server {
   pub fn new(client: Client) -> Self {
-    Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client))))
+    Self(Arc::new(Inner::new(client)))
   }
 
   pub async fn run() -> Result {
@@ -66,21 +71,20 @@ impl LanguageServer for Server {
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    self.0.lock().await.code_action(params).await
+    self.0.code_action(params).await
   }
 
   async fn completion(
     &self,
     params: lsp::CompletionParams,
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
-    self.0.lock().await.completion(params).await
+    self.0.completion(params).await
   }
 
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    let mut inner = self.0.lock().await;
-
-    if let Err(error) = inner.did_change(params).await {
-      inner
+    if let Err(error) = self.0.did_change(params).await {
+      self
+        .0
         .client
         .log_message(lsp::MessageType::ERROR, error)
         .await;
@@ -88,14 +92,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.lock().await.did_close(params).await
+    self.0.did_close(params).await
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    let mut inner = self.0.lock().await;
-
-    if let Err(error) = inner.did_open(params).await {
-      inner
+    if let Err(error) = self.0.did_open(params).await {
+      self
+        .0
         .client
         .log_message(lsp::MessageType::ERROR, error)
         .await;
@@ -106,87 +109,86 @@ impl LanguageServer for Server {
     &self,
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
-    self.0.lock().await.document_highlight(params).await
+    self.0.document_highlight(params).await
   }
 
   async fn execute_command(
     &self,
     params: lsp::ExecuteCommandParams,
   ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    self.0.lock().await.execute_command(params).await
+    self.0.execute_command(params).await
   }
 
   async fn folding_range(
     &self,
     params: lsp::FoldingRangeParams,
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
-    self.0.lock().await.folding_range(params).await
+    self.0.folding_range(params).await
   }
 
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    self.0.lock().await.formatting(params).await
+    self.0.formatting(params).await
   }
 
   async fn goto_definition(
     &self,
     params: lsp::GotoDefinitionParams,
   ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    self.0.lock().await.goto_definition(params).await
+    self.0.goto_definition(params).await
   }
 
   async fn hover(
     &self,
     params: lsp::HoverParams,
   ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
-    self.0.lock().await.hover(params).await
+    self.0.hover(params).await
   }
 
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
   ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    self.0.lock().await.initialize(params).await
+    self.0.initialize(params).await
   }
 
   async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.lock().await.initialized(params).await
+    self.0.initialized(params).await
   }
 
   async fn references(
     &self,
     params: lsp::ReferenceParams,
   ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    self.0.lock().await.references(params).await
+    self.0.references(params).await
   }
 
   async fn rename(
     &self,
     params: lsp::RenameParams,
   ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
-    self.0.lock().await.rename(params).await
+    self.0.rename(params).await
   }
 
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.lock().await.shutdown().await
+    self.0.shutdown().await
   }
 }
 
-#[derive(Debug)]
 pub(crate) struct Inner {
   client: Client,
-  documents: BTreeMap<lsp::Url, Document>,
-  initialized: bool,
+  documents: RwLock<BTreeMap<lsp::Url, Document>>,
+  initialized: AtomicBool,
 }
 
 impl Inner {
   fn new(client: Client) -> Self {
     Self {
       client,
-      documents: BTreeMap::new(),
-      initialized: false,
+      documents: RwLock::new(BTreeMap::new()),
+      initialized: AtomicBool::new(false),
     }
   }
 
@@ -196,7 +198,9 @@ impl Inner {
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
       let mut actions = Vec::new();
 
       for recipe in document.get_recipes() {
@@ -239,7 +243,9 @@ impl Inner {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri;
 
-    if let Some(document) = self.documents.get(&uri) {
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(&uri) {
       let mut completion_items = Vec::new();
 
       let recipes = document.get_recipes();
@@ -289,42 +295,51 @@ impl Inner {
   }
 
   async fn did_change(
-    &mut self,
+    &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    if let Some(document) = self.documents.get_mut(&params.text_document.uri) {
-      document.apply_change(params)?;
+    let mut should_publish = false;
+
+    {
+      let mut documents = self.documents.write().await;
+
+      if let Some(document) = documents.get_mut(&uri) {
+        document.apply_change(params)?;
+        should_publish = true;
+      }
+    }
+
+    if should_publish {
       self.publish_diagnostics(&uri).await;
     }
 
     Ok(())
   }
 
-  async fn did_close(&mut self, params: lsp::DidCloseTextDocumentParams) {
-    let uri = &params.text_document.uri;
+  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
 
-    if self.documents.contains_key(uri) {
-      self.documents.remove(uri);
+    let removed = {
+      let mut documents = self.documents.write().await;
+      documents.remove(&uri).is_some()
+    };
 
-      self
-        .client
-        .publish_diagnostics(uri.clone(), vec![], None)
-        .await;
+    if removed {
+      self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
 
-  async fn did_open(
-    &mut self,
-    params: lsp::DidOpenTextDocumentParams,
-  ) -> Result {
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    self.documents.insert(
-      params.text_document.uri.to_owned(),
-      Document::try_from(params)?,
-    );
+    let document = Document::try_from(params)?;
+
+    {
+      let mut documents = self.documents.write().await;
+      documents.insert(uri.clone(), document);
+    }
 
     self.publish_diagnostics(&uri).await;
 
@@ -339,7 +354,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -420,7 +437,9 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
       let recipes = document.get_recipes();
 
       let folding_ranges = recipes
@@ -460,18 +479,28 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
-      let content = document.content.to_string();
+    let snapshot = {
+      let documents = self.documents.read().await;
 
+      documents.get(uri).map(|document| {
+        let content = document.content.to_string();
+
+        let end = document
+          .content
+          .byte_to_lsp_position(document.content.len_bytes());
+
+        (content, end)
+      })
+    };
+
+    if let Some((content, document_end)) = snapshot {
       match self.format_document(&content).await {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
               range: lsp::Range {
                 start: lsp::Position::new(0, 0),
-                end: document
-                  .content
-                  .byte_to_lsp_position(document.content.len_bytes()),
+                end: document_end,
               },
               new_text: formatted,
             }]));
@@ -527,7 +556,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -549,7 +580,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -574,7 +607,7 @@ impl Inner {
     })
   }
 
-  async fn initialized(&mut self, _: lsp::InitializedParams) {
+  async fn initialized(&self, _: lsp::InitializedParams) {
     self
       .client
       .log_message(
@@ -583,26 +616,32 @@ impl Inner {
       )
       .await;
 
-    self.initialized = true;
+    self
+      .initialized
+      .store(true, std::sync::atomic::Ordering::Relaxed);
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized {
+    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
       return;
     }
 
-    if let Some(document) = self.documents.get(uri) {
-      let analyzer = Analyzer::new(document);
+    let (diagnostics, version) = {
+      let documents = self.documents.read().await;
 
-      self
-        .client
-        .publish_diagnostics(
-          uri.clone(),
-          analyzer.analyze(),
-          Some(document.version),
-        )
-        .await;
-    }
+      match documents.get(uri) {
+        Some(document) => {
+          let analyzer = Analyzer::new(document);
+          (analyzer.analyze(), document.version)
+        }
+        None => return,
+      }
+    };
+
+    self
+      .client
+      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .await;
   }
 
   async fn references(
@@ -613,7 +652,9 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -633,7 +674,9 @@ impl Inner {
 
     let new_name = params.new_name;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
