@@ -17,7 +17,8 @@ impl Rule for UnusedParameterRule {
     let mut diagnostics = Vec::new();
 
     let exported = ctx.settings().iter().any(|setting| {
-      setting.name == "export" && setting.kind == SettingKind::Boolean(true)
+      setting.name == "export"
+        && matches!(setting.kind, SettingKind::Boolean(true))
     });
 
     for (recipe_name, identifiers) in ctx.recipe_identifier_usage() {

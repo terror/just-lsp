@@ -816,6 +816,17 @@ mod tests {
 
     Test::new(indoc! {
       "
+      set export := false
+
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused")
+    .run();
+
+    Test::new(indoc! {
+      "
       set export
 
       foo bar:
