@@ -16,6 +16,7 @@ impl Rule for RecipeParameterRule {
 
     for recipe in ctx.recipes() {
       let mut seen = HashSet::new();
+
       let (mut passed_default, mut passed_variadic) = (false, false);
 
       for (index, param) in recipe.parameters.iter().enumerate() {
