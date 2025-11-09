@@ -124,12 +124,9 @@ impl IdentifierAnalysis {
             .or_default()
             .insert(identifier_name.clone());
 
-          if recipe_parameters
-            .get(&recipe.name)
-            .is_some_and(|params| {
-              params.iter().any(|param| param.name == identifier_name)
-            })
-          {
+          if recipe_parameters.get(&recipe.name).is_some_and(|params| {
+            params.iter().any(|param| param.name == identifier_name)
+          }) {
             continue;
           }
         }
