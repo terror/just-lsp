@@ -66,14 +66,8 @@ pub(crate) struct UnresolvedIdentifier {
   pub(crate) range: lsp::Range,
 }
 
-pub(crate) struct InvalidParameterDefault {
-  pub(crate) range: lsp::Range,
-  pub(crate) value: String,
-}
-
 #[derive(Default)]
 pub(crate) struct IdentifierAnalysis {
-  invalid_parameter_defaults: Vec<InvalidParameterDefault>,
   recipe_identifier_usage: HashMap<String, HashSet<String>>,
   unresolved_identifiers: Vec<UnresolvedIdentifier>,
   variable_usage: HashMap<String, bool>,
@@ -95,69 +89,27 @@ impl IdentifierAnalysis {
 
     let mut unresolved_identifiers = Vec::new();
 
-    let mut invalid_parameter_defaults = Vec::new();
-
     if let Some(tree) = ctx.tree() {
       let root = tree.root_node();
 
-      let document = ctx.document();
-
-      let recipe_parameters = ctx.recipe_parameters();
-      let value_names = ctx.variable_and_builtin_names();
-
       for identifier in root.find_all("expression > value > identifier") {
-        let recipe_name = identifier
-          .get_parent("recipe")
-          .as_ref()
-          .and_then(|recipe_node| {
-            recipe_node.find("recipe_header > identifier")
-          })
-          .map_or_else(String::new, |identifier_node| {
-            document.get_node_text(&identifier_node)
-          });
-
-        let identifier_name = document.get_node_text(&identifier);
-
-        if let Some(recipe) = ctx.recipe(&recipe_name) {
-          recipe_identifier_usage
-            .entry(recipe.name.clone())
-            .or_default()
-            .insert(identifier_name.clone());
-
-          if recipe_parameters.get(&recipe.name).is_some_and(|params| {
-            params.iter().any(|param| param.name == identifier_name)
-          }) {
-            continue;
-          }
-        }
-
-        if let Some(usage) = variable_usage.get_mut(&identifier_name) {
-          *usage = true;
-        }
-
-        if !value_names.contains(&identifier_name) {
-          unresolved_identifiers.push(UnresolvedIdentifier {
-            name: identifier_name,
-            range: identifier.get_range(),
-          });
-        }
+        Self::record_identifier(
+          ctx,
+          &mut recipe_identifier_usage,
+          &mut variable_usage,
+          &mut unresolved_identifiers,
+          identifier,
+        );
       }
-    }
 
-    for recipe in ctx.recipes() {
-      for parameter in &recipe.parameters {
-        if let Some(default_value) = parameter.default_value.as_ref() {
-          if let Some(usage) = variable_usage.get_mut(default_value) {
-            *usage = true;
-          } else if !default_value.starts_with('\'')
-            && !default_value.starts_with('"')
-          {
-            invalid_parameter_defaults.push(InvalidParameterDefault {
-              value: default_value.clone(),
-              range: parameter.range,
-            });
-          }
-        }
+      for identifier in root.find_all("parameter > value > identifier") {
+        Self::record_identifier(
+          ctx,
+          &mut recipe_identifier_usage,
+          &mut variable_usage,
+          &mut unresolved_identifiers,
+          identifier,
+        );
       }
     }
 
@@ -165,7 +117,52 @@ impl IdentifierAnalysis {
       variable_usage,
       recipe_identifier_usage,
       unresolved_identifiers,
-      invalid_parameter_defaults,
+    }
+  }
+
+  fn record_identifier(
+    ctx: &RuleContext<'_>,
+    recipe_identifier_usage: &mut HashMap<String, HashSet<String>>,
+    variable_usage: &mut HashMap<String, bool>,
+    unresolved_identifiers: &mut Vec<UnresolvedIdentifier>,
+    identifier: Node<'_>,
+  ) {
+    let document = ctx.document();
+    let recipe_parameters = ctx.recipe_parameters();
+    let value_names = ctx.variable_and_builtin_names();
+
+    let recipe_name = identifier
+      .get_parent("recipe")
+      .as_ref()
+      .and_then(|recipe_node| recipe_node.find("recipe_header > identifier"))
+      .map_or_else(String::new, |identifier_node| {
+        document.get_node_text(&identifier_node)
+      });
+
+    let identifier_name = document.get_node_text(&identifier);
+
+    if let Some(recipe) = ctx.recipe(&recipe_name) {
+      recipe_identifier_usage
+        .entry(recipe.name.clone())
+        .or_default()
+        .insert(identifier_name.clone());
+
+      if recipe_parameters.get(&recipe.name).is_some_and(|params| {
+        params.iter().any(|param| param.name == identifier_name)
+      }) {
+        return;
+      }
+    }
+
+    if let Some(usage) = variable_usage.get_mut(&identifier_name) {
+      *usage = true;
+    }
+
+    if !value_names.contains(&identifier_name) {
+      unresolved_identifiers.push(UnresolvedIdentifier {
+        name: identifier_name,
+        range: identifier.get_range(),
+      });
     }
   }
 }
@@ -316,11 +313,5 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn unresolved_identifiers(&self) -> &[UnresolvedIdentifier] {
     &self.identifier_analysis().unresolved_identifiers
-  }
-
-  pub(crate) fn invalid_parameter_defaults(
-    &self,
-  ) -> &[InvalidParameterDefault] {
-    &self.identifier_analysis().invalid_parameter_defaults
   }
 }

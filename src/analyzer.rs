@@ -939,6 +939,28 @@ mod tests {
   }
 
   #[test]
+  fn default_parameter_expression_functions() {
+    Test::new(indoc! {
+      "
+      build version=uppercase(\"1.0.0\"):
+        echo {{ version }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn default_parameter_expression_with_env_call() {
+    Test::new(indoc! {
+      "
+      build target=(env('TARGET', 'debug')):
+        echo {{ target }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn unknown_default_recipe_parameter_reference() {
     Test::new(indoc! {
       "

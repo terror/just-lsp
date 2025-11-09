@@ -23,15 +23,6 @@ impl Rule for UndefinedIdentifierRule {
       }));
     }
 
-    for invalid_default in ctx.invalid_parameter_defaults() {
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: invalid_default.range,
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: format!("Variable `{}` not found", invalid_default.value),
-        ..Default::default()
-      }));
-    }
-
     diagnostics
   }
 }
