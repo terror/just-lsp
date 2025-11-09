@@ -108,25 +108,8 @@ impl Recipe {
     for attribute in &self.attributes {
       let attribute_name = attribute.name.value.as_str();
 
-      match attribute_name {
-        "windows" => {
-          os_groups.insert(OsGroup::Windows);
-        }
-        "linux" => {
-          os_groups.insert(OsGroup::Linux);
-        }
-        "macos" => {
-          os_groups.insert(OsGroup::Macos);
-        }
-        "openbsd" => {
-          os_groups.insert(OsGroup::Openbsd);
-        }
-        "unix" => {
-          os_groups.insert(OsGroup::Linux);
-          os_groups.insert(OsGroup::Macos);
-          os_groups.insert(OsGroup::Openbsd);
-        }
-        _ => {}
+      if let Some(targets) = OsGroup::targets(attribute_name) {
+        os_groups.extend(targets);
       }
     }
 
