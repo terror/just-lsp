@@ -12,6 +12,7 @@ use {
   document::Document,
   env_logger::Env,
   node_ext::NodeExt,
+  once_cell::sync::OnceCell,
   os_group::OsGroup,
   point_ext::PointExt,
   position_ext::PositionExt,
@@ -19,12 +20,13 @@ use {
   resolver::Resolver,
   rope_ext::RopeExt,
   ropey::Rope,
+  rule::{RuleContext, RULES},
   serde::{Deserialize, Serialize},
   server::Server,
   setting::{Setting, SettingKind},
   std::{
     backtrace::BacktraceStatus,
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
@@ -59,6 +61,7 @@ mod position_ext;
 mod recipe;
 mod resolver;
 mod rope_ext;
+mod rule;
 mod server;
 mod setting;
 mod subcommand;

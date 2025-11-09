@@ -620,6 +620,7 @@ dependencies = [
  "env_logger",
  "indoc",
  "log",
+ "once_cell",
  "pretty_assertions",
  "ropey",
  "serde",

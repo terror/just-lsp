@@ -6,811 +6,15 @@ pub struct Analyzer<'a> {
 }
 
 impl<'a> Analyzer<'a> {
+  /// Creates a new analyzer for the given document.
   pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
   }
 
+  /// Analyzes the document and returns a list of diagnostics.
   pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
-    self
-      .aggregate_parser_errors()
-      .into_iter()
-      .chain(self.analyze_aliases())
-      .chain(self.analyze_attributes())
-      .chain(self.analyze_function_calls())
-      .chain(self.analyze_recipes())
-      .chain(self.analyze_settings())
-      .chain(self.analyze_values())
-      .collect()
-  }
-
-  fn aggregate_parser_errors(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    if let Some(tree) = &self.document.tree {
-      let mut cursor = tree.root_node().walk();
-      Self::aggregate_parser_errors_rec(&mut cursor, &mut diagnostics);
-    }
-
-    diagnostics
-  }
-
-  fn aggregate_parser_errors_rec(
-    cursor: &mut TreeCursor<'_>,
-    diagnostics: &mut Vec<lsp::Diagnostic>,
-  ) {
-    let node = cursor.node();
-
-    if node.is_error() {
-      diagnostics.push(lsp::Diagnostic {
-        range: node.get_range(),
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        source: Some("just-lsp".to_string()),
-        message: "Syntax error".to_string(),
-        ..Default::default()
-      });
-    }
-
-    if node.is_missing() {
-      diagnostics.push(lsp::Diagnostic {
-        range: node.get_range(),
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        source: Some("just-lsp".to_string()),
-        message: "Missing syntax element".to_string(),
-        ..Default::default()
-      });
-    }
-
-    if cursor.goto_first_child() {
-      loop {
-        Self::aggregate_parser_errors_rec(cursor, diagnostics);
-
-        if !cursor.goto_next_sibling() {
-          break;
-        }
-      }
-
-      cursor.goto_parent();
-    }
-  }
-
-  fn analyze_aliases(&self) -> Vec<lsp::Diagnostic> {
-    let recipe_names = self
-      .document
-      .get_recipes()
-      .iter()
-      .map(|recipe| recipe.name.clone())
-      .collect::<HashSet<_>>();
-
-    let aliases = self.document.get_aliases();
-
-    let mut diagnostics = Vec::new();
-
-    for alias in &aliases {
-      if !recipe_names.contains(&alias.value.value) {
-        diagnostics.push(lsp::Diagnostic {
-          range: alias.value.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Recipe `{}` not found", alias.value.value),
-          ..Default::default()
-        });
-      }
-    }
-
-    let mut seen = HashSet::new();
-
-    for alias in &aliases {
-      if !seen.insert(&alias.name.value) {
-        diagnostics.push(lsp::Diagnostic {
-          range: alias.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Duplicate alias `{}`", alias.name.value),
-          ..Default::default()
-        });
-      }
-    }
-
-    diagnostics
-  }
-
-  fn analyze_attributes(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let root = match &self.document.tree {
-      Some(tree) => tree.root_node(),
-      None => return diagnostics,
-    };
-
-    let attribute_nodes = root.find_all("attribute");
-
-    for attribute_node in attribute_nodes {
-      for identifier_node in attribute_node.find_all("identifier") {
-        let attribute_name = self.document.get_node_text(&identifier_node);
-
-        let matching_attributes: Vec<_> = builtins::BUILTINS
-          .iter()
-          .filter(|f| matches!(f, Builtin::Attribute { name, .. } if *name == attribute_name))
-          .collect();
-
-        if matching_attributes.is_empty() {
-          diagnostics.push(lsp::Diagnostic {
-            range: identifier_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Unknown attribute `{attribute_name}`"),
-            ..Default::default()
-          });
-
-          continue;
-        }
-
-        let argument_count = identifier_node
-          .find_siblings_until("string", "identifier")
-          .len();
-
-        let has_arguments = argument_count > 0;
-
-        let parameter_mismatch = matching_attributes.iter().all(|attr| {
-          if let Builtin::Attribute { parameters, .. } = attr {
-            (parameters.is_some() && !has_arguments)
-              || (parameters.is_none() && has_arguments)
-              || (parameters.map_or(0, |_| 1) < argument_count)
-          } else {
-            false
-          }
-        });
-
-        if parameter_mismatch {
-          let required_argument_count = matching_attributes
-            .iter()
-            .find_map(|attr| {
-              if let Builtin::Attribute { parameters, .. } = attr {
-                parameters.map(|_| 1)
-              } else {
-                None
-              }
-            })
-            .unwrap_or(0);
-
-          diagnostics.push(lsp::Diagnostic {
-            range: attribute_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Attribute `{attribute_name}` got {argument_count} {} but takes {required_argument_count} {}",
-              Count("argument", argument_count),
-              Count("argument", required_argument_count),
-            ),
-            ..Default::default()
-          });
-        }
-
-        if let Some(parent) = attribute_node.parent() {
-          let target_type = match parent.kind() {
-            "alias" => AttributeTarget::Alias,
-            "assignment" => AttributeTarget::Assignment,
-            "export" => AttributeTarget::Assignment,
-            "module" => AttributeTarget::Module,
-            "recipe" => AttributeTarget::Recipe,
-            _ => {
-              diagnostics.push(lsp::Diagnostic {
-                range: attribute_node.get_range(),
-                severity: Some(lsp::DiagnosticSeverity::ERROR),
-                source: Some("just-lsp".to_string()),
-                message: format!(
-                  "Attribute `{attribute_name}` applied to invalid target",
-                ),
-                ..Default::default()
-              });
-
-              continue;
-            }
-          };
-
-          let is_valid_target = matching_attributes
-            .iter()
-            .filter_map(|attr| {
-              if let Builtin::Attribute { targets, .. } = attr {
-                Some(targets)
-              } else {
-                None
-              }
-            })
-            .any(|targets| {
-              targets
-                .iter()
-                .any(|target| target.is_valid_for(target_type))
-            });
-
-          if !is_valid_target {
-            diagnostics.push(lsp::Diagnostic {
-            range: attribute_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Attribute `{attribute_name}` cannot be applied to {target_type} target",
-            ),
-            ..Default::default()
-          });
-          }
-        }
-      }
-    }
-
-    diagnostics
-  }
-
-  fn analyze_function_calls(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let root = match &self.document.tree {
-      Some(tree) => tree.root_node(),
-      None => return diagnostics,
-    };
-
-    let function_calls = root.find_all("function_call");
-
-    for function_call in function_calls {
-      if let Some(identifier_node) = function_call.find("identifier") {
-        let function_name = self.document.get_node_text(&identifier_node);
-
-        let builtin = builtins::BUILTINS
-          .iter()
-          .find(|f| matches!(f, Builtin::Function { name, .. } if *name == function_name));
-
-        if let Some(Builtin::Function {
-          required_args,
-          accepts_variadic,
-          ..
-        }) = builtin
-        {
-          let arguments = function_call
-            .find("sequence")
-            .map(|sequence| {
-              (0..sequence.child_count())
-                .filter_map(|i| sequence.child(i))
-                .filter(|child| child.kind() == "expression")
-                .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-          let arg_count = arguments.len();
-
-          if arg_count < *required_args {
-            diagnostics.push(
-              lsp::Diagnostic {
-                range: function_call.get_range(),
-                severity: Some(lsp::DiagnosticSeverity::ERROR),
-                source: Some("just-lsp".to_string()),
-                message: format!(
-                  "Function `{function_name}` requires at least {required_args} {}, but {arg_count} provided",
-                  Count("argument", *required_args)
-                ),
-                ..Default::default()
-            });
-          } else if !accepts_variadic && arg_count > *required_args {
-            diagnostics.push(lsp::Diagnostic {
-              range: function_call.get_range(),
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Function `{function_name}` accepts {required_args} {}, but {arg_count} provided",
-                Count("argument", *required_args)
-              ),
-              ..Default::default()
-            });
-          }
-        } else {
-          diagnostics.push(lsp::Diagnostic {
-            range: identifier_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Unknown function `{function_name}`"),
-            ..Default::default()
-          });
-        }
-      }
-    }
-
-    diagnostics
-  }
-
-  fn analyze_recipes(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let recipes = self.document.get_recipes();
-
-    for recipe in &recipes {
-      let mut seen = HashSet::new();
-
-      let (mut passed_default, mut passed_variadic) = (false, false);
-
-      for (index, param) in recipe.parameters.iter().enumerate() {
-        if !seen.insert(param.name.clone()) {
-          diagnostics.push(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Duplicate parameter `{}`", param.name),
-            ..Default::default()
-          });
-        }
-
-        let has_default = param.default_value.is_some();
-
-        if matches!(param.kind, ParameterKind::Variadic(_)) {
-          if index < recipe.parameters.len() - 1 {
-            diagnostics.push(lsp::Diagnostic {
-              range: param.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Variadic parameter `{}` must be the last parameter",
-                param.name
-              ),
-              ..Default::default()
-            });
-          }
-
-          passed_variadic = true;
-        }
-
-        if passed_default
-          && !has_default
-          && !matches!(param.kind, ParameterKind::Variadic(_))
-        {
-          diagnostics.push(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Required parameter `{}` follows a parameter with a default value", param.name),
-            ..Default::default()
-          });
-        }
-
-        if passed_variadic && index < recipe.parameters.len() - 1 {
-          diagnostics.push(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Parameter `{}` follows a variadic parameter",
-              param.name
-            ),
-            ..Default::default()
-          });
-        }
-
-        if has_default {
-          passed_default = true;
-        }
-      }
-    }
-
-    let mut recipe_groups: HashMap<String, Vec<(Recipe, HashSet<OsGroup>)>> =
-      HashMap::new();
-
-    for recipe in &recipes {
-      let os_groups = recipe.os_groups();
-
-      recipe_groups
-        .entry(recipe.name.clone())
-        .or_default()
-        .push((recipe.clone(), os_groups));
-    }
-
-    for (recipe_name, group) in &recipe_groups {
-      if group.len() <= 1 {
-        continue;
-      }
-
-      for (i, (recipe1, os_groups1)) in group.iter().enumerate() {
-        for (_, (_, os_groups2)) in group.iter().enumerate().take(i) {
-          let has_conflict = os_groups1.iter().any(|group1| {
-            os_groups2
-              .iter()
-              .any(|group2| group1.conflicts_with(group2))
-          });
-
-          if has_conflict {
-            diagnostics.push(lsp::Diagnostic {
-              range: recipe1.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!("Duplicate recipe name `{recipe_name}`"),
-              ..Default::default()
-            });
-
-            break;
-          }
-        }
-      }
-    }
-
-    let mut dependency_graph = HashMap::new();
-
-    for recipe in &recipes {
-      dependency_graph.insert(
-        recipe.name.clone(),
-        recipe
-          .dependencies
-          .iter()
-          .map(|dep| dep.name.clone())
-          .collect::<Vec<String>>(),
-      );
-    }
-
-    for recipe in &recipes {
-      let mut visited = HashSet::new();
-
-      let mut path = Vec::new();
-
-      Self::detect_recipe_dependency_cycle(
-        &recipe.name,
-        &dependency_graph,
-        &mut visited,
-        &mut path,
-        &mut diagnostics,
-        &recipes,
-      );
-    }
-
-    let recipe_names = recipes
-      .iter()
-      .map(|r| r.name.clone())
-      .collect::<HashSet<_>>();
-
-    let recipe_parameters = recipes
-      .iter()
-      .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
-      .collect::<HashMap<String, Vec<Parameter>>>();
-
-    for recipe in &recipes {
-      for dependency in &recipe.dependencies {
-        if !recipe_names.contains(&dependency.name) {
-          diagnostics.push(lsp::Diagnostic {
-            range: dependency.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!("Recipe `{}` not found", dependency.name),
-            ..Default::default()
-          });
-        }
-
-        if let Some(params) = recipe_parameters.get(&dependency.name) {
-          let required_params = params
-            .iter()
-            .filter(|p| {
-              p.default_value.is_none()
-                && !matches!(p.kind, ParameterKind::Variadic(_))
-            })
-            .count();
-
-          let has_variadic = params
-            .iter()
-            .any(|p| matches!(p.kind, ParameterKind::Variadic(_)));
-
-          let total_params = params.len();
-
-          let arg_count = dependency.arguments.len();
-
-          if arg_count < required_params {
-            diagnostics.push(lsp::Diagnostic {
-              range: dependency.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Dependency `{}` requires {required_params} {}, but {arg_count} provided",
-                dependency.name, Count("argument", required_params)
-              ),
-              ..Default::default()
-            });
-          } else if !has_variadic && arg_count > total_params {
-            diagnostics.push(lsp::Diagnostic {
-              range: dependency.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              source: Some("just-lsp".to_string()),
-              message: format!(
-                "Dependency `{}` accepts {total_params} {}, but {arg_count} provided",
-                dependency.name, Count("argument", total_params)
-              ),
-              ..Default::default()
-            });
-          }
-        }
-      }
-    }
-
-    diagnostics
-  }
-
-  fn detect_recipe_dependency_cycle(
-    recipe_name: &str,
-    graph: &HashMap<String, Vec<String>>,
-    visited: &mut HashSet<String>,
-    path: &mut Vec<String>,
-    diagnostics: &mut Vec<lsp::Diagnostic>,
-    recipes: &[Recipe],
-  ) {
-    if visited.contains(recipe_name) {
-      return;
-    }
-
-    if path.contains(&recipe_name.to_string()) {
-      let cycle_start_idx = path.iter().position(|r| r == recipe_name).unwrap();
-
-      let mut cycle = path[cycle_start_idx..].to_vec();
-      cycle.push(recipe_name.to_string());
-
-      if let Some(recipe) =
-        recipes.iter().find(|r| r.name == *path.first().unwrap())
-      {
-        let message = if cycle.len() == 2 && cycle[0] == cycle[1] {
-          format!("Recipe `{}` depends on itself", cycle[0])
-        } else if cycle[0] == recipe_name {
-          format!(
-            "Recipe `{}` has circular dependency `{}`",
-            recipe_name,
-            cycle.join(" -> ")
-          )
-        } else {
-          return path.push(recipe_name.to_string());
-        };
-
-        diagnostics.push(lsp::Diagnostic {
-          range: recipe.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message,
-          ..Default::default()
-        });
-      }
-
-      return;
-    }
-
-    if !graph.contains_key(recipe_name) {
-      return;
-    }
-
-    path.push(recipe_name.to_string());
-
-    if let Some(dependencies) = graph.get(recipe_name) {
-      for dependency in dependencies {
-        Self::detect_recipe_dependency_cycle(
-          dependency,
-          graph,
-          visited,
-          path,
-          diagnostics,
-          recipes,
-        );
-      }
-    }
-
-    visited.insert(recipe_name.to_string());
-
-    path.pop();
-  }
-
-  fn analyze_settings(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let settings = self.document.get_settings();
-
-    for setting in &settings {
-      let builtin = builtins::BUILTINS.iter().find(
-        |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
-      );
-
-      if let Some(Builtin::Setting { kind, .. }) = builtin {
-        if setting.kind != *kind {
-          diagnostics.push(lsp::Diagnostic {
-            range: setting.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("just-lsp".to_string()),
-            message: format!(
-              "Setting `{}` expects a {kind} value",
-              setting.name,
-            ),
-            ..Default::default()
-          });
-        }
-      } else {
-        diagnostics.push(lsp::Diagnostic {
-          range: setting.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Unknown setting `{}`", setting.name),
-          ..Default::default()
-        });
-      }
-    }
-
-    let mut seen = HashSet::new();
-
-    for setting in settings {
-      if !seen.insert(setting.name.clone()) {
-        diagnostics.push(lsp::Diagnostic {
-          range: setting.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          source: Some("just-lsp".to_string()),
-          message: format!("Duplicate setting `{}`", setting.name),
-          ..Default::default()
-        });
-      }
-    }
-
-    diagnostics
-  }
-
-  fn analyze_values(&self) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let root = match self.document.tree {
-      Some(ref tree) => tree.root_node(),
-      None => return diagnostics,
-    };
-
-    let identifiers = root.find_all("expression > value > identifier");
-
-    let mut variable_names = self
-      .document
-      .get_variables()
-      .iter()
-      .map(|variable| variable.name.value.clone())
-      .collect::<HashSet<_>>();
-
-    variable_names.extend(builtins::BUILTINS.into_iter().filter_map(
-      |builtin| match builtin {
-        Builtin::Constant { name, .. } => Some(name.to_owned()),
-        _ => None,
-      },
-    ));
-
-    let mut recipe_identifier_map = self.document.get_recipes().iter().fold(
-      HashMap::new(),
-      |mut acc, recipe| {
-        acc.insert(recipe.name.clone(), HashSet::new());
-        acc
-      },
-    );
-
-    let mut variable_usage_map = self.document.get_variables().iter().fold(
-      HashMap::new(),
-      |mut acc, variable| {
-        acc.insert(variable.name.value.clone(), false);
-        acc
-      },
-    );
-
-    for identifier in identifiers {
-      let recipe_name = identifier
-        .get_parent("recipe")
-        .as_ref()
-        .and_then(|recipe_node| recipe_node.find("recipe_header > identifier"))
-        .map_or_else(String::new, |identifier_node| {
-          self.document.get_node_text(&identifier_node)
-        });
-
-      let recipe = self.document.find_recipe(&recipe_name);
-
-      let identifier_name = self.document.get_node_text(&identifier);
-
-      let create_diagnostic = |message: String| lsp::Diagnostic {
-        range: identifier.get_range(),
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        source: Some("just-lsp".to_string()),
-        message,
-        ..Default::default()
-      };
-
-      match recipe {
-        Some(recipe) => {
-          recipe_identifier_map
-            .entry(recipe.name.clone())
-            .or_insert_with(HashSet::new)
-            .insert(identifier_name.clone());
-
-          let recipe_parameter_names = recipe
-            .parameters
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<HashSet<_>>();
-
-          if !recipe_parameter_names.contains(&identifier_name) {
-            if let Entry::Occupied(mut entry) =
-              variable_usage_map.entry(identifier_name.clone())
-            {
-              entry.insert(true);
-            }
-
-            if !variable_names.contains(&identifier_name) {
-              diagnostics.push(create_diagnostic(format!(
-                "Variable `{identifier_name}` not found",
-              )));
-            }
-          }
-
-          for parameter in recipe.parameters {
-            if let Some(default_value) = parameter.default_value {
-              if let Entry::Occupied(mut entry) =
-                variable_usage_map.entry(default_value.clone())
-              {
-                entry.insert(true);
-              } else if !default_value.starts_with('\'')
-                && !default_value.starts_with('"')
-              {
-                diagnostics.push(lsp::Diagnostic {
-                  range: parameter.range,
-                  severity: Some(lsp::DiagnosticSeverity::ERROR),
-                  source: Some("just-lsp".to_string()),
-                  message: format!("Variable `{default_value}` not found"),
-                  ..Default::default()
-                });
-              }
-            }
-          }
-        }
-        None => {
-          if let Entry::Occupied(mut entry) =
-            variable_usage_map.entry(identifier_name.clone())
-          {
-            entry.insert(true);
-          }
-
-          if !variable_names.contains(&identifier_name) {
-            diagnostics.push(create_diagnostic(format!(
-              "Variable `{identifier_name}` not found",
-            )));
-          }
-        }
-      }
-    }
-
-    for (variable_name, is_used) in variable_usage_map {
-      if !is_used {
-        if let Some(variable) = self.document.find_variable(&variable_name) {
-          if !variable.export {
-            diagnostics.push(lsp::Diagnostic {
-              range: variable.name.range,
-              severity: Some(lsp::DiagnosticSeverity::WARNING),
-              source: Some("just-lsp".to_string()),
-              message: format!("Variable `{variable_name}` appears unused"),
-              ..Default::default()
-            });
-          }
-        }
-      }
-    }
-
-    let settings = self.document.get_settings();
-
-    let exported = settings.iter().any(|setting| {
-      setting.name == "export" && setting.kind == SettingKind::Boolean(true)
-    });
-
-    for (recipe_name, identifiers) in recipe_identifier_map {
-      if let Some(recipe) = self.document.find_recipe(&recipe_name) {
-        for parameter in recipe.parameters {
-          if !identifiers.contains(&parameter.name)
-            && parameter.kind != ParameterKind::Export
-            && !exported
-          {
-            diagnostics.push(lsp::Diagnostic {
-              range: parameter.range,
-              severity: Some(lsp::DiagnosticSeverity::WARNING),
-              source: Some("just-lsp".to_string()),
-              message: format!("Parameter `{}` appears unused", parameter.name),
-              ..Default::default()
-            });
-          }
-        }
-      }
-    }
-
-    diagnostics
+    let context = RuleContext::new(self.document);
+    RULES.iter().flat_map(|rule| rule.run(&context)).collect()
   }
 }
 
@@ -1612,6 +816,17 @@ mod tests {
 
     Test::new(indoc! {
       "
+      set export := false
+
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused")
+    .run();
+
+    Test::new(indoc! {
+      "
       set export
 
       foo bar:
@@ -1652,6 +867,23 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused")
+    .run()
+  }
+
+  #[test]
+  fn duplicate_recipe_names_allowed_via_setting() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes := true
+
+      foo:
+        echo foo
+
+      [linux]
+      foo:
+        echo foo on linux
+      "
+    })
     .run()
   }
 
@@ -1712,6 +944,28 @@ mod tests {
 
       recipe arg=param_value:
         echo {{ arg }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn default_parameter_expression_functions() {
+    Test::new(indoc! {
+      "
+      build version=uppercase(\"1.0.0\"):
+        echo {{ version }}
+      "
+    })
+    .run()
+  }
+
+  #[test]
+  fn default_parameter_expression_with_env_call() {
+    Test::new(indoc! {
+      "
+      build target=(env('TARGET', 'debug')):
+        echo {{ target }}
       "
     })
     .run()
@@ -1814,9 +1068,9 @@ mod tests {
       build:
         echo \"Building on Windows\"
 
-      [unix]
+      [macos]
       build:
-        echo \"Building on Unix\"
+        echo \"Building on macOS\"
       "
     })
     .run()
@@ -1840,7 +1094,6 @@ mod tests {
   }
 
   #[test]
-  #[cfg(target_os = "macos")]
   fn mixed_os_specific_and_regular_recipe() {
     Test::new(indoc! {
       "
@@ -1852,6 +1105,23 @@ mod tests {
         echo \"Building on any OS\"
       "
     })
+    .error("Duplicate recipe name `build`")
+    .run()
+  }
+
+  #[test]
+  fn windows_recipe_conflicts_with_default() {
+    Test::new(indoc! {
+      "
+      [windows]
+      build:
+        echo \"Building on Windows\"
+
+      build:
+        echo \"Building on every OS\"
+      "
+    })
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1873,7 +1143,7 @@ mod tests {
   }
 
   #[test]
-  fn linux_openbsd_conflicts() {
+  fn linux_openbsd_no_conflict() {
     Test::new(indoc! {
       "
       [linux]
@@ -1885,12 +1155,11 @@ mod tests {
         echo \"Building on OpenBSD\"
       "
     })
-    .error("Duplicate recipe name `build`")
     .run()
   }
 
   #[test]
-  fn linux_unix_no_conflict() {
+  fn linux_unix_conflict() {
     Test::new(indoc! {
       "
       [linux]
@@ -1902,6 +1171,7 @@ mod tests {
         echo \"Building on Unix systems\"
       "
     })
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -2045,6 +1315,25 @@ mod tests {
     .error("Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`")
     .error("Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`")
     .error("Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`")
+    .run()
+  }
+
+  #[test]
+  fn circular_dependencies_only_flags_cycle_members() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+
+      baz: bar
+        echo \"baz\"
+      "
+    })
+    .error("Recipe `bar` has circular dependency `bar -> baz -> bar`")
+    .error("Recipe `baz` has circular dependency `baz -> bar -> baz`")
     .run()
   }
 
