@@ -58,7 +58,7 @@ impl Setting {
       });
     }
 
-    let parts: Vec<&str> = text.split(":=").collect();
+    let parts = text.split(":=").collect::<Vec<&str>>();
 
     if parts.len() != 2 {
       return None;

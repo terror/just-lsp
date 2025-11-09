@@ -1,39 +1,57 @@
 use {
-  super::*, aliases::AliasesRule, attributes::AttributesRule,
+  super::*, attribute_arguments::AttributeArgumentsRule,
+  attribute_invalid_target::AttributeInvalidTargetRule,
+  attribute_target_support::AttributeTargetSupportRule,
   dependency_arguments::DependencyArgumentRule,
-  duplicate_recipes::DuplicateRecipeRule, function_calls::FunctionCallsRule,
+  duplicate_alias::DuplicateAliasRule, duplicate_recipes::DuplicateRecipeRule,
+  duplicate_setting::DuplicateSettingRule, function_calls::FunctionCallsRule,
+  invalid_setting_kind::InvalidSettingKindRule,
   missing_dependencies::MissingDependencyRule,
+  missing_recipe_for_alias::MissingRecipeForAliasRule,
   recipe_dependency_cycles::RecipeDependencyCycleRule,
-  recipe_parameters::RecipeParameterRule, settings::SettingsRule,
-  syntax::SyntaxRule, undefined_identifiers::UndefinedIdentifierRule,
+  recipe_parameters::RecipeParameterRule, syntax::SyntaxRule,
+  undefined_identifiers::UndefinedIdentifierRule,
+  unknown_attribute::UnknownAttributeRule, unknown_setting::UnknownSettingRule,
   unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
 };
 
-mod aliases;
-mod attributes;
+mod attribute_arguments;
+mod attribute_invalid_target;
+mod attribute_target_support;
 mod dependency_arguments;
+mod duplicate_alias;
 mod duplicate_recipes;
+mod duplicate_setting;
 mod function_calls;
+mod invalid_setting_kind;
 mod missing_dependencies;
+mod missing_recipe_for_alias;
 mod recipe_dependency_cycles;
 mod recipe_parameters;
-mod settings;
 mod syntax;
 mod undefined_identifiers;
+mod unknown_attribute;
+mod unknown_setting;
 mod unused_parameters;
 mod unused_variables;
 
 pub(crate) static RULES: &[&dyn Rule] = &[
   &SyntaxRule,
-  &AliasesRule,
-  &AttributesRule,
+  &MissingRecipeForAliasRule,
+  &DuplicateAliasRule,
+  &UnknownAttributeRule,
+  &AttributeArgumentsRule,
+  &AttributeInvalidTargetRule,
+  &AttributeTargetSupportRule,
   &FunctionCallsRule,
   &RecipeParameterRule,
   &DuplicateRecipeRule,
   &RecipeDependencyCycleRule,
   &MissingDependencyRule,
   &DependencyArgumentRule,
-  &SettingsRule,
+  &UnknownSettingRule,
+  &InvalidSettingKindRule,
+  &DuplicateSettingRule,
   &UndefinedIdentifierRule,
   &UnusedVariableRule,
   &UnusedParameterRule,
