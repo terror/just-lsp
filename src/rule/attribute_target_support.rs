@@ -1,5 +1,7 @@
 use super::*;
 
+/// Validates that each attribute is attached to a supported target kind (recipe,
+/// module, alias, etc.) according to the builtin metadata.
 pub struct AttributeTargetSupportRule;
 
 impl Rule for AttributeTargetSupportRule {

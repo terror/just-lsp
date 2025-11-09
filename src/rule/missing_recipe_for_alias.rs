@@ -1,5 +1,6 @@
 use super::*;
 
+/// Flags aliases that point to recipes which aren’t defined.
 pub struct MissingRecipeForAliasRule;
 
 impl Rule for MissingRecipeForAliasRule {

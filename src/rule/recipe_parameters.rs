@@ -1,5 +1,7 @@
 use super::*;
 
+/// Validates recipe parameter lists for duplicate names, ordering mistakes, and
+/// illegal variadic/default combinations.
 pub struct RecipeParameterRule;
 
 impl Rule for RecipeParameterRule {

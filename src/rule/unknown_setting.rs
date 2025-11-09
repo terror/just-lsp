@@ -1,5 +1,7 @@
 use super::*;
 
+/// Emits diagnostics for `set` directives targeting settings that don’t exist in
+/// the builtin catalog.
 pub struct UnknownSettingRule;
 
 impl Rule for UnknownSettingRule {

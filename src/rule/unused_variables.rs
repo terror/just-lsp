@@ -1,5 +1,7 @@
 use super::*;
 
+/// Finds non-exported global variables that are never referenced anywhere in the
+/// document.
 pub struct UnusedVariableRule;
 
 impl Rule for UnusedVariableRule {

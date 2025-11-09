@@ -1,5 +1,7 @@
 use super::*;
 
+/// Reports expressions that reference variables or parameters which are not
+/// defined and aren’t builtins.
 pub struct UndefinedIdentifierRule;
 
 impl Rule for UndefinedIdentifierRule {

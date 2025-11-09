@@ -1,5 +1,6 @@
 use super::*;
 
+/// Warns when an attribute name isn’t part of the known builtin attribute set.
 pub struct UnknownAttributeRule;
 
 impl Rule for UnknownAttributeRule {

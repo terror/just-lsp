@@ -1,5 +1,7 @@
 use super::*;
 
+/// Reports recipe dependencies that reference recipes which don’t exist in the
+/// current document.
 pub struct MissingDependencyRule;
 
 impl Rule for MissingDependencyRule {

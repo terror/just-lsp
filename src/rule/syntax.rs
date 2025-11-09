@@ -1,5 +1,7 @@
 use super::*;
 
+/// Surfaces tree-sitter syntax errors and missing nodes so users get feedback on
+/// malformed `justfile` syntax before other rules run.
 pub struct SyntaxRule;
 
 impl Rule for SyntaxRule {

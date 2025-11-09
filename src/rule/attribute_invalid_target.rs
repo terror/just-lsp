@@ -1,5 +1,6 @@
 use super::*;
 
+/// Ensures attributes only appear on syntax nodes that actually accept attributes.
 pub struct AttributeInvalidTargetRule;
 
 impl Rule for AttributeInvalidTargetRule {
@@ -24,12 +25,11 @@ impl Rule for AttributeInvalidTargetRule {
     for attribute_node in root.find_all("attribute") {
       for identifier_node in attribute_node.find_all("identifier") {
         let attribute_name = document.get_node_text(&identifier_node);
-        let attribute_name_str = attribute_name.as_str();
 
         let is_known = builtins::BUILTINS.iter().any(|f| {
           matches!(
             f,
-            Builtin::Attribute { name, .. } if *name == attribute_name_str
+            Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
           )
         });
 
@@ -41,7 +41,7 @@ impl Rule for AttributeInvalidTargetRule {
           continue;
         };
 
-        if attribute_target_from_kind(parent.kind()).is_none() {
+        if Self::attribute_target_from_kind(parent.kind()).is_none() {
           diagnostics.push(self.diagnostic(lsp::Diagnostic {
             range: attribute_node.get_range(),
             severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -58,12 +58,14 @@ impl Rule for AttributeInvalidTargetRule {
   }
 }
 
-fn attribute_target_from_kind(kind: &str) -> Option<AttributeTarget> {
-  match kind {
-    "alias" => Some(AttributeTarget::Alias),
-    "assignment" | "export" => Some(AttributeTarget::Assignment),
-    "module" => Some(AttributeTarget::Module),
-    "recipe" => Some(AttributeTarget::Recipe),
-    _ => None,
+impl AttributeInvalidTargetRule {
+  fn attribute_target_from_kind(kind: &str) -> Option<AttributeTarget> {
+    match kind {
+      "alias" => Some(AttributeTarget::Alias),
+      "assignment" | "export" => Some(AttributeTarget::Assignment),
+      "module" => Some(AttributeTarget::Module),
+      "recipe" => Some(AttributeTarget::Recipe),
+      _ => None,
+    }
   }
 }

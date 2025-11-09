@@ -1,5 +1,7 @@
 use super::*;
 
+/// Reports attribute invocations whose argument counts don’t match their builtin
+/// definitions.
 pub struct AttributeArgumentsRule;
 
 impl Rule for AttributeArgumentsRule {

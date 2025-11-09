@@ -1,5 +1,6 @@
 use super::*;
 
+/// Flags alias declarations that reuse the same name multiple times.
 pub struct DuplicateAliasRule;
 
 impl Rule for DuplicateAliasRule {

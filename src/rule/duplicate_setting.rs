@@ -1,5 +1,6 @@
 use super::*;
 
+/// Emits diagnostics when the same `set` option is declared more than once.
 pub struct DuplicateSettingRule;
 
 impl Rule for DuplicateSettingRule {

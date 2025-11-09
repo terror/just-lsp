@@ -1,5 +1,7 @@
 use super::*;
 
+/// Detects circular dependency chains between recipes to prevent infinite
+/// execution loops.
 pub struct RecipeDependencyCycleRule;
 
 impl Rule for RecipeDependencyCycleRule {

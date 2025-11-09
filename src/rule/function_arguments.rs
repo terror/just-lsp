@@ -1,5 +1,7 @@
 use super::*;
 
+/// Verifies builtin function calls use a valid argument count and respect
+/// variadic constraints.
 pub struct FunctionArgumentsRule;
 
 impl Rule for FunctionArgumentsRule {

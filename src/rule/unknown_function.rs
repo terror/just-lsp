@@ -1,5 +1,7 @@
 use super::*;
 
+/// Ensures every function call references a builtin function recognized by
+/// `just`.
 pub struct UnknownFunctionRule;
 
 impl Rule for UnknownFunctionRule {
