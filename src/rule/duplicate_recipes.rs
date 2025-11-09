@@ -23,7 +23,7 @@ impl Rule for DuplicateRecipeRule {
       recipe_groups
         .entry(recipe.name.clone())
         .or_default()
-        .push((recipe.range.clone(), recipe.os_groups()));
+        .push((recipe.range, recipe.os_groups()));
     }
 
     for (recipe_name, group) in &recipe_groups {
@@ -41,7 +41,7 @@ impl Rule for DuplicateRecipeRule {
 
           if has_conflict {
             diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: range.clone(),
+              range: *range,
               severity: Some(lsp::DiagnosticSeverity::ERROR),
               message: format!("Duplicate recipe name `{recipe_name}`"),
               ..Default::default()
