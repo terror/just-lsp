@@ -1,14 +1,14 @@
 use super::*;
 
-pub struct FunctionCallsRule;
+pub struct FunctionArgumentsRule;
 
-impl Rule for FunctionCallsRule {
+impl Rule for FunctionArgumentsRule {
   fn id(&self) -> &'static str {
-    "function-calls"
+    "function-arguments"
   }
 
   fn display_name(&self) -> &'static str {
-    "Function Calls"
+    "Function Arguments"
   }
 
   fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
@@ -25,9 +25,9 @@ impl Rule for FunctionCallsRule {
       if let Some(identifier_node) = function_call.find("identifier") {
         let function_name = document.get_node_text(&identifier_node);
 
-        let builtin = builtins::BUILTINS
-          .iter()
-          .find(|f| matches!(f, Builtin::Function { name, .. } if *name == function_name));
+        let builtin = builtins::BUILTINS.iter().find(|f| {
+          matches!(f, Builtin::Function { name, .. } if *name == function_name)
+        });
 
         if let Some(Builtin::Function {
           required_args,
@@ -35,17 +35,7 @@ impl Rule for FunctionCallsRule {
           ..
         }) = builtin
         {
-          let arguments = function_call
-            .find("sequence")
-            .map(|sequence| {
-              (0..sequence.child_count())
-                .filter_map(|i| sequence.child(i))
-                .filter(|child| child.kind() == "expression")
-                .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-          let arg_count = arguments.len();
+          let arg_count = Self::argument_count(&function_call);
 
           if arg_count < *required_args {
             diagnostics.push(self.diagnostic(lsp::Diagnostic {
@@ -68,17 +58,24 @@ impl Rule for FunctionCallsRule {
               ..Default::default()
             }));
           }
-        } else {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: identifier_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!("Unknown function `{function_name}`"),
-            ..Default::default()
-          }));
         }
       }
     }
 
     diagnostics
+  }
+}
+
+impl FunctionArgumentsRule {
+  fn argument_count(function_call: &Node) -> usize {
+    function_call
+      .find("sequence")
+      .map(|sequence| {
+        (0..sequence.child_count())
+          .filter_map(|i| sequence.child(i))
+          .filter(|child| child.kind() == "expression")
+          .count()
+      })
+      .unwrap_or(0)
   }
 }

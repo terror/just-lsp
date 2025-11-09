@@ -4,14 +4,16 @@ use {
   attribute_target_support::AttributeTargetSupportRule,
   dependency_arguments::DependencyArgumentRule,
   duplicate_alias::DuplicateAliasRule, duplicate_recipes::DuplicateRecipeRule,
-  duplicate_setting::DuplicateSettingRule, function_calls::FunctionCallsRule,
+  duplicate_setting::DuplicateSettingRule,
+  function_arguments::FunctionArgumentsRule,
   invalid_setting_kind::InvalidSettingKindRule,
   missing_dependencies::MissingDependencyRule,
   missing_recipe_for_alias::MissingRecipeForAliasRule,
   recipe_dependency_cycles::RecipeDependencyCycleRule,
   recipe_parameters::RecipeParameterRule, syntax::SyntaxRule,
   undefined_identifiers::UndefinedIdentifierRule,
-  unknown_attribute::UnknownAttributeRule, unknown_setting::UnknownSettingRule,
+  unknown_attribute::UnknownAttributeRule,
+  unknown_function::UnknownFunctionRule, unknown_setting::UnknownSettingRule,
   unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
 };
 
@@ -22,7 +24,7 @@ mod dependency_arguments;
 mod duplicate_alias;
 mod duplicate_recipes;
 mod duplicate_setting;
-mod function_calls;
+mod function_arguments;
 mod invalid_setting_kind;
 mod missing_dependencies;
 mod missing_recipe_for_alias;
@@ -31,6 +33,7 @@ mod recipe_parameters;
 mod syntax;
 mod undefined_identifiers;
 mod unknown_attribute;
+mod unknown_function;
 mod unknown_setting;
 mod unused_parameters;
 mod unused_variables;
@@ -43,7 +46,8 @@ pub(crate) static RULES: &[&dyn Rule] = &[
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
   &AttributeTargetSupportRule,
-  &FunctionCallsRule,
+  &UnknownFunctionRule,
+  &FunctionArgumentsRule,
   &RecipeParameterRule,
   &DuplicateRecipeRule,
   &RecipeDependencyCycleRule,
