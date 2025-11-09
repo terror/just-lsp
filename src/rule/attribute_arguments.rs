@@ -24,13 +24,13 @@ impl Rule for AttributeArgumentsRule {
     for attribute_node in root.find_all("attribute") {
       for identifier_node in attribute_node.find_all("identifier") {
         let attribute_name = document.get_node_text(&identifier_node);
-        let attribute_name_str = attribute_name.as_str();
+
         let matching = builtins::BUILTINS
           .iter()
           .filter(|f| {
             matches!(
               f,
-              Builtin::Attribute { name, .. } if *name == attribute_name_str
+              Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
             )
           })
           .collect::<Vec<_>>();
