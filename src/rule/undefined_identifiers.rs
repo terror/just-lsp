@@ -1,0 +1,37 @@
+use super::*;
+
+pub struct UndefinedIdentifierRule;
+
+impl Rule for UndefinedIdentifierRule {
+  fn id(&self) -> &'static str {
+    "undefined-identifiers"
+  }
+
+  fn display_name(&self) -> &'static str {
+    "Undefined Identifiers"
+  }
+
+  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for unresolved in ctx.unresolved_identifiers() {
+      diagnostics.push(self.diagnostic(lsp::Diagnostic {
+        range: unresolved.range,
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        message: format!("Variable `{}` not found", unresolved.name),
+        ..Default::default()
+      }));
+    }
+
+    for invalid_default in ctx.invalid_parameter_defaults() {
+      diagnostics.push(self.diagnostic(lsp::Diagnostic {
+        range: invalid_default.range,
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        message: format!("Variable `{}` not found", invalid_default.value),
+        ..Default::default()
+      }));
+    }
+
+    diagnostics
+  }
+}

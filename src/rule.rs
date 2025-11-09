@@ -1,8 +1,43 @@
-use super::*;
+use {
+  super::*, aliases::AliasesRule, attributes::AttributesRule,
+  dependency_arguments::DependencyArgumentRule,
+  duplicate_recipes::DuplicateRecipeRule, function_calls::FunctionCallsRule,
+  missing_dependencies::MissingDependencyRule,
+  recipe_dependency_cycles::RecipeDependencyCycleRule,
+  recipe_parameters::RecipeParameterRule, settings::SettingsRule,
+  syntax::SyntaxRule, undefined_identifiers::UndefinedIdentifierRule,
+  unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
+};
 
-pub use syntax::SyntaxRule;
-
+mod aliases;
+mod attributes;
+mod dependency_arguments;
+mod duplicate_recipes;
+mod function_calls;
+mod missing_dependencies;
+mod recipe_dependency_cycles;
+mod recipe_parameters;
+mod settings;
 mod syntax;
+mod undefined_identifiers;
+mod unused_parameters;
+mod unused_variables;
+
+pub(crate) static RULES: &[&dyn Rule] = &[
+  &SyntaxRule,
+  &AliasesRule,
+  &AttributesRule,
+  &FunctionCallsRule,
+  &RecipeParameterRule,
+  &DuplicateRecipeRule,
+  &RecipeDependencyCycleRule,
+  &MissingDependencyRule,
+  &DependencyArgumentRule,
+  &SettingsRule,
+  &UndefinedIdentifierRule,
+  &UnusedVariableRule,
+  &UnusedParameterRule,
+];
 
 pub(crate) struct UnresolvedIdentifier {
   pub(crate) name: String,
@@ -10,16 +45,16 @@ pub(crate) struct UnresolvedIdentifier {
 }
 
 pub(crate) struct InvalidParameterDefault {
-  pub(crate) value: String,
   pub(crate) range: lsp::Range,
+  pub(crate) value: String,
 }
 
 #[derive(Default)]
 pub(crate) struct IdentifierAnalysis {
-  variable_usage: HashMap<String, bool>,
+  invalid_parameter_defaults: Vec<InvalidParameterDefault>,
   recipe_identifier_usage: HashMap<String, HashSet<String>>,
   unresolved_identifiers: Vec<UnresolvedIdentifier>,
-  invalid_parameter_defaults: Vec<InvalidParameterDefault>,
+  variable_usage: HashMap<String, bool>,
 }
 
 impl IdentifierAnalysis {

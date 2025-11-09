@@ -20,7 +20,7 @@ use {
   resolver::Resolver,
   rope_ext::RopeExt,
   ropey::Rope,
-  rule::{Rule, RuleContext, SyntaxRule},
+  rule::{RuleContext, RULES},
   serde::{Deserialize, Serialize},
   server::Server,
   setting::{Setting, SettingKind},
