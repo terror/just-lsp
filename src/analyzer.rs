@@ -1035,9 +1035,9 @@ mod tests {
       build:
         echo \"Building on Windows\"
 
-      [unix]
+      [macos]
       build:
-        echo \"Building on Unix\"
+        echo \"Building on macOS\"
       "
     })
     .run()
@@ -1061,7 +1061,6 @@ mod tests {
   }
 
   #[test]
-  #[cfg(target_os = "macos")]
   fn mixed_os_specific_and_regular_recipe() {
     Test::new(indoc! {
       "
@@ -1073,6 +1072,23 @@ mod tests {
         echo \"Building on any OS\"
       "
     })
+    .error("Duplicate recipe name `build`")
+    .run()
+  }
+
+  #[test]
+  fn windows_recipe_conflicts_with_default() {
+    Test::new(indoc! {
+      "
+      [windows]
+      build:
+        echo \"Building on Windows\"
+
+      build:
+        echo \"Building on every OS\"
+      "
+    })
+    .error("Duplicate recipe name `build`")
     .run()
   }
 
@@ -1094,7 +1110,7 @@ mod tests {
   }
 
   #[test]
-  fn linux_openbsd_conflicts() {
+  fn linux_openbsd_no_conflict() {
     Test::new(indoc! {
       "
       [linux]
@@ -1106,12 +1122,11 @@ mod tests {
         echo \"Building on OpenBSD\"
       "
     })
-    .error("Duplicate recipe name `build`")
     .run()
   }
 
   #[test]
-  fn linux_unix_no_conflict() {
+  fn linux_unix_conflict() {
     Test::new(indoc! {
       "
       [linux]
@@ -1123,6 +1138,7 @@ mod tests {
         echo \"Building on Unix systems\"
       "
     })
+    .error("Duplicate recipe name `build`")
     .run()
   }
 

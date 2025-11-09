@@ -108,17 +108,30 @@ impl Recipe {
     for attribute in &self.attributes {
       let attribute_name = attribute.name.value.as_str();
 
-      if let Ok(group) = OsGroup::try_from(attribute_name) {
-        os_groups.insert(group);
+      match attribute_name {
+        "windows" => {
+          os_groups.insert(OsGroup::Windows);
+        }
+        "linux" => {
+          os_groups.insert(OsGroup::Linux);
+        }
+        "macos" => {
+          os_groups.insert(OsGroup::Macos);
+        }
+        "openbsd" => {
+          os_groups.insert(OsGroup::Openbsd);
+        }
+        "unix" => {
+          os_groups.insert(OsGroup::Linux);
+          os_groups.insert(OsGroup::Macos);
+          os_groups.insert(OsGroup::Openbsd);
+        }
+        _ => {}
       }
     }
 
     if os_groups.is_empty() {
-      if let Ok(group) = OsGroup::try_from(target::os()) {
-        os_groups.insert(group);
-      } else {
-        os_groups.insert(OsGroup::None);
-      }
+      os_groups.insert(OsGroup::Any);
     }
 
     os_groups
@@ -298,7 +311,6 @@ mod tests {
   }
 
   #[test]
-  #[cfg(target_os = "macos")]
   fn recipe_os_groups_no_attributes() {
     let recipe = Recipe {
       name: "test".to_string(),
@@ -309,37 +321,7 @@ mod tests {
       range: create_range(0, 0, 2, 0),
     };
 
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::UnixMacOS]));
-  }
-
-  #[test]
-  #[cfg(target_os = "linux")]
-  fn recipe_os_groups_no_attributes() {
-    let recipe = Recipe {
-      name: "test".to_string(),
-      attributes: vec![],
-      dependencies: vec![],
-      parameters: vec![],
-      content: "test:\n  echo test".to_string(),
-      range: create_range(0, 0, 2, 0),
-    };
-
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::LinuxOpenBSD]));
-  }
-
-  #[test]
-  #[cfg(target_os = "windows")]
-  fn recipe_os_groups_no_attributes() {
-    let recipe = Recipe {
-      name: "test".to_string(),
-      attributes: vec![],
-      dependencies: vec![],
-      parameters: vec![],
-      content: "test:\n  echo test".to_string(),
-      range: create_range(0, 0, 2, 0),
-    };
-
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::Windows]));
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::Any]));
   }
 
   #[test]
@@ -360,7 +342,7 @@ mod tests {
       range: create_range(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::LinuxOpenBSD]));
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::Linux]));
   }
 
   #[test]
@@ -393,7 +375,7 @@ mod tests {
 
     assert_eq!(
       recipe.os_groups(),
-      HashSet::from([OsGroup::LinuxOpenBSD, OsGroup::Windows])
+      HashSet::from([OsGroup::Linux, OsGroup::Windows])
     );
   }
 
@@ -454,15 +436,15 @@ mod tests {
     assert_eq!(
       recipe.os_groups(),
       HashSet::from([
-        OsGroup::LinuxOpenBSD,
+        OsGroup::Linux,
         OsGroup::Windows,
-        OsGroup::UnixMacOS
+        OsGroup::Macos,
+        OsGroup::Openbsd
       ])
     );
   }
 
   #[test]
-  #[cfg(target_os = "macos")]
   fn recipe_os_groups_non_os_attributes() {
     let recipe = Recipe {
       name: "test".to_string(),
@@ -480,6 +462,6 @@ mod tests {
       range: create_range(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::UnixMacOS]));
+    assert_eq!(recipe.os_groups(), HashSet::from([OsGroup::Any]));
   }
 }
