@@ -14,9 +14,8 @@ impl Rule for RecipeDependencyCycleRule {
   }
 
   fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
-
     let mut dependency_graph = HashMap::new();
+    let mut diagnostics = Vec::new();
 
     for recipe in ctx.recipes() {
       dependency_graph.insert(
@@ -29,17 +28,24 @@ impl Rule for RecipeDependencyCycleRule {
       );
     }
 
+    let mut reported_recipes = HashSet::new();
+
     for recipe in ctx.recipes() {
-      let mut visited = HashSet::new();
       let mut path = Vec::new();
+      let mut visited = HashSet::new();
+
+      let mut traversal_state = TraversalState {
+        visited: &mut visited,
+        path: &mut path,
+        reported_recipes: &mut reported_recipes,
+      };
 
       self.detect_cycle(
         &recipe.name,
         &dependency_graph,
-        &mut visited,
-        &mut path,
         &mut diagnostics,
         ctx,
+        &mut traversal_state,
       );
     }
 
@@ -47,48 +53,59 @@ impl Rule for RecipeDependencyCycleRule {
   }
 }
 
+struct TraversalState<'a> {
+  visited: &'a mut HashSet<String>,
+  path: &'a mut Vec<String>,
+  reported_recipes: &'a mut HashSet<String>,
+}
+
 impl RecipeDependencyCycleRule {
   fn detect_cycle(
     &self,
     recipe_name: &str,
     graph: &HashMap<String, Vec<String>>,
-    visited: &mut HashSet<String>,
-    path: &mut Vec<String>,
     diagnostics: &mut Vec<lsp::Diagnostic>,
     ctx: &RuleContext<'_>,
+    traversal: &mut TraversalState<'_>,
   ) {
-    if visited.contains(recipe_name) {
+    if traversal.visited.contains(recipe_name) {
       return;
     }
 
-    if path.iter().any(|r| r == recipe_name) {
-      let cycle_start_idx = path.iter().position(|r| r == recipe_name).unwrap();
+    if traversal.path.iter().any(|r| r == recipe_name) {
+      let cycle_start_idx = traversal
+        .path
+        .iter()
+        .position(|r| r == recipe_name)
+        .unwrap();
 
-      let mut cycle = path[cycle_start_idx..].to_vec();
+      let mut cycle = traversal.path[cycle_start_idx..].to_vec();
       cycle.push(recipe_name.to_string());
 
-      if let Some(first) = path.first() {
-        if let Some(recipe) = ctx.recipe(first) {
-          let message = if cycle.len() == 2 && cycle[0] == cycle[1] {
-            format!("Recipe `{}` depends on itself", cycle[0])
-          } else if cycle[0] == recipe_name {
-            format!(
-              "Recipe `{}` has circular dependency `{}`",
-              recipe_name,
-              cycle.join(" -> ")
-            )
-          } else {
-            path.push(recipe_name.to_string());
-            return;
-          };
+      if let Some(recipe) = ctx.recipe(recipe_name) {
+        let message = if cycle.len() == 2 && cycle[0] == cycle[1] {
+          format!("Recipe `{}` depends on itself", cycle[0])
+        } else if cycle[0] == recipe_name {
+          format!(
+            "Recipe `{}` has circular dependency `{}`",
+            recipe_name,
+            cycle.join(" -> ")
+          )
+        } else {
+          traversal.path.push(recipe_name.to_string());
+          return;
+        };
 
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: recipe.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message,
-            ..Default::default()
-          }));
+        if !traversal.reported_recipes.insert(recipe_name.to_string()) {
+          return;
         }
+
+        diagnostics.push(self.diagnostic(lsp::Diagnostic {
+          range: recipe.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          message,
+          ..Default::default()
+        }));
       }
 
       return;
@@ -98,16 +115,16 @@ impl RecipeDependencyCycleRule {
       return;
     }
 
-    path.push(recipe_name.to_string());
+    traversal.path.push(recipe_name.to_string());
 
     if let Some(dependencies) = graph.get(recipe_name) {
       for dependency in dependencies {
-        self.detect_cycle(dependency, graph, visited, path, diagnostics, ctx);
+        self.detect_cycle(dependency, graph, diagnostics, ctx, traversal);
       }
     }
 
-    visited.insert(recipe_name.to_string());
+    traversal.visited.insert(recipe_name.to_string());
 
-    path.pop();
+    traversal.path.pop();
   }
 }

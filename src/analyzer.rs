@@ -1319,6 +1319,25 @@ mod tests {
   }
 
   #[test]
+  fn circular_dependencies_only_flags_cycle_members() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+
+      baz: bar
+        echo \"baz\"
+      "
+    })
+    .error("Recipe `bar` has circular dependency `bar -> baz -> bar`")
+    .error("Recipe `baz` has circular dependency `baz -> bar -> baz`")
+    .run()
+  }
+
+  #[test]
   fn circular_dependencies_with_multiple_dependencies() {
     Test::new(indoc! {
       "
