@@ -860,6 +860,23 @@ mod tests {
   }
 
   #[test]
+  fn duplicate_recipe_names_allowed_via_setting() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes := true
+
+      foo:
+        echo foo
+
+      [linux]
+      foo:
+        echo foo on linux
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn used_variables_no_warnings() {
     Test::new(indoc! {
       "

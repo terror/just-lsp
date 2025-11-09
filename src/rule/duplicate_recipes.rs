@@ -12,6 +12,15 @@ impl Rule for DuplicateRecipeRule {
   }
 
   fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+    let allow_duplicates = ctx.settings().iter().any(|setting| {
+      setting.name == "allow-duplicate-recipes"
+        && matches!(setting.kind, SettingKind::Boolean(true))
+    });
+
+    if allow_duplicates {
+      return Vec::new();
+    }
+
     let mut diagnostics = Vec::new();
 
     let mut recipe_groups: HashMap<
