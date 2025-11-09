@@ -12,6 +12,7 @@ use {
   document::Document,
   env_logger::Env,
   node_ext::NodeExt,
+  once_cell::sync::OnceCell,
   os_group::OsGroup,
   point_ext::PointExt,
   position_ext::PositionExt,
@@ -19,6 +20,7 @@ use {
   resolver::Resolver,
   rope_ext::RopeExt,
   ropey::Rope,
+  rule::{Rule, RuleContext, SyntaxRule},
   serde::{Deserialize, Serialize},
   server::Server,
   setting::{Setting, SettingKind},
@@ -39,7 +41,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
-  tree_sitter::{Language, Node, Parser, Point, Tree},
+  tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
   variable::Variable,
 };
 
@@ -59,6 +61,7 @@ mod position_ext;
 mod recipe;
 mod resolver;
 mod rope_ext;
+mod rule;
 mod server;
 mod setting;
 mod subcommand;
