@@ -1,7 +1,6 @@
 use super::*;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum SettingKind {
   Array,
   Boolean(bool),

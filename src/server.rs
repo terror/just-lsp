@@ -148,7 +148,6 @@ impl LanguageServer for Server {
   }
 
   #[allow(clippy::unused_async)]
-  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
@@ -175,7 +174,6 @@ impl LanguageServer for Server {
   }
 
   #[allow(clippy::unused_async)]
-  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     self.0.shutdown().await
   }
@@ -187,16 +185,7 @@ pub(crate) struct Inner {
   initialized: AtomicBool,
 }
 
-#[allow(clippy::arbitrary_source_item_ordering)]
 impl Inner {
-  fn new(client: Client) -> Self {
-    Self {
-      client,
-      documents: RwLock::new(BTreeMap::new()),
-      initialized: AtomicBool::new(false),
-    }
-  }
-
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
@@ -478,6 +467,31 @@ impl Inner {
     Ok(None)
   }
 
+  async fn format_document(&self, content: &str) -> Result<String> {
+    let tempdir = tempdir()?;
+
+    let file = tempdir.path().join("justfile");
+
+    fs::write(&file, content.as_bytes())?;
+
+    let mut command = tokio::process::Command::new("just");
+
+    command.arg("--fmt").arg("--unstable").arg("--quiet");
+
+    command.current_dir(tempdir.path());
+
+    let output = command.output().await?;
+
+    if !output.status.success() {
+      bail!(
+        "just formatting failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+    }
+
+    Ok(fs::read_to_string(&file)?)
+  }
+
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
@@ -526,31 +540,6 @@ impl Inner {
     }
 
     Ok(None)
-  }
-
-  async fn format_document(&self, content: &str) -> Result<String> {
-    let tempdir = tempdir()?;
-
-    let file = tempdir.path().join("justfile");
-
-    fs::write(&file, content.as_bytes())?;
-
-    let mut command = tokio::process::Command::new("just");
-
-    command.arg("--fmt").arg("--unstable").arg("--quiet");
-
-    command.current_dir(tempdir.path());
-
-    let output = command.output().await?;
-
-    if !output.status.success() {
-      bail!(
-        "just formatting failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-      );
-    }
-
-    Ok(fs::read_to_string(&file)?)
   }
 
   async fn goto_definition(
@@ -625,6 +614,14 @@ impl Inner {
     self
       .initialized
       .store(true, std::sync::atomic::Ordering::Relaxed);
+  }
+
+  fn new(client: Client) -> Self {
+    Self {
+      client,
+      documents: RwLock::new(BTreeMap::new()),
+      initialized: AtomicBool::new(false),
+    }
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
