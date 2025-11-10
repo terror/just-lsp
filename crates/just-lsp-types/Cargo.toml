@@ -1,0 +1,9 @@
+[package]
+name = "just-lsp-types"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+tower-lsp = { workspace = true }

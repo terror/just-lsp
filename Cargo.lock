@@ -619,6 +619,7 @@ dependencies = [
  "clap",
  "env_logger",
  "indoc",
+ "just-lsp-types",
  "log",
  "once_cell",
  "pretty_assertions",
@@ -632,6 +633,14 @@ dependencies = [
  "tower-lsp",
  "tower-test",
  "tree-sitter",
+]
+
+[[package]]
+name = "just-lsp-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "tower-lsp",
 ]
 
 [[package]]
