@@ -236,14 +236,14 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn aliases(&self) -> &[Alias] {
     self
       .aliases
-      .get_or_init(|| self.document.get_aliases())
+      .get_or_init(|| self.document.aliases())
       .as_slice()
   }
 
   pub(crate) fn recipes(&self) -> &[Recipe] {
     self
       .recipes
-      .get_or_init(|| self.document.get_recipes())
+      .get_or_init(|| self.document.recipes())
       .as_slice()
   }
 
@@ -261,14 +261,14 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn settings(&self) -> &[Setting] {
     self
       .settings
-      .get_or_init(|| self.document.get_settings())
+      .get_or_init(|| self.document.settings())
       .as_slice()
   }
 
   pub(crate) fn variables(&self) -> &[Variable] {
     self
       .variables
-      .get_or_init(|| self.document.get_variables())
+      .get_or_init(|| self.document.variables())
       .as_slice()
   }
 

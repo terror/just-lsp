@@ -47,7 +47,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == identifier_name {
@@ -177,7 +177,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == text {

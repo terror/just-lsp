@@ -203,7 +203,7 @@ impl Inner {
     if let Some(document) = documents.get(uri) {
       let mut actions = Vec::new();
 
-      for recipe in document.get_recipes() {
+      for recipe in document.recipes() {
         let parameters = recipe
           .parameters
           .into_iter()
@@ -248,7 +248,7 @@ impl Inner {
     if let Some(document) = documents.get(&uri) {
       let mut completion_items = Vec::new();
 
-      let recipes = document.get_recipes();
+      let recipes = document.recipes();
 
       for recipe in recipes {
         completion_items.push(lsp::CompletionItem {
@@ -266,7 +266,7 @@ impl Inner {
         });
       }
 
-      let variables = document.get_variables();
+      let variables = document.variables();
 
       for variable in variables {
         completion_items.push(lsp::CompletionItem {
@@ -440,7 +440,7 @@ impl Inner {
     let documents = self.documents.read().await;
 
     if let Some(document) = documents.get(uri) {
-      let recipes = document.get_recipes();
+      let recipes = document.recipes();
 
       let folding_ranges = recipes
         .into_iter()

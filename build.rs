@@ -1,9 +1,12 @@
-use {cc::Build, std::path::PathBuf};
+use {
+  cc::Build,
+  std::path::{Path, PathBuf},
+};
 
 struct Parser<'a> {
+  extra: Vec<&'a str>,
   name: &'a str,
   src: &'a str,
-  extra: Vec<&'a str>,
 }
 
 impl Parser<'_> {
@@ -15,23 +18,31 @@ impl Parser<'_> {
 
     let c = files
       .iter()
-      .filter(|file| file.ends_with(".c"))
-      .cloned()
+      .filter(|file| {
+        Path::new(file)
+          .extension()
+          .is_some_and(|extension| extension.eq_ignore_ascii_case("c"))
+      })
+      .copied()
       .collect::<Vec<&str>>();
 
     let mut build = Build::new();
     build.include(&path).warnings(false);
 
-    c.iter().for_each(|file| {
+    for file in &c {
       build.file(path.join(file));
-    });
+    }
 
     build.compile(self.name);
 
     let cpp = files
       .iter()
-      .filter(|file| !file.ends_with(".c"))
-      .cloned()
+      .filter(|file| {
+        !Path::new(file)
+          .extension()
+          .is_some_and(|extension| extension.eq_ignore_ascii_case("c"))
+      })
+      .copied()
       .collect::<Vec<&str>>();
 
     if !cpp.is_empty() {
@@ -52,9 +63,9 @@ impl Parser<'_> {
         "--std=c++14"
       });
 
-      cpp.iter().for_each(|file| {
+      for file in &cpp {
         build.file(path.join(file));
-      });
+      }
 
       build.compile(&format!("{}-cpp", self.name));
     }
@@ -72,5 +83,5 @@ fn main() {
     println!("cargo:rerun-if-changed={}", parser.src);
   }
 
-  parsers.iter().for_each(|parser| parser.build());
+  parsers.iter().for_each(Parser::build);
 }

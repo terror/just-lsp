@@ -59,19 +59,19 @@ impl Document {
 
   pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
-      .get_recipes()
+      .recipes()
       .into_iter()
       .find(|recipe| recipe.name == name)
   }
 
   pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
     self
-      .get_variables()
+      .variables()
       .into_iter()
       .find(|var| var.name.value == name)
   }
 
-  pub(crate) fn get_aliases(&self) -> Vec<Alias> {
+  pub(crate) fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -184,7 +184,7 @@ impl Document {
       .to_string()
   }
 
-  pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
+  pub(crate) fn recipes(&self) -> Vec<Recipe> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -284,7 +284,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn get_settings(&self) -> Vec<Setting> {
+  pub(crate) fn settings(&self) -> Vec<Setting> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -300,7 +300,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn get_variables(&self) -> Vec<Variable> {
+  pub(crate) fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -496,7 +496,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -526,7 +526,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 1);
 
     assert_eq!(
@@ -580,7 +580,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -610,7 +610,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -641,7 +641,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -738,7 +738,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -836,7 +836,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 3);
 
     assert_eq!(
@@ -902,7 +902,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -938,7 +938,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.get_variables(),
+      doc.variables(),
       vec![
         Variable {
           name: TextNode {
@@ -1116,7 +1116,7 @@ mod tests {
       "
     });
 
-    let variables = doc.get_variables();
+    let variables = doc.variables();
 
     assert!(variables[0].export);
 
