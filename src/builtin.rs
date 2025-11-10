@@ -1,34 +1,5 @@
 use super::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum AttributeTarget {
-  Alias,
-  Assignment,
-  Module,
-  Recipe,
-}
-
-impl Display for AttributeTarget {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    write!(
-      f,
-      "{}",
-      match self {
-        AttributeTarget::Alias => "alias",
-        AttributeTarget::Assignment => "assignment",
-        AttributeTarget::Module => "module",
-        AttributeTarget::Recipe => "recipe",
-      }
-    )
-  }
-}
-
-impl AttributeTarget {
-  pub(crate) fn is_valid_for(&self, target: AttributeTarget) -> bool {
-    *self == target
-  }
-}
-
 #[derive(Debug)]
 pub(crate) enum Builtin<'a> {
   Attribute {

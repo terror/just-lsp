@@ -186,6 +186,7 @@ pub(crate) trait Rule: Sync {
 }
 
 pub(crate) struct RuleContext<'a> {
+  attributes: OnceCell<Vec<Attribute>>,
   aliases: OnceCell<Vec<Alias>>,
   document: &'a Document,
   document_variable_names: OnceCell<HashSet<String>>,
@@ -202,6 +203,7 @@ pub(crate) struct RuleContext<'a> {
 impl<'a> RuleContext<'a> {
   pub(crate) fn new(document: &'a Document) -> Self {
     Self {
+      attributes: OnceCell::new(),
       aliases: OnceCell::new(),
       document,
       document_variable_names: OnceCell::new(),
@@ -218,6 +220,13 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn document(&self) -> &Document {
     self.document
+  }
+
+  pub(crate) fn attributes(&self) -> &[Attribute] {
+    self
+      .attributes
+      .get_or_init(|| self.document.attributes())
+      .as_slice()
   }
 
   pub(crate) fn tree(&self) -> Option<&Tree> {
