@@ -12,7 +12,7 @@ use {
   just_lsp_rope_ext::RopeExt,
   just_lsp_types::{
     Alias, Attribute, Dependency, Group, Parameter, ParameterJson,
-    ParameterKind, Recipe, TextNode, Variable,
+    ParameterKind, Recipe, Setting, SettingKind, TextNode, Variable,
   },
   node_ext::NodeExt,
   once_cell::sync::OnceCell,
@@ -22,7 +22,6 @@ use {
   ropey::Rope,
   rule::{RuleContext, RULES},
   server::Server,
-  setting::{Setting, SettingKind},
   std::{
     backtrace::BacktraceStatus,
     collections::{BTreeMap, HashMap, HashSet},
@@ -55,7 +54,6 @@ mod position_ext;
 mod resolver;
 mod rule;
 mod server;
-mod setting;
 mod subcommand;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
