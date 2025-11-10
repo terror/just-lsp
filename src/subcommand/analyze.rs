@@ -16,7 +16,7 @@ impl Analyze {
       env::current_dir()?.join(&self.path)
     };
 
-    let uri = lsp::Url::from_file_path(&absolute_path).map_err(|_| {
+    let uri = lsp::Url::from_file_path(&absolute_path).map_err(|()| {
       anyhow!("failed to convert `{}` to file url", self.path.display())
     })?;
 

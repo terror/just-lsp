@@ -6,15 +6,15 @@ pub struct Analyzer<'a> {
 }
 
 impl<'a> Analyzer<'a> {
-  /// Creates a new analyzer for the given document.
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
-  }
-
   /// Analyzes the document and returns a list of diagnostics.
   pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
     let context = RuleContext::new(self.document);
     RULES.iter().flat_map(|rule| rule.run(&context)).collect()
+  }
+
+  /// Creates a new analyzer for the given document.
+  pub(crate) fn new(document: &'a Document) -> Self {
+    Self { document }
   }
 }
 
@@ -29,6 +29,17 @@ mod tests {
   }
 
   impl Test {
+    fn error(self, message: &str) -> Self {
+      Self {
+        messages: self
+          .messages
+          .into_iter()
+          .chain([(message.to_owned(), Some(lsp::DiagnosticSeverity::ERROR))])
+          .collect(),
+        ..self
+      }
+    }
+
     fn new(content: &str) -> Self {
       Self {
         document: Document::try_from(lsp::DidOpenTextDocumentParams {
@@ -44,15 +55,16 @@ mod tests {
       }
     }
 
-    fn error(self, message: &str) -> Self {
-      Self {
-        messages: self
-          .messages
-          .into_iter()
-          .chain([(message.to_owned(), Some(lsp::DiagnosticSeverity::ERROR))])
-          .collect(),
-        ..self
-      }
+    fn run(self) {
+      let analyzer = Analyzer::new(&self.document);
+
+      let messages = analyzer
+        .analyze()
+        .into_iter()
+        .map(|d| (d.message, d.severity))
+        .collect::<Vec<(String, Option<lsp::DiagnosticSeverity>)>>();
+
+      assert_eq!(messages, self.messages);
     }
 
     fn warning(self, message: &str) -> Self {
@@ -64,18 +76,6 @@ mod tests {
           .collect(),
         ..self
       }
-    }
-
-    fn run(self) {
-      let analyzer = Analyzer::new(&self.document);
-
-      let messages = analyzer
-        .analyze()
-        .into_iter()
-        .map(|d| (d.message, d.severity))
-        .collect::<Vec<(String, Option<lsp::DiagnosticSeverity>)>>();
-
-      assert_eq!(messages, self.messages);
     }
   }
 

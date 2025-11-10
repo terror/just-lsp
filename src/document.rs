@@ -30,47 +30,6 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
-  pub(crate) fn apply_change(
-    &mut self,
-    params: lsp::DidChangeTextDocumentParams,
-  ) -> Result {
-    let lsp::DidChangeTextDocumentParams {
-      content_changes,
-      text_document: lsp::VersionedTextDocumentIdentifier { version, .. },
-      ..
-    } = params;
-
-    self.version = version;
-
-    for change in content_changes {
-      let edit = self.content.build_edit(&change);
-
-      self.content.apply_edit(&edit);
-
-      if let Some(tree) = &mut self.tree {
-        tree.edit(&edit.input_edit);
-      }
-    }
-
-    self.parse()?;
-
-    Ok(())
-  }
-
-  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
-    self
-      .recipes()
-      .into_iter()
-      .find(|recipe| recipe.name == name)
-  }
-
-  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
-    self
-      .variables()
-      .into_iter()
-      .find(|var| var.name.value == name)
-  }
-
   pub(crate) fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -96,6 +55,33 @@ impl Document {
         })
         .collect()
     })
+  }
+
+  pub(crate) fn apply_change(
+    &mut self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result {
+    let lsp::DidChangeTextDocumentParams {
+      content_changes,
+      text_document: lsp::VersionedTextDocumentIdentifier { version, .. },
+      ..
+    } = params;
+
+    self.version = version;
+
+    for change in content_changes {
+      let edit = self.content.build_edit(&change);
+
+      self.content.apply_edit(&edit);
+
+      if let Some(tree) = &mut self.tree {
+        tree.edit(&edit.input_edit);
+      }
+    }
+
+    self.parse()?;
+
+    Ok(())
   }
 
   pub(crate) fn attributes(&self) -> Vec<Attribute> {
@@ -136,6 +122,20 @@ impl Document {
         })
         .collect()
     })
+  }
+
+  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
+    self
+      .recipes()
+      .into_iter()
+      .find(|recipe| recipe.name == name)
+  }
+
+  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
+    self
+      .variables()
+      .into_iter()
+      .find(|var| var.name.value == name)
   }
 
   pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
@@ -182,6 +182,31 @@ impl Document {
           ..self.content.byte_to_char(node.end_byte()),
       )
       .to_string()
+  }
+
+  pub(crate) fn node_at_position(
+    &self,
+    position: lsp::Position,
+  ) -> Option<Node<'_>> {
+    if let Some(tree) = &self.tree {
+      let point = position.point();
+      Some(tree.root_node().descendant_for_point_range(point, point)?)
+    } else {
+      None
+    }
+  }
+
+  pub(crate) fn parse(&mut self) -> Result {
+    let mut parser = Parser::new();
+
+    // SAFETY: tree_sitter_just returns a static language definition.
+    parser.set_language(&unsafe { tree_sitter_just() })?;
+
+    let old_tree = self.tree.take();
+
+    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
+
+    Ok(())
   }
 
   pub(crate) fn recipes(&self) -> Vec<Recipe> {
@@ -321,30 +346,6 @@ impl Document {
         })
         .collect()
     })
-  }
-
-  pub(crate) fn node_at_position(
-    &self,
-    position: lsp::Position,
-  ) -> Option<Node<'_>> {
-    if let Some(tree) = &self.tree {
-      let point = position.point();
-      Some(tree.root_node().descendant_for_point_range(point, point)?)
-    } else {
-      None
-    }
-  }
-
-  pub(crate) fn parse(&mut self) -> Result {
-    let mut parser = Parser::new();
-
-    parser.set_language(&unsafe { tree_sitter_just() })?;
-
-    let old_tree = self.tree.take();
-
-    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
-
-    Ok(())
   }
 }
 

@@ -9,22 +9,6 @@ impl Debug for Server {
 }
 
 impl Server {
-  pub fn new(client: Client) -> Self {
-    Self(Arc::new(Inner::new(client)))
-  }
-
-  pub async fn run() -> Result {
-    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
-
-    let (service, socket) = LspService::new(Server::new);
-
-    tower_lsp::Server::new(stdin, stdout, socket)
-      .serve(service)
-      .await;
-
-    Ok(())
-  }
-
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
@@ -63,6 +47,22 @@ impl Server {
       ..Default::default()
     }
   }
+
+  pub fn new(client: Client) -> Self {
+    Self(Arc::new(Inner::new(client)))
+  }
+
+  pub async fn run() -> Result {
+    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
+
+    let (service, socket) = LspService::new(Server::new);
+
+    tower_lsp::Server::new(stdin, stdout, socket)
+      .serve(service)
+      .await;
+
+    Ok(())
+  }
 }
 
 #[tower_lsp::async_trait]
@@ -92,7 +92,7 @@ impl LanguageServer for Server {
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.did_close(params).await
+    self.0.did_close(params).await;
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
@@ -147,6 +147,8 @@ impl LanguageServer for Server {
     self.0.hover(params).await
   }
 
+  #[allow(clippy::unused_async)]
+  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
@@ -155,7 +157,7 @@ impl LanguageServer for Server {
   }
 
   async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.initialized(params).await
+    self.0.initialized(params).await;
   }
 
   async fn references(
@@ -172,6 +174,8 @@ impl LanguageServer for Server {
     self.0.rename(params).await
   }
 
+  #[allow(clippy::unused_async)]
+  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     self.0.shutdown().await
   }
@@ -183,6 +187,7 @@ pub(crate) struct Inner {
   initialized: AtomicBool,
 }
 
+#[allow(clippy::arbitrary_source_item_ordering)]
 impl Inner {
   fn new(client: Client) -> Self {
     Self {
@@ -402,7 +407,7 @@ impl Inner {
           let path = uri
             .to_file_path()
             .ok()
-            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+            .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
             .unwrap_or(PathBuf::new());
 
           let recipe_arguments = Vec::new();
@@ -592,6 +597,7 @@ impl Inner {
     }))
   }
 
+  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     _params: lsp::InitializeParams,
@@ -827,7 +833,8 @@ impl Inner {
                     .await
                     .ok();
 
-                  let newlines = buffer.matches('\n').count() as u32;
+                  let newlines = u32::try_from(buffer.matches('\n').count())
+                    .expect("line count exceeds u32::MAX");
 
                   current_line += newlines;
                   buffer.clear();
@@ -835,7 +842,9 @@ impl Inner {
                 }
               }
               Err(error) => {
-                buffer.push_str(&format!("Error reading output: {error}\n"));
+                buffer.push_str("Error reading output: ");
+                buffer.push_str(&error.to_string());
+                buffer.push('\n');
               }
             }
           }
@@ -900,6 +909,7 @@ impl Inner {
     });
   }
 
+  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
@@ -935,6 +945,12 @@ mod tests {
       })
     }
 
+    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
+      self.requests.push(notification.into_value());
+      self.responses.push(None);
+      self
+    }
+
     fn request<T: IntoValue>(mut self, request: T) -> Self {
       self.requests.push(request.into_value());
       self
@@ -942,12 +958,6 @@ mod tests {
 
     fn response<T: IntoValue>(mut self, response: T) -> Self {
       self.responses.push(Some(response.into_value()));
-      self
-    }
-
-    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
-      self.requests.push(notification.into_value());
-      self.responses.push(None);
       self
     }
 
@@ -1025,8 +1035,8 @@ mod tests {
 
   #[derive(Debug)]
   struct DidOpenNotification<'a> {
-    uri: &'a str,
     text: &'a str,
+    uri: &'a str,
   }
 
   impl IntoValue for DidOpenNotification<'_> {
@@ -1048,9 +1058,9 @@ mod tests {
 
   #[derive(Debug)]
   struct DidChangeNotification<'a> {
+    changes: Vec<lsp::TextDocumentContentChangeEvent>,
     uri: &'a str,
     version: i32,
-    changes: Vec<lsp::TextDocumentContentChangeEvent>,
   }
 
   impl IntoValue for DidChangeNotification<'_> {
@@ -1071,10 +1081,10 @@ mod tests {
 
   #[derive(Debug)]
   struct GotoDefinitionRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for GotoDefinitionRequest<'_> {
@@ -1098,12 +1108,12 @@ mod tests {
 
   #[derive(Debug)]
   struct GotoDefinitionResponse<'a> {
-    id: i64,
-    uri: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    id: i64,
+    start_char: u32,
+    start_line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for GotoDefinitionResponse<'_> {
@@ -1130,11 +1140,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Location<'a> {
-    uri: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    start_char: u32,
+    start_line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for Location<'_> {
@@ -1157,11 +1167,11 @@ mod tests {
 
   #[derive(Debug)]
   struct ReferencesRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
     include_declaration: bool,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for ReferencesRequest<'_> {
@@ -1196,7 +1206,7 @@ mod tests {
     fn into_value(self) -> Value {
       self
         .into_iter()
-        .map(|location| location.into_value())
+        .map(Location::into_value)
         .collect()
     }
   }
@@ -1213,11 +1223,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Rename<'a> {
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
     new_text: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for Rename<'_> {
@@ -1240,11 +1250,11 @@ mod tests {
 
   #[derive(Debug)]
   struct RenameRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
     new_name: &'a str,
+    uri: &'a str,
   }
 
   impl IntoValue for RenameRequest<'_> {
@@ -1269,14 +1279,14 @@ mod tests {
 
   #[derive(Debug)]
   struct RenameResponse<'a> {
+    edits: Vec<Rename<'a>>,
     id: i64,
     uri: &'a str,
-    edits: Vec<Rename<'a>>,
   }
 
   impl IntoValue for Vec<Rename<'_>> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|edit| edit.into_value()).collect()
+      self.into_iter().map(Rename::into_value).collect()
     }
   }
 
@@ -1296,10 +1306,10 @@ mod tests {
 
   #[derive(Debug)]
   struct HoverRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for HoverRequest<'_> {
@@ -1323,13 +1333,13 @@ mod tests {
 
   #[derive(Debug)]
   struct HoverResponse<'a> {
-    id: i64,
     content: &'a str,
-    kind: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    id: i64,
+    kind: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for HoverResponse<'_> {
@@ -1359,10 +1369,10 @@ mod tests {
 
   #[derive(Debug)]
   struct DocumentHighlightRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for DocumentHighlightRequest<'_> {
@@ -1386,8 +1396,8 @@ mod tests {
 
   #[derive(Debug)]
   struct DocumentHighlightResponse<'a> {
-    id: i64,
     highlights: Vec<Highlight<'a>>,
+    id: i64,
   }
 
   impl IntoValue for DocumentHighlightResponse<'_> {
@@ -1402,11 +1412,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Highlight<'a> {
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
     kind: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for Highlight<'_> {
@@ -1423,7 +1433,6 @@ mod tests {
           }
         },
         "kind": match self.kind {
-          "text" => 1,
           "read" => 2,
           "write" => 3,
           _ => 1
@@ -1436,16 +1445,16 @@ mod tests {
     fn into_value(self) -> Value {
       self
         .into_iter()
-        .map(|highlight| highlight.into_value())
+        .map(Highlight::into_value)
         .collect()
     }
   }
 
   #[derive(Debug)]
   struct FoldingRange<'a> {
-    start_line: u32,
     end_line: u32,
     kind: &'a str,
+    start_line: u32,
   }
 
   impl IntoValue for FoldingRange<'_> {
@@ -1460,7 +1469,7 @@ mod tests {
 
   impl IntoValue for Vec<FoldingRange<'_>> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|range| range.into_value()).collect()
+      self.into_iter().map(FoldingRange::into_value).collect()
     }
   }
 
@@ -1504,8 +1513,8 @@ mod tests {
   #[derive(Debug)]
   struct CodeActionRequest {
     id: i64,
-    uri: &'static str,
     range: lsp::Range,
+    uri: &'static str,
   }
 
   impl IntoValue for CodeActionRequest {
@@ -1538,8 +1547,8 @@ mod tests {
 
   #[derive(Debug)]
   struct CodeActionResponse {
-    id: i64,
     actions: Vec<CodeAction>,
+    id: i64,
   }
 
   impl IntoValue for CodeActionResponse {
@@ -1554,10 +1563,10 @@ mod tests {
 
   #[derive(Debug)]
   struct CodeAction {
-    title: &'static str,
-    kind: &'static str,
-    command: Command,
     arguments: Vec<ParameterJson>,
+    command: Command,
+    kind: &'static str,
+    title: &'static str,
   }
 
   impl IntoValue for Vec<ParameterJson> {
@@ -1591,7 +1600,7 @@ mod tests {
 
   impl IntoValue for Vec<CodeAction> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|a| a.into_value()).collect()
+      self.into_iter().map(CodeAction::into_value).collect()
     }
   }
 

@@ -5,12 +5,12 @@ use super::*;
 pub struct UndefinedIdentifierRule;
 
 impl Rule for UndefinedIdentifierRule {
-  fn id(&self) -> &'static str {
-    "undefined-identifiers"
-  }
-
   fn display_name(&self) -> &'static str {
     "Undefined Identifiers"
+  }
+
+  fn id(&self) -> &'static str {
+    "undefined-identifiers"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

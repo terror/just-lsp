@@ -5,12 +5,12 @@ use super::*;
 pub struct FunctionArgumentsRule;
 
 impl Rule for FunctionArgumentsRule {
-  fn id(&self) -> &'static str {
-    "function-arguments"
-  }
-
   fn display_name(&self) -> &'static str {
     "Function Arguments"
+  }
+
+  fn id(&self) -> &'static str {
+    "function-arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
