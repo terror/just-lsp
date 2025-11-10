@@ -1,19 +1,23 @@
-use super::*;
+use {
+  ropey::{self, Rope},
+  tower_lsp::lsp_types as lsp,
+  tree_sitter::{InputEdit, Point},
+};
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TextPosition {
-  pub(crate) byte: usize,
-  pub(crate) char: usize,
-  pub(crate) code: usize,
-  pub(crate) point: tree_sitter::Point,
+pub struct TextPosition {
+  pub byte: usize,
+  pub char: usize,
+  pub code: usize,
+  pub point: Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TextEdit<'a> {
-  pub(crate) end_char_idx: usize,
-  pub(crate) input_edit: tree_sitter::InputEdit,
-  pub(crate) start_char_idx: usize,
-  pub(crate) text: &'a str,
+pub struct TextEdit<'a> {
+  pub end_char_idx: usize,
+  pub input_edit: InputEdit,
+  pub start_char_idx: usize,
+  pub text: &'a str,
 }
 
 pub trait RopeExt {
@@ -23,7 +27,7 @@ pub trait RopeExt {
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> TextEdit<'a>;
   fn byte_to_lsp_position(&self, offset: usize) -> lsp::Position;
-  fn byte_to_tree_sitter_point(&self, offset: usize) -> tree_sitter::Point;
+  fn byte_to_tree_sitter_point(&self, offset: usize) -> Point;
   fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition;
 }
 
@@ -58,7 +62,7 @@ impl RopeExt for Rope {
 
       let line_byte_idx = ropey::str_utils::line_to_byte_idx(text, line_idx);
 
-      tree_sitter::Point::new(
+      Point::new(
         self.len_lines() + line_idx,
         text_end_byte_idx - line_byte_idx,
       )
@@ -66,7 +70,7 @@ impl RopeExt for Rope {
       self.byte_to_tree_sitter_point(new_end_byte)
     };
 
-    let input_edit = tree_sitter::InputEdit {
+    let input_edit = InputEdit {
       start_byte: start.byte,
       old_end_byte: old_end.byte,
       new_end_byte,
@@ -97,10 +101,10 @@ impl RopeExt for Rope {
     lsp::Position::new(line_idx as u32, character as u32)
   }
 
-  fn byte_to_tree_sitter_point(&self, byte_idx: usize) -> tree_sitter::Point {
+  fn byte_to_tree_sitter_point(&self, byte_idx: usize) -> Point {
     let line_idx = self.byte_to_line(byte_idx);
     let line_byte_idx = self.line_to_byte(line_idx);
-    tree_sitter::Point::new(line_idx, byte_idx - line_byte_idx)
+    Point::new(line_idx, byte_idx - line_byte_idx)
   }
 
   fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition {
