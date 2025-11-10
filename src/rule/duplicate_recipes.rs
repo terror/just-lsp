@@ -13,8 +13,8 @@ impl Rule for DuplicateRecipeRule {
     "Duplicate Recipes"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let allow_duplicates = ctx.settings().iter().any(|setting| {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+    let allow_duplicates = context.settings().iter().any(|setting| {
       setting.name == "allow-duplicate-recipes"
         && matches!(setting.kind, SettingKind::Boolean(true))
     });
@@ -28,7 +28,7 @@ impl Rule for DuplicateRecipeRule {
     let mut recipe_groups: HashMap<String, Vec<(lsp::Range, HashSet<Group>)>> =
       HashMap::new();
 
-    for recipe in ctx.recipes() {
+    for recipe in context.recipes() {
       recipe_groups
         .entry(recipe.name.clone())
         .or_default()

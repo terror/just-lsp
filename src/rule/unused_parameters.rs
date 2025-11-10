@@ -13,16 +13,16 @@ impl Rule for UnusedParameterRule {
     "Unused Parameters"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let exported = ctx.settings().iter().any(|setting| {
+    let exported = context.settings().iter().any(|setting| {
       setting.name == "export"
         && matches!(setting.kind, SettingKind::Boolean(true))
     });
 
-    for (recipe_name, identifiers) in ctx.recipe_identifier_usage() {
-      if let Some(recipe) = ctx.recipe(recipe_name) {
+    for (recipe_name, identifiers) in context.recipe_identifier_usage() {
+      if let Some(recipe) = context.recipe(recipe_name) {
         for parameter in &recipe.parameters {
           if !identifiers.contains(&parameter.name)
             && parameter.kind != ParameterKind::Export

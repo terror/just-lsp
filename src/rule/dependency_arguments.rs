@@ -13,12 +13,12 @@ impl Rule for DependencyArgumentRule {
     "Dependency Arguments"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let recipe_parameters = ctx.recipe_parameters();
+    let recipe_parameters = context.recipe_parameters();
 
-    for recipe in ctx.recipes() {
+    for recipe in context.recipes() {
       for dependency in &recipe.dependencies {
         if let Some(params) = recipe_parameters.get(&dependency.name) {
           let required_params = params

@@ -12,12 +12,12 @@ impl Rule for DuplicateAliasRule {
     "Duplicate Alias"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let mut seen = HashSet::new();
 
-    for alias in ctx.aliases() {
+    for alias in context.aliases() {
       if !seen.insert(alias.name.value.clone()) {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
           range: alias.range,

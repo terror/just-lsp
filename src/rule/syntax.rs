@@ -13,10 +13,10 @@ impl Rule for SyntaxRule {
     "Syntax Errors"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    if let Some(tree) = ctx.tree() {
+    if let Some(tree) = context.tree() {
       let mut cursor = tree.root_node().walk();
       self.collect(&mut cursor, &mut diagnostics);
     }

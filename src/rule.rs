@@ -74,14 +74,14 @@ pub(crate) struct IdentifierAnalysis {
 }
 
 impl IdentifierAnalysis {
-  fn new(ctx: &RuleContext<'_>) -> Self {
-    let mut variable_usage = ctx
+  fn new(context: &RuleContext<'_>) -> Self {
+    let mut variable_usage = context
       .variables()
       .iter()
       .map(|variable| (variable.name.value.clone(), false))
       .collect::<HashMap<_, _>>();
 
-    let mut recipe_identifier_usage = ctx
+    let mut recipe_identifier_usage = context
       .recipes()
       .iter()
       .map(|recipe| (recipe.name.clone(), HashSet::new()))
@@ -89,12 +89,12 @@ impl IdentifierAnalysis {
 
     let mut unresolved_identifiers = Vec::new();
 
-    if let Some(tree) = ctx.tree() {
+    if let Some(tree) = context.tree() {
       let root = tree.root_node();
 
       for identifier in root.find_all("expression > value > identifier") {
         Self::record_identifier(
-          ctx,
+          context,
           &mut recipe_identifier_usage,
           &mut variable_usage,
           &mut unresolved_identifiers,
@@ -104,7 +104,7 @@ impl IdentifierAnalysis {
 
       for identifier in root.find_all("parameter > value > identifier") {
         Self::record_identifier(
-          ctx,
+          context,
           &mut recipe_identifier_usage,
           &mut variable_usage,
           &mut unresolved_identifiers,
@@ -121,15 +121,15 @@ impl IdentifierAnalysis {
   }
 
   fn record_identifier(
-    ctx: &RuleContext<'_>,
+    context: &RuleContext<'_>,
     recipe_identifier_usage: &mut HashMap<String, HashSet<String>>,
     variable_usage: &mut HashMap<String, bool>,
     unresolved_identifiers: &mut Vec<UnresolvedIdentifier>,
     identifier: Node<'_>,
   ) {
-    let document = ctx.document();
-    let recipe_parameters = ctx.recipe_parameters();
-    let value_names = ctx.variable_and_builtin_names();
+    let document = context.document();
+    let recipe_parameters = context.recipe_parameters();
+    let value_names = context.variable_and_builtin_names();
 
     let recipe_name = identifier
       .get_parent("recipe")
@@ -141,7 +141,7 @@ impl IdentifierAnalysis {
 
     let identifier_name = document.get_node_text(&identifier);
 
-    if let Some(recipe) = ctx.recipe(&recipe_name) {
+    if let Some(recipe) = context.recipe(&recipe_name) {
       recipe_identifier_usage
         .entry(recipe.name.clone())
         .or_default()
@@ -182,7 +182,7 @@ pub(crate) trait Rule: Sync {
   }
 
   /// Execute the rule and return diagnostics.
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic>;
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic>;
 }
 
 pub(crate) struct RuleContext<'a> {
