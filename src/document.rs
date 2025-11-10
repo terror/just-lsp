@@ -276,8 +276,8 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
+    just_lsp_types::{ParameterKind, VariadicType},
     pretty_assertions::assert_eq,
-    recipe::{ParameterKind, VariadicType},
   };
 
   fn document(content: &str) -> Document {

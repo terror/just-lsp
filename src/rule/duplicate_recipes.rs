@@ -25,16 +25,14 @@ impl Rule for DuplicateRecipeRule {
 
     let mut diagnostics = Vec::new();
 
-    let mut recipe_groups: HashMap<
-      String,
-      Vec<(lsp::Range, HashSet<OsGroup>)>,
-    > = HashMap::new();
+    let mut recipe_groups: HashMap<String, Vec<(lsp::Range, HashSet<Group>)>> =
+      HashMap::new();
 
     for recipe in ctx.recipes() {
       recipe_groups
         .entry(recipe.name.clone())
         .or_default()
-        .push((recipe.range, recipe.os_groups()));
+        .push((recipe.range, recipe.groups()));
     }
 
     for (recipe_name, group) in &recipe_groups {
@@ -42,12 +40,10 @@ impl Rule for DuplicateRecipeRule {
         continue;
       }
 
-      for (i, (range, os_groups1)) in group.iter().enumerate() {
-        for (_, (_, os_groups2)) in group.iter().enumerate().take(i) {
-          let has_conflict = os_groups1.iter().any(|group1| {
-            os_groups2
-              .iter()
-              .any(|group2| group1.conflicts_with(group2))
+      for (i, (range, groups1)) in group.iter().enumerate() {
+        for (_, (_, groups2)) in group.iter().enumerate().take(i) {
+          let has_conflict = groups1.iter().any(|group1| {
+            groups2.iter().any(|group2| group1.conflicts_with(group2))
           });
 
           if has_conflict {
