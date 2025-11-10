@@ -1,3 +1,35 @@
+//! Extensions that bridge `ropey::Rope` with Language Server Protocol positions
+//! and tree-sitter edit bookkeeping.
+//!
+//! The [`RopeExt`] trait is used inside `just-lsp` to keep three different
+//! coordinate spaces (bytes, UTF-16 code units, and tree-sitter points) in sync
+//! whenever an editor sends a `textDocument/didChange` notification.
+//!
+//! ```
+//! use just_lsp_rope_ext::RopeExt;
+//! use ropey::Rope;
+//! use tower_lsp::lsp_types::{
+//!   Position,
+//!   Range,
+//!   TextDocumentContentChangeEvent,
+//! };
+//!
+//! let mut rope = Rope::from_str("hello world");
+//! let change = TextDocumentContentChangeEvent {
+//!   range: Some(Range {
+//!     start: Position::new(0, 6),
+//!     end: Position::new(0, 11),
+//!   }),
+//!   range_length: None,
+//!   text: "rope".into(),
+//! };
+//!
+//! let edit = rope.build_edit(&change);
+//! rope.apply_edit(&edit);
+//!
+//! assert_eq!(rope.to_string(), "hello rope");
+//! ```
+
 use {
   ropey::{self, Rope},
   tower_lsp::lsp_types as lsp,
@@ -109,21 +141,96 @@ impl RopeExt for Rope {
 
   fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition {
     let row_idx = position.line as usize;
-    let col_code_idx = position.character as usize;
-
     let row_char_idx = self.line_to_char(row_idx);
-    let col_char_idx = self.utf16_cu_to_char(col_code_idx);
-
     let row_byte_idx = self.line_to_byte(row_idx);
+    let row_code_idx = self.char_to_utf16_cu(row_char_idx);
+    let col_code_offset = position.character as usize;
+    let col_code_idx = row_code_idx + col_code_offset;
+
+    let col_char_idx = self.utf16_cu_to_char(col_code_idx);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 
-    let row_code_idx = self.char_to_utf16_cu(row_char_idx);
-
     TextPosition {
-      char: row_char_idx + col_char_idx,
-      byte: row_byte_idx + col_byte_idx,
-      code: row_code_idx + col_code_idx,
-      point: tree_sitter::Point::new(row_idx, col_byte_idx),
+      char: col_char_idx,
+      byte: col_byte_idx,
+      code: col_code_idx,
+      point: tree_sitter::Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use {super::*, ropey::Rope};
+
+  fn change_event(
+    range: lsp::Range,
+    text: &str,
+  ) -> lsp::TextDocumentContentChangeEvent {
+    lsp::TextDocumentContentChangeEvent {
+      range: Some(range),
+      range_length: None,
+      text: text.into(),
+    }
+  }
+
+  #[test]
+  fn apply_edit_updates_rope_contents() {
+    let mut rope = Rope::from_str("hello world");
+
+    let change = change_event(
+      lsp::Range {
+        start: lsp::Position::new(0, 6),
+        end: lsp::Position::new(0, 11),
+      },
+      "rope",
+    );
+
+    rope.apply_edit(&rope.build_edit(&change));
+
+    assert_eq!(rope.to_string(), "hello rope");
+  }
+
+  #[test]
+  fn lsp_round_trip_handles_utf16_columns() {
+    let rope = Rope::from_str("a😊b\nsecond");
+
+    let after_emoji = rope.to_string().find('b').unwrap();
+
+    let position = rope.byte_to_lsp_position(after_emoji);
+
+    let core = rope.lsp_position_to_core(position);
+
+    assert_eq!(core.byte, after_emoji);
+    assert_eq!(core.char, rope.byte_to_char(after_emoji));
+    assert_eq!(core.code, rope.char_to_utf16_cu(core.char));
+    assert_eq!(core.point, rope.byte_to_tree_sitter_point(after_emoji));
+  }
+
+  #[test]
+  fn build_edit_populates_input_edit_fields() {
+    let rope = Rope::from_str("hello\nworld\n");
+
+    let change = change_event(
+      lsp::Range {
+        start: lsp::Position::new(1, 0),
+        end: lsp::Position::new(1, 5),
+      },
+      "rust",
+    );
+
+    let edit = rope.build_edit(&change);
+
+    let expected_start_byte = rope.line_to_byte(1);
+    let expected_start_char = rope.line_to_char(1);
+
+    assert_eq!(edit.start_char_idx, expected_start_char);
+    assert_eq!(edit.end_char_idx, expected_start_char + 5);
+    assert_eq!(edit.input_edit.start_byte, expected_start_byte);
+    assert_eq!(edit.input_edit.old_end_byte, expected_start_byte + 5);
+    assert_eq!(edit.input_edit.new_end_byte, expected_start_byte + 4);
+    assert_eq!(edit.input_edit.start_position, Point::new(1, 0));
+    assert_eq!(edit.input_edit.old_end_position, Point::new(1, 5));
+    assert_eq!(edit.input_edit.new_end_position, Point::new(1, 4));
   }
 }
