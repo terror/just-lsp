@@ -27,7 +27,7 @@ use {
     backtrace::BacktraceStatus,
     collections::{BTreeMap, HashMap, HashSet},
     env,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter, Write},
     fs,
     path::PathBuf,
     process,
