@@ -189,6 +189,7 @@ pub(crate) struct RuleContext<'a> {
   aliases: OnceCell<Vec<Alias>>,
   document: &'a Document,
   document_variable_names: OnceCell<HashSet<String>>,
+  function_calls: OnceCell<Vec<FunctionCall>>,
   identifier_analysis: OnceCell<IdentifierAnalysis>,
   recipe_names: OnceCell<HashSet<String>>,
   recipe_parameters: OnceCell<HashMap<String, Vec<Parameter>>>,
@@ -204,6 +205,7 @@ impl<'a> RuleContext<'a> {
       aliases: OnceCell::new(),
       document,
       document_variable_names: OnceCell::new(),
+      function_calls: OnceCell::new(),
       identifier_analysis: OnceCell::new(),
       recipe_names: OnceCell::new(),
       recipe_parameters: OnceCell::new(),
@@ -233,6 +235,13 @@ impl<'a> RuleContext<'a> {
     self
       .recipes
       .get_or_init(|| self.document.get_recipes())
+      .as_slice()
+  }
+
+  pub(crate) fn function_calls(&self) -> &[FunctionCall] {
+    self
+      .function_calls
+      .get_or_init(|| self.document.function_calls())
       .as_slice()
   }
 

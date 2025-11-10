@@ -11,6 +11,7 @@ pub use {
   alias::Alias,
   attribute::Attribute,
   dependency::Dependency,
+  function_call::FunctionCall,
   group::Group,
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   recipe::Recipe,
@@ -22,6 +23,7 @@ pub use {
 mod alias;
 mod attribute;
 mod dependency;
+mod function_call;
 mod group;
 mod parameter;
 mod recipe;

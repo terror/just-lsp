@@ -11,8 +11,9 @@ use {
   env_logger::Env,
   just_lsp_rope_ext::RopeExt,
   just_lsp_types::{
-    Alias, Attribute, Dependency, Group, Parameter, ParameterJson,
-    ParameterKind, Recipe, Setting, SettingKind, TextNode, Variable,
+    Alias, Attribute, Dependency, FunctionCall, Group, Parameter,
+    ParameterJson, ParameterKind, Recipe, Setting, SettingKind, TextNode,
+    Variable,
   },
   node_ext::NodeExt,
   once_cell::sync::OnceCell,

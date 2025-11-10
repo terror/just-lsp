@@ -16,29 +16,20 @@ impl Rule for UnknownFunctionRule {
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let root = match context.tree() {
-      Some(tree) => tree.root_node(),
-      None => return diagnostics,
-    };
+    for function_call in context.function_calls() {
+      let function_name = &function_call.name.value;
 
-    let document = context.document();
+      let is_builtin = builtins::BUILTINS.iter().any(|f| {
+        matches!(f, Builtin::Function { name, .. } if *name == function_name)
+      });
 
-    for function_call in root.find_all("function_call") {
-      if let Some(identifier_node) = function_call.find("identifier") {
-        let function_name = document.get_node_text(&identifier_node);
-
-        let is_builtin = builtins::BUILTINS.iter().any(|f| {
-          matches!(f, Builtin::Function { name, .. } if *name == function_name)
-        });
-
-        if !is_builtin {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: identifier_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!("Unknown function `{function_name}`"),
-            ..Default::default()
-          }));
-        }
+      if !is_builtin {
+        diagnostics.push(self.diagnostic(lsp::Diagnostic {
+          range: function_call.name.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          message: format!("Unknown function `{function_name}`"),
+          ..Default::default()
+        }));
       }
     }
 
