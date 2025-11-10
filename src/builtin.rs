@@ -1,5 +1,4 @@
-use super::*;
-use std::fmt::Write;
+use {super::*, std::fmt::Write};
 
 #[derive(Debug)]
 pub(crate) enum Builtin<'a> {

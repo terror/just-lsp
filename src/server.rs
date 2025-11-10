@@ -1201,10 +1201,7 @@ mod tests {
 
   impl IntoValue for Vec<Location<'_>> {
     fn into_value(self) -> Value {
-      self
-        .into_iter()
-        .map(Location::into_value)
-        .collect()
+      self.into_iter().map(Location::into_value).collect()
     }
   }
 
@@ -1440,10 +1437,7 @@ mod tests {
 
   impl IntoValue for Vec<Highlight<'_>> {
     fn into_value(self) -> Value {
-      self
-        .into_iter()
-        .map(Highlight::into_value)
-        .collect()
+      self.into_iter().map(Highlight::into_value).collect()
     }
   }
 
