@@ -200,6 +200,17 @@ mod tests {
   }
 
   #[test]
+  fn escaped_braces_are_treated_as_literal_text() {
+    Test::new(indoc! {
+      "
+      test:
+        echo \"{{{{hello}}\"
+      "
+    })
+    .run()
+  }
+
+  #[test]
   fn attributes_no_parameters_needed() {
     Test::new(indoc! {
       "
