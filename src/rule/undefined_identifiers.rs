@@ -13,10 +13,10 @@ impl Rule for UndefinedIdentifierRule {
     "Undefined Identifiers"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for unresolved in ctx.unresolved_identifiers() {
+    for unresolved in context.unresolved_identifiers() {
       diagnostics.push(self.diagnostic(lsp::Diagnostic {
         range: unresolved.range,
         severity: Some(lsp::DiagnosticSeverity::ERROR),

@@ -12,15 +12,15 @@ impl Rule for AttributeInvalidTargetRule {
     "Attribute Invalid Target"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let root = match ctx.tree() {
+    let root = match context.tree() {
       Some(tree) => tree.root_node(),
       None => return diagnostics,
     };
 
-    let document = ctx.document();
+    let document = context.document();
 
     for attribute_node in root.find_all("attribute") {
       for identifier_node in attribute_node.find_all("identifier") {

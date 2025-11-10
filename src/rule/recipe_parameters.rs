@@ -13,10 +13,10 @@ impl Rule for RecipeParameterRule {
     "Recipe Parameters"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for recipe in ctx.recipes() {
+    for recipe in context.recipes() {
       let mut seen = HashSet::new();
 
       let (mut passed_default, mut passed_variadic) = (false, false);

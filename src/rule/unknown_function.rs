@@ -13,15 +13,15 @@ impl Rule for UnknownFunctionRule {
     "Unknown Function"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let root = match ctx.tree() {
+    let root = match context.tree() {
       Some(tree) => tree.root_node(),
       None => return diagnostics,
     };
 
-    let document = ctx.document();
+    let document = context.document();
 
     for function_call in root.find_all("function_call") {
       if let Some(identifier_node) = function_call.find("identifier") {

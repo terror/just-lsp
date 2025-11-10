@@ -12,12 +12,12 @@ impl Rule for MissingRecipeForAliasRule {
     "Missing Recipe for Alias"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let recipe_names = ctx.recipe_names();
+    let recipe_names = context.recipe_names();
 
-    for alias in ctx.aliases() {
+    for alias in context.aliases() {
       if !recipe_names.contains(&alias.value.value) {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
           range: alias.value.range,

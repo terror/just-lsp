@@ -12,12 +12,12 @@ impl Rule for DuplicateSettingRule {
     "Duplicate Setting"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let mut seen = HashSet::new();
 
-    for setting in ctx.settings() {
+    for setting in context.settings() {
       if !seen.insert(setting.name.clone()) {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
           range: setting.range,

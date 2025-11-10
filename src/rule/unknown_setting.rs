@@ -13,10 +13,10 @@ impl Rule for UnknownSettingRule {
     "Unknown Setting"
   }
 
-  fn run(&self, ctx: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for setting in ctx.settings() {
+    for setting in context.settings() {
       let builtin = builtins::BUILTINS.iter().find(
         |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
       );
