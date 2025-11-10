@@ -98,6 +98,42 @@ impl Document {
     })
   }
 
+  pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("function_call")
+        .into_iter()
+        .filter_map(|function_call_node| {
+          let identifier_node = function_call_node.find("identifier")?;
+
+          let arguments = function_call_node
+            .find("sequence")
+            .map(|sequence| {
+              sequence
+                .find_all("^expression")
+                .into_iter()
+                .map(|argument_node| TextNode {
+                  value: self.get_node_text(&argument_node),
+                  range: argument_node.get_range(),
+                })
+                .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+          Some(FunctionCall {
+            name: TextNode {
+              value: self.get_node_text(&identifier_node),
+              range: identifier_node.get_range(),
+            },
+            arguments,
+            range: function_call_node.get_range(),
+          })
+        })
+        .collect()
+    })
+  }
+
   pub(crate) fn get_node_text(&self, node: &Node) -> String {
     self
       .content
@@ -1690,5 +1726,26 @@ mod tests {
         }
       }
     );
+  }
+
+  #[test]
+  fn list_function_calls() {
+    let doc = document(indoc! {"
+      foo:
+        echo {{arch()}}
+        echo {{env_var(\"HOME\", \"fallback\")}}
+    "});
+
+    let calls = doc.function_calls();
+
+    assert_eq!(calls.len(), 2);
+
+    assert_eq!(calls[0].name.value, "arch");
+    assert_eq!(calls[0].arguments.len(), 0);
+
+    assert_eq!(calls[1].name.value, "env_var");
+    assert_eq!(calls[1].arguments.len(), 2);
+    assert_eq!(calls[1].arguments[0].value, "\"HOME\"");
+    assert_eq!(calls[1].arguments[1].value, "\"fallback\"");
   }
 }
