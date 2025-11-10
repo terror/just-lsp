@@ -79,7 +79,7 @@ run *args:
 
 [group: 'test']
 test:
-  cargo test
+  cargo test --all --all-targets
 
 [group: 'test']
 test-release-workflow:
