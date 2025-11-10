@@ -10,6 +10,7 @@ use {
 pub use {
   alias::Alias,
   attribute::Attribute,
+  attribute_target::AttributeTarget,
   dependency::Dependency,
   function_call::FunctionCall,
   group::Group,
@@ -22,6 +23,7 @@ pub use {
 
 mod alias;
 mod attribute;
+mod attribute_target;
 mod dependency;
 mod function_call;
 mod group;

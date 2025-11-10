@@ -15,32 +15,23 @@ impl Rule for UnknownAttributeRule {
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let root = match context.tree() {
-      Some(tree) => tree.root_node(),
-      None => return diagnostics,
-    };
+    for attribute in context.attributes() {
+      let attribute_name = &attribute.name.value;
 
-    let document = context.document();
+      let is_known = builtins::BUILTINS.iter().any(|f| {
+        matches!(
+          f,
+          Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
+        )
+      });
 
-    for attribute_node in root.find_all("attribute") {
-      for identifier_node in attribute_node.find_all("identifier") {
-        let attribute_name = document.get_node_text(&identifier_node);
-
-        let is_known = builtins::BUILTINS.iter().any(|f| {
-          matches!(
-            f,
-            Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
-          )
-        });
-
-        if !is_known {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: identifier_node.get_range(),
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!("Unknown attribute `{attribute_name}`"),
-            ..Default::default()
-          }));
-        }
+      if !is_known {
+        diagnostics.push(self.diagnostic(lsp::Diagnostic {
+          range: attribute.name.range,
+          severity: Some(lsp::DiagnosticSeverity::ERROR),
+          message: format!("Unknown attribute `{attribute_name}`"),
+          ..Default::default()
+        }));
       }
     }
 

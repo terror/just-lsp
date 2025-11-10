@@ -76,6 +76,7 @@ mod tests {
           range: create_range(0, 1, 0, 6),
         },
         arguments: vec![],
+        target: Some(AttributeTarget::Recipe),
         range: create_range(0, 0, 1, 0),
       }],
       dependencies: vec![],
@@ -98,6 +99,7 @@ mod tests {
             range: create_range(0, 1, 0, 6),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(0, 0, 1, 0),
         },
         Attribute {
@@ -106,6 +108,7 @@ mod tests {
             range: create_range(1, 1, 1, 8),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(1, 0, 2, 0),
         },
       ],
@@ -132,6 +135,7 @@ mod tests {
             range: create_range(0, 1, 0, 6),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(0, 0, 1, 0),
         },
         Attribute {
@@ -140,6 +144,7 @@ mod tests {
             range: create_range(1, 1, 1, 8),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(1, 0, 2, 0),
         },
         Attribute {
@@ -148,6 +153,7 @@ mod tests {
             range: create_range(2, 1, 2, 6),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(2, 0, 3, 0),
         },
         Attribute {
@@ -156,6 +162,7 @@ mod tests {
             range: create_range(3, 1, 3, 5),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(3, 0, 4, 0),
         },
         Attribute {
@@ -164,6 +171,7 @@ mod tests {
             range: create_range(4, 1, 4, 8),
           },
           arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
           range: create_range(4, 0, 5, 0),
         },
       ],
@@ -196,6 +204,7 @@ mod tests {
           range: create_range(0, 1, 0, 8),
         },
         arguments: vec![],
+        target: Some(AttributeTarget::Recipe),
         range: create_range(0, 0, 1, 0),
       }],
       dependencies: vec![],

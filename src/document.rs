@@ -98,6 +98,46 @@ impl Document {
     })
   }
 
+  pub(crate) fn attributes(&self) -> Vec<Attribute> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("attribute")
+        .into_iter()
+        .flat_map(|attribute_node| {
+          let target = attribute_node
+            .parent()
+            .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
+
+          attribute_node
+            .find_all("identifier")
+            .into_iter()
+            .map(move |identifier_node| {
+              let arguments = identifier_node
+                .find_siblings_until("string", "identifier")
+                .into_iter()
+                .map(|argument_node| TextNode {
+                  value: self.get_node_text(&argument_node),
+                  range: argument_node.get_range(),
+                })
+                .collect::<Vec<_>>();
+
+              Attribute {
+                name: TextNode {
+                  value: self.get_node_text(&identifier_node),
+                  range: identifier_node.get_range(),
+                },
+                arguments,
+                target,
+                range: attribute_node.get_range(),
+              }
+            })
+            .collect::<Vec<_>>()
+        })
+        .collect()
+    })
+  }
+
   pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -175,6 +215,7 @@ impl Document {
                   range: identifier.get_range(),
                 },
                 arguments,
+                target: Some(AttributeTarget::Recipe),
                 range: attribute_node.get_range(),
               })
             })
@@ -312,7 +353,7 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
-    just_lsp_types::{ParameterKind, VariadicType},
+    just_lsp_types::{AttributeTarget, ParameterKind, VariadicType},
     pretty_assertions::assert_eq,
   };
 
@@ -1615,6 +1656,7 @@ mod tests {
           }
         },
         arguments: vec![],
+        target: Some(AttributeTarget::Recipe),
         range: lsp::Range {
           start: lsp::Position {
             line: 0,
@@ -1657,6 +1699,7 @@ mod tests {
             },
           }
         }],
+        target: Some(AttributeTarget::Recipe),
         range: lsp::Range {
           start: lsp::Position {
             line: 1,
@@ -1714,6 +1757,7 @@ mod tests {
             }
           }
         ],
+        target: Some(AttributeTarget::Recipe),
         range: lsp::Range {
           start: lsp::Position {
             line: 2,
@@ -1726,6 +1770,53 @@ mod tests {
         }
       }
     );
+  }
+
+  #[test]
+  fn list_document_attributes() {
+    let doc = document(indoc! {
+      "
+      [private, description: \"desc\"]
+      foo:
+        echo \"foo\"
+
+      [alias_attr]
+      alias build := foo
+
+      [var_attr(\"value\")]
+      bar := \"bar\"
+
+      [export_attr]
+      export baz := \"baz\"
+
+      [module_attr]
+      mod utils \"./utils.just\"
+      "
+    });
+
+    let attributes = doc.attributes();
+
+    let names_and_targets = attributes
+      .iter()
+      .map(|attr| (attr.name.value.clone(), attr.target))
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      names_and_targets,
+      vec![
+        ("private".into(), Some(AttributeTarget::Recipe)),
+        ("description".into(), Some(AttributeTarget::Recipe)),
+        ("alias_attr".into(), Some(AttributeTarget::Alias)),
+        ("var_attr".into(), Some(AttributeTarget::Assignment)),
+        ("export_attr".into(), Some(AttributeTarget::Assignment)),
+        ("module_attr".into(), Some(AttributeTarget::Module)),
+      ]
+    );
+
+    assert_eq!(attributes[1].arguments.len(), 1);
+    assert_eq!(attributes[1].arguments[0].value, "\"desc\"");
+    assert_eq!(attributes[3].arguments.len(), 1);
+    assert_eq!(attributes[3].arguments[0].value, "\"value\"");
   }
 
   #[test]
