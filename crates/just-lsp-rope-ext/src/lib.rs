@@ -6,15 +6,14 @@
 //! whenever an editor sends a `textDocument/didChange` notification.
 //!
 //! ```
-//! use just_lsp_rope_ext::RopeExt;
-//! use ropey::Rope;
-//! use tower_lsp::lsp_types::{
-//!   Position,
-//!   Range,
-//!   TextDocumentContentChangeEvent,
+//! use {
+//!   just_lsp_rope_ext::RopeExt,
+//!   ropey::Rope,
+//!   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent}
 //! };
 //!
 //! let mut rope = Rope::from_str("hello world");
+//!
 //! let change = TextDocumentContentChangeEvent {
 //!   range: Some(Range {
 //!     start: Position::new(0, 6),
