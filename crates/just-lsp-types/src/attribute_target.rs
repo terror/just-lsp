@@ -1,4 +1,4 @@
-use std::fmt::{self, Display, Formatter};
+use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeTarget {
@@ -24,10 +24,6 @@ impl Display for AttributeTarget {
 }
 
 impl AttributeTarget {
-  pub fn is_valid_for(self, target: AttributeTarget) -> bool {
-    self == target
-  }
-
   pub fn try_from_kind(kind: &str) -> Option<Self> {
     match kind {
       "alias" => Some(Self::Alias),

@@ -39,9 +39,7 @@ impl Rule for AttributeTargetSupportRule {
 
       let is_valid_target = matching.iter().any(|attr| {
         if let Builtin::Attribute { targets, .. } = attr {
-          targets
-            .iter()
-            .any(|target| target.is_valid_for(target_type))
+          targets.contains(&target_type)
         } else {
           false
         }
