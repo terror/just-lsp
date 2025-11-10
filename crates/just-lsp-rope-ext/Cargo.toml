@@ -1,0 +1,10 @@
+[package]
+name = "just-lsp-rope-ext"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ropey = { workspace = true }
+tower-lsp = { workspace = true }
+tree-sitter = { workspace = true }

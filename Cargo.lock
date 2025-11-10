@@ -619,6 +619,7 @@ dependencies = [
  "clap",
  "env_logger",
  "indoc",
+ "just-lsp-rope-ext",
  "just-lsp-types",
  "log",
  "once_cell",
@@ -632,6 +633,15 @@ dependencies = [
  "tokio-stream",
  "tower-lsp",
  "tower-test",
+ "tree-sitter",
+]
+
+[[package]]
+name = "just-lsp-rope-ext"
+version = "0.0.0"
+dependencies = [
+ "ropey",
+ "tower-lsp",
  "tree-sitter",
 ]
 

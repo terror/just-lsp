@@ -9,6 +9,7 @@ use {
   count::Count,
   document::Document,
   env_logger::Env,
+  just_lsp_rope_ext::RopeExt,
   just_lsp_types::{
     Alias, Attribute, Dependency, Group, Parameter, ParameterJson,
     ParameterKind, Recipe, TextNode, Variable,
@@ -18,7 +19,6 @@ use {
   point_ext::PointExt,
   position_ext::PositionExt,
   resolver::Resolver,
-  rope_ext::RopeExt,
   ropey::Rope,
   rule::{RuleContext, RULES},
   server::Server,
@@ -53,7 +53,6 @@ mod node_ext;
 mod point_ext;
 mod position_ext;
 mod resolver;
-mod rope_ext;
 mod rule;
 mod server;
 mod setting;
