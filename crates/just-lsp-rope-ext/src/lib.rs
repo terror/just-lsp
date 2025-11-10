@@ -53,13 +53,28 @@ pub struct TextEdit<'a> {
 }
 
 pub trait RopeExt {
+  /// Applies a previously constructed [`TextEdit`] to the rope, keeping both
+  /// the textual contents and the internal tree-sitter offsets in sync.
   fn apply_edit(&mut self, edit: &TextEdit);
+
+  /// Converts an LSP `textDocument/didChange` event into a [`TextEdit`] that
+  /// can be consumed both by `ropey` and tree-sitter.
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> TextEdit<'a>;
+
+  /// Maps an absolute byte offset into an LSP line/character pair where the
+  /// column is expressed in UTF-16 code units as required by the spec.
   fn byte_to_lsp_position(&self, offset: usize) -> lsp::Position;
+
+  /// Maps an absolute byte offset into a tree-sitter [`Point`] (line and utf8
+  /// column measured in bytes).
   fn byte_to_tree_sitter_point(&self, offset: usize) -> Point;
+
+  /// Converts an LSP position back into absolute byte/char/code offsets and a
+  /// tree-sitter point so downstream consumers can choose whichever coordinate
+  /// space they need.
   fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition;
 }
 
