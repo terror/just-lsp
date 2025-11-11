@@ -57,7 +57,6 @@ just-lsp-rope-ext = { path = "crates/just-lsp-rope-ext" }
 just-lsp-types = { path = "crates/just-lsp-types" }
 pretty_assertions = "1.4.1"
 ropey = "1.6.1"
-salsa = "0.24.0"
 serde = { version = "1.0.219", features = ["derive"] }
 tower-lsp = "0.20.0"
 tree-sitter = "0.25.8"
