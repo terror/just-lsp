@@ -8,6 +8,7 @@ use {
   },
   once_cell::sync::OnceCell,
   rule::*,
+  rule_context::RuleContext,
   std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
@@ -18,6 +19,7 @@ use {
 
 mod count;
 mod rule;
+mod rule_context;
 
 static RULES: &[&dyn Rule] = &[
   &SyntaxRule,
