@@ -1,0 +1,76 @@
+{
+  "name": "just-lsp",
+  "displayName": "just-lsp",
+  "description": "Full JUSTFILE support in vs code",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/colemannerd/just-lsp"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:just"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "just",
+        "aliases": [
+          "Justfile",
+          "Just"
+        ],
+        "extensions": [
+          ".just",
+          ".justfile"
+        ],
+        "filenames": [
+          "JUSTFILE",
+          "Justfile",
+          "justfile"
+        ]
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "just-lsp",
+      "properties": {
+        "just-lsp.pathToJustBinary": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the JUST binary"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "build": "cd ../ && cargo build --release &&  cp target/release/just-lsp bin/",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.99.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@vscode/vsce": "^3.3.2",
+    "vscode-languageclient": "^9.0.1"
+  }
+}
