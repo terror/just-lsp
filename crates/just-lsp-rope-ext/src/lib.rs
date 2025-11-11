@@ -162,9 +162,9 @@ impl RopeExt for Rope {
     let row_char_idx = self.line_to_char(row_idx);
     let row_byte_idx = self.line_to_byte(row_idx);
     let row_code_idx = self.char_to_utf16_cu(row_char_idx);
+
     let col_code_offset = position.character as usize;
     let col_code_idx = row_code_idx + col_code_offset;
-
     let col_char_idx = self.utf16_cu_to_char(col_code_idx);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 

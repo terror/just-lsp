@@ -983,7 +983,7 @@ mod tests {
     super::*,
     indoc::indoc,
     pretty_assertions::assert_eq,
-    serde_json::{json, Value},
+    serde_json::{Value, json},
     std::env,
     tower_lsp::LspService,
     tower_test::mock::Spawn,
@@ -2199,8 +2199,8 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation(
-  ) -> Result {
+  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
+  -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
