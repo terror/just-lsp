@@ -40,16 +40,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
       text, uri, version, ..
     } = params.text_document;
 
-    let mut document = Self {
-      content: Rope::from_str(&text),
-      tree: None,
-      uri,
-      version,
-    };
-
-    document.parse()?;
-
-    Ok(document)
+    Self::from_text(uri, text, version)
   }
 }
 
@@ -169,6 +160,28 @@ impl Document {
       .variables()
       .into_iter()
       .find(|var| var.name.value == name)
+  }
+
+  /// Creates a document from raw text, parsing it immediately.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if tree-sitter cannot parse the provided contents.
+  pub fn from_text(
+    uri: lsp::Url,
+    text: impl AsRef<str>,
+    version: i32,
+  ) -> Result<Self> {
+    let mut document = Self {
+      content: Rope::from_str(text.as_ref()),
+      tree: None,
+      uri,
+      version,
+    };
+
+    document.parse()?;
+
+    Ok(document)
   }
 
   #[must_use]

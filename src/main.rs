@@ -5,6 +5,7 @@ use {
   clap::Parser as Clap,
   command::Command,
   env_logger::Env,
+  just_lsp_analysis::{AnalysisHost, FileId},
   just_lsp_analyzer::Analyzer,
   just_lsp_builtins::BUILTINS,
   just_lsp_document::Document,
@@ -25,7 +26,10 @@ use {
   },
   subcommand::Subcommand,
   tempfile::tempdir,
-  tokio::{io::AsyncBufReadExt, sync::RwLock},
+  tokio::{
+    io::AsyncBufReadExt,
+    sync::{Mutex, RwLock},
+  },
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
 };

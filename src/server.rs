@@ -181,7 +181,9 @@ impl LanguageServer for Server {
 
 pub(crate) struct Inner {
   client: Client,
+  analysis: Mutex<AnalysisHost>,
   documents: RwLock<BTreeMap<lsp::Url, Document>>,
+  file_ids: RwLock<HashMap<lsp::Url, FileId>>,
   initialized: AtomicBool,
 }
 
@@ -295,14 +297,21 @@ impl Inner {
     let uri = params.text_document.uri.clone();
 
     let mut should_publish = false;
+    let mut analysis_payload: Option<(i32, String)> = None;
 
     {
       let mut documents = self.documents.write().await;
 
       if let Some(document) = documents.get_mut(&uri) {
         document.apply_change(params)?;
+        analysis_payload =
+          Some((document.version, document.content.to_string()));
         should_publish = true;
       }
+    }
+
+    if let Some((version, text)) = analysis_payload {
+      self.upsert_analysis_file(&uri, version, text).await;
     }
 
     if should_publish {
@@ -321,6 +330,7 @@ impl Inner {
     };
 
     if removed {
+      self.clear_analysis_entry(&uri).await;
       self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
@@ -330,10 +340,16 @@ impl Inner {
 
     let document = Document::try_from(params)?;
 
+    let version = document.version;
+
+    let text = document.content.to_string();
+
     {
       let mut documents = self.documents.write().await;
       documents.insert(uri.clone(), document);
     }
+
+    self.upsert_analysis_file(&uri, version, text).await;
 
     self.publish_diagnostics(&uri).await;
 
@@ -619,7 +635,9 @@ impl Inner {
   fn new(client: Client) -> Self {
     Self {
       client,
+      analysis: Mutex::new(AnalysisHost::new()),
       documents: RwLock::new(BTreeMap::new()),
+      file_ids: RwLock::new(HashMap::new()),
       initialized: AtomicBool::new(false),
     }
   }
@@ -629,22 +647,69 @@ impl Inner {
       return;
     }
 
-    let (diagnostics, version) = {
-      let documents = self.documents.read().await;
+    let file_id = {
+      let files = self.file_ids.read().await;
+      files.get(uri).copied()
+    };
 
-      match documents.get(uri) {
-        Some(document) => {
-          let analyzer = Analyzer::new(document);
-          (analyzer.analyze(), document.version)
-        }
-        None => return,
-      }
+    let Some(file_id) = file_id else {
+      return;
+    };
+
+    let (diagnostics, version) = {
+      let analysis = self.analysis.lock().await;
+      let diagnostics = analysis.diagnostics(file_id);
+      let version = analysis.file_version(file_id);
+      (diagnostics, version)
     };
 
     self
       .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .publish_diagnostics(
+        uri.clone(),
+        diagnostics.as_ref().clone(),
+        Some(version),
+      )
       .await;
+  }
+
+  async fn upsert_analysis_file(
+    &self,
+    uri: &lsp::Url,
+    version: i32,
+    text: String,
+  ) {
+    let existing = {
+      let files = self.file_ids.read().await;
+      files.get(uri).copied()
+    };
+
+    match existing {
+      Some(file_id) => {
+        let mut analysis = self.analysis.lock().await;
+        analysis.update_file(file_id, text, version);
+      }
+      None => {
+        let mut analysis = self.analysis.lock().await;
+        let file_id = analysis.open_file(uri.clone(), text, version);
+        drop(analysis);
+
+        let mut files = self.file_ids.write().await;
+        files.insert(uri.clone(), file_id);
+      }
+    }
+  }
+
+  async fn clear_analysis_entry(&self, uri: &lsp::Url) {
+    let file_id = {
+      let mut files = self.file_ids.write().await;
+      files.remove(uri)
+    };
+
+    if let Some(file_id) = file_id {
+      let mut analysis = self.analysis.lock().await;
+      analysis.clear_file(file_id);
+    }
   }
 
   async fn references(
