@@ -1,5 +1,7 @@
-use {
-  super::*, attribute_arguments::AttributeArgumentsRule,
+use super::*;
+
+pub use {
+  attribute_arguments::AttributeArgumentsRule,
   attribute_invalid_target::AttributeInvalidTargetRule,
   attribute_target_support::AttributeTargetSupportRule,
   dependency_arguments::DependencyArgumentRule,
@@ -37,29 +39,6 @@ mod unknown_function;
 mod unknown_setting;
 mod unused_parameters;
 mod unused_variables;
-
-pub(crate) static RULES: &[&dyn Rule] = &[
-  &SyntaxRule,
-  &MissingRecipeForAliasRule,
-  &DuplicateAliasRule,
-  &UnknownAttributeRule,
-  &AttributeArgumentsRule,
-  &AttributeInvalidTargetRule,
-  &AttributeTargetSupportRule,
-  &UnknownFunctionRule,
-  &FunctionArgumentsRule,
-  &RecipeParameterRule,
-  &DuplicateRecipeRule,
-  &RecipeDependencyCycleRule,
-  &MissingDependencyRule,
-  &DependencyArgumentRule,
-  &UnknownSettingRule,
-  &InvalidSettingKindRule,
-  &DuplicateSettingRule,
-  &UndefinedIdentifierRule,
-  &UnusedVariableRule,
-  &UnusedParameterRule,
-];
 
 pub(crate) struct UnresolvedIdentifier {
   pub(crate) name: String,
@@ -311,11 +290,9 @@ impl<'a> RuleContext<'a> {
     self.variable_and_builtin_names.get_or_init(|| {
       let mut names = self.document_variable_names().clone();
 
-      names.extend(builtins::BUILTINS.into_iter().filter_map(|builtin| {
-        match builtin {
-          Builtin::Constant { name, .. } => Some(name.to_owned()),
-          _ => None,
-        }
+      names.extend(BUILTINS.into_iter().filter_map(|builtin| match builtin {
+        Builtin::Constant { name, .. } => Some(name.to_owned()),
+        _ => None,
       }));
 
       names

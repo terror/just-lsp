@@ -58,7 +58,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      for builtin in builtins::BUILTINS {
+      for builtin in BUILTINS {
         match builtin {
           Builtin::Constant { name, .. } if identifier_name == name => {
             return Some(lsp::Location {
@@ -71,7 +71,7 @@ impl<'a> Resolver<'a> {
       }
     }
 
-    for builtin in builtins::BUILTINS {
+    for builtin in BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
           if identifier_name == name
@@ -185,7 +185,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      for builtin in builtins::BUILTINS {
+      for builtin in BUILTINS {
         match builtin {
           Builtin::Constant { name, .. } if text == name => {
             return Some(lsp::Hover {
@@ -198,7 +198,7 @@ impl<'a> Resolver<'a> {
       }
     }
 
-    for builtin in builtins::BUILTINS {
+    for builtin in BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
           if text == name

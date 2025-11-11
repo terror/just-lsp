@@ -1,28 +1,22 @@
 use {
-  analyzer::Analyzer,
   anyhow::{anyhow, bail, Error},
   arguments::Arguments,
   ariadne::{sources, Color, Label, Report, ReportKind},
-  builtin::Builtin,
   clap::Parser as Clap,
   command::Command,
-  count::Count,
   env_logger::Env,
+  just_lsp_analyzer::Analyzer,
+  just_lsp_builtins::BUILTINS,
   just_lsp_document::{Document, NodeExt},
   just_lsp_rope_ext::RopeExt,
-  just_lsp_types::{
-    Alias, Attribute, AttributeTarget, FunctionCall, Group, Parameter,
-    ParameterJson, ParameterKind, Recipe, Setting, SettingKind, Variable,
-  },
-  once_cell::sync::OnceCell,
+  just_lsp_types::{Builtin, ParameterJson},
   resolver::Resolver,
-  rule::{RuleContext, RULES},
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     env,
-    fmt::{self, Debug, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter},
     fs,
     path::PathBuf,
     process,
@@ -34,17 +28,12 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
-  tree_sitter::{Node, Tree, TreeCursor},
+  tree_sitter::Node,
 };
 
-mod analyzer;
 mod arguments;
-mod builtin;
-mod builtins;
 mod command;
-mod count;
 mod resolver;
-mod rule;
 mod server;
 mod subcommand;
 

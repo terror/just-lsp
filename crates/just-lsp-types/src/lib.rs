@@ -2,7 +2,7 @@ use {
   serde::{Deserialize, Serialize},
   std::{
     collections::HashSet,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Display, Formatter, Write},
   },
   tower_lsp::lsp_types as lsp,
 };
@@ -11,6 +11,7 @@ pub use {
   alias::Alias,
   attribute::Attribute,
   attribute_target::AttributeTarget,
+  builtin::Builtin,
   dependency::Dependency,
   function_call::FunctionCall,
   group::Group,
@@ -24,6 +25,7 @@ pub use {
 mod alias;
 mod attribute;
 mod attribute_target;
+mod builtin;
 mod dependency;
 mod function_call;
 mod group;

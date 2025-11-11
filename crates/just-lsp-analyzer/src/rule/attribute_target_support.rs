@@ -19,7 +19,7 @@ impl Rule for AttributeTargetSupportRule {
     for attribute in context.attributes() {
       let attribute_name = &attribute.name.value;
 
-      let matching = builtins::BUILTINS
+      let matching = BUILTINS
         .iter()
         .filter(|f| {
           matches!(

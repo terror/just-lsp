@@ -1,0 +1,17 @@
+[package]
+name = "just-lsp-analyzer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+just-lsp-builtins = { workspace = true }
+just-lsp-document = { workspace = true }
+just-lsp-types = { workspace = true }
+once_cell = "1.21.3"
+tower-lsp = { workspace = true }
+tree-sitter = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
+pretty_assertions = { workspace = true }

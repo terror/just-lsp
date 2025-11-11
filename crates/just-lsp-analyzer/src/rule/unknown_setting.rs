@@ -17,7 +17,7 @@ impl Rule for UnknownSettingRule {
     let mut diagnostics = Vec::new();
 
     for setting in context.settings() {
-      let builtin = builtins::BUILTINS.iter().find(
+      let builtin = BUILTINS.iter().find(
         |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
       );
 
