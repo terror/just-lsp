@@ -51,17 +51,18 @@ pub(crate) static SEMANTIC_TOKENS_LEGEND: Lazy<lsp::SemanticTokensLegend> =
   Lazy::new(|| lsp::SemanticTokensLegend {
     token_types: TOKEN_TYPES
       .iter()
-      .map(|name| lsp::SemanticTokenType::new(*name))
+      .map(|name| lsp::SemanticTokenType::new(name))
       .collect(),
     token_modifiers: TOKEN_MODIFIERS
       .iter()
-      .map(|name| lsp::SemanticTokenModifier::new(*name))
+      .map(|name| lsp::SemanticTokenModifier::new(name))
       .collect(),
   });
 
 static HIGHLIGHT_CONFIGURATION: Lazy<HighlightConfiguration> =
   Lazy::new(|| {
     let mut configuration = HighlightConfiguration::new(
+      // SAFETY: tree_sitter_just exposes a static tree-sitter language definition.
       unsafe { tree_sitter_just() },
       "just",
       HIGHLIGHTS_QUERY,
@@ -77,8 +78,8 @@ static HIGHLIGHT_CONFIGURATION: Lazy<HighlightConfiguration> =
 
 #[derive(Clone, Copy)]
 struct SemanticTokenMapping {
-  token_type_index: u32,
   modifiers_bitset: u32,
+  token_type_index: u32,
 }
 
 impl SemanticTokenMapping {
@@ -91,11 +92,11 @@ impl SemanticTokenMapping {
 }
 
 struct TokenData {
-  line: u32,
-  start_character: u32,
   length: u32,
-  token_type_index: u32,
+  line: u32,
   modifiers_bitset: u32,
+  start_character: u32,
+  token_type_index: u32,
 }
 
 static HIGHLIGHT_MAPPINGS: Lazy<Vec<Option<SemanticTokenMapping>>> =
@@ -141,7 +142,10 @@ pub(crate) fn semantic_tokens(
 
   highlighter
     .parser()
-    .set_language(&unsafe { tree_sitter_just() })
+    .set_language(
+      // SAFETY: The generated parser exposes a valid static tree-sitter language.
+      &unsafe { tree_sitter_just() },
+    )
     .map_err(|error| anyhow!("Failed to configure highlighter: {error}"))?;
 
   let source = document.content.to_string();
@@ -260,11 +264,11 @@ fn push_tokens_for_span(
     };
 
     tokens.push(TokenData {
-      line,
-      start_character,
       length,
-      token_type_index: mapping.token_type_index,
+      line,
       modifiers_bitset: mapping.modifiers_bitset,
+      start_character,
+      token_type_index: mapping.token_type_index,
     });
   }
 }
@@ -316,7 +320,9 @@ fn token_type_index(token_type: &str) -> u32 {
   TOKEN_TYPES
     .iter()
     .position(|candidate| candidate == &token_type)
-    .map(|index| index as u32)
+    .map(|index| {
+      u32::try_from(index).expect("Token type legend must fit within a u32")
+    })
     .expect("Token type missing from legend")
 }
 
@@ -324,7 +330,9 @@ fn modifier_index(modifier: &str) -> Option<u32> {
   TOKEN_MODIFIERS
     .iter()
     .position(|candidate| candidate == &modifier)
-    .map(|index| index as u32)
+    .map(|index| {
+      u32::try_from(index).expect("Token modifier legend must fit within a u32")
+    })
 }
 
 fn modifier_bitset(modifiers: &[&str]) -> u32 {

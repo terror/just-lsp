@@ -721,39 +721,6 @@ impl Inner {
     }))
   }
 
-  async fn semantic_tokens_full(
-    &self,
-    params: lsp::SemanticTokensParams,
-  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
-    let uri = params.text_document.uri;
-
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(&uri) {
-      match semantic_tokens::semantic_tokens(document) {
-        Ok(data) => {
-          return Ok(Some(lsp::SemanticTokensResult::Tokens(
-            lsp::SemanticTokens {
-              result_id: None,
-              data,
-            },
-          )));
-        }
-        Err(error) => {
-          self
-            .client
-            .log_message(
-              lsp::MessageType::ERROR,
-              format!("Failed to compute semantic tokens: {error}"),
-            )
-            .await;
-        }
-      }
-    }
-
-    Ok(None)
-  }
-
   async fn run_recipe(
     &self,
     recipe_name: &str,
@@ -954,6 +921,39 @@ impl Inner {
         }
       }
     });
+  }
+
+  async fn semantic_tokens_full(
+    &self,
+    params: lsp::SemanticTokensParams,
+  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
+    let uri = params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(&uri) {
+      match semantic_tokens::semantic_tokens(document) {
+        Ok(data) => {
+          return Ok(Some(lsp::SemanticTokensResult::Tokens(
+            lsp::SemanticTokens {
+              result_id: None,
+              data,
+            },
+          )));
+        }
+        Err(error) => {
+          self
+            .client
+            .log_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to compute semantic tokens: {error}"),
+            )
+            .await;
+        }
+      }
+    }
+
+    Ok(None)
   }
 
   #[allow(clippy::unused_async)]
