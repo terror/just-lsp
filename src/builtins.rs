@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",
@@ -42,6 +42,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
     version: "1.27.0",
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
     parameters: Some("'NAME'"),
+  },
+  Builtin::Attribute {
+    name: "metadata",
+    description: "Attach METADATA to recipe.",
+    version: "1.42.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("'METADATA'"),
   },
   Builtin::Attribute {
     name: "linux",
@@ -159,6 +166,16 @@ pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
     name: "HEXUPPER",
     description: "Uppercase hexadecimal digit string",
     value: "\"0123456789ABCDEF\"",
+  },
+  Builtin::Constant {
+    name: "PATH_SEP",
+    description: "Path separator (`/` on Unix, `\\` on Windows)",
+    value: "\"/\"",
+  },
+  Builtin::Constant {
+    name: "PATH_VAR_SEP",
+    description: "Path list separator (`:` on Unix, `;` on Windows)",
+    value: "\":\"",
   },
   Builtin::Constant {
     name: "CLEAR",
@@ -785,6 +802,12 @@ pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
     name: "dotenv-load",
     kind: SettingKind::Boolean(false),
     description: "Load a `.env` file, if present.",
+    default: "false",
+  },
+  Builtin::Setting {
+    name: "dotenv-override",
+    kind: SettingKind::Boolean(false),
+    description: "Override existing environment variables with values from the `.env` file.",
     default: "false",
   },
   Builtin::Setting {
