@@ -1,7 +1,7 @@
 use super::*;
 
-/// Finds non-exported global variables that are never referenced anywhere in the
-/// document.
+/// Finds non-exported global variables that are never referenced anywhere in
+/// the document.
 pub(crate) struct UnusedVariableRule;
 
 impl Rule for UnusedVariableRule {

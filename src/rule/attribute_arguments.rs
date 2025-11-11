@@ -1,7 +1,7 @@
 use super::*;
 
-/// Reports attribute invocations whose argument counts don’t match their builtin
-/// definitions.
+/// Reports attribute invocations whose argument counts don’t match their
+/// builtin definitions.
 pub(crate) struct AttributeArgumentsRule;
 
 impl Rule for AttributeArgumentsRule {

@@ -1,7 +1,7 @@
 use super::*;
 
-/// Validates that each attribute is attached to a supported target kind (recipe,
-/// module, alias, etc.) according to the builtin metadata.
+/// Validates that each attribute is attached to a supported target kind
+/// (recipe, module, alias, etc.) according to the builtin metadata.
 pub(crate) struct AttributeTargetSupportRule;
 
 impl Rule for AttributeTargetSupportRule {
