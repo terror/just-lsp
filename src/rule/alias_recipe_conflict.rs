@@ -25,9 +25,8 @@ impl Rule for AliasRecipeConflictRule {
     let recipe_name_ranges = recipes
       .iter()
       .map(|recipe| {
-        let key = RangeKey::from(recipe.range);
         recipe_name_lookup
-          .get(&key)
+          .get(&RangeKey::from(recipe.range))
           .copied()
           .unwrap_or(recipe.range)
       })
