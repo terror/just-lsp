@@ -1,5 +1,7 @@
 use super::*;
 
+use std::collections::HashSet;
+
 pub(crate) struct Server(Arc<Inner>);
 
 impl Debug for Server {
@@ -182,6 +184,7 @@ impl LanguageServer for Server {
 pub(crate) struct Inner {
   analysis: Mutex<AnalysisHost>,
   client: Client,
+  closed_documents: RwLock<HashSet<lsp::Url>>,
   file_ids: RwLock<HashMap<lsp::Url, FileId>>,
   initialized: AtomicBool,
 }
@@ -195,6 +198,18 @@ impl Inner {
   async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
     let file_id = self.file_id_for_uri(uri).await?;
     Some(self.analysis.lock().await.file_text(file_id))
+  }
+
+  async fn is_uri_closed(&self, uri: &lsp::Url) -> bool {
+    self.closed_documents.read().await.contains(uri)
+  }
+
+  async fn mark_uri_closed(&self, uri: &lsp::Url) {
+    self.closed_documents.write().await.insert(uri.clone());
+  }
+
+  async fn mark_uri_open(&self, uri: &lsp::Url) {
+    self.closed_documents.write().await.remove(uri);
   }
 
   fn apply_content_changes(
@@ -212,10 +227,14 @@ impl Inner {
   }
 
   async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
-    let file_id = self.file_ids.write().await.remove(uri);
+    let file_id = {
+      let mut file_ids = self.file_ids.write().await;
+      file_ids.remove(uri)
+    };
 
     if let Some(file_id) = file_id {
       self.analysis.lock().await.clear_file(file_id);
+      self.mark_uri_closed(uri).await;
       true
     } else {
       false
@@ -335,27 +354,36 @@ impl Inner {
 
     let (uri, version) = (text_document.uri, text_document.version);
 
-    if let Some(file_id) = self.file_id_for_uri(&uri).await {
-      let current_text = self.analysis.lock().await.file_text(file_id);
+    let file_ids = self.file_ids.read().await;
 
-      self
-        .upsert_analysis_file(
-          &uri,
-          version,
-          Self::apply_content_changes(&current_text, &content_changes),
-        )
-        .await;
+    if let Some(&file_id) = file_ids.get(&uri) {
+      {
+        let mut analysis = self.analysis.lock().await;
+        let current_text = analysis.file_text(file_id);
+        let updated_text =
+          Self::apply_content_changes(&current_text, &content_changes);
+        analysis.update_file(file_id, updated_text, version);
+      }
 
+      drop(file_ids);
       self.publish_diagnostics(&uri).await;
-    } else if let Some(full_change) = content_changes
-      .iter()
-      .rfind(|change| change.range.is_none())
-    {
-      self
-        .upsert_analysis_file(&uri, version, full_change.text.clone())
-        .await;
+    } else {
+      drop(file_ids);
 
-      self.publish_diagnostics(&uri).await;
+      if self.is_uri_closed(&uri).await {
+        return Ok(());
+      }
+
+      if let Some(full_change) = content_changes
+        .iter()
+        .rfind(|change| change.range.is_none())
+      {
+        self
+          .upsert_analysis_file(&uri, version, full_change.text.clone())
+          .await;
+
+        self.publish_diagnostics(&uri).await;
+      }
     }
 
     Ok(())
@@ -668,6 +696,7 @@ impl Inner {
     Self {
       client,
       analysis: Mutex::new(AnalysisHost::new()),
+      closed_documents: RwLock::new(HashSet::new()),
       file_ids: RwLock::new(HashMap::new()),
       initialized: AtomicBool::new(false),
     }
@@ -992,6 +1021,8 @@ impl Inner {
 
       self.file_ids.write().await.insert(uri.clone(), file_id);
     }
+
+    self.mark_uri_open(uri).await;
   }
 }
 
