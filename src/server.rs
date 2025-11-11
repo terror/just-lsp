@@ -1,5 +1,7 @@
 use super::*;
 
+use std::collections::HashSet;
+
 pub(crate) struct Server(Arc<Inner>);
 
 impl Debug for Server {
@@ -180,21 +182,72 @@ impl LanguageServer for Server {
 }
 
 pub(crate) struct Inner {
+  analysis: Mutex<AnalysisHost>,
   client: Client,
-  documents: RwLock<BTreeMap<lsp::Url, Document>>,
+  closed_documents: RwLock<HashSet<lsp::Url>>,
+  file_ids: RwLock<HashMap<lsp::Url, FileId>>,
   initialized: AtomicBool,
 }
 
 impl Inner {
+  async fn analysis_document(&self, uri: &lsp::Url) -> Option<Arc<Document>> {
+    let file_id = self.file_id_for_uri(uri).await?;
+    self.analysis.lock().await.document(file_id)
+  }
+
+  async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
+    let file_id = self.file_id_for_uri(uri).await?;
+    Some(self.analysis.lock().await.file_text(file_id))
+  }
+
+  async fn is_uri_closed(&self, uri: &lsp::Url) -> bool {
+    self.closed_documents.read().await.contains(uri)
+  }
+
+  async fn mark_uri_closed(&self, uri: &lsp::Url) {
+    self.closed_documents.write().await.insert(uri.clone());
+  }
+
+  async fn mark_uri_open(&self, uri: &lsp::Url) {
+    self.closed_documents.write().await.remove(uri);
+  }
+
+  fn apply_content_changes(
+    current_text: &str,
+    changes: &[lsp::TextDocumentContentChangeEvent],
+  ) -> String {
+    let mut rope = Rope::from_str(current_text);
+
+    for change in changes {
+      let edit = rope.build_edit(change);
+      rope.apply_edit(&edit);
+    }
+
+    rope.to_string()
+  }
+
+  async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
+    let file_id = {
+      let mut file_ids = self.file_ids.write().await;
+      file_ids.remove(uri)
+    };
+
+    if let Some(file_id) = file_id {
+      self.analysis.lock().await.clear_file(file_id);
+      self.mark_uri_closed(uri).await;
+      true
+    } else {
+      false
+    }
+  }
+
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = self.analysis_document(uri).await {
       let mut actions = Vec::new();
 
       for recipe in document.recipes() {
@@ -237,9 +290,7 @@ impl Inner {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(&uri) {
+    if let Some(document) = self.analysis_document(&uri).await {
       let mut completion_items = Vec::new();
 
       let recipes = document.recipes();
@@ -292,21 +343,47 @@ impl Inner {
     &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let uri = params.text_document.uri.clone();
+    let lsp::DidChangeTextDocumentParams {
+      text_document,
+      content_changes,
+    } = params;
 
-    let mut should_publish = false;
-
-    {
-      let mut documents = self.documents.write().await;
-
-      if let Some(document) = documents.get_mut(&uri) {
-        document.apply_change(params)?;
-        should_publish = true;
-      }
+    if content_changes.is_empty() {
+      return Ok(());
     }
 
-    if should_publish {
+    let (uri, version) = (text_document.uri, text_document.version);
+
+    let file_ids = self.file_ids.read().await;
+
+    if let Some(&file_id) = file_ids.get(&uri) {
+      {
+        let mut analysis = self.analysis.lock().await;
+        let current_text = analysis.file_text(file_id);
+        let updated_text =
+          Self::apply_content_changes(&current_text, &content_changes);
+        analysis.update_file(file_id, updated_text, version);
+      }
+
+      drop(file_ids);
       self.publish_diagnostics(&uri).await;
+    } else {
+      drop(file_ids);
+
+      if self.is_uri_closed(&uri).await {
+        return Ok(());
+      }
+
+      if let Some(full_change) = content_changes
+        .iter()
+        .rfind(|change| change.range.is_none())
+      {
+        self
+          .upsert_analysis_file(&uri, version, full_change.text.clone())
+          .await;
+
+        self.publish_diagnostics(&uri).await;
+      }
     }
 
     Ok(())
@@ -315,29 +392,29 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let removed = {
-      let mut documents = self.documents.write().await;
-      documents.remove(&uri).is_some()
-    };
-
-    if removed {
+    if self.clear_analysis_entry(&uri).await {
       self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
-    let uri = params.text_document.uri.clone();
+    let lsp::DidOpenTextDocumentParams {
+      text_document:
+        lsp::TextDocumentItem {
+          uri, version, text, ..
+        },
+    } = params;
 
-    let document = Document::try_from(params)?;
-
-    {
-      let mut documents = self.documents.write().await;
-      documents.insert(uri.clone(), document);
-    }
+    self.upsert_analysis_file(&uri, version, text).await;
 
     self.publish_diagnostics(&uri).await;
 
     Ok(())
+  }
+
+  fn document_end_position(text: &str) -> lsp::Position {
+    let rope = Rope::from_str(text);
+    rope.byte_to_lsp_position(rope.len_bytes())
   }
 
   async fn document_highlight(
@@ -348,11 +425,13 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -365,8 +444,8 @@ impl Inner {
               kind: Some(lsp::DocumentHighlightKind::TEXT),
             })
             .collect()
-        })
-    }))
+        }),
+    )
   }
 
   async fn execute_command(
@@ -425,15 +504,17 @@ impl Inner {
     Ok(None)
   }
 
+  async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
+    self.file_ids.read().await.get(uri).copied()
+  }
+
   async fn folding_range(
     &self,
     params: lsp::FoldingRangeParams,
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = self.analysis_document(uri).await {
       let recipes = document.recipes();
 
       let folding_ranges = recipes
@@ -498,19 +579,10 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let snapshot = {
-      let documents = self.documents.read().await;
-
-      documents.get(uri).map(|document| {
-        let content = document.content.to_string();
-
-        let end = document
-          .content
-          .byte_to_lsp_position(document.content.len_bytes());
-
-        (content, end)
-      })
-    };
+    let snapshot = self.analysis_text(uri).await.map(|content| {
+      let end = Self::document_end_position(&content);
+      (content, end)
+    });
 
     if let Some((content, document_end)) = snapshot {
       match self.format_document(&content).await {
@@ -550,20 +622,22 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          let resolver = Resolver::new(document);
+          let resolver = Resolver::new(&document);
 
           resolver
             .resolve_identifier_definition(&identifier)
             .map(lsp::GotoDefinitionResponse::Scalar)
-        })
-    }))
+        }),
+    )
   }
 
   async fn hover(
@@ -574,16 +648,18 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier))
-    }))
+        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier)),
+    )
   }
 
   #[allow(clippy::unused_async)]
@@ -619,7 +695,9 @@ impl Inner {
   fn new(client: Client) -> Self {
     Self {
       client,
-      documents: RwLock::new(BTreeMap::new()),
+      analysis: Mutex::new(AnalysisHost::new()),
+      closed_documents: RwLock::new(HashSet::new()),
+      file_ids: RwLock::new(HashMap::new()),
       initialized: AtomicBool::new(false),
     }
   }
@@ -629,21 +707,26 @@ impl Inner {
       return;
     }
 
-    let (diagnostics, version) = {
-      let documents = self.documents.read().await;
+    let Some(file_id) = self.file_id_for_uri(uri).await else {
+      return;
+    };
 
-      match documents.get(uri) {
-        Some(document) => {
-          let analyzer = Analyzer::new(document);
-          (analyzer.analyze(), document.version)
-        }
-        None => return,
-      }
+    let (diagnostics, version) = {
+      let analysis = self.analysis.lock().await;
+
+      (
+        analysis.diagnostics(file_id),
+        analysis.file_version(file_id),
+      )
     };
 
     self
       .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .publish_diagnostics(
+        uri.clone(),
+        diagnostics.as_ref().clone(),
+        Some(version),
+      )
       .await;
   }
 
@@ -655,16 +738,18 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| resolver.resolve_identifier_references(&identifier))
-    }))
+        .map(|identifier| resolver.resolve_identifier_references(&identifier)),
+    )
   }
 
   async fn rename(
@@ -677,14 +762,16 @@ impl Inner {
 
     let new_name = params.new_name;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
-          let resolver = Resolver::new(document);
+          let resolver = Resolver::new(&document);
 
           let references = resolver.resolve_identifier_references(&identifier);
 
@@ -700,8 +787,8 @@ impl Inner {
             changes: Some(HashMap::from([(uri.clone(), text_edits)])),
             ..Default::default()
           }
-        })
-    }))
+        }),
+    )
   }
 
   async fn run_recipe(
@@ -909,6 +996,33 @@ impl Inner {
   #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
+  }
+
+  async fn upsert_analysis_file(
+    &self,
+    uri: &lsp::Url,
+    version: i32,
+    text: String,
+  ) {
+    let existing = self.file_ids.read().await.get(uri).copied();
+
+    if let Some(file_id) = existing {
+      self
+        .analysis
+        .lock()
+        .await
+        .update_file(file_id, text, version);
+    } else {
+      let mut analysis = self.analysis.lock().await;
+
+      let file_id = analysis.open_file(uri.clone(), text, version);
+
+      drop(analysis);
+
+      self.file_ids.write().await.insert(uri.clone(), file_id);
+    }
+
+    self.mark_uri_open(uri).await;
   }
 }
 
