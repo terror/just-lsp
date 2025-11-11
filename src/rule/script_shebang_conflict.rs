@@ -13,9 +13,8 @@ impl Rule for ScriptShebangConflictRule {
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let tree = match context.tree() {
-      Some(tree) => tree,
-      None => return Vec::new(),
+    let Some(tree) = context.tree() else {
+      return Vec::new();
     };
 
     let root = tree.root_node();
