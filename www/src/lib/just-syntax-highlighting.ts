@@ -8,7 +8,7 @@ import {
 import type { Language, Parser, Query } from 'web-tree-sitter';
 import { Parser as TreeSitterParser } from 'web-tree-sitter';
 
-import highlightsQuerySource from '../../../vendor/tree-sitter-just/queries/just/highlights.scm?raw';
+import highlightsQuerySource from '../../../queries/highlights.scm?raw';
 
 const BASE_CAPTURE_TO_CLASSES: Record<string, string[]> = {
   attribute: ['cm-just-attribute'],

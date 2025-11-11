@@ -1,13 +1,10 @@
 use super::*;
 
-const HIGHLIGHTS_QUERY: &str =
-  include_str!("../vendor/tree-sitter-just/queries/just/highlights.scm");
+const HIGHLIGHTS_QUERY: &str = include_str!("../queries/highlights.scm");
 
-const INJECTIONS_QUERY: &str =
-  include_str!("../vendor/tree-sitter-just/queries/just/injections.scm");
+const INJECTIONS_QUERY: &str = include_str!("../queries/injections.scm");
 
-const LOCALS_QUERY: &str =
-  include_str!("../vendor/tree-sitter-just/queries/just/locals.scm");
+const LOCALS_QUERY: &str = include_str!("../queries/locals.scm");
 
 const TOKEN_TYPES: &[&str] = &[
   "comment",
