@@ -721,6 +721,7 @@ dependencies = [
  "log",
  "once_cell",
  "pretty_assertions",
+ "ropey",
  "serde",
  "serde_json",
  "target",

@@ -182,7 +182,6 @@ impl LanguageServer for Server {
 pub(crate) struct Inner {
   client: Client,
   analysis: Mutex<AnalysisHost>,
-  documents: RwLock<BTreeMap<lsp::Url, Document>>,
   file_ids: RwLock<HashMap<lsp::Url, FileId>>,
   initialized: AtomicBool,
 }
@@ -290,27 +289,36 @@ impl Inner {
     &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let uri = params.text_document.uri.clone();
+    let lsp::DidChangeTextDocumentParams {
+      text_document,
+      content_changes,
+    } = params;
 
-    let mut should_publish = false;
-    let mut analysis_payload: Option<(i32, String)> = None;
+    if content_changes.is_empty() {
+      return Ok(());
+    }
 
+    let uri = text_document.uri;
+    let version = text_document.version;
+
+    if let Some(file_id) = self.file_id_for_uri(&uri).await {
+      let current_text = {
+        let analysis = self.analysis.lock().await;
+        analysis.file_text(file_id)
+      };
+
+      let updated_text =
+        Self::apply_content_changes(&current_text, &content_changes);
+
+      self.upsert_analysis_file(&uri, version, updated_text).await;
+      self.publish_diagnostics(&uri).await;
+    } else if let Some(full_change) = content_changes
+      .iter()
+      .rfind(|change| change.range.is_none())
     {
-      let mut documents = self.documents.write().await;
-
-      if let Some(document) = documents.get_mut(&uri) {
-        document.apply_change(params)?;
-        analysis_payload =
-          Some((document.version, document.content.to_string()));
-        should_publish = true;
-      }
-    }
-
-    if let Some((version, text)) = analysis_payload {
-      self.upsert_analysis_file(&uri, version, text).await;
-    }
-
-    if should_publish {
+      self
+        .upsert_analysis_file(&uri, version, full_change.text.clone())
+        .await;
       self.publish_diagnostics(&uri).await;
     }
 
@@ -320,30 +328,18 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let removed = {
-      let mut documents = self.documents.write().await;
-      documents.remove(&uri).is_some()
-    };
-
-    if removed {
-      self.clear_analysis_entry(&uri).await;
+    if self.clear_analysis_entry(&uri).await {
       self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    let document = Document::try_from(params)?;
-
-    let version = document.version;
-
-    let text = document.content.to_string();
-
-    {
-      let mut documents = self.documents.write().await;
-      documents.insert(uri.clone(), document);
-    }
+    let lsp::DidOpenTextDocumentParams {
+      text_document:
+        lsp::TextDocumentItem {
+          uri, version, text, ..
+        },
+    } = params;
 
     self.upsert_analysis_file(&uri, version, text).await;
 
@@ -510,13 +506,8 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let snapshot = self.analysis_document(uri).await.map(|document| {
-      let content = document.content.to_string();
-
-      let end = document
-        .content
-        .byte_to_lsp_position(document.content.len_bytes());
-
+    let snapshot = self.analysis_text(uri).await.map(|content| {
+      let end = Self::document_end_position(&content);
       (content, end)
     });
 
@@ -632,7 +623,6 @@ impl Inner {
     Self {
       client,
       analysis: Mutex::new(AnalysisHost::new()),
-      documents: RwLock::new(BTreeMap::new()),
       file_ids: RwLock::new(HashMap::new()),
       initialized: AtomicBool::new(false),
     }
@@ -671,6 +661,32 @@ impl Inner {
     analysis.document(file_id)
   }
 
+  async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
+    let file_id = self.file_id_for_uri(uri).await?;
+
+    let analysis = self.analysis.lock().await;
+    Some(analysis.file_text(file_id))
+  }
+
+  fn apply_content_changes(
+    current_text: &str,
+    changes: &[lsp::TextDocumentContentChangeEvent],
+  ) -> String {
+    let mut rope = Rope::from_str(current_text);
+
+    for change in changes {
+      let edit = rope.build_edit(change);
+      rope.apply_edit(&edit);
+    }
+
+    rope.to_string()
+  }
+
+  fn document_end_position(text: &str) -> lsp::Position {
+    let rope = Rope::from_str(text);
+    rope.byte_to_lsp_position(rope.len_bytes())
+  }
+
   async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
     let files = self.file_ids.read().await;
     files.get(uri).copied()
@@ -703,7 +719,7 @@ impl Inner {
     }
   }
 
-  async fn clear_analysis_entry(&self, uri: &lsp::Url) {
+  async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
     let file_id = {
       let mut files = self.file_ids.write().await;
       files.remove(uri)
@@ -712,6 +728,9 @@ impl Inner {
     if let Some(file_id) = file_id {
       let mut analysis = self.analysis.lock().await;
       analysis.clear_file(file_id);
+      true
+    } else {
+      false
     }
   }
 

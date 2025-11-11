@@ -12,10 +12,11 @@ use {
   just_lsp_resolver::Resolver,
   just_lsp_rope_ext::RopeExt,
   just_lsp_types::ParameterJson,
+  ropey::Rope,
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,

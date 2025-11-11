@@ -19,8 +19,8 @@ pub type FileId = SourceFile;
 
 #[derive(Clone, Debug)]
 pub enum DocumentState {
-  Parsed(Arc<Document>),
   Error(String),
+  Parsed(Arc<Document>),
 }
 
 impl PartialEq for DocumentState {
@@ -86,6 +86,11 @@ impl AnalysisHost {
   }
 
   #[must_use]
+  pub fn diagnostics(&self, file: SourceFile) -> Arc<Vec<lsp::Diagnostic>> {
+    diagnostics(&self.db, file)
+  }
+
+  #[must_use]
   pub fn document(&self, file: SourceFile) -> Option<Arc<Document>> {
     match document_state(&self.db, file) {
       DocumentState::Parsed(document) => Some(document),
@@ -94,8 +99,8 @@ impl AnalysisHost {
   }
 
   #[must_use]
-  pub fn diagnostics(&self, file: SourceFile) -> Arc<Vec<lsp::Diagnostic>> {
-    diagnostics(&self.db, file)
+  pub fn file_text(&self, file: SourceFile) -> String {
+    file.text(&self.db).clone()
   }
 
   #[must_use]
