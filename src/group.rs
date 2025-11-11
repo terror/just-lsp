@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Group {
+pub(crate) enum Group {
   Any,
   Linux,
   Macos,
@@ -9,12 +9,12 @@ pub enum Group {
 
 impl Group {
   #[must_use]
-  pub fn conflicts_with(self, other: Group) -> bool {
+  pub(crate) fn conflicts_with(self, other: Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
 
   #[must_use]
-  pub fn targets(attribute: &str) -> Option<Vec<Self>> {
+  pub(crate) fn targets(attribute: &str) -> Option<Vec<Self>> {
     match attribute {
       "windows" => Some(vec![Group::Windows]),
       "linux" => Some(vec![Group::Linux]),

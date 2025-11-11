@@ -2,7 +2,7 @@ use super::*;
 
 /// Detects circular dependency chains between recipes to prevent infinite
 /// execution loops.
-pub struct RecipeDependencyCycleRule;
+pub(crate) struct RecipeDependencyCycleRule;
 
 impl Rule for RecipeDependencyCycleRule {
   fn display_name(&self) -> &'static str {

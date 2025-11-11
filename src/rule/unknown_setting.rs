@@ -2,7 +2,7 @@ use super::*;
 
 /// Emits diagnostics for `set` directives targeting settings that don’t exist in
 /// the builtin catalog.
-pub struct UnknownSettingRule;
+pub(crate) struct UnknownSettingRule;
 
 impl Rule for UnknownSettingRule {
   fn display_name(&self) -> &'static str {

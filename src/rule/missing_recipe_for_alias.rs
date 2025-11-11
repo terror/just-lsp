@@ -1,7 +1,7 @@
 use super::*;
 
 /// Flags aliases that point to recipes which aren’t defined.
-pub struct MissingRecipeForAliasRule;
+pub(crate) struct MissingRecipeForAliasRule;
 
 impl Rule for MissingRecipeForAliasRule {
   fn display_name(&self) -> &'static str {

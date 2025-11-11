@@ -1,7 +1,7 @@
 use super::*;
 
 /// Ensures attributes only appear on syntax nodes that actually accept attributes.
-pub struct AttributeInvalidTargetRule;
+pub(crate) struct AttributeInvalidTargetRule;
 
 impl Rule for AttributeInvalidTargetRule {
   fn display_name(&self) -> &'static str {

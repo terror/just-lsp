@@ -48,11 +48,11 @@ impl Server {
     }
   }
 
-  pub fn new(client: Client) -> Self {
+  pub(crate) fn new(client: Client) -> Self {
     Self(Arc::new(Inner::new(client)))
   }
 
-  pub async fn run() -> Result {
+  pub(crate) async fn run() -> Result {
     let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
     let (service, socket) = LspService::new(Server::new);

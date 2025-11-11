@@ -1,6 +1,6 @@
 use super::*;
 
-pub use {
+pub(crate) use {
   attribute_arguments::AttributeArgumentsRule,
   attribute_invalid_target::AttributeInvalidTargetRule,
   attribute_target_support::AttributeTargetSupportRule,

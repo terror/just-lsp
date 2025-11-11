@@ -1,18 +1,18 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct Resolver<'a> {
+pub(crate) struct Resolver<'a> {
   document: &'a Document,
 }
 
 impl<'a> Resolver<'a> {
   #[must_use]
-  pub fn new(document: &'a Document) -> Self {
+  pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
   }
 
   #[must_use]
-  pub fn resolve_identifier_definition(
+  pub(crate) fn resolve_identifier_definition(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
@@ -129,7 +129,7 @@ impl<'a> Resolver<'a> {
   }
 
   #[must_use]
-  pub fn resolve_identifier_hover(
+  pub(crate) fn resolve_identifier_hover(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Hover> {
@@ -238,7 +238,7 @@ impl<'a> Resolver<'a> {
   }
 
   #[must_use]
-  pub fn resolve_identifier_references(
+  pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {

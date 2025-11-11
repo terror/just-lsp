@@ -82,7 +82,7 @@ mod variable;
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 unsafe extern "C" {
-  pub fn tree_sitter_just() -> Language;
+  pub(crate) fn tree_sitter_just() -> Language;
 }
 
 #[tokio::main]

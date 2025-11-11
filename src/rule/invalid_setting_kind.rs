@@ -2,7 +2,7 @@ use super::*;
 
 /// Ensures each `set` statement uses the correct value type (boolean, string, or
 /// array) for the targeted builtin setting.
-pub struct InvalidSettingKindRule;
+pub(crate) struct InvalidSettingKindRule;
 
 impl Rule for InvalidSettingKindRule {
   fn display_name(&self) -> &'static str {

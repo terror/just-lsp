@@ -1,8 +1,8 @@
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Dependency {
-  pub arguments: Vec<TextNode>,
-  pub name: String,
-  pub range: lsp::Range,
+pub(crate) struct Dependency {
+  pub(crate) arguments: Vec<TextNode>,
+  pub(crate) name: String,
+  pub(crate) range: lsp::Range,
 }

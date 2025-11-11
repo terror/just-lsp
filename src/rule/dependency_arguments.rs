@@ -2,7 +2,7 @@ use super::*;
 
 /// Checks that dependency invocations supply the correct number of arguments for
 /// the referenced recipe’s signature.
-pub struct DependencyArgumentRule;
+pub(crate) struct DependencyArgumentRule;
 
 impl Rule for DependencyArgumentRule {
   fn display_name(&self) -> &'static str {

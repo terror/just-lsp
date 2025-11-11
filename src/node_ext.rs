@@ -1,6 +1,6 @@
 use super::*;
 
-pub trait NodeExt {
+pub(crate) trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
   fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>>;

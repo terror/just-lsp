@@ -1,6 +1,6 @@
 use super::*;
 
-pub const BUILTINS: [Builtin<'_>; 134] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 134] = [
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",

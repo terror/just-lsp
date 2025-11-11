@@ -2,7 +2,7 @@ use super::*;
 
 /// Highlights recipe parameters that never get read anywhere in the recipe body
 /// (unless `set export` is on).
-pub struct UnusedParameterRule;
+pub(crate) struct UnusedParameterRule;
 
 impl Rule for UnusedParameterRule {
   fn display_name(&self) -> &'static str {

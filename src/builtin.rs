@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub enum Builtin<'a> {
+pub(crate) enum Builtin<'a> {
   Attribute {
     name: &'a str,
     description: &'a str,
@@ -31,7 +31,7 @@ pub enum Builtin<'a> {
 
 impl Builtin<'_> {
   #[must_use]
-  pub fn completion_item(&self) -> lsp::CompletionItem {
+  pub(crate) fn completion_item(&self) -> lsp::CompletionItem {
     match self {
       Self::Attribute { name, .. } => lsp::CompletionItem {
         label: (*name).to_string(),
@@ -166,7 +166,7 @@ impl Builtin<'_> {
     }
   }
 
-  pub fn documentation(&self) -> lsp::MarkupContent {
+  pub(crate) fn documentation(&self) -> lsp::MarkupContent {
     match self {
       Self::Attribute {
         name,

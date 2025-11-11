@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub enum SettingKind {
+pub(crate) enum SettingKind {
   Array,
   Boolean(bool),
   String,
@@ -29,15 +29,15 @@ impl PartialEq for SettingKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Setting {
-  pub kind: SettingKind,
-  pub name: String,
-  pub range: lsp::Range,
+pub(crate) struct Setting {
+  pub(crate) kind: SettingKind,
+  pub(crate) name: String,
+  pub(crate) range: lsp::Range,
 }
 
 impl Setting {
   #[must_use]
-  pub fn parse(text: &str, range: lsp::Range) -> Option<Self> {
+  pub(crate) fn parse(text: &str, range: lsp::Range) -> Option<Self> {
     if !text.starts_with("set ") {
       return None;
     }
