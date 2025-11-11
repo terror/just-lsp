@@ -13,6 +13,8 @@ static RULES: &[&dyn Rule] = &[
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
   &RecipeParameterRule,
+  &MixedIndentationRule,
+  &InconsistentIndentationRule,
   &DuplicateRecipeRule,
   &RecipeDependencyCycleRule,
   &MissingDependencyRule,
@@ -514,6 +516,45 @@ mod tests {
     })
     .error("Syntax error")
     .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_between_lines() {
+    Test::new(indoc! {
+      "
+      foo:
+      \techo \"foo\"
+        echo \"bar\"
+      "
+    })
+    .warning("Recipe `foo` mixes tabs and spaces for indentation")
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_single_line_mix() {
+    Test::new(indoc! {
+      "
+      foo:
+   \t  echo \"foo\"
+      "
+    })
+    .warning("Recipe `foo` mixes tabs and spaces for indentation")
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_between_lines() {
+    Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_consistent_indentation() {
+    Test::new("foo:\n  echo \"foo\"\n  echo \"bar\"\n").run();
   }
 
   #[test]

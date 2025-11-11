@@ -12,9 +12,11 @@ pub(crate) use {
   duplicate_setting::DuplicateSettingRule,
   duplicate_variables::DuplicateVariableRule,
   function_arguments::FunctionArgumentsRule,
+  inconsistent_indentation::InconsistentIndentationRule,
   invalid_setting_kind::InvalidSettingKindRule,
   missing_dependencies::MissingDependencyRule,
   missing_recipe_for_alias::MissingRecipeForAliasRule,
+  mixed_indentation::MixedIndentationRule,
   recipe_dependency_cycles::RecipeDependencyCycleRule,
   recipe_parameters::RecipeParameterRule, syntax::SyntaxRule,
   undefined_identifiers::UndefinedIdentifierRule,
@@ -34,9 +36,11 @@ mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;
 mod function_arguments;
+mod inconsistent_indentation;
 mod invalid_setting_kind;
 mod missing_dependencies;
 mod missing_recipe_for_alias;
+mod mixed_indentation;
 mod recipe_dependency_cycles;
 mod recipe_parameters;
 mod syntax;
