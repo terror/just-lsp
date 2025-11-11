@@ -114,6 +114,11 @@ vim.lsp.enable('just')
 `vim.lsp.config` automatically merges your overrides with the upstream config
 shipped inside nvim-lspconfig’s `lsp/just.lua`.
 
+`capabilities` describe what features your client supports (completion
+snippets, folding ranges, etc.). The helper from `cmp-nvim-lsp` augments the
+defaults so completion-related capabilities line up with `nvim-cmp`. If you do
+not use `nvim-cmp`, you can omit the field or build your own table.
+
 ### Zed
 
 A third-party [**zed**](https://zed.dev/) extension is maintained over at https://github.com/sectore/zed-just-ls,
@@ -228,7 +233,8 @@ end
 ```
 
 **n.b.** This setup requires the [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig)
-plugin (and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp)).
+plugin (and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp) for the
+capabilities helper).
 
 ### Extending the parser
 
