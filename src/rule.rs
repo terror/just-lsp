@@ -5,7 +5,9 @@ pub(crate) use {
   attribute_invalid_target::AttributeInvalidTargetRule,
   attribute_target_support::AttributeTargetSupportRule,
   dependency_arguments::DependencyArgumentRule,
-  duplicate_alias::DuplicateAliasRule, duplicate_recipes::DuplicateRecipeRule,
+  duplicate_alias::DuplicateAliasRule,
+  duplicate_default_attribute::DuplicateDefaultAttributeRule,
+  duplicate_recipes::DuplicateRecipeRule,
   duplicate_setting::DuplicateSettingRule,
   function_arguments::FunctionArgumentsRule,
   invalid_setting_kind::InvalidSettingKindRule,
@@ -24,6 +26,7 @@ mod attribute_invalid_target;
 mod attribute_target_support;
 mod dependency_arguments;
 mod duplicate_alias;
+mod duplicate_default_attribute;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod function_arguments;

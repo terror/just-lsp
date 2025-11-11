@@ -8,6 +8,7 @@ static RULES: &[&dyn Rule] = &[
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
   &AttributeTargetSupportRule,
+  &DuplicateDefaultAttributeRule,
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
   &RecipeParameterRule,
@@ -184,6 +185,41 @@ mod tests {
         echo \"baz\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_between_recipes() {
+    Test::new(indoc! {
+      "
+      [default]
+      check:
+        echo \"check\"
+
+      [default]
+      ci:
+        echo \"ci\"
+      "
+    })
+    .error(
+      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module",
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_on_same_recipe() {
+    Test::new(indoc! {
+      "
+      [default]
+      [default]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module",
+    )
     .run();
   }
 
