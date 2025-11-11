@@ -232,6 +232,10 @@ local on_attach = function(client, bufnr)
 end
 ```
 
+As in the basic example above, we use `cmp_nvim_lsp.default_capabilities()` so
+that the dev build inherits completion-related capabilities from `nvim-cmp`.
+Swap in your own table if you use a different completion plugin.
+
 **n.b.** This setup requires the [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig)
 plugin (and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp) for the
 capabilities helper).
