@@ -177,6 +177,13 @@ dependencies, recipes, and more.
 
 Workspace-wide symbol renaming is supported.
 
+### `textDocument/semanticTokens`
+
+The server exposes semantic tokens for recipes, parameters, assignments, built-in
+symbols, and comments. Clients that support semantic highlighting (Neovim, VS
+Code, Helix, etc.) will automatically colorize justfiles when this capability is
+enabled, offering more granular syntax highlighting than regex-based schemes.
+
 ## Development
 
 I use [Neovim](https://neovim.io/) to work on this project, and I load the

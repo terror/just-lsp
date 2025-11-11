@@ -17,7 +17,7 @@ use {
   function_call::FunctionCall,
   group::Group,
   node_ext::NodeExt,
-  once_cell::sync::OnceCell,
+  once_cell::sync::{Lazy, OnceCell},
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
   position_ext::PositionExt,
@@ -48,6 +48,9 @@ use {
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
+  tree_sitter_highlight::{
+    Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
+  },
   variable::Variable,
 };
 
@@ -77,6 +80,7 @@ mod server;
 mod setting;
 mod subcommand;
 mod text_node;
+mod tokenizer;
 mod variable;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
