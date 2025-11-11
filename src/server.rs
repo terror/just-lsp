@@ -298,19 +298,19 @@ impl Inner {
       return Ok(());
     }
 
-    let uri = text_document.uri;
-    let version = text_document.version;
+    let (uri, version) = (text_document.uri, text_document.version);
 
     if let Some(file_id) = self.file_id_for_uri(&uri).await {
-      let current_text = {
-        let analysis = self.analysis.lock().await;
-        analysis.file_text(file_id)
-      };
+      let current_text = self.analysis.lock().await.file_text(file_id);
 
-      let updated_text =
-        Self::apply_content_changes(&current_text, &content_changes);
+      self
+        .upsert_analysis_file(
+          &uri,
+          version,
+          Self::apply_content_changes(&current_text, &content_changes),
+        )
+        .await;
 
-      self.upsert_analysis_file(&uri, version, updated_text).await;
       self.publish_diagnostics(&uri).await;
     } else if let Some(full_change) = content_changes
       .iter()
@@ -319,6 +319,7 @@ impl Inner {
       self
         .upsert_analysis_file(&uri, version, full_change.text.clone())
         .await;
+
       self.publish_diagnostics(&uri).await;
     }
 
@@ -639,6 +640,7 @@ impl Inner {
 
     let (diagnostics, version) = {
       let analysis = self.analysis.lock().await;
+
       (
         analysis.diagnostics(file_id),
         analysis.file_version(file_id),
