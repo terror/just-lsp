@@ -54,8 +54,8 @@ impl InconsistentIndentationRule {
       severity: Some(lsp::DiagnosticSeverity::ERROR),
       message: format!(
         "Recipe line has inconsistent leading whitespace. Recipe started with `{}` but found line with `{}`",
-        visualize_whitespace(expected),
-        visualize_whitespace(found)
+        Self::visualize_whitespace(expected),
+        Self::visualize_whitespace(found)
       ),
       ..Default::default()
     })
@@ -77,6 +77,7 @@ impl InconsistentIndentationRule {
 
     while line_idx < document.content.len_lines() {
       let line_text = document.content.line(line_idx).to_string();
+
       let line = line_text.trim_end_matches(['\r', '\n']);
 
       if line.trim().is_empty() {
@@ -88,17 +89,17 @@ impl InconsistentIndentationRule {
         break;
       }
 
-      let indent: String = line
+      let indent = line
         .chars()
         .take_while(|c| *c == ' ' || *c == '\t')
-        .collect();
+        .collect::<String>();
 
       if indent.is_empty() {
         line_idx += 1;
         continue;
       }
 
-      let Some(kind) = indent_kind(&indent) else {
+      let Some(kind) = IndentKind::from_indent(&indent) else {
         line_idx += 1;
         continue;
       };
@@ -112,11 +113,10 @@ impl InconsistentIndentationRule {
           }
 
           if *expected != indent {
-            let line_number = u32::try_from(line_idx).unwrap_or(u32::MAX);
             return Some(self.diagnostic_for_line(
               expected.as_str(),
               &indent,
-              line_number,
+              u32::try_from(line_idx).unwrap_or(u32::MAX),
             ));
           }
         }
@@ -127,21 +127,21 @@ impl InconsistentIndentationRule {
 
     None
   }
-}
 
-fn visualize_whitespace(indent: &str) -> String {
-  if indent.is_empty() {
-    return "∅".to_string();
+  fn visualize_whitespace(indent: &str) -> String {
+    if indent.is_empty() {
+      return "∅".to_string();
+    }
+
+    indent
+      .chars()
+      .map(|ch| match ch {
+        ' ' => '␠',
+        '\t' => '⇥',
+        other => other,
+      })
+      .collect()
   }
-
-  indent
-    .chars()
-    .map(|ch| match ch {
-      ' ' => '␠',
-      '\t' => '⇥',
-      other => other,
-    })
-    .collect()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -150,17 +150,21 @@ enum IndentKind {
   Tabs,
 }
 
-fn indent_kind(indent: &str) -> Option<IndentKind> {
-  if indent.is_empty() {
-    return None;
-  }
+impl IndentKind {
+  fn from_indent(indent: &str) -> Option<Self> {
+    if indent.is_empty() {
+      return None;
+    }
 
-  let has_space = indent.chars().any(|ch| ch == ' ');
-  let has_tab = indent.chars().any(|ch| ch == '\t');
+    let (has_space, has_tab) = (
+      indent.chars().any(|ch| ch == ' '),
+      indent.chars().any(|ch| ch == '\t'),
+    );
 
-  match (has_space, has_tab) {
-    (true, false) => Some(IndentKind::Spaces),
-    (false, true) => Some(IndentKind::Tabs),
-    (true, true) | (false, false) => None,
+    match (has_space, has_tab) {
+      (true, false) => Some(Self::Spaces),
+      (false, true) => Some(Self::Tabs),
+      (true, true) | (false, false) => None,
+    }
   }
 }
