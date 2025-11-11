@@ -54,6 +54,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
+  #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -81,6 +82,11 @@ impl Document {
     })
   }
 
+  /// Applies incremental edits from the client and reparses the syntax tree.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if tree-sitter fails to parse the updated document.
   pub fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -108,6 +114,7 @@ impl Document {
     Ok(())
   }
 
+  #[must_use]
   pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -148,6 +155,7 @@ impl Document {
     })
   }
 
+  #[must_use]
   pub fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .recipes()
@@ -155,6 +163,7 @@ impl Document {
       .find(|recipe| recipe.name == name)
   }
 
+  #[must_use]
   pub fn find_variable(&self, name: &str) -> Option<Variable> {
     self
       .variables()
@@ -162,6 +171,7 @@ impl Document {
       .find(|var| var.name.value == name)
   }
 
+  #[must_use]
   pub fn function_calls(&self) -> Vec<FunctionCall> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -198,6 +208,7 @@ impl Document {
     })
   }
 
+  #[must_use]
   pub fn get_node_text(&self, node: &Node) -> String {
     self
       .content
@@ -208,6 +219,7 @@ impl Document {
       .to_string()
   }
 
+  #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
       let point = position.point();
@@ -217,6 +229,12 @@ impl Document {
     }
   }
 
+  /// Parses the current document contents and updates the cached syntax tree.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
+  /// contents fail to parse.
   pub fn parse(&mut self) -> Result {
     let mut parser = Parser::new();
 
@@ -230,6 +248,7 @@ impl Document {
     Ok(())
   }
 
+  #[must_use]
   pub fn recipes(&self) -> Vec<Recipe> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -330,6 +349,7 @@ impl Document {
     })
   }
 
+  #[must_use]
   pub fn settings(&self) -> Vec<Setting> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -346,6 +366,7 @@ impl Document {
     })
   }
 
+  #[must_use]
   pub fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree

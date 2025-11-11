@@ -24,6 +24,7 @@ impl Display for AttributeTarget {
 }
 
 impl AttributeTarget {
+  #[must_use]
   pub fn try_from_kind(kind: &str) -> Option<Self> {
     match kind {
       "alias" => Some(Self::Alias),

@@ -17,23 +17,24 @@ impl Rule for InvalidSettingKindRule {
     let mut diagnostics = Vec::new();
 
     for setting in context.settings() {
-      let builtin = builtins::BUILTINS.iter().find(
+      let builtin = BUILTINS.iter().find(
         |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
       );
 
-      if let Some(Builtin::Setting { kind, .. }) = builtin {
-        if setting.kind != *kind {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: setting.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
-              "Setting `{}` expects a {kind} value",
-              setting.name,
-            ),
-            ..Default::default()
-          }));
-        }
+      let Some(Builtin::Setting { kind, .. }) = builtin else {
+        continue;
+      };
+
+      if setting.kind == *kind {
+        continue;
       }
+
+      diagnostics.push(self.diagnostic(lsp::Diagnostic {
+        range: setting.range,
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        message: format!("Setting `{}` expects a {kind} value", setting.name,),
+        ..Default::default()
+      }));
     }
 
     diagnostics

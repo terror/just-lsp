@@ -1,5 +1,5 @@
 [package]
-name = "just-lsp-wasm"
+name = "just-lsp-builtins"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -8,3 +8,4 @@ publish = false
 workspace = true
 
 [dependencies]
+just-lsp-types = { workspace = true }

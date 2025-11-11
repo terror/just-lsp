@@ -19,7 +19,7 @@ impl Rule for UnknownFunctionRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      let is_builtin = builtins::BUILTINS.iter().any(|f| {
+      let is_builtin = BUILTINS.iter().any(|f| {
         matches!(f, Builtin::Function { name, .. } if *name == function_name)
       });
 

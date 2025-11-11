@@ -19,7 +19,7 @@ impl Rule for FunctionArgumentsRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      let builtin = builtins::BUILTINS.iter().find(|f| {
+      let builtin = BUILTINS.iter().find(|f| {
         matches!(f, Builtin::Function { name, .. } if *name == function_name)
       });
 

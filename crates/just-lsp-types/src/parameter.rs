@@ -2,9 +2,9 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterKind {
+  Export,
   Normal,
   Variadic(VariadicType),
-  Export,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,17 +15,17 @@ pub enum VariadicType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-  pub name: String,
-  pub kind: ParameterKind,
-  pub default_value: Option<String>,
   pub content: String,
+  pub default_value: Option<String>,
+  pub kind: ParameterKind,
+  pub name: String,
   pub range: lsp::Range,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ParameterJson {
-  pub name: String,
   pub default_value: Option<String>,
+  pub name: String,
 }
 
 impl From<Parameter> for ParameterJson {
@@ -38,6 +38,7 @@ impl From<Parameter> for ParameterJson {
 }
 
 impl Parameter {
+  #[must_use]
   pub fn parse(text: &str, range: lsp::Range) -> Option<Self> {
     let parts: Vec<&str> = text.split('=').collect();
 

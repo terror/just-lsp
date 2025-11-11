@@ -1,4 +1,48 @@
-use super::*;
+use {
+  count::Count,
+  just_lsp_builtins::BUILTINS,
+  just_lsp_document::{Document, NodeExt},
+  just_lsp_types::{
+    Alias, Attribute, Builtin, FunctionCall, Group, Parameter, ParameterKind,
+    Recipe, Setting, SettingKind, Variable,
+  },
+  once_cell::sync::OnceCell,
+  rule::*,
+  rule_context::RuleContext,
+  std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+  },
+  tower_lsp::lsp_types as lsp,
+  tree_sitter::{Node, Tree, TreeCursor},
+};
+
+mod count;
+mod rule;
+mod rule_context;
+
+static RULES: &[&dyn Rule] = &[
+  &SyntaxRule,
+  &MissingRecipeForAliasRule,
+  &DuplicateAliasRule,
+  &UnknownAttributeRule,
+  &AttributeArgumentsRule,
+  &AttributeInvalidTargetRule,
+  &AttributeTargetSupportRule,
+  &UnknownFunctionRule,
+  &FunctionArgumentsRule,
+  &RecipeParameterRule,
+  &DuplicateRecipeRule,
+  &RecipeDependencyCycleRule,
+  &MissingDependencyRule,
+  &DependencyArgumentRule,
+  &UnknownSettingRule,
+  &InvalidSettingKindRule,
+  &DuplicateSettingRule,
+  &UndefinedIdentifierRule,
+  &UnusedVariableRule,
+  &UnusedParameterRule,
+];
 
 #[derive(Debug)]
 pub struct Analyzer<'a> {
@@ -7,13 +51,14 @@ pub struct Analyzer<'a> {
 
 impl<'a> Analyzer<'a> {
   /// Analyzes the document and returns a list of diagnostics.
-  pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
+  pub fn analyze(&self) -> Vec<lsp::Diagnostic> {
     let context = RuleContext::new(self.document);
     RULES.iter().flat_map(|rule| rule.run(&context)).collect()
   }
 
   /// Creates a new analyzer for the given document.
-  pub(crate) fn new(document: &'a Document) -> Self {
+  #[must_use]
+  pub fn new(document: &'a Document) -> Self {
     Self { document }
   }
 }

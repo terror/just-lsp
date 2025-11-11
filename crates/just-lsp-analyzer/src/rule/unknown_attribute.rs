@@ -1,15 +1,15 @@
 use super::*;
 
-/// Ensures attributes only appear on syntax nodes that actually accept attributes.
-pub struct AttributeInvalidTargetRule;
+/// Warns when an attribute name isn’t part of the known builtin attribute set.
+pub struct UnknownAttributeRule;
 
-impl Rule for AttributeInvalidTargetRule {
+impl Rule for UnknownAttributeRule {
   fn display_name(&self) -> &'static str {
-    "Attribute Invalid Target"
+    "Unknown Attribute"
   }
 
   fn id(&self) -> &'static str {
-    "attribute-invalid-target"
+    "unknown-attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
@@ -18,7 +18,7 @@ impl Rule for AttributeInvalidTargetRule {
     for attribute in context.attributes() {
       let attribute_name = &attribute.name.value;
 
-      let is_known = builtins::BUILTINS.iter().any(|f| {
+      let is_known = BUILTINS.iter().any(|f| {
         matches!(
           f,
           Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
@@ -26,16 +26,10 @@ impl Rule for AttributeInvalidTargetRule {
       });
 
       if !is_known {
-        continue;
-      }
-
-      if attribute.target.is_none() {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
+          range: attribute.name.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
-            "Attribute `{attribute_name}` applied to invalid target",
-          ),
+          message: format!("Unknown attribute `{attribute_name}`"),
           ..Default::default()
         }));
       }

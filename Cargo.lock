@@ -621,6 +621,8 @@ dependencies = [
  "clap",
  "env_logger",
  "indoc",
+ "just-lsp-analyzer",
+ "just-lsp-builtins",
  "just-lsp-document",
  "just-lsp-rope-ext",
  "just-lsp-types",
@@ -636,6 +638,27 @@ dependencies = [
  "tower-lsp",
  "tower-test",
  "tree-sitter",
+]
+
+[[package]]
+name = "just-lsp-analyzer"
+version = "0.0.0"
+dependencies = [
+ "indoc",
+ "just-lsp-builtins",
+ "just-lsp-document",
+ "just-lsp-types",
+ "once_cell",
+ "pretty_assertions",
+ "tower-lsp",
+ "tree-sitter",
+]
+
+[[package]]
+name = "just-lsp-builtins"
+version = "0.0.0"
+dependencies = [
+ "just-lsp-types",
 ]
 
 [[package]]
