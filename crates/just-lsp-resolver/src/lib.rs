@@ -1,4 +1,8 @@
-use super::*;
+use {
+  just_lsp_builtins::BUILTINS, just_lsp_document::Document,
+  just_lsp_document::NodeExt, just_lsp_types::Builtin,
+  tower_lsp::lsp_types as lsp, tree_sitter::Node,
+};
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
@@ -6,11 +10,13 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-  pub(crate) fn new(document: &'a Document) -> Self {
+  #[must_use]
+  pub fn new(document: &'a Document) -> Self {
     Self { document }
   }
 
-  pub(crate) fn resolve_identifier_definition(
+  #[must_use]
+  pub fn resolve_identifier_definition(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
@@ -18,13 +24,13 @@ impl<'a> Resolver<'a> {
 
     let identifier_parent_kind = identifier.parent()?.kind();
 
-    if ["dependency", "alias"].contains(&identifier_parent_kind) {
-      if let Some(recipe) = self.document.find_recipe(&identifier_name) {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: recipe.range,
-        });
-      }
+    if ["dependency", "alias"].contains(&identifier_parent_kind)
+      && let Some(recipe) = self.document.find_recipe(&identifier_name)
+    {
+      return Some(lsp::Location {
+        uri: self.document.uri.clone(),
+        range: recipe.range,
+      });
     }
 
     if identifier_parent_kind == "value" {
@@ -64,7 +70,7 @@ impl<'a> Resolver<'a> {
             return Some(lsp::Location {
               uri: self.document.uri.clone(),
               range: identifier.get_range(),
-            })
+            });
           }
           _ => {}
         }
@@ -126,7 +132,8 @@ impl<'a> Resolver<'a> {
     None
   }
 
-  pub(crate) fn resolve_identifier_hover(
+  #[must_use]
+  pub fn resolve_identifier_hover(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Hover> {
@@ -134,18 +141,18 @@ impl<'a> Resolver<'a> {
 
     let parent_kind = identifier.parent().map(|p| p.kind());
 
-    if let Some(recipe) = self.document.find_recipe(&text) {
-      if parent_kind.is_some_and(|kind| {
+    if let Some(recipe) = self.document.find_recipe(&text)
+      && parent_kind.is_some_and(|kind| {
         ["alias", "dependency", "recipe_header"].contains(&kind)
-      }) {
-        return Some(lsp::Hover {
-          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
-          }),
-          range: Some(identifier.get_range()),
-        });
-      }
+      })
+    {
+      return Some(lsp::Hover {
+        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+          kind: lsp::MarkupKind::PlainText,
+          value: recipe.content,
+        }),
+        range: Some(identifier.get_range()),
+      });
     }
 
     if parent_kind.is_some_and(|kind| kind == "value") {
@@ -234,7 +241,8 @@ impl<'a> Resolver<'a> {
     None
   }
 
-  pub(crate) fn resolve_identifier_references(
+  #[must_use]
+  pub fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
@@ -1372,9 +1380,11 @@ mod tests {
 
     let root = doc.tree.as_ref().unwrap().root_node();
 
-    assert!(resolver
-      .resolve_identifier_hover(&root.find("text").unwrap())
-      .is_none());
+    assert!(
+      resolver
+        .resolve_identifier_hover(&root.find("text").unwrap())
+        .is_none()
+    );
   }
 
   #[test]

@@ -26,7 +26,7 @@ check:
 
 [group: 'check']
 ci: test clippy forbid
-  cargo +nightly fmt --all -- --check
+  cargo fmt --all -- --check
   cargo update --locked --package just-lsp
 
 [group: 'check']
@@ -35,7 +35,7 @@ clippy:
 
 [group: 'format']
 fmt:
-  cargo +nightly fmt
+  cargo fmt
 
 [group: 'format']
 fmt-web:
@@ -43,7 +43,7 @@ fmt-web:
 
 [group: 'format']
 fmt-check:
-  cargo +nightly fmt --all -- --check
+  cargo fmt --all -- --check
 
 [group: 'check']
 forbid:

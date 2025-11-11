@@ -7,10 +7,10 @@ use {
   env_logger::Env,
   just_lsp_analyzer::Analyzer,
   just_lsp_builtins::BUILTINS,
-  just_lsp_document::{Document, NodeExt},
+  just_lsp_document::Document,
+  just_lsp_resolver::Resolver,
   just_lsp_rope_ext::RopeExt,
-  just_lsp_types::{Builtin, ParameterJson},
-  resolver::Resolver,
+  just_lsp_types::ParameterJson,
   server::Server,
   std::{
     backtrace::BacktraceStatus,
@@ -28,12 +28,10 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
-  tree_sitter::Node,
 };
 
 mod arguments;
 mod command;
-mod resolver;
 mod server;
 mod subcommand;
 
