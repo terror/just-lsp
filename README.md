@@ -87,18 +87,37 @@ with some of the more popular ones.
 
 ### Neovim
 
-You can use the release build of `just-lsp` by setting up the `just` server on
-[`lspconfig`](https://github.com/neovim/nvim-lspconfig), so somewhere in your config:
+`nvim-lspconfig` exposes its server definitions to the builtin
+[`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#lsp-config) API, so the
+old `require('lspconfig').just.setup()` pattern is deprecated. With Nvim
+0.11.3+ and the latest nvim-lspconfig installed, enabling `just-lsp` looks like:
 
 ```lua
-local lsp = require('lspconfig')
-
-lsp.just.setup({
-  -- ...
-})
+vim.lsp.enable('just')
 ```
 
-This assumes `just-lsp` is installed on your system and is in your `$PATH`.
+If you need to override the default command, capabilities, or hooks, define (or
+extend) the config before enabling it:
+
+```lua
+vim.lsp.config('just', {
+  cmd = { '/path/to/just-lsp' }, -- only needed when the binary is not on $PATH
+  on_attach = function(client, bufnr)
+    -- add your mappings or buffer-local options
+  end,
+  capabilities = require('cmp_nvim_lsp').default_capabilities(),
+})
+
+vim.lsp.enable('just')
+```
+
+`vim.lsp.config` automatically merges your overrides with the upstream config
+shipped inside nvim-lspconfig’s `lsp/just.lua`.
+
+`capabilities` describe what features your client supports (completion
+snippets, folding ranges, etc.). The helper from `cmp-nvim-lsp` augments the
+defaults so completion-related capabilities line up with `nvim-cmp`. If you do
+not use `nvim-cmp`, you can omit the field or build your own table.
 
 ### Zed
 
@@ -176,43 +195,36 @@ cargo build
 Add this to your editor configuration:
 
 ```lua
-local lsp = require('lspconfig')
+local dev_cmd = '/path/to/just-lsp/target/debug/just-lsp'
 
-local configs = require('lspconfig.configs')
-
-if not configs.just_lsp then
-  configs.just_lsp = {
-    default_config = {
-      cmd = { '/path/to/just-lsp/target/debug/just-lsp' },
-      filetypes = { 'just' },
-      root_dir = function(fname)
-        return lsp.util.find_git_ancestor(fname)
-      end,
-      settings = {},
-    },
-  }
-end
-
-local on_attach = function(client)
+local on_attach = function(client, bufnr)
   -- Add your implementation here
 end
 
-local capabilities = {} -- Define what functionality the LSP client is able to handle
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
-lsp.just_lsp.setup({
+vim.lsp.config('just_dev', {
+  cmd = { dev_cmd },
+  filetypes = { 'just' },
+  root_dir = function(fname)
+    return vim.fs.root(fname, { '.git', 'justfile' })
+  end,
   on_attach = on_attach,
   capabilities = capabilities,
 })
+
+vim.lsp.enable('just_dev')
 ```
 
-**n.b.** You'll need to replace `/path/to/just-lsp/target/debug/just-lsp` with
-the actual absolute path to the binary.
+This uses a separate config name (`just_dev`) so you can switch between the
+local development build and the stock `just` config. Replace `dev_cmd` with the
+absolute path to your freshly built binary.
 
-`on_attach` is a function that gets called after an LSP client gets attached
-to a buffer, [mine](https://github.com/terror/dotfiles/blob/0cc595de761d27d99367ad0ea98920b7718be4fb/etc/nvim/lua/config.lua#L207) just sets up a few mappings:
+`on_attach` is a function that gets called after an LSP client attaches to a
+buffer, [mine](https://github.com/terror/dotfiles/blob/0cc595de761d27d99367ad0ea98920b7718be4fb/etc/nvim/lua/config.lua#L207) just sets up a few mappings:
 
 ```lua
-local on_attach = function(client)
+local on_attach = function(client, bufnr)
   -- ...
   map('n', '<leader>ar', '<cmd>lua vim.lsp.buf.rename()<CR>')
   map('n', '<leader>s', '<cmd>lua vim.lsp.buf.format({ async = true })<CR>')
@@ -220,17 +232,13 @@ local on_attach = function(client)
 end
 ```
 
-...and `capabilities` is a table defining what functionality the LSP client is able
-to handle, I use
-[default capabilities](https://github.com/hrsh7th/cmp-nvim-lsp/blob/99290b3ec1322070bcfb9e846450a46f6efa50f0/lua/cmp_nvim_lsp/init.lua#L37)
-provided by [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp):
+As in the basic example above, we use `cmp_nvim_lsp.default_capabilities()` so
+that the dev build inherits completion-related capabilities from `nvim-cmp`.
+Swap in your own table if you use a different completion plugin.
 
-```lua
-local capabilities = require('cmp_nvim_lsp').default_capabilities()
-```
-
-**n.b.** This will require you to have the [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig)
-(and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp)) plugin installed.
+**n.b.** This setup requires the [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig)
+plugin (and optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp) for the
+capabilities helper).
 
 ### Extending the parser
 
