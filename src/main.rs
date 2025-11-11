@@ -1,7 +1,7 @@
 use {
-  anyhow::{anyhow, bail, Error},
+  anyhow::{Error, anyhow, bail},
   arguments::Arguments,
-  ariadne::{sources, Color, Label, Report, ReportKind},
+  ariadne::{Color, Label, Report, ReportKind, sources},
   clap::Parser as Clap,
   command::Command,
   env_logger::Env,
@@ -20,14 +20,14 @@ use {
     fs,
     path::PathBuf,
     process,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::Instant,
   },
   subcommand::Subcommand,
   tempfile::tempdir,
   tokio::{io::AsyncBufReadExt, sync::RwLock},
-  tokio_stream::{wrappers::LinesStream, StreamExt},
-  tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
+  tokio_stream::{StreamExt, wrappers::LinesStream},
+  tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
 };
 
 mod arguments;
