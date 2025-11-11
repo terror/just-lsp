@@ -24,7 +24,7 @@ unsafe extern "C" {
   pub(crate) fn tree_sitter_just() -> Language;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Document {
   pub content: Rope,
   pub tree: Option<Tree>,

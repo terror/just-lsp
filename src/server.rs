@@ -194,9 +194,7 @@ impl Inner {
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = self.analysis_document(uri).await {
       let mut actions = Vec::new();
 
       for recipe in document.recipes() {
@@ -239,9 +237,7 @@ impl Inner {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(&uri) {
+    if let Some(document) = self.analysis_document(&uri).await {
       let mut completion_items = Vec::new();
 
       let recipes = document.recipes();
@@ -364,11 +360,13 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -381,8 +379,8 @@ impl Inner {
               kind: Some(lsp::DocumentHighlightKind::TEXT),
             })
             .collect()
-        })
-    }))
+        }),
+    )
   }
 
   async fn execute_command(
@@ -447,9 +445,7 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
-
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = self.analysis_document(uri).await {
       let recipes = document.recipes();
 
       let folding_ranges = recipes
@@ -514,19 +510,15 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let snapshot = {
-      let documents = self.documents.read().await;
+    let snapshot = self.analysis_document(uri).await.map(|document| {
+      let content = document.content.to_string();
 
-      documents.get(uri).map(|document| {
-        let content = document.content.to_string();
+      let end = document
+        .content
+        .byte_to_lsp_position(document.content.len_bytes());
 
-        let end = document
-          .content
-          .byte_to_lsp_position(document.content.len_bytes());
-
-        (content, end)
-      })
-    };
+      (content, end)
+    });
 
     if let Some((content, document_end)) = snapshot {
       match self.format_document(&content).await {
@@ -566,20 +558,22 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          let resolver = Resolver::new(document);
+          let resolver = Resolver::new(&document);
 
           resolver
             .resolve_identifier_definition(&identifier)
             .map(lsp::GotoDefinitionResponse::Scalar)
-        })
-    }))
+        }),
+    )
   }
 
   async fn hover(
@@ -590,16 +584,18 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier))
-    }))
+        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier)),
+    )
   }
 
   #[allow(clippy::unused_async)]
@@ -647,12 +643,7 @@ impl Inner {
       return;
     }
 
-    let file_id = {
-      let files = self.file_ids.read().await;
-      files.get(uri).copied()
-    };
-
-    let Some(file_id) = file_id else {
+    let Some(file_id) = self.file_id_for_uri(uri).await else {
       return;
     };
 
@@ -671,6 +662,18 @@ impl Inner {
         Some(version),
       )
       .await;
+  }
+
+  async fn analysis_document(&self, uri: &lsp::Url) -> Option<Arc<Document>> {
+    let file_id = self.file_id_for_uri(uri).await?;
+
+    let analysis = self.analysis.lock().await;
+    analysis.document(file_id)
+  }
+
+  async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
+    let files = self.file_ids.read().await;
+    files.get(uri).copied()
   }
 
   async fn upsert_analysis_file(
@@ -720,16 +723,18 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    let resolver = Resolver::new(&document);
 
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| resolver.resolve_identifier_references(&identifier))
-    }))
+        .map(|identifier| resolver.resolve_identifier_references(&identifier)),
+    )
   }
 
   async fn rename(
@@ -742,14 +747,16 @@ impl Inner {
 
     let new_name = params.new_name;
 
-    let documents = self.documents.read().await;
+    let Some(document) = self.analysis_document(&uri).await else {
+      return Ok(None);
+    };
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
-          let resolver = Resolver::new(document);
+          let resolver = Resolver::new(&document);
 
           let references = resolver.resolve_identifier_references(&identifier);
 
@@ -765,8 +772,8 @@ impl Inner {
             changes: Some(HashMap::from([(uri.clone(), text_edits)])),
             ..Default::default()
           }
-        })
-    }))
+        }),
+    )
   }
 
   async fn run_recipe(

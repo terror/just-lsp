@@ -17,19 +17,49 @@ pub struct SourceFile {
 
 pub type FileId = SourceFile;
 
+#[derive(Clone, Debug)]
+pub enum DocumentState {
+  Parsed(Arc<Document>),
+  Error(String),
+}
+
+impl PartialEq for DocumentState {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Self::Parsed(lhs), Self::Parsed(rhs)) => Arc::ptr_eq(lhs, rhs),
+      (Self::Error(lhs), Self::Error(rhs)) => lhs == rhs,
+      _ => false,
+    }
+  }
+}
+
+impl Eq for DocumentState {}
+
+#[salsa::tracked]
+fn document_state(db: &dyn salsa::Database, file: SourceFile) -> DocumentState {
+  match Document::from_text(
+    file.uri(db).clone(),
+    file.text(db).as_str(),
+    file.version(db),
+  ) {
+    Ok(document) => DocumentState::Parsed(Arc::new(document)),
+    Err(error) => DocumentState::Error(error.to_string()),
+  }
+}
+
 #[salsa::tracked]
 fn diagnostics(
   db: &dyn salsa::Database,
   file: SourceFile,
 ) -> Arc<Vec<lsp::Diagnostic>> {
-  let (uri, text) = (file.uri(db), file.text(db));
-
-  match Document::from_text(uri.clone(), text.as_str(), file.version(db)) {
-    Ok(document) => Arc::new(Analyzer::new(&document).analyze()),
-    Err(error) => Arc::new(vec![lsp::Diagnostic {
+  match document_state(db, file) {
+    DocumentState::Parsed(document) => {
+      Arc::new(Analyzer::new(&document).analyze())
+    }
+    DocumentState::Error(error) => Arc::new(vec![lsp::Diagnostic {
+      message: format!("failed to parse `{}`: {error}", file.uri(db).as_str()),
       range: lsp::Range::default(),
       severity: Some(lsp::DiagnosticSeverity::ERROR),
-      message: format!("failed to parse `{uri}`: {error}"),
       ..Default::default()
     }]),
   }
@@ -53,6 +83,14 @@ impl AnalysisHost {
   pub fn clear_file(&mut self, file: SourceFile) {
     file.set_text(&mut self.db).to(String::new());
     file.set_version(&mut self.db).to(0);
+  }
+
+  #[must_use]
+  pub fn document(&self, file: SourceFile) -> Option<Arc<Document>> {
+    match document_state(&self.db, file) {
+      DocumentState::Parsed(document) => Some(document),
+      DocumentState::Error(_) => None,
+    }
   }
 
   #[must_use]
