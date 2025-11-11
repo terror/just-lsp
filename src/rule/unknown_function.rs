@@ -19,11 +19,7 @@ impl Rule for UnknownFunctionRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      let is_builtin = BUILTINS.iter().any(|f| {
-        matches!(f, Builtin::Function { name, .. } if *name == function_name)
-      });
-
-      if !is_builtin {
+      if context.builtin_function(function_name.as_str()).is_none() {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
           range: function_call.name.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),

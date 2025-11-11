@@ -18,14 +18,7 @@ impl Rule for UnknownAttributeRule {
     for attribute in context.attributes() {
       let attribute_name = &attribute.name.value;
 
-      let is_known = BUILTINS.iter().any(|f| {
-        matches!(
-          f,
-          Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
-        )
-      });
-
-      if !is_known {
+      if context.builtin_attributes(attribute_name).is_empty() {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
           range: attribute.name.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),

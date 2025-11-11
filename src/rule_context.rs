@@ -109,6 +109,12 @@ impl IdentifierAnalysis {
 pub(crate) struct RuleContext<'a> {
   aliases: OnceCell<Vec<Alias>>,
   attributes: OnceCell<Vec<Attribute>>,
+  builtin_attributes_map:
+    OnceCell<HashMap<&'static str, Vec<&'static Builtin<'static>>>>,
+  builtin_function_map:
+    OnceCell<HashMap<&'static str, &'static Builtin<'static>>>,
+  builtin_setting_map:
+    OnceCell<HashMap<&'static str, &'static Builtin<'static>>>,
   document: &'a Document,
   document_variable_names: OnceCell<HashSet<String>>,
   function_calls: OnceCell<Vec<FunctionCall>>,
@@ -134,6 +140,78 @@ impl<'a> RuleContext<'a> {
       .attributes
       .get_or_init(|| self.document.attributes())
       .as_slice()
+  }
+
+  pub(crate) fn builtin_attributes(
+    &self,
+    name: &str,
+  ) -> &[&'static Builtin<'static>] {
+    self
+      .builtin_attributes_map()
+      .get(name)
+      .map_or(&[], Vec::as_slice)
+  }
+
+  fn builtin_attributes_map(
+    &self,
+  ) -> &HashMap<&'static str, Vec<&'static Builtin<'static>>> {
+    self.builtin_attributes_map.get_or_init(|| {
+      let mut map = HashMap::new();
+
+      for builtin in &BUILTINS {
+        if let Builtin::Attribute { name, .. } = builtin {
+          map.entry(*name).or_insert_with(Vec::new).push(builtin);
+        }
+      }
+
+      map
+    })
+  }
+
+  pub(crate) fn builtin_function(
+    &self,
+    name: &str,
+  ) -> Option<&'static Builtin<'static>> {
+    self.builtin_function_map().get(name).copied()
+  }
+
+  fn builtin_function_map(
+    &self,
+  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
+    self.builtin_function_map.get_or_init(|| {
+      let mut map = HashMap::new();
+
+      for builtin in &BUILTINS {
+        if let Builtin::Function { name, .. } = builtin {
+          map.entry(*name).or_insert(builtin);
+        }
+      }
+
+      map
+    })
+  }
+
+  pub(crate) fn builtin_setting(
+    &self,
+    name: &str,
+  ) -> Option<&'static Builtin<'static>> {
+    self.builtin_setting_map().get(name).copied()
+  }
+
+  fn builtin_setting_map(
+    &self,
+  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
+    self.builtin_setting_map.get_or_init(|| {
+      let mut map = HashMap::new();
+
+      for builtin in &BUILTINS {
+        if let Builtin::Setting { name, .. } = builtin {
+          map.entry(*name).or_insert(builtin);
+        }
+      }
+
+      map
+    })
   }
 
   pub(crate) fn document(&self) -> &Document {
@@ -167,6 +245,9 @@ impl<'a> RuleContext<'a> {
     Self {
       aliases: OnceCell::new(),
       attributes: OnceCell::new(),
+      builtin_attributes_map: OnceCell::new(),
+      builtin_function_map: OnceCell::new(),
+      builtin_setting_map: OnceCell::new(),
       document,
       document_variable_names: OnceCell::new(),
       function_calls: OnceCell::new(),

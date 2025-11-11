@@ -19,15 +19,11 @@ impl Rule for FunctionArgumentsRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      let builtin = BUILTINS.iter().find(|f| {
-        matches!(f, Builtin::Function { name, .. } if *name == function_name)
-      });
-
       if let Some(Builtin::Function {
         required_args,
         accepts_variadic,
         ..
-      }) = builtin
+      }) = context.builtin_function(function_name.as_str())
       {
         let arg_count = function_call.arguments.len();
 
