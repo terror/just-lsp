@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.8](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-11-11
+
+### Added
+
+- Add web playground ([#117](https://github.com/terror/just-lsp/pull/117) by [terror](https://github.com/terror))
+- Enable release LTO with single codegen unit ([#120](https://github.com/terror/just-lsp/pull/120) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix escaped brace handling in recipe command text ([#126](https://github.com/terror/just-lsp/pull/126) by [terror](https://github.com/terror))
+- Replace global mutex with scoped `RwLock` ([#123](https://github.com/terror/just-lsp/pull/123) by [terror](https://github.com/terror))
+
+### Misc
+
+- Enable lints for root workspace ([#141](https://github.com/terror/just-lsp/pull/141) by [terror](https://github.com/terror))
+- Update edition to 2024 ([#139](https://github.com/terror/just-lsp/pull/139) by [terror](https://github.com/terror))
+- Expand coverage workflow to include all workspace targets ([#138](https://github.com/terror/just-lsp/pull/138) by [terror](https://github.com/terror))
+- Move `Resolver` into its own crate ([#137](https://github.com/terror/just-lsp/pull/137) by [terror](https://github.com/terror))
+- Move `Analyzer` into its own separate crate ([#136](https://github.com/terror/just-lsp/pull/136) by [terror](https://github.com/terror))
+- Move `Document` into its own crate ([#135](https://github.com/terror/just-lsp/pull/135) by [terror](https://github.com/terror))
+- Enforce stricter default clippy ruleset ([#134](https://github.com/terror/just-lsp/pull/134) by [terror](https://github.com/terror))
+- Add attribute extraction to `Document` ([#133](https://github.com/terror/just-lsp/pull/133) by [terror](https://github.com/terror))
+- Add function call extraction to `Document` ([#132](https://github.com/terror/just-lsp/pull/132) by [terror](https://github.com/terror))
+- Rename `ctx` to `context` for explicitness ([#131](https://github.com/terror/just-lsp/pull/131) by [terror](https://github.com/terror))
+- Move `Setting` into `just-lsp-types` ([#130](https://github.com/terror/just-lsp/pull/130) by [terror](https://github.com/terror))
+- Rename `update-contributors` crate to `just-lsp-changelog` ([#129](https://github.com/terror/just-lsp/pull/129) by [terror](https://github.com/terror))
+- Extract out `RopeExt` into a separate crate ([#128](https://github.com/terror/just-lsp/pull/128) by [terror](https://github.com/terror))
+- Move types into separate crate ([#127](https://github.com/terror/just-lsp/pull/127) by [terror](https://github.com/terror))
+- Refactor analyzer into rule-based system ([#124](https://github.com/terror/just-lsp/pull/124) by [terror](https://github.com/terror))
+- Track code coverage metrics ([#122](https://github.com/terror/just-lsp/pull/122) by [terror](https://github.com/terror))
+
 ## [0.2.7](https://github.com/terror/just-lsp/releases/tag/0.2.7) - 2025-09-25
 
 ### Added

@@ -20,4 +20,4 @@ indoc = { workspace = true }
 pretty_assertions = { workspace = true }
 
 [build-dependencies]
-cc = "1.2.31"
+cc = "1.2.45"
