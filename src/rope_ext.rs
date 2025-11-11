@@ -32,22 +32,22 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TextPosition {
-  pub byte: usize,
-  pub char: usize,
-  pub code: usize,
-  pub point: Point,
+pub(crate) struct TextPosition {
+  pub(crate) byte: usize,
+  pub(crate) char: usize,
+  pub(crate) code: usize,
+  pub(crate) point: Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TextEdit<'a> {
-  pub end_char_idx: usize,
-  pub input_edit: InputEdit,
-  pub start_char_idx: usize,
-  pub text: &'a str,
+pub(crate) struct TextEdit<'a> {
+  pub(crate) end_char_idx: usize,
+  pub(crate) input_edit: InputEdit,
+  pub(crate) start_char_idx: usize,
+  pub(crate) text: &'a str,
 }
 
-pub trait RopeExt {
+pub(crate) trait RopeExt {
   /// Applies a previously constructed [`TextEdit`] to the rope, keeping both
   /// the textual contents and the internal tree-sitter offsets in sync.
   fn apply_edit(&mut self, edit: &TextEdit);

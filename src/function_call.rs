@@ -1,8 +1,8 @@
 use super::*;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct FunctionCall {
-  pub arguments: Vec<TextNode>,
-  pub name: TextNode,
-  pub range: lsp::Range,
+pub(crate) struct FunctionCall {
+  pub(crate) arguments: Vec<TextNode>,
+  pub(crate) name: TextNode,
+  pub(crate) range: lsp::Range,
 }

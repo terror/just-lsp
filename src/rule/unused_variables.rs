@@ -2,7 +2,7 @@ use super::*;
 
 /// Finds non-exported global variables that are never referenced anywhere in the
 /// document.
-pub struct UnusedVariableRule;
+pub(crate) struct UnusedVariableRule;
 
 impl Rule for UnusedVariableRule {
   fn display_name(&self) -> &'static str {

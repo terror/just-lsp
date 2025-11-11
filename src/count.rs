@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) struct Count<T: Display>(pub T, pub usize);
+pub(crate) struct Count<T: Display>(pub(crate) T, pub(crate) usize);
 
 impl<T: Display> Display for Count<T> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {

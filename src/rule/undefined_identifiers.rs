@@ -2,7 +2,7 @@ use super::*;
 
 /// Reports expressions that reference variables or parameters which are not
 /// defined and aren’t builtins.
-pub struct UndefinedIdentifierRule;
+pub(crate) struct UndefinedIdentifierRule;
 
 impl Rule for UndefinedIdentifierRule {
   fn display_name(&self) -> &'static str {

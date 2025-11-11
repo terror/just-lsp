@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AttributeTarget {
+pub(crate) enum AttributeTarget {
   Alias,
   Assignment,
   Module,
@@ -25,7 +25,7 @@ impl Display for AttributeTarget {
 
 impl AttributeTarget {
   #[must_use]
-  pub fn try_from_kind(kind: &str) -> Option<Self> {
+  pub(crate) fn try_from_kind(kind: &str) -> Option<Self> {
     match kind {
       "alias" => Some(Self::Alias),
       "assignment" | "export" => Some(Self::Assignment),

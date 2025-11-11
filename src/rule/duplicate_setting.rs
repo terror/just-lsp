@@ -1,7 +1,7 @@
 use super::*;
 
 /// Emits diagnostics when the same `set` option is declared more than once.
-pub struct DuplicateSettingRule;
+pub(crate) struct DuplicateSettingRule;
 
 impl Rule for DuplicateSettingRule {
   fn display_name(&self) -> &'static str {

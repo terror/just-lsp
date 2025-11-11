@@ -2,7 +2,7 @@ use super::*;
 
 /// Reports attribute invocations whose argument counts don’t match their builtin
 /// definitions.
-pub struct AttributeArgumentsRule;
+pub(crate) struct AttributeArgumentsRule;
 
 impl Rule for AttributeArgumentsRule {
   fn display_name(&self) -> &'static str {

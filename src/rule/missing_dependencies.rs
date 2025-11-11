@@ -2,7 +2,7 @@ use super::*;
 
 /// Reports recipe dependencies that reference recipes which don’t exist in the
 /// current document.
-pub struct MissingDependencyRule;
+pub(crate) struct MissingDependencyRule;
 
 impl Rule for MissingDependencyRule {
   fn display_name(&self) -> &'static str {

@@ -1,7 +1,7 @@
 use super::*;
 
 /// Warns when an attribute name isn’t part of the known builtin attribute set.
-pub struct UnknownAttributeRule;
+pub(crate) struct UnknownAttributeRule;
 
 impl Rule for UnknownAttributeRule {
   fn display_name(&self) -> &'static str {

@@ -2,7 +2,7 @@ use super::*;
 
 /// Verifies builtin function calls use a valid argument count and respect
 /// variadic constraints.
-pub struct FunctionArgumentsRule;
+pub(crate) struct FunctionArgumentsRule;
 
 impl Rule for FunctionArgumentsRule {
   fn display_name(&self) -> &'static str {

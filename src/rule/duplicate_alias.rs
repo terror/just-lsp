@@ -1,7 +1,7 @@
 use super::*;
 
 /// Flags alias declarations that reuse the same name multiple times.
-pub struct DuplicateAliasRule;
+pub(crate) struct DuplicateAliasRule;
 
 impl Rule for DuplicateAliasRule {
   fn display_name(&self) -> &'static str {

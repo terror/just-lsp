@@ -2,7 +2,7 @@ use super::*;
 
 /// Surfaces tree-sitter syntax errors and missing nodes so users get feedback on
 /// malformed `justfile` syntax before other rules run.
-pub struct SyntaxRule;
+pub(crate) struct SyntaxRule;
 
 impl Rule for SyntaxRule {
   fn display_name(&self) -> &'static str {

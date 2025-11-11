@@ -1,18 +1,18 @@
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Recipe {
-  pub attributes: Vec<Attribute>,
-  pub content: String,
-  pub dependencies: Vec<Dependency>,
-  pub name: String,
-  pub parameters: Vec<Parameter>,
-  pub range: lsp::Range,
+pub(crate) struct Recipe {
+  pub(crate) attributes: Vec<Attribute>,
+  pub(crate) content: String,
+  pub(crate) dependencies: Vec<Dependency>,
+  pub(crate) name: String,
+  pub(crate) parameters: Vec<Parameter>,
+  pub(crate) range: lsp::Range,
 }
 
 impl Recipe {
   #[must_use]
-  pub fn groups(&self) -> HashSet<Group> {
+  pub(crate) fn groups(&self) -> HashSet<Group> {
     let mut groups = HashSet::new();
 
     for attribute in &self.attributes {

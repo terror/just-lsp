@@ -24,20 +24,20 @@ static RULES: &[&dyn Rule] = &[
 ];
 
 #[derive(Debug)]
-pub struct Analyzer<'a> {
+pub(crate) struct Analyzer<'a> {
   document: &'a Document,
 }
 
 impl<'a> Analyzer<'a> {
   /// Analyzes the document and returns a list of diagnostics.
-  pub fn analyze(&self) -> Vec<lsp::Diagnostic> {
+  pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
     let context = RuleContext::new(self.document);
     RULES.iter().flat_map(|rule| rule.run(&context)).collect()
   }
 
   /// Creates a new analyzer for the given document.
   #[must_use]
-  pub fn new(document: &'a Document) -> Self {
+  pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
   }
 }

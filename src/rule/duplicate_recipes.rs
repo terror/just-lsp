@@ -2,7 +2,7 @@ use super::*;
 
 /// Detects recipes that have the same name and overlapping OS constraints, which
 /// would shadow each other at runtime unless overrides are enabled.
-pub struct DuplicateRecipeRule;
+pub(crate) struct DuplicateRecipeRule;
 
 impl Rule for DuplicateRecipeRule {
   fn display_name(&self) -> &'static str {

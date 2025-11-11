@@ -2,7 +2,7 @@ use super::*;
 
 /// Ensures every function call references a builtin function recognized by
 /// `just`.
-pub struct UnknownFunctionRule;
+pub(crate) struct UnknownFunctionRule;
 
 impl Rule for UnknownFunctionRule {
   fn display_name(&self) -> &'static str {
