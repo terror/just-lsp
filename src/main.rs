@@ -76,11 +76,11 @@ mod resolver;
 mod rope_ext;
 mod rule;
 mod rule_context;
-mod semantic_tokens;
 mod server;
 mod setting;
 mod subcommand;
 mod text_node;
+mod tokenizer;
 mod variable;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

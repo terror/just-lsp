@@ -33,7 +33,7 @@ impl Server {
       semantic_tokens_provider: Some(
         lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
           lsp::SemanticTokensOptions {
-            legend: semantic_tokens::SEMANTIC_TOKENS_LEGEND.clone(),
+            legend: tokenizer::Tokenizer::legend().clone(),
             full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
             range: None,
             ..Default::default()
@@ -932,7 +932,9 @@ impl Inner {
     let documents = self.documents.read().await;
 
     if let Some(document) = documents.get(&uri) {
-      match semantic_tokens::semantic_tokens(document) {
+      let tokenizer = tokenizer::Tokenizer::new(document);
+
+      match tokenizer.tokenize() {
         Ok(data) => {
           return Ok(Some(lsp::SemanticTokensResult::Tokens(
             lsp::SemanticTokens {
