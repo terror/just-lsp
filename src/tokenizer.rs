@@ -140,6 +140,8 @@ pub(crate) struct Tokenizer<'doc> {
 }
 
 impl<'doc> Tokenizer<'doc> {
+  /// Returns the UTF-8 scalar starting at `byte_idx`, if the index points to the
+  /// beginning of a code point inside the rope.
   fn char_at_byte(rope: &Rope, byte_idx: usize) -> Option<char> {
     if byte_idx >= rope.len_bytes() {
       return None;
@@ -149,6 +151,9 @@ impl<'doc> Tokenizer<'doc> {
 
     rope.byte_slice(byte_idx..end).chars().next()
   }
+
+  /// Sorts collected semantic token data and converts it into the LSP wire format,
+  /// computing delta-encoded positions as required by the protocol.
   fn encode_tokens(mut tokens: Vec<TokenData>) -> Vec<lsp::SemanticToken> {
     tokens.sort_by(|left, right| {
       left
@@ -159,8 +164,8 @@ impl<'doc> Tokenizer<'doc> {
 
     let mut data = Vec::with_capacity(tokens.len());
 
-    let mut previous_line = 0;
-    let mut previous_start = 0;
+    let (mut previous_line, mut previous_start) = (0, 0);
+
     let mut first = true;
 
     for token in tokens {
@@ -184,19 +189,21 @@ impl<'doc> Tokenizer<'doc> {
         token_modifiers_bitset: token.modifiers_bitset,
       });
 
-      previous_line = token.line;
-      previous_start = token.start_character;
+      (previous_line, previous_start) = (token.line, token.start_character);
+
       first = false;
     }
 
     data
   }
 
+  /// Provides the static semantic token legend shared by all tokenizer instances.
   #[must_use]
   pub(crate) fn legend() -> &'static lsp::SemanticTokensLegend {
     &SEMANTIC_TOKENS_LEGEND
   }
 
+  /// Converts a list of modifier names into a bitset understood by the LSP client.
   fn modifier_bitset(modifiers: &[&str]) -> u32 {
     modifiers
       .iter()
@@ -204,6 +211,7 @@ impl<'doc> Tokenizer<'doc> {
       .fold(0, |bitset, index| bitset | (1 << index))
   }
 
+  /// Finds the ordinal for a modifier inside the published legend.
   fn modifier_index(modifier: &str) -> Option<u32> {
     TOKEN_MODIFIERS
       .iter()
@@ -214,11 +222,14 @@ impl<'doc> Tokenizer<'doc> {
       })
   }
 
+  /// Creates a tokenizer that operates on the supplied document.
   #[must_use]
   pub(crate) fn new(document: &'doc Document) -> Self {
     Self { document }
   }
 
+  /// Breaks a highlighted span into per-line semantic token entries expressed in
+  /// UTF-16 coordinates, pushing them into `tokens`.
   fn push_tokens_for_span(
     rope: &Rope,
     start_byte: usize,
@@ -249,8 +260,8 @@ impl<'doc> Tokenizer<'doc> {
       let mut segment_end = if line_idx == end_line {
         end_byte
       } else {
-        let newline_len = Self::trailing_line_break_len(rope, line_idx);
-        line_end_byte.saturating_sub(newline_len)
+        line_end_byte
+          .saturating_sub(Self::trailing_line_break_len(rope, line_idx))
       };
 
       if segment_end > end_byte {
@@ -300,6 +311,7 @@ impl<'doc> Tokenizer<'doc> {
     }
   }
 
+  /// Resolves the legend index for the provided token type name.
   fn token_type_index(token_type: &str) -> u32 {
     TOKEN_TYPES
       .iter()
@@ -310,6 +322,8 @@ impl<'doc> Tokenizer<'doc> {
       .expect("Token type missing from legend")
   }
 
+  /// Runs the tree-sitter highlighter over the document and emits the LSP semantic
+  /// token stream corresponding to the captured scopes.
   pub(crate) fn tokenize(&self) -> Result<Vec<lsp::SemanticToken>> {
     let mut highlighter = Highlighter::new();
 
@@ -367,6 +381,8 @@ impl<'doc> Tokenizer<'doc> {
     Ok(Self::encode_tokens(tokens))
   }
 
+  /// Returns the number of bytes that make up the trailing line break for the given
+  /// line, handling `\n` and `\r\n` endings.
   fn trailing_line_break_len(rope: &Rope, line_idx: usize) -> usize {
     let line_start_byte = rope.line_to_byte(line_idx);
     let line_end_byte = rope.line_to_byte((line_idx + 1).min(rope.len_lines()));
@@ -440,6 +456,7 @@ mod tests {
     let text = "alpha\nbeta\n";
     let rope = Rope::from_str(text);
     let mapping = SemanticTokenMapping::new("keyword", &[]);
+
     let mut tokens = Vec::new();
 
     let end_byte = text.len() - 1;
@@ -447,9 +464,11 @@ mod tests {
     Tokenizer::push_tokens_for_span(&rope, 0, end_byte, mapping, &mut tokens);
 
     assert_eq!(tokens.len(), 2);
+
     assert_eq!(tokens[0].line, 0);
     assert_eq!(tokens[0].start_character, 0);
     assert_eq!(tokens[0].length, 5);
+
     assert_eq!(tokens[1].line, 1);
     assert_eq!(tokens[1].start_character, 0);
     assert_eq!(tokens[1].length, 4);
@@ -484,10 +503,13 @@ mod tests {
     let encoded = Tokenizer::encode_tokens(tokens);
 
     assert_eq!(encoded.len(), 3);
+
     assert_eq!(encoded[0].delta_line, 0);
     assert_eq!(encoded[0].delta_start, 5);
+
     assert_eq!(encoded[1].delta_line, 1);
     assert_eq!(encoded[1].delta_start, 0);
+
     assert_eq!(encoded[2].delta_line, 1);
     assert_eq!(encoded[2].delta_start, 1);
   }
@@ -500,13 +522,11 @@ mod tests {
   }
 
   #[test]
-  fn tokenizer_emits_expected_tokens() -> Result {
+  fn tokenizer_emits_expected_tokens() {
     let document = document("foo:\n  echo \"bar\"\n");
 
-    let tokens = Tokenizer::new(&document).tokenize()?;
-
     assert_eq!(
-      tokens,
+      Tokenizer::new(&document).tokenize().unwrap(),
       vec![
         lsp::SemanticToken {
           delta_line: 0,
@@ -524,7 +544,5 @@ mod tests {
         },
       ],
     );
-
-    Ok(())
   }
 }
