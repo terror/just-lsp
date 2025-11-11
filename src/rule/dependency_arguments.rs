@@ -1,7 +1,7 @@
 use super::*;
 
-/// Checks that dependency invocations supply the correct number of arguments for
-/// the referenced recipe’s signature.
+/// Checks that dependency invocations supply the correct number of arguments
+/// for the referenced recipe’s signature.
 pub(crate) struct DependencyArgumentRule;
 
 impl Rule for DependencyArgumentRule {

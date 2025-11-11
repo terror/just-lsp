@@ -1,6 +1,7 @@
 use super::*;
 
-/// Ensures attributes only appear on syntax nodes that actually accept attributes.
+/// Ensures attributes only appear on syntax nodes that actually accept
+/// attributes.
 pub(crate) struct AttributeInvalidTargetRule;
 
 impl Rule for AttributeInvalidTargetRule {

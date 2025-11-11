@@ -1,7 +1,7 @@
 use super::*;
 
-/// Detects recipes that have the same name and overlapping OS constraints, which
-/// would shadow each other at runtime unless overrides are enabled.
+/// Detects recipes that have the same name and overlapping OS constraints,
+/// which would shadow each other at runtime unless overrides are enabled.
 pub(crate) struct DuplicateRecipeRule;
 
 impl Rule for DuplicateRecipeRule {

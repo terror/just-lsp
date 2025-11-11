@@ -1,7 +1,7 @@
 use super::*;
 
-/// Ensures each `set` statement uses the correct value type (boolean, string, or
-/// array) for the targeted builtin setting.
+/// Ensures each `set` statement uses the correct value type (boolean, string,
+/// or array) for the targeted builtin setting.
 pub(crate) struct InvalidSettingKindRule;
 
 impl Rule for InvalidSettingKindRule {

@@ -11,6 +11,21 @@ impl<'a> Resolver<'a> {
     Self { document }
   }
 
+  /// Returns the [`lsp::Location`] that defines the symbol represented by
+  /// `identifier`.
+  ///
+  /// The resolver inspects the identifier's parent node to infer what kind of
+  /// symbol is being referenced. Recipe invocations that appear in aliases or
+  /// dependency lists resolve to the recipe header, identifiers inside a
+  /// recipe body (`value`) prefer matching parameters, then global variables,
+  /// and finally builtin constants. It also surfaces builtin
+  /// attribute/function/setting identifiers by returning the range of
+  /// the identifier itself so editors can jump to inline documentation.
+  ///
+  /// When the identifier belongs to a header construct (assignments,
+  /// parameters, variadic parameters, or the recipe header identifier) the
+  /// range of that construct is returned. `None` indicates that the resolver
+  /// could not find a definition in the current document.
   #[must_use]
   pub(crate) fn resolve_identifier_definition(
     &self,
@@ -128,6 +143,17 @@ impl<'a> Resolver<'a> {
     None
   }
 
+  /// Builds an [`lsp::Hover`] for the symbol at `identifier`.
+  ///
+  /// When the identifier names a recipe (inside aliases, dependencies, or the
+  /// recipe header) the hover shows the rendered recipe body. Within a recipe
+  /// body the resolver prefers parameter documentation, then global variable
+  /// documentation, and finally the associated builtin constant description.
+  /// Builtin attributes, functions, and settings also map to their builtin
+  /// documentation as long as the identifier appears in the appropriate
+  /// syntactic context.
+  ///
+  /// If no contextual information exists the function returns `None`.
   #[must_use]
   pub(crate) fn resolve_identifier_hover(
     &self,
@@ -237,6 +263,21 @@ impl<'a> Resolver<'a> {
     None
   }
 
+  /// Collects every [`lsp::Location`] that references the same logical symbol
+  /// as `identifier`.
+  ///
+  /// The resolver walks the entire syntax tree, filters identifier nodes with
+  /// matching text, and then applies parent-kind specific rules so that
+  /// references stay within the correct scope. Recipe names only match other
+  /// aliases/dependencies/headers, assignment targets only match body usages
+  /// that are not shadowed by parameters, and parameters (including variadic
+  /// ones) only match within the same recipe. Identifiers inside the
+  /// recipe body (`value`) will match local parameters first and fall back to
+  /// global assignments when no shadowing parameters exist. The identifier
+  /// node itself is always included.
+  ///
+  /// An empty vector is returned when the document tree or necessary parent
+  /// context is missing.
   #[must_use]
   pub(crate) fn resolve_identifier_references(
     &self,
