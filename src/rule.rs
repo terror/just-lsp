@@ -1,6 +1,7 @@
 use super::*;
 
 pub(crate) use {
+  alias_recipe_conflict::AliasRecipeConflictRule,
   attribute_arguments::AttributeArgumentsRule,
   attribute_invalid_target::AttributeInvalidTargetRule,
   attribute_target_support::AttributeTargetSupportRule,
@@ -21,6 +22,7 @@ pub(crate) use {
   unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
 };
 
+mod alias_recipe_conflict;
 mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;
