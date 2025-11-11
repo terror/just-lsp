@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) trait PositionExt {
+pub trait PositionExt {
   fn point(&self) -> Point;
 }
 

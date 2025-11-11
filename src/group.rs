@@ -9,7 +9,7 @@ pub enum Group {
 
 impl Group {
   #[must_use]
-  pub fn conflicts_with(&self, other: &Group) -> bool {
+  pub fn conflicts_with(self, other: Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
 

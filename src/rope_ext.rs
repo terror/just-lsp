@@ -29,12 +29,7 @@
 //! assert_eq!(rope.to_string(), "hello rope");
 //! ```
 
-use {
-  ropey::{self, Rope},
-  std::convert::TryFrom,
-  tower_lsp::lsp_types as lsp,
-  tree_sitter::{InputEdit, Point},
-};
+use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextPosition {

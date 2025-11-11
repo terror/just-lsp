@@ -43,7 +43,7 @@ impl Rule for DuplicateRecipeRule {
       for (i, (range, a)) in group.iter().enumerate() {
         for (_, (_, b)) in group.iter().enumerate().take(i) {
           let has_conflict =
-            a.iter().any(|a| b.iter().any(|b| a.conflicts_with(b)));
+            a.iter().any(|a| b.iter().any(|b| a.conflicts_with(*b)));
 
           if has_conflict {
             diagnostics.push(self.diagnostic(lsp::Diagnostic {

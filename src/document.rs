@@ -1,28 +1,4 @@
-use {
-  just_lsp_rope_ext::RopeExt,
-  just_lsp_types::{
-    Alias, Attribute, AttributeTarget, Dependency, FunctionCall, Parameter,
-    Recipe, Setting, TextNode, Variable,
-  },
-  point_ext::PointExt,
-  position_ext::PositionExt,
-  ropey::Rope,
-  tower_lsp::lsp_types as lsp,
-  tree_sitter::{Language, LanguageError, Node, Parser, Point, Tree},
-};
-
-pub type Result<T = (), E = Error> = std::result::Result<T, E>;
-
-pub use {error::Error, node_ext::NodeExt};
-
-mod error;
-mod node_ext;
-mod point_ext;
-mod position_ext;
-
-unsafe extern "C" {
-  pub(crate) fn tree_sitter_just() -> Language;
-}
+use super::*;
 
 #[derive(Debug)]
 pub struct Document {
@@ -394,11 +370,7 @@ impl Document {
 #[cfg(test)]
 mod tests {
   use {
-    super::*,
-    indoc::indoc,
-    just_lsp_types::{
-      AttributeTarget, ParameterKind, SettingKind, VariadicType,
-    },
+    super::*, indoc::indoc, parameter::VariadicType,
     pretty_assertions::assert_eq,
   };
 

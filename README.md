@@ -9,7 +9,7 @@
 
 **just-lsp** is a server implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) for [just](https://github.com/casey/just), the command runner.
 
-<img width="1667" alt="demo" src="https://github.com/user-attachments/assets/77ea8cff-3de4-46ee-b7fc-52b2b6805e5d" />
+<img width="1667" alt="demo" src="screenshot.png" />
 
 ## Installation
 

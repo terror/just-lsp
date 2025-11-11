@@ -1,8 +1,4 @@
-use {
-  just_lsp_builtins::BUILTINS, just_lsp_document::Document,
-  just_lsp_document::NodeExt, just_lsp_types::Builtin,
-  tower_lsp::lsp_types as lsp, tree_sitter::Node,
-};
+use super::*;
 
 #[derive(Debug)]
 pub struct Resolver<'a> {

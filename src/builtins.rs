@@ -1,4 +1,4 @@
-use just_lsp_types::{AttributeTarget, Builtin, SettingKind};
+use super::*;
 
 pub const BUILTINS: [Builtin<'_>; 134] = [
   Builtin::Attribute {

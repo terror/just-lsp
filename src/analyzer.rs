@@ -1,25 +1,4 @@
-use {
-  count::Count,
-  just_lsp_builtins::BUILTINS,
-  just_lsp_document::{Document, NodeExt},
-  just_lsp_types::{
-    Alias, Attribute, Builtin, FunctionCall, Group, Parameter, ParameterKind,
-    Recipe, Setting, SettingKind, Variable,
-  },
-  once_cell::sync::OnceCell,
-  rule::*,
-  rule_context::RuleContext,
-  std::{
-    collections::{HashMap, HashSet},
-    fmt::{self, Display, Formatter},
-  },
-  tower_lsp::lsp_types as lsp,
-  tree_sitter::{Node, Tree, TreeCursor},
-};
-
-mod count;
-mod rule;
-mod rule_context;
+use super::*;
 
 static RULES: &[&dyn Rule] = &[
   &SyntaxRule,
