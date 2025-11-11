@@ -527,7 +527,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .warning("Recipe `foo` mixes tabs and spaces for indentation")
+    .error("Recipe `foo` mixes tabs and spaces for indentation")
     .run();
   }
 
@@ -539,7 +539,7 @@ mod tests {
    \t  echo \"foo\"
       "
     })
-    .warning("Recipe `foo` mixes tabs and spaces for indentation")
+    .error("Recipe `foo` mixes tabs and spaces for indentation")
     .run();
   }
 

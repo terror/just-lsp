@@ -55,7 +55,7 @@ impl MixedIndentationRule {
 
     self.diagnostic(lsp::Diagnostic {
       range,
-      severity: Some(lsp::DiagnosticSeverity::WARNING),
+      severity: Some(lsp::DiagnosticSeverity::ERROR),
       message: format!(
         "Recipe `{recipe_name}` mixes tabs and spaces for indentation"
       ),
