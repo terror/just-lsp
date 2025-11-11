@@ -87,7 +87,7 @@ with some of the more popular ones.
 
 ### Neovim
 
-`nvim-lspconfig` now exposes its server definitions to the builtin
+`nvim-lspconfig` exposes its server definitions to the builtin
 [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#lsp-config) API, so the
 old `require('lspconfig').just.setup()` pattern is deprecated. With Nvim
 0.11.3+ and the latest nvim-lspconfig installed, enabling `just-lsp` looks like:
