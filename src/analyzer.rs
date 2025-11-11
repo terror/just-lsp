@@ -9,6 +9,7 @@ static RULES: &[&dyn Rule] = &[
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
   &AttributeTargetSupportRule,
+  &ScriptShebangConflictRule,
   &DuplicateDefaultAttributeRule,
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
@@ -348,6 +349,32 @@ mod tests {
       "
     })
     .error("Unknown attribute `unknown_attribute`")
+    .run();
+  }
+
+  #[test]
+  fn script_attribute_with_shebang_conflict() {
+    Test::new(indoc! {
+      "
+      [script]
+      publish:
+        #!/usr/bin/env bash
+        echo \"publish\"
+      "
+    })
+    .error("Recipe `publish` has both shebang line and `[script]` attribute")
+    .run();
+  }
+
+  #[test]
+  fn script_attribute_without_shebang_is_allowed() {
+    Test::new(indoc! {
+      "
+      [script]
+      publish:
+        echo \"publish\"
+      "
+    })
     .run();
   }
 
