@@ -19,15 +19,7 @@ impl Rule for AttributeTargetSupportRule {
     for attribute in context.attributes() {
       let attribute_name = &attribute.name.value;
 
-      let matching = BUILTINS
-        .iter()
-        .filter(|f| {
-          matches!(
-            f,
-            Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
-          )
-        })
-        .collect::<Vec<_>>();
+      let matching = context.builtin_attributes(attribute_name);
 
       if matching.is_empty() {
         continue;
@@ -37,7 +29,7 @@ impl Rule for AttributeTargetSupportRule {
         continue;
       };
 
-      let is_valid_target = matching.iter().any(|attr| {
+      let is_valid_target = matching.iter().copied().any(|attr| {
         if let Builtin::Attribute { targets, .. } = attr {
           targets.contains(&target_type)
         } else {

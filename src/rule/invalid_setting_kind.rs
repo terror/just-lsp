@@ -17,11 +17,9 @@ impl Rule for InvalidSettingKindRule {
     let mut diagnostics = Vec::new();
 
     for setting in context.settings() {
-      let builtin = BUILTINS.iter().find(
-        |f| matches!(f, Builtin::Setting { name, .. } if *name == setting.name),
-      );
-
-      let Some(Builtin::Setting { kind, .. }) = builtin else {
+      let Some(Builtin::Setting { kind, .. }) =
+        context.builtin_setting(&setting.name)
+      else {
         continue;
       };
 

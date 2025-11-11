@@ -19,15 +19,7 @@ impl Rule for AttributeArgumentsRule {
     for attribute in context.attributes() {
       let attribute_name = &attribute.name.value;
 
-      let matching = BUILTINS
-        .iter()
-        .filter(|f| {
-          matches!(
-            f,
-            Builtin::Attribute { name, .. } if *name == attribute_name.as_str()
-          )
-        })
-        .collect::<Vec<_>>();
+      let matching = context.builtin_attributes(attribute_name);
 
       if matching.is_empty() {
         continue;
@@ -36,7 +28,7 @@ impl Rule for AttributeArgumentsRule {
       let argument_count = attribute.arguments.len();
       let has_arguments = argument_count > 0;
 
-      let parameter_mismatch = matching.iter().all(|attr| {
+      let parameter_mismatch = matching.iter().copied().all(|attr| {
         if let Builtin::Attribute { parameters, .. } = attr {
           (parameters.is_some() && !has_arguments)
             || (parameters.is_none() && has_arguments)
@@ -49,6 +41,7 @@ impl Rule for AttributeArgumentsRule {
       if parameter_mismatch {
         let required_argument_count = matching
           .iter()
+          .copied()
           .find_map(|attr| {
             if let Builtin::Attribute { parameters, .. } = attr {
               parameters.map(|_| 1)
