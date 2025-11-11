@@ -639,9 +639,10 @@ impl Inner {
 
     let (diagnostics, version) = {
       let analysis = self.analysis.lock().await;
-      let diagnostics = analysis.diagnostics(file_id);
-      let version = analysis.file_version(file_id);
-      (diagnostics, version)
+      (
+        analysis.diagnostics(file_id),
+        analysis.file_version(file_id),
+      )
     };
 
     self
@@ -656,16 +657,12 @@ impl Inner {
 
   async fn analysis_document(&self, uri: &lsp::Url) -> Option<Arc<Document>> {
     let file_id = self.file_id_for_uri(uri).await?;
-
-    let analysis = self.analysis.lock().await;
-    analysis.document(file_id)
+    self.analysis.lock().await.document(file_id)
   }
 
   async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
     let file_id = self.file_id_for_uri(uri).await?;
-
-    let analysis = self.analysis.lock().await;
-    Some(analysis.file_text(file_id))
+    Some(self.analysis.lock().await.file_text(file_id))
   }
 
   fn apply_content_changes(
@@ -688,8 +685,7 @@ impl Inner {
   }
 
   async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
-    let files = self.file_ids.read().await;
-    files.get(uri).copied()
+    self.file_ids.read().await.get(uri).copied()
   }
 
   async fn upsert_analysis_file(
@@ -698,36 +694,33 @@ impl Inner {
     version: i32,
     text: String,
   ) {
-    let existing = {
-      let files = self.file_ids.read().await;
-      files.get(uri).copied()
-    };
+    let existing = self.file_ids.read().await.get(uri).copied();
 
     match existing {
       Some(file_id) => {
-        let mut analysis = self.analysis.lock().await;
-        analysis.update_file(file_id, text, version);
+        self
+          .analysis
+          .lock()
+          .await
+          .update_file(file_id, text, version);
       }
       None => {
         let mut analysis = self.analysis.lock().await;
+
         let file_id = analysis.open_file(uri.clone(), text, version);
+
         drop(analysis);
 
-        let mut files = self.file_ids.write().await;
-        files.insert(uri.clone(), file_id);
+        self.file_ids.write().await.insert(uri.clone(), file_id);
       }
     }
   }
 
   async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
-    let file_id = {
-      let mut files = self.file_ids.write().await;
-      files.remove(uri)
-    };
+    let file_id = self.file_ids.write().await.remove(uri);
 
     if let Some(file_id) = file_id {
-      let mut analysis = self.analysis.lock().await;
-      analysis.clear_file(file_id);
+      self.analysis.lock().await.clear_file(file_id);
       true
     } else {
       false
