@@ -31,6 +31,7 @@
 
 use {
   ropey::{self, Rope},
+  std::convert::TryFrom,
   tower_lsp::lsp_types as lsp,
   tree_sitter::{InputEdit, Point},
 };
@@ -144,7 +145,10 @@ impl RopeExt for Rope {
 
     let character = char_utf16_cu_idx - line_utf16_cu_idx;
 
-    lsp::Position::new(line_idx as u32, character as u32)
+    lsp::Position::new(
+      u32::try_from(line_idx).expect("line index exceeds u32::MAX"),
+      u32::try_from(character).expect("character offset exceeds u32::MAX"),
+    )
   }
 
   fn byte_to_tree_sitter_point(&self, byte_idx: usize) -> Point {

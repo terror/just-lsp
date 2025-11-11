@@ -20,8 +20,33 @@ include = [
   "/vendor/*-src/**/**.h"
 ]
 
+[profile.release]
+codegen-units = 1
+lto = true
+
 [workspace]
 members = [".", "crates/*"]
+
+[workspace.lints.rust]
+mismatched_lifetime_syntaxes = "allow"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+arbitrary-source-item-ordering = "deny"
+enum_glob_use = "allow"
+ignore_without_reason = "allow"
+needless_pass_by_value = "allow"
+pedantic = { level = "deny", priority = -1 }
+similar_names = "allow"
+struct_excessive_bools = "allow"
+struct_field_names = "allow"
+too_many_arguments = "allow"
+too_many_lines = "allow"
+type_complexity = "allow"
+undocumented_unsafe_blocks = "deny"
+unnecessary_wraps = "allow"
+wildcard_imports = "allow"
 
 [workspace.dependencies]
 indoc = "2.0.6"
@@ -56,33 +81,8 @@ tokio-stream = { version = "0.1.17", features = ["io-util"] }
 tower-lsp = { workspace = true }
 tree-sitter = { workspace = true }
 
-[profile.release]
-codegen-units = 1
-lto = true
-
 [dev-dependencies]
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = "1.0.142"
 tower-test = "0.4.0"
-
-[lints.rust]
-mismatched_lifetime_syntaxes = "allow"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
-
-[lints.clippy]
-all = { level = "deny", priority = -1 }
-arbitrary-source-item-ordering = "deny"
-enum_glob_use = "allow"
-ignore_without_reason = "allow"
-needless_pass_by_value = "allow"
-pedantic = { level = "deny", priority = -1 }
-similar_names = "allow"
-struct_excessive_bools = "allow"
-struct_field_names = "allow"
-too_many_arguments = "allow"
-too_many_lines = "allow"
-type_complexity = "allow"
-undocumented_unsafe_blocks = "deny"
-unnecessary_wraps = "allow"
-wildcard_imports = "allow"

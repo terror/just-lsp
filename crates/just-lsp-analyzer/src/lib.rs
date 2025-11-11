@@ -57,6 +57,7 @@ impl<'a> Analyzer<'a> {
   }
 
   /// Creates a new analyzer for the given document.
+  #[must_use]
   pub fn new(document: &'a Document) -> Self {
     Self { document }
   }

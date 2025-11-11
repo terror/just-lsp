@@ -2,15 +2,16 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recipe {
-  pub name: String,
   pub attributes: Vec<Attribute>,
-  pub dependencies: Vec<Dependency>,
-  pub parameters: Vec<Parameter>,
   pub content: String,
+  pub dependencies: Vec<Dependency>,
+  pub name: String,
+  pub parameters: Vec<Parameter>,
   pub range: lsp::Range,
 }
 
 impl Recipe {
+  #[must_use]
   pub fn groups(&self) -> HashSet<Group> {
     let mut groups = HashSet::new();
 

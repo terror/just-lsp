@@ -1,17 +1,19 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Group {
   Any,
-  Windows,
   Linux,
   Macos,
   Openbsd,
+  Windows,
 }
 
 impl Group {
+  #[must_use]
   pub fn conflicts_with(&self, other: &Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
 
+  #[must_use]
   pub fn targets(attribute: &str) -> Option<Vec<Self>> {
     match attribute {
       "windows" => Some(vec![Group::Windows]),

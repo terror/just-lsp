@@ -30,12 +30,13 @@ impl PartialEq for SettingKind {
 
 #[derive(Debug, PartialEq)]
 pub struct Setting {
-  pub name: String,
   pub kind: SettingKind,
+  pub name: String,
   pub range: lsp::Range,
 }
 
 impl Setting {
+  #[must_use]
   pub fn parse(text: &str, range: lsp::Range) -> Option<Self> {
     if !text.starts_with("set ") {
       return None;
@@ -77,7 +78,7 @@ impl Setting {
 
     let kind = if value_part == "true" || value_part == "false" {
       SettingKind::Boolean(value_part == "true")
-    } else if value_part.starts_with("[") && value_part.ends_with("]") {
+    } else if value_part.starts_with('[') && value_part.ends_with(']') {
       SettingKind::Array
     } else {
       SettingKind::String

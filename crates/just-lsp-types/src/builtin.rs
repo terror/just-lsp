@@ -30,6 +30,7 @@ pub enum Builtin<'a> {
 }
 
 impl Builtin<'_> {
+  #[must_use]
   pub fn completion_item(&self) -> lsp::CompletionItem {
     match self {
       Self::Attribute { name, .. } => lsp::CompletionItem {

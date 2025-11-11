@@ -2,8 +2,8 @@ use super::*;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Attribute {
-  pub name: TextNode,
   pub arguments: Vec<TextNode>,
-  pub target: Option<AttributeTarget>,
+  pub name: TextNode,
   pub range: lsp::Range,
+  pub target: Option<AttributeTarget>,
 }
