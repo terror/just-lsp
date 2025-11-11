@@ -10,6 +10,7 @@ pub(crate) use {
   duplicate_default_attribute::DuplicateDefaultAttributeRule,
   duplicate_recipes::DuplicateRecipeRule,
   duplicate_setting::DuplicateSettingRule,
+  duplicate_variables::DuplicateVariableRule,
   function_arguments::FunctionArgumentsRule,
   invalid_setting_kind::InvalidSettingKindRule,
   missing_dependencies::MissingDependencyRule,
@@ -31,6 +32,7 @@ mod duplicate_alias;
 mod duplicate_default_attribute;
 mod duplicate_recipes;
 mod duplicate_setting;
+mod duplicate_variables;
 mod function_arguments;
 mod invalid_setting_kind;
 mod missing_dependencies;
