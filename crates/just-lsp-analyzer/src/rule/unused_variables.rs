@@ -21,19 +21,25 @@ impl Rule for UnusedVariableRule {
     }
 
     for (variable_name, is_used) in context.variable_usage() {
-      if !*is_used {
-        if let Some(variable) = context.document().find_variable(variable_name)
-        {
-          if !variable.export {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: variable.name.range,
-              severity: Some(lsp::DiagnosticSeverity::WARNING),
-              message: format!("Variable `{variable_name}` appears unused"),
-              ..Default::default()
-            }));
-          }
-        }
+      if *is_used {
+        continue;
       }
+
+      let Some(variable) = context.document().find_variable(variable_name)
+      else {
+        continue;
+      };
+
+      if variable.export {
+        continue;
+      }
+
+      diagnostics.push(self.diagnostic(lsp::Diagnostic {
+        range: variable.name.range,
+        severity: Some(lsp::DiagnosticSeverity::WARNING),
+        message: format!("Variable `{variable_name}` appears unused"),
+        ..Default::default()
+      }));
     }
 
     diagnostics
