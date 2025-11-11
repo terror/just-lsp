@@ -20,6 +20,7 @@ static RULES: &[&dyn Rule] = &[
   &UnknownSettingRule,
   &InvalidSettingKindRule,
   &DuplicateSettingRule,
+  &DuplicateVariableRule,
   &UndefinedIdentifierRule,
   &UnusedVariableRule,
   &UnusedParameterRule,
@@ -973,6 +974,37 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused")
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments() {
+    Test::new(indoc! {
+      "
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
+    .error("Duplicate variable `foo`")
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_allowed_via_setting() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-variables := true
+
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
     .run();
   }
 
