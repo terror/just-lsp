@@ -1,0 +1,19 @@
+[package]
+name = "just-lsp-resolver"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+just-lsp-builtins = { workspace = true }
+just-lsp-document = { workspace = true }
+just-lsp-types = { workspace = true }
+tower-lsp = { workspace = true }
+tree-sitter = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
+pretty_assertions = { workspace = true }

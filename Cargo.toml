@@ -68,6 +68,7 @@ env_logger = "0.11.8"
 just-lsp-analyzer = { path = "crates/just-lsp-analyzer" }
 just-lsp-builtins = { workspace = true }
 just-lsp-document = { workspace = true }
+just-lsp-resolver = { path = "crates/just-lsp-resolver" }
 just-lsp-rope-ext = { workspace = true }
 just-lsp-types = { workspace = true }
 log = "0.4.27"
@@ -79,7 +80,6 @@ tempfile = "3.20.0"
 tokio = { version = "1.47.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
 tower-lsp = { workspace = true }
-tree-sitter = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

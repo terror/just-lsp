@@ -624,6 +624,7 @@ dependencies = [
  "just-lsp-analyzer",
  "just-lsp-builtins",
  "just-lsp-document",
+ "just-lsp-resolver",
  "just-lsp-rope-ext",
  "just-lsp-types",
  "log",
@@ -637,7 +638,6 @@ dependencies = [
  "tokio-stream",
  "tower-lsp",
  "tower-test",
- "tree-sitter",
 ]
 
 [[package]]
@@ -679,6 +679,19 @@ dependencies = [
  "pretty_assertions",
  "ropey",
  "thiserror",
+ "tower-lsp",
+ "tree-sitter",
+]
+
+[[package]]
+name = "just-lsp-resolver"
+version = "0.0.0"
+dependencies = [
+ "indoc",
+ "just-lsp-builtins",
+ "just-lsp-document",
+ "just-lsp-types",
+ "pretty_assertions",
  "tower-lsp",
  "tree-sitter",
 ]
