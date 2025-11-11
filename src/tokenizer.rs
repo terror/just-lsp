@@ -127,7 +127,7 @@ impl SemanticTokenMapping {
   }
 }
 
-struct TokenData {
+struct Token {
   length: u32,
   line: u32,
   modifiers_bitset: u32,
@@ -154,7 +154,7 @@ impl<'doc> Tokenizer<'doc> {
 
   /// Sorts collected semantic token data and converts it into the LSP wire format,
   /// computing delta-encoded positions as required by the protocol.
-  fn encode_tokens(mut tokens: Vec<TokenData>) -> Vec<lsp::SemanticToken> {
+  fn encode_tokens(mut tokens: Vec<Token>) -> Vec<lsp::SemanticToken> {
     tokens.sort_by(|left, right| {
       left
         .line
@@ -235,7 +235,7 @@ impl<'doc> Tokenizer<'doc> {
     start_byte: usize,
     end_byte: usize,
     mapping: SemanticTokenMapping,
-    tokens: &mut Vec<TokenData>,
+    tokens: &mut Vec<Token>,
   ) {
     if start_byte >= end_byte {
       return;
@@ -301,7 +301,7 @@ impl<'doc> Tokenizer<'doc> {
         continue;
       };
 
-      tokens.push(TokenData {
+      tokens.push(Token {
         length,
         line,
         modifiers_bitset: mapping.modifiers_bitset,
@@ -477,21 +477,21 @@ mod tests {
   #[test]
   fn encode_tokens_sorts_and_computes_deltas() {
     let tokens = vec![
-      TokenData {
+      Token {
         line: 2,
         start_character: 1,
         length: 2,
         token_type_index: 0,
         modifiers_bitset: 0,
       },
-      TokenData {
+      Token {
         line: 0,
         start_character: 5,
         length: 3,
         token_type_index: 1,
         modifiers_bitset: 0,
       },
-      TokenData {
+      Token {
         line: 1,
         start_character: 0,
         length: 4,
