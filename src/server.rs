@@ -180,13 +180,48 @@ impl LanguageServer for Server {
 }
 
 pub(crate) struct Inner {
-  client: Client,
   analysis: Mutex<AnalysisHost>,
+  client: Client,
   file_ids: RwLock<HashMap<lsp::Url, FileId>>,
   initialized: AtomicBool,
 }
 
 impl Inner {
+  async fn analysis_document(&self, uri: &lsp::Url) -> Option<Arc<Document>> {
+    let file_id = self.file_id_for_uri(uri).await?;
+    self.analysis.lock().await.document(file_id)
+  }
+
+  async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
+    let file_id = self.file_id_for_uri(uri).await?;
+    Some(self.analysis.lock().await.file_text(file_id))
+  }
+
+  fn apply_content_changes(
+    current_text: &str,
+    changes: &[lsp::TextDocumentContentChangeEvent],
+  ) -> String {
+    let mut rope = Rope::from_str(current_text);
+
+    for change in changes {
+      let edit = rope.build_edit(change);
+      rope.apply_edit(&edit);
+    }
+
+    rope.to_string()
+  }
+
+  async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
+    let file_id = self.file_ids.write().await.remove(uri);
+
+    if let Some(file_id) = file_id {
+      self.analysis.lock().await.clear_file(file_id);
+      true
+    } else {
+      false
+    }
+  }
+
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
@@ -349,6 +384,11 @@ impl Inner {
     Ok(())
   }
 
+  fn document_end_position(text: &str) -> lsp::Position {
+    let rope = Rope::from_str(text);
+    rope.byte_to_lsp_position(rope.len_bytes())
+  }
+
   async fn document_highlight(
     &self,
     params: lsp::DocumentHighlightParams,
@@ -434,6 +474,10 @@ impl Inner {
     }
 
     Ok(None)
+  }
+
+  async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
+    self.file_ids.read().await.get(uri).copied()
   }
 
   async fn folding_range(
@@ -655,78 +699,6 @@ impl Inner {
         Some(version),
       )
       .await;
-  }
-
-  async fn analysis_document(&self, uri: &lsp::Url) -> Option<Arc<Document>> {
-    let file_id = self.file_id_for_uri(uri).await?;
-    self.analysis.lock().await.document(file_id)
-  }
-
-  async fn analysis_text(&self, uri: &lsp::Url) -> Option<String> {
-    let file_id = self.file_id_for_uri(uri).await?;
-    Some(self.analysis.lock().await.file_text(file_id))
-  }
-
-  fn apply_content_changes(
-    current_text: &str,
-    changes: &[lsp::TextDocumentContentChangeEvent],
-  ) -> String {
-    let mut rope = Rope::from_str(current_text);
-
-    for change in changes {
-      let edit = rope.build_edit(change);
-      rope.apply_edit(&edit);
-    }
-
-    rope.to_string()
-  }
-
-  fn document_end_position(text: &str) -> lsp::Position {
-    let rope = Rope::from_str(text);
-    rope.byte_to_lsp_position(rope.len_bytes())
-  }
-
-  async fn file_id_for_uri(&self, uri: &lsp::Url) -> Option<FileId> {
-    self.file_ids.read().await.get(uri).copied()
-  }
-
-  async fn upsert_analysis_file(
-    &self,
-    uri: &lsp::Url,
-    version: i32,
-    text: String,
-  ) {
-    let existing = self.file_ids.read().await.get(uri).copied();
-
-    match existing {
-      Some(file_id) => {
-        self
-          .analysis
-          .lock()
-          .await
-          .update_file(file_id, text, version);
-      }
-      None => {
-        let mut analysis = self.analysis.lock().await;
-
-        let file_id = analysis.open_file(uri.clone(), text, version);
-
-        drop(analysis);
-
-        self.file_ids.write().await.insert(uri.clone(), file_id);
-      }
-    }
-  }
-
-  async fn clear_analysis_entry(&self, uri: &lsp::Url) -> bool {
-    let file_id = self.file_ids.write().await.remove(uri);
-
-    if let Some(file_id) = file_id {
-      self.analysis.lock().await.clear_file(file_id);
-      true
-    } else {
-      false
-    }
   }
 
   async fn references(
@@ -995,6 +967,31 @@ impl Inner {
   #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
+  }
+
+  async fn upsert_analysis_file(
+    &self,
+    uri: &lsp::Url,
+    version: i32,
+    text: String,
+  ) {
+    let existing = self.file_ids.read().await.get(uri).copied();
+
+    if let Some(file_id) = existing {
+      self
+        .analysis
+        .lock()
+        .await
+        .update_file(file_id, text, version);
+    } else {
+      let mut analysis = self.analysis.lock().await;
+
+      let file_id = analysis.open_file(uri.clone(), text, version);
+
+      drop(analysis);
+
+      self.file_ids.write().await.insert(uri.clone(), file_id);
+    }
   }
 }
 

@@ -20,6 +20,9 @@ include = [
   "/vendor/*-src/**/**.h"
 ]
 
+[lints]
+workspace = true
+
 [profile.release]
 codegen-units = 1
 lto = true
