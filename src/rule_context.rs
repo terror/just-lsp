@@ -213,6 +213,12 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
+  pub(crate) fn setting_enabled(&self, name: &str) -> bool {
+    self.settings().iter().any(|setting| {
+      setting.name == name && matches!(setting.kind, SettingKind::Boolean(true))
+    })
+  }
+
   pub(crate) fn settings(&self) -> &[Setting] {
     self
       .settings

@@ -16,10 +16,7 @@ impl Rule for UnusedParameterRule {
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let exported = context.settings().iter().any(|setting| {
-      setting.name == "export"
-        && matches!(setting.kind, SettingKind::Boolean(true))
-    });
+    let exported = context.setting_enabled("export");
 
     for (recipe_name, identifiers) in context.recipe_identifier_usage() {
       if let Some(recipe) = context.recipe(recipe_name) {
