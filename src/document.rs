@@ -30,6 +30,33 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
+  pub(crate) fn aliases(&self) -> Vec<Alias> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("alias")
+        .iter()
+        .filter_map(|alias_node| {
+          let left_node = alias_node.find("^identifier[0]")?;
+
+          let right_node = alias_node.find("^identifier[1]")?;
+
+          Some(Alias {
+            name: TextNode {
+              value: self.get_node_text(&left_node),
+              range: left_node.get_range(),
+            },
+            value: TextNode {
+              value: self.get_node_text(&right_node),
+              range: right_node.get_range(),
+            },
+            range: alias_node.get_range(),
+          })
+        })
+        .collect()
+    })
+  }
+
   pub(crate) fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -55,47 +82,6 @@ impl Document {
     self.parse()?;
 
     Ok(())
-  }
-
-  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
-    self
-      .get_recipes()
-      .into_iter()
-      .find(|recipe| recipe.name == name)
-  }
-
-  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
-    self
-      .get_variables()
-      .into_iter()
-      .find(|var| var.name.value == name)
-  }
-
-  pub(crate) fn get_aliases(&self) -> Vec<Alias> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("alias")
-        .iter()
-        .filter_map(|alias_node| {
-          let left_node = alias_node.find("^identifier[0]")?;
-
-          let right_node = alias_node.find("^identifier[1]")?;
-
-          Some(Alias {
-            name: TextNode {
-              value: self.get_node_text(&left_node),
-              range: left_node.get_range(),
-            },
-            value: TextNode {
-              value: self.get_node_text(&right_node),
-              range: right_node.get_range(),
-            },
-            range: alias_node.get_range(),
-          })
-        })
-        .collect()
-    })
   }
 
   pub(crate) fn attributes(&self) -> Vec<Attribute> {
@@ -136,6 +122,20 @@ impl Document {
         })
         .collect()
     })
+  }
+
+  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
+    self
+      .recipes()
+      .into_iter()
+      .find(|recipe| recipe.name == name)
+  }
+
+  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
+    self
+      .variables()
+      .into_iter()
+      .find(|var| var.name.value == name)
   }
 
   pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
@@ -184,7 +184,32 @@ impl Document {
       .to_string()
   }
 
-  pub(crate) fn get_recipes(&self) -> Vec<Recipe> {
+  pub(crate) fn node_at_position(
+    &self,
+    position: lsp::Position,
+  ) -> Option<Node<'_>> {
+    if let Some(tree) = &self.tree {
+      let point = position.point();
+      Some(tree.root_node().descendant_for_point_range(point, point)?)
+    } else {
+      None
+    }
+  }
+
+  pub(crate) fn parse(&mut self) -> Result {
+    let mut parser = Parser::new();
+
+    // SAFETY: tree_sitter_just returns a static language definition.
+    parser.set_language(&unsafe { tree_sitter_just() })?;
+
+    let old_tree = self.tree.take();
+
+    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
+
+    Ok(())
+  }
+
+  pub(crate) fn recipes(&self) -> Vec<Recipe> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -284,7 +309,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn get_settings(&self) -> Vec<Setting> {
+  pub(crate) fn settings(&self) -> Vec<Setting> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -300,7 +325,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn get_variables(&self) -> Vec<Variable> {
+  pub(crate) fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -321,30 +346,6 @@ impl Document {
         })
         .collect()
     })
-  }
-
-  pub(crate) fn node_at_position(
-    &self,
-    position: lsp::Position,
-  ) -> Option<Node<'_>> {
-    if let Some(tree) = &self.tree {
-      let point = position.point();
-      Some(tree.root_node().descendant_for_point_range(point, point)?)
-    } else {
-      None
-    }
-  }
-
-  pub(crate) fn parse(&mut self) -> Result {
-    let mut parser = Parser::new();
-
-    parser.set_language(&unsafe { tree_sitter_just() })?;
-
-    let old_tree = self.tree.take();
-
-    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
-
-    Ok(())
   }
 }
 
@@ -496,7 +497,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -526,7 +527,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 1);
 
     assert_eq!(
@@ -580,7 +581,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -610,7 +611,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -641,7 +642,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -738,7 +739,7 @@ mod tests {
       "
     });
 
-    let aliases = doc.get_aliases();
+    let aliases = doc.aliases();
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -836,7 +837,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 3);
 
     assert_eq!(
@@ -902,7 +903,7 @@ mod tests {
       "
     });
 
-    let settings = doc.get_settings();
+    let settings = doc.settings();
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -938,7 +939,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.get_variables(),
+      doc.variables(),
       vec![
         Variable {
           name: TextNode {
@@ -1116,7 +1117,7 @@ mod tests {
       "
     });
 
-    let variables = doc.get_variables();
+    let variables = doc.variables();
 
     assert!(variables[0].export);
 

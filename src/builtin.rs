@@ -33,7 +33,7 @@ impl Builtin<'_> {
   pub(crate) fn completion_item(&self) -> lsp::CompletionItem {
     match self {
       Self::Attribute { name, .. } => lsp::CompletionItem {
-        label: name.to_string(),
+        label: (*name).to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
@@ -44,19 +44,30 @@ impl Builtin<'_> {
         ..Default::default()
       },
       Self::Constant { name, .. } => lsp::CompletionItem {
-        label: name.to_string(),
+        label: (*name).to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
-        insert_text: Some(name.to_string()),
+        insert_text: Some((*name).to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{name}")),
         ..Default::default()
       },
       Self::Function { name, .. } => {
         let snippet = match *name {
-          "absolute_path" => format!("{name}(${{1:path:string}})"),
+          "absolute_path"
+          | "blake3_file"
+          | "canonicalize"
+          | "clean"
+          | "extension"
+          | "file_name"
+          | "file_stem"
+          | "parent_directory"
+          | "path_exists"
+          | "read"
+          | "sha256_file"
+          | "without_extension" => format!("{name}(${{1:path:string}})"),
           "append" => {
             format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
           }
@@ -81,83 +92,62 @@ impl Builtin<'_> {
           | "data_local_directory"
           | "executable_directory"
           | "home_directory" => format!("{name}()"),
-          "blake3" => format!("{name}(${{1:string:string}})"),
-          "blake3_file" => format!("{name}(${{1:path:string}})"),
-          "canonicalize" => format!("{name}(${{1:path:string}})"),
-          "capitalize" => format!("{name}(${{1:s:string}})"),
+          "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
+          "capitalize"
+          | "encode_uri_component"
+          | "kebabcase"
+          | "lowercase"
+          | "lowercamelcase"
+          | "quote"
+          | "shoutykebabcase"
+          | "shoutysnakecase"
+          | "snakecase"
+          | "titlecase"
+          | "trim"
+          | "trim_end"
+          | "trim_start"
+          | "uppercamelcase"
+          | "uppercase" => format!("{name}(${{1:s:string}})"),
           "choose" => {
             format!("{name}(${{1:n:string}}, ${{2:alphabet:string}})")
           }
-          "clean" => format!("{name}(${{1:path:string}})"),
-          "datetime" => format!("{name}(${{1:format:string}})"),
-          "datetime_utc" => format!("{name}(${{1:format:string}})"),
-          "encode_uri_component" => format!("{name}(${{1:s:string}})"),
+          "datetime" | "datetime_utc" => format!("{name}(${{1:format:string}})"),
           "env" => {
             format!("{name}(${{1:key:string}}${{2:, default:string}})")
           }
           "error" => format!("{name}(${{1:message:string}})"),
-          "extension" => format!("{name}(${{1:path:string}})"),
-          "file_name" => format!("{name}(${{1:path:string}})"),
-          "file_stem" => format!("{name}(${{1:path:string}})"),
           "join" => format!(
             "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
           ),
-          "kebabcase" => format!("{name}(${{1:s:string}})"),
-          "lowercase" => format!("{name}(${{1:s:string}})"),
-          "lowercamelcase" => format!("{name}(${{1:s:string}})"),
-          "parent_directory" => format!("{name}(${{1:path:string}})"),
-          "path_exists" => format!("{name}(${{1:path:string}})"),
           "prepend" => {
             format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
           }
-          "quote" => format!("{name}(${{1:s:string}})"),
-          "read" => format!("{name}(${{1:path:string}})"),
           "replace" => format!(
             "{name}(${{1:s:string}}, ${{2:from:string}}, ${{3:to:string}})",
           ),
           "replace_regex" => format!(
-          "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})",
-        ),
-          "require" => format!("{name}(${{1:name:string}})"),
+            "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})",
+          ),
+          "require" | "style" | "which" => format!("{name}(${{1:name:string}})"),
           "semver_matches" => {
             format!(
               "{name}(${{1:version:string}}, ${{2:requirement:string}})",
             )
           }
-          "sha256" => format!("{name}(${{1:string:string}})"),
-          "sha256_file" => format!("{name}(${{1:path:string}})"),
           "shell" => {
             format!("{name}(${{1:command:string}}${{2:, args:string...}})")
           }
-          "shoutykebabcase" => format!("{name}(${{1:s:string}})"),
-          "shoutysnakecase" => format!("{name}(${{1:s:string}})"),
-          "snakecase" => format!("{name}(${{1:s:string}})"),
-          "style" => format!("{name}(${{1:name:string}})"),
-          "titlecase" => format!("{name}(${{1:s:string}})"),
-          "trim" => format!("{name}(${{1:s:string}})"),
-          "trim_end" => format!("{name}(${{1:s:string}})"),
-          "trim_end_match" => {
+          "trim_end_match"
+          | "trim_end_matches"
+          | "trim_start_match"
+          | "trim_start_matches" => {
             format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
           }
-          "trim_end_matches" => {
-            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
-          }
-          "trim_start" => format!("{name}(${{1:s:string}})"),
-          "trim_start_match" => {
-            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
-          }
-          "trim_start_matches" => {
-            format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
-          }
-          "uppercamelcase" => format!("{name}(${{1:s:string}})"),
-          "uppercase" => format!("{name}(${{1:s:string}})"),
-          "which" => format!("{name}(${{1:name:string}})"),
-          "without_extension" => format!("{name}(${{1:path:string}})"),
           _ => format!("{name}(${{1:}})"),
         };
 
         lsp::CompletionItem {
-          label: name.to_string(),
+          label: (*name).to_string(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             self.documentation(),
@@ -169,7 +159,7 @@ impl Builtin<'_> {
         }
       }
       Self::Setting { name, .. } => lsp::CompletionItem {
-        label: name.to_string(),
+        label: (*name).to_string(),
         kind: Some(lsp::CompletionItemKind::PROPERTY),
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
@@ -195,18 +185,18 @@ impl Builtin<'_> {
           format!("**Attribute**: [{name}]\n{description}");
 
         if let Some(params) = parameters {
-          documentation.push_str(&format!("\n**Syntax**: [{name}({params})]"));
+          let _ = write!(documentation, "\n**Syntax**: [{name}({params})]");
         }
 
-        documentation.push_str(&format!("\n**Introduced in**: {version}"));
+        let _ = write!(documentation, "\n**Introduced in**: {version}");
 
         let targets = targets
           .iter()
-          .map(|target| target.to_string())
+          .map(ToString::to_string)
           .collect::<Vec<String>>();
 
-        documentation
-          .push_str(&format!("\n**Target(s)**: {}", targets.join(", ")));
+        let _ =
+          write!(documentation, "\n**Target(s)**: {}", targets.join(", "));
 
         lsp::MarkupContent {
           kind: lsp::MarkupKind::Markdown,
@@ -282,7 +272,7 @@ impl Builtin<'_> {
 
         documentation.push_str(description);
 
-        documentation.push_str(format!("\n```\n{signature}\n```").as_str());
+        let _ = write!(documentation, "\n```\n{signature}\n```");
 
         if !example.is_empty() {
           documentation.push_str("\n**Examples:**\n```\n");
@@ -304,8 +294,8 @@ impl Builtin<'_> {
       } => {
         let mut documentation = format!("**Setting**: {name}\n{description}");
 
-        documentation.push_str(&format!("\n**Type**: {kind}"));
-        documentation.push_str(&format!("\n**Default**: {default}"));
+        let _ = write!(documentation, "\n**Type**: {kind}");
+        let _ = write!(documentation, "\n**Default**: {default}");
 
         lsp::MarkupContent {
           kind: lsp::MarkupKind::Markdown,

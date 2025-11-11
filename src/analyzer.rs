@@ -6,15 +6,15 @@ pub struct Analyzer<'a> {
 }
 
 impl<'a> Analyzer<'a> {
-  /// Creates a new analyzer for the given document.
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
-  }
-
   /// Analyzes the document and returns a list of diagnostics.
   pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
     let context = RuleContext::new(self.document);
     RULES.iter().flat_map(|rule| rule.run(&context)).collect()
+  }
+
+  /// Creates a new analyzer for the given document.
+  pub(crate) fn new(document: &'a Document) -> Self {
+    Self { document }
   }
 }
 
@@ -29,6 +29,17 @@ mod tests {
   }
 
   impl Test {
+    fn error(self, message: &str) -> Self {
+      Self {
+        messages: self
+          .messages
+          .into_iter()
+          .chain([(message.to_owned(), Some(lsp::DiagnosticSeverity::ERROR))])
+          .collect(),
+        ..self
+      }
+    }
+
     fn new(content: &str) -> Self {
       Self {
         document: Document::try_from(lsp::DidOpenTextDocumentParams {
@@ -44,15 +55,16 @@ mod tests {
       }
     }
 
-    fn error(self, message: &str) -> Self {
-      Self {
-        messages: self
-          .messages
-          .into_iter()
-          .chain([(message.to_owned(), Some(lsp::DiagnosticSeverity::ERROR))])
-          .collect(),
-        ..self
-      }
+    fn run(self) {
+      let analyzer = Analyzer::new(&self.document);
+
+      let messages = analyzer
+        .analyze()
+        .into_iter()
+        .map(|d| (d.message, d.severity))
+        .collect::<Vec<(String, Option<lsp::DiagnosticSeverity>)>>();
+
+      assert_eq!(messages, self.messages);
     }
 
     fn warning(self, message: &str) -> Self {
@@ -64,18 +76,6 @@ mod tests {
           .collect(),
         ..self
       }
-    }
-
-    fn run(self) {
-      let analyzer = Analyzer::new(&self.document);
-
-      let messages = analyzer
-        .analyze()
-        .into_iter()
-        .map(|d| (d.message, d.severity))
-        .collect::<Vec<(String, Option<lsp::DiagnosticSeverity>)>>();
-
-      assert_eq!(messages, self.messages);
     }
   }
 
@@ -89,7 +89,7 @@ mod tests {
       alias bar := foo
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -106,7 +106,7 @@ mod tests {
     })
     .error("Duplicate alias `bar`")
     .error("Duplicate alias `bar`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -120,7 +120,7 @@ mod tests {
       "
     })
     .error("Recipe `baz` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -138,7 +138,7 @@ mod tests {
     })
     .error("Recipe `nonexistent` not found")
     .error("Recipe `missing` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -160,7 +160,7 @@ mod tests {
         echo \"baz\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -183,7 +183,7 @@ mod tests {
       "
     })
     .error("Attribute `default` got 1 argument but takes 0 arguments")
-    .run()
+    .run();
   }
 
   #[test]
@@ -196,7 +196,7 @@ mod tests {
       "
     })
     .error("Attribute `doc` got 0 arguments but takes 1 argument")
-    .run()
+    .run();
   }
 
   #[test]
@@ -207,7 +207,7 @@ mod tests {
         echo \"{{{{hello}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -237,7 +237,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -250,7 +250,7 @@ mod tests {
       "
     })
     .error("Unknown attribute `unknown_attribute`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -265,7 +265,7 @@ mod tests {
       "
     })
     .error("Attribute `group` cannot be applied to alias target")
-    .run()
+    .run();
   }
 
   #[test]
@@ -278,7 +278,7 @@ mod tests {
       "
     })
     .error("Unknown attribute `foo`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -290,7 +290,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -301,7 +301,7 @@ mod tests {
       mod foo
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -314,7 +314,7 @@ mod tests {
       "
     })
     .error("Attribute `group` got 2 arguments but takes 1 argument")
-    .run()
+    .run();
   }
 
   #[test]
@@ -335,7 +335,7 @@ mod tests {
         echo {{ public_var }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -346,7 +346,7 @@ mod tests {
       export PATH := '/usr/local/bin'
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -358,7 +358,7 @@ mod tests {
         echo {{ join(\"a\", \"b\", \"c\") }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -370,7 +370,7 @@ mod tests {
       "
     })
     .error("Function `replace` requires at least 3 arguments, but 0 provided")
-    .run()
+    .run();
   }
 
   #[test]
@@ -382,7 +382,7 @@ mod tests {
       "
     })
     .error("Function `uppercase` accepts 1 argument, but 2 provided")
-    .run()
+    .run();
   }
 
   #[test]
@@ -394,7 +394,7 @@ mod tests {
       "
     })
     .error("Unknown function `unknown_function`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -405,7 +405,7 @@ mod tests {
         echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -417,7 +417,7 @@ mod tests {
       "
     })
     .error("Syntax error")
-    .run()
+    .run();
   }
 
   #[test]
@@ -428,7 +428,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -442,7 +442,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -457,7 +457,7 @@ mod tests {
       "
     })
     .error("Recipe `baz` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -473,7 +473,7 @@ mod tests {
     })
     .error("Recipe `missing1` not found")
     .error("Recipe `missing2` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -487,7 +487,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -502,7 +502,7 @@ mod tests {
       "
     })
     .error("Dependency `foo` requires 2 arguments, but 0 provided")
-    .run()
+    .run();
   }
 
   #[test]
@@ -517,7 +517,7 @@ mod tests {
       "
     })
     .error("Dependency `foo` requires 2 arguments, but 1 provided")
-    .run()
+    .run();
   }
 
   #[test]
@@ -532,7 +532,7 @@ mod tests {
       "
     })
     .error("Dependency `foo` accepts 1 argument, but 3 provided")
-    .run()
+    .run();
   }
 
   #[test]
@@ -547,7 +547,7 @@ mod tests {
       "
     })
     .error("Variable `wow` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -563,7 +563,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -577,7 +577,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -591,7 +591,7 @@ mod tests {
         echo \"recipe-b called with {{param}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -605,7 +605,7 @@ mod tests {
         echo \"recipe-b called with {{param}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -616,7 +616,7 @@ mod tests {
         echo \"{{arg1}} {{arg2}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -628,7 +628,7 @@ mod tests {
       "
     })
     .error("Duplicate parameter `arg1`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -640,7 +640,7 @@ mod tests {
       "
     })
     .error("Required parameter `arg2` follows a parameter with a default value")
-    .run()
+    .run();
   }
 
   #[test]
@@ -651,7 +651,7 @@ mod tests {
         echo \"{{arg1}} {{arg2}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -662,7 +662,7 @@ mod tests {
         echo \"{{arg1}} {{args}}\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -675,7 +675,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -689,7 +689,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -703,7 +703,7 @@ mod tests {
       "
     })
     .error("Setting `export` expects a boolean value")
-    .run()
+    .run();
   }
 
   #[test]
@@ -719,7 +719,7 @@ mod tests {
       "
     })
     .error("Duplicate setting `export`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -737,7 +737,7 @@ mod tests {
     })
     .error("Unknown setting `unknown-setting`")
     .error("Duplicate setting `export`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -750,7 +750,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -764,7 +764,7 @@ mod tests {
       "
     })
     .error("Setting `dotenv-path` expects a string value")
-    .run()
+    .run();
   }
 
   #[test]
@@ -778,7 +778,7 @@ mod tests {
       "
     })
     .error("Unknown setting `unknown-setting`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -791,7 +791,7 @@ mod tests {
       test var=\"something\": (other-recipe var)
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -803,7 +803,7 @@ mod tests {
       "
     })
     .error("Variable `var` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -844,7 +844,7 @@ mod tests {
         echo foo
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -863,7 +863,7 @@ mod tests {
     })
     .error("Duplicate recipe name `foo`")
     .error("Duplicate recipe name `foo`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -878,7 +878,7 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -895,7 +895,7 @@ mod tests {
         echo foo on linux
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -912,7 +912,7 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -930,7 +930,7 @@ mod tests {
       "
     })
     .warning("Variable `unused` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -944,7 +944,7 @@ mod tests {
         darwin-rebuild switch --flake {{ flake }}#{{ output }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -957,7 +957,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -968,7 +968,7 @@ mod tests {
         echo {{ version }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -979,7 +979,7 @@ mod tests {
         echo {{ target }}
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -991,7 +991,7 @@ mod tests {
       "
     })
     .error("Variable `foo` not found")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1009,7 +1009,7 @@ mod tests {
       "
     })
     .warning("Variable `unused_var` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1026,7 +1026,7 @@ mod tests {
       "
     })
     .warning("Variable `param` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1048,7 +1048,7 @@ mod tests {
       "
     })
     .warning("Variable `never_used` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1064,7 +1064,7 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1084,7 +1084,7 @@ mod tests {
         echo \"Building on macOS\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -1101,7 +1101,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1117,7 +1117,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1133,7 +1133,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1150,7 +1150,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1166,7 +1166,7 @@ mod tests {
         echo \"Building on OpenBSD\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -1183,7 +1183,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1199,7 +1199,7 @@ mod tests {
         echo \"Building on macOS\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -1219,7 +1219,7 @@ mod tests {
         echo \"Building on Windows\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -1241,7 +1241,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1259,7 +1259,7 @@ mod tests {
       "
     })
     .error("Duplicate recipe name `build`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1278,7 +1278,7 @@ mod tests {
         echo \"Testing\"
       "
     })
-    .run()
+    .run();
   }
 
   #[test]
@@ -1290,7 +1290,7 @@ mod tests {
       "
     })
     .error("Recipe `foo` depends on itself")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1306,7 +1306,7 @@ mod tests {
     })
     .error("Recipe `foo` has circular dependency `foo -> bar -> foo`")
     .error("Recipe `bar` has circular dependency `bar -> foo -> bar`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1326,7 +1326,7 @@ mod tests {
     .error("Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`")
     .error("Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`")
     .error("Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1345,7 +1345,7 @@ mod tests {
     })
     .error("Recipe `bar` has circular dependency `bar -> baz -> bar`")
     .error("Recipe `baz` has circular dependency `baz -> bar -> baz`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1368,7 +1368,7 @@ mod tests {
     .error("Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`")
     .error("Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`")
     .error("Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`")
-    .run()
+    .run();
   }
 
   #[test]
@@ -1396,6 +1396,6 @@ mod tests {
     .error("Recipe `x` has circular dependency `x -> y -> z -> x`")
     .error("Recipe `y` has circular dependency `y -> z -> x -> y`")
     .error("Recipe `z` has circular dependency `z -> x -> y -> z`")
-    .run()
+    .run();
   }
 }

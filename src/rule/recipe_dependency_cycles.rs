@@ -5,12 +5,12 @@ use super::*;
 pub struct RecipeDependencyCycleRule;
 
 impl Rule for RecipeDependencyCycleRule {
-  fn id(&self) -> &'static str {
-    "recipe-dependency-cycles"
-  }
-
   fn display_name(&self) -> &'static str {
     "Recipe Dependency Cycles"
+  }
+
+  fn id(&self) -> &'static str {
+    "recipe-dependency-cycles"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
@@ -54,9 +54,9 @@ impl Rule for RecipeDependencyCycleRule {
 }
 
 struct TraversalState<'a> {
-  visited: &'a mut HashSet<String>,
   path: &'a mut Vec<String>,
   reported_recipes: &'a mut HashSet<String>,
+  visited: &'a mut HashSet<String>,
 }
 
 impl RecipeDependencyCycleRule {

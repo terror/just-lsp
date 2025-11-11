@@ -5,12 +5,12 @@ use super::*;
 pub struct UnusedVariableRule;
 
 impl Rule for UnusedVariableRule {
-  fn id(&self) -> &'static str {
-    "unused-variables"
-  }
-
   fn display_name(&self) -> &'static str {
     "Unused Variables"
+  }
+
+  fn id(&self) -> &'static str {
+    "unused-variables"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

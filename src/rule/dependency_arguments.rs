@@ -5,12 +5,12 @@ use super::*;
 pub struct DependencyArgumentRule;
 
 impl Rule for DependencyArgumentRule {
-  fn id(&self) -> &'static str {
-    "dependency-arguments"
-  }
-
   fn display_name(&self) -> &'static str {
     "Dependency Arguments"
+  }
+
+  fn id(&self) -> &'static str {
+    "dependency-arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

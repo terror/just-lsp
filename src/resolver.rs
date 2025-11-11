@@ -47,7 +47,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == identifier_name {
@@ -114,13 +114,7 @@ impl<'a> Resolver<'a> {
           });
         }
       }
-      "assignment" => {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: identifier.parent()?.get_range(),
-        });
-      }
-      "parameter" | "variadic_parameter" => {
+      "assignment" | "parameter" | "variadic_parameter" => {
         return Some(lsp::Location {
           uri: self.document.uri.clone(),
           range: identifier.parent()?.get_range(),
@@ -177,7 +171,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == text {
@@ -268,9 +262,8 @@ impl<'a> Resolver<'a> {
           return false;
         }
 
-        let candidate_parent = match candidate.parent() {
-          Some(p) => p,
-          None => return false,
+        let Some(candidate_parent) = candidate.parent() else {
+          return false;
         };
 
         let candidate_parent_kind = candidate_parent.kind();
@@ -292,10 +285,9 @@ impl<'a> Resolver<'a> {
                 .and_then(|recipe_node| {
                   recipe_node.find("recipe_header > identifier")
                 })
-                .map(|identifier_node| {
+                .map_or_else(String::new, |identifier_node| {
                   self.document.get_node_text(&identifier_node)
-                })
-                .unwrap_or_else(String::new),
+                }),
             );
 
             candidate_recipe.is_some_and(|recipe| {

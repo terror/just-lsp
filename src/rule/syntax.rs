@@ -5,12 +5,12 @@ use super::*;
 pub struct SyntaxRule;
 
 impl Rule for SyntaxRule {
-  fn id(&self) -> &'static str {
-    "syntax-errors"
-  }
-
   fn display_name(&self) -> &'static str {
     "Syntax Errors"
+  }
+
+  fn id(&self) -> &'static str {
+    "syntax-errors"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

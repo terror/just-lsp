@@ -114,9 +114,9 @@ impl IdentifierAnalysis {
     }
 
     Self {
-      variable_usage,
       recipe_identifier_usage,
       unresolved_identifiers,
+      variable_usage,
     }
   }
 
@@ -168,12 +168,6 @@ impl IdentifierAnalysis {
 }
 
 pub(crate) trait Rule: Sync {
-  /// Unique identifier for the rule.
-  fn id(&self) -> &'static str;
-
-  /// Human-readable name for the rule.
-  fn display_name(&self) -> &'static str;
-
   /// Helper to annotate diagnostics with rule information.
   fn diagnostic(&self, mut diagnostic: lsp::Diagnostic) -> lsp::Diagnostic {
     diagnostic.source = Some(format!("just-lsp ({})", self.display_name()));
@@ -181,13 +175,19 @@ pub(crate) trait Rule: Sync {
     diagnostic
   }
 
+  /// Human-readable name for the rule.
+  fn display_name(&self) -> &'static str;
+
+  /// Unique identifier for the rule.
+  fn id(&self) -> &'static str;
+
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic>;
 }
 
 pub(crate) struct RuleContext<'a> {
-  attributes: OnceCell<Vec<Attribute>>,
   aliases: OnceCell<Vec<Alias>>,
+  attributes: OnceCell<Vec<Attribute>>,
   document: &'a Document,
   document_variable_names: OnceCell<HashSet<String>>,
   function_calls: OnceCell<Vec<FunctionCall>>,
@@ -201,10 +201,51 @@ pub(crate) struct RuleContext<'a> {
 }
 
 impl<'a> RuleContext<'a> {
+  pub(crate) fn aliases(&self) -> &[Alias] {
+    self
+      .aliases
+      .get_or_init(|| self.document.aliases())
+      .as_slice()
+  }
+
+  pub(crate) fn attributes(&self) -> &[Attribute] {
+    self
+      .attributes
+      .get_or_init(|| self.document.attributes())
+      .as_slice()
+  }
+
+  pub(crate) fn document(&self) -> &Document {
+    self.document
+  }
+
+  pub(crate) fn document_variable_names(&self) -> &HashSet<String> {
+    self.document_variable_names.get_or_init(|| {
+      self
+        .variables()
+        .iter()
+        .map(|variable| variable.name.value.clone())
+        .collect()
+    })
+  }
+
+  pub(crate) fn function_calls(&self) -> &[FunctionCall] {
+    self
+      .function_calls
+      .get_or_init(|| self.document.function_calls())
+      .as_slice()
+  }
+
+  fn identifier_analysis(&self) -> &IdentifierAnalysis {
+    self
+      .identifier_analysis
+      .get_or_init(|| IdentifierAnalysis::new(self))
+  }
+
   pub(crate) fn new(document: &'a Document) -> Self {
     Self {
-      attributes: OnceCell::new(),
       aliases: OnceCell::new(),
+      attributes: OnceCell::new(),
       document,
       document_variable_names: OnceCell::new(),
       function_calls: OnceCell::new(),
@@ -218,58 +259,14 @@ impl<'a> RuleContext<'a> {
     }
   }
 
-  pub(crate) fn document(&self) -> &Document {
-    self.document
-  }
-
-  pub(crate) fn attributes(&self) -> &[Attribute] {
-    self
-      .attributes
-      .get_or_init(|| self.document.attributes())
-      .as_slice()
-  }
-
-  pub(crate) fn tree(&self) -> Option<&Tree> {
-    self.document.tree.as_ref()
-  }
-
-  pub(crate) fn aliases(&self) -> &[Alias] {
-    self
-      .aliases
-      .get_or_init(|| self.document.get_aliases())
-      .as_slice()
-  }
-
-  pub(crate) fn recipes(&self) -> &[Recipe] {
-    self
-      .recipes
-      .get_or_init(|| self.document.get_recipes())
-      .as_slice()
-  }
-
-  pub(crate) fn function_calls(&self) -> &[FunctionCall] {
-    self
-      .function_calls
-      .get_or_init(|| self.document.function_calls())
-      .as_slice()
-  }
-
   pub(crate) fn recipe(&self, name: &str) -> Option<&Recipe> {
     self.recipes().iter().find(|recipe| recipe.name == name)
   }
 
-  pub(crate) fn settings(&self) -> &[Setting] {
-    self
-      .settings
-      .get_or_init(|| self.document.get_settings())
-      .as_slice()
-  }
-
-  pub(crate) fn variables(&self) -> &[Variable] {
-    self
-      .variables
-      .get_or_init(|| self.document.get_variables())
-      .as_slice()
+  pub(crate) fn recipe_identifier_usage(
+    &self,
+  ) -> &HashMap<String, HashSet<String>> {
+    &self.identifier_analysis().recipe_identifier_usage
   }
 
   pub(crate) fn recipe_names(&self) -> &HashSet<String> {
@@ -288,14 +285,26 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn document_variable_names(&self) -> &HashSet<String> {
-    self.document_variable_names.get_or_init(|| {
-      self
-        .variables()
-        .iter()
-        .map(|variable| variable.name.value.clone())
-        .collect()
-    })
+  pub(crate) fn recipes(&self) -> &[Recipe] {
+    self
+      .recipes
+      .get_or_init(|| self.document.recipes())
+      .as_slice()
+  }
+
+  pub(crate) fn settings(&self) -> &[Setting] {
+    self
+      .settings
+      .get_or_init(|| self.document.settings())
+      .as_slice()
+  }
+
+  pub(crate) fn tree(&self) -> Option<&Tree> {
+    self.document.tree.as_ref()
+  }
+
+  pub(crate) fn unresolved_identifiers(&self) -> &[UnresolvedIdentifier] {
+    &self.identifier_analysis().unresolved_identifiers
   }
 
   pub(crate) fn variable_and_builtin_names(&self) -> &HashSet<String> {
@@ -313,23 +322,14 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  fn identifier_analysis(&self) -> &IdentifierAnalysis {
-    self
-      .identifier_analysis
-      .get_or_init(|| IdentifierAnalysis::new(self))
-  }
-
   pub(crate) fn variable_usage(&self) -> &HashMap<String, bool> {
     &self.identifier_analysis().variable_usage
   }
 
-  pub(crate) fn recipe_identifier_usage(
-    &self,
-  ) -> &HashMap<String, HashSet<String>> {
-    &self.identifier_analysis().recipe_identifier_usage
-  }
-
-  pub(crate) fn unresolved_identifiers(&self) -> &[UnresolvedIdentifier] {
-    &self.identifier_analysis().unresolved_identifiers
+  pub(crate) fn variables(&self) -> &[Variable] {
+    self
+      .variables
+      .get_or_init(|| self.document.variables())
+      .as_slice()
   }
 }

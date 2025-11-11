@@ -4,12 +4,12 @@ use super::*;
 pub struct AttributeInvalidTargetRule;
 
 impl Rule for AttributeInvalidTargetRule {
-  fn id(&self) -> &'static str {
-    "attribute-invalid-target"
-  }
-
   fn display_name(&self) -> &'static str {
     "Attribute Invalid Target"
+  }
+
+  fn id(&self) -> &'static str {
+    "attribute-invalid-target"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
