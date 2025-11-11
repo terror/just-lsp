@@ -30,6 +30,16 @@ impl Server {
       hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Left(true)),
+      semantic_tokens_provider: Some(
+        lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
+          lsp::SemanticTokensOptions {
+            legend: semantic_tokens::SEMANTIC_TOKENS_LEGEND.clone(),
+            full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+            range: None,
+            ..Default::default()
+          },
+        ),
+      ),
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
         lsp::TextDocumentSyncOptions {
           open_close: Some(true),
@@ -171,6 +181,13 @@ impl LanguageServer for Server {
     params: lsp::RenameParams,
   ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
     self.0.rename(params).await
+  }
+
+  async fn semantic_tokens_full(
+    &self,
+    params: lsp::SemanticTokensParams,
+  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
+    self.0.semantic_tokens_full(params).await
   }
 
   #[allow(clippy::unused_async)]
@@ -702,6 +719,39 @@ impl Inner {
           }
         })
     }))
+  }
+
+  async fn semantic_tokens_full(
+    &self,
+    params: lsp::SemanticTokensParams,
+  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
+    let uri = params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(&uri) {
+      match semantic_tokens::semantic_tokens(document) {
+        Ok(data) => {
+          return Ok(Some(lsp::SemanticTokensResult::Tokens(
+            lsp::SemanticTokens {
+              result_id: None,
+              data,
+            },
+          )));
+        }
+        Err(error) => {
+          self
+            .client
+            .log_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to compute semantic tokens: {error}"),
+            )
+            .await;
+        }
+      }
+    }
+
+    Ok(None)
   }
 
   async fn run_recipe(
@@ -1438,6 +1488,45 @@ mod tests {
   impl IntoValue for Vec<Highlight<'_>> {
     fn into_value(self) -> Value {
       self.into_iter().map(Highlight::into_value).collect()
+    }
+  }
+
+  #[derive(Debug)]
+  struct SemanticTokensRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for SemanticTokensRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/semanticTokens/full",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct SemanticTokensResponse {
+    data: Vec<u32>,
+    id: i64,
+  }
+
+  impl IntoValue for SemanticTokensResponse {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "data": self.data,
+        }
+      })
     }
   }
 
@@ -2254,6 +2343,35 @@ mod tests {
             end_char: 16,
             kind: "text",
           },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn semantic_tokens_basic() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"bar\"
+          "
+        },
+      })
+      .request(SemanticTokensRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(SemanticTokensResponse {
+        id: 2,
+        data: vec![
+          0, 0, 3, 6, 1, //
+          0, 3, 1, 3, 0,
         ],
       })
       .run()

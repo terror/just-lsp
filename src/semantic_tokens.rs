@@ -1,0 +1,378 @@
+use super::*;
+
+const HIGHLIGHTS_QUERY: &str =
+  include_str!("../vendor/tree-sitter-just/queries/just/highlights.scm");
+
+const INJECTIONS_QUERY: &str =
+  include_str!("../vendor/tree-sitter-just/queries/just/injections.scm");
+
+const LOCALS_QUERY: &str =
+  include_str!("../vendor/tree-sitter-just/queries/just/locals.scm");
+
+const TOKEN_TYPES: &[&str] = &[
+  "comment",
+  "keyword",
+  "string",
+  "operator",
+  "variable",
+  "parameter",
+  "function",
+  "namespace",
+  "decorator",
+  "boolean",
+];
+
+const TOKEN_MODIFIERS: &[&str] = &["declaration", "deprecated"];
+
+const HIGHLIGHT_NAMES: &[&str] = &[
+  "keyword.import",
+  "keyword.conditional",
+  "keyword.directive",
+  "keyword",
+  "module",
+  "variable.parameter",
+  "variable",
+  "function.call",
+  "function",
+  "attribute",
+  "operator",
+  "punctuation.delimiter",
+  "punctuation.bracket",
+  "punctuation.special",
+  "boolean",
+  "string.escape",
+  "string",
+  "comment",
+  "spell",
+  "error",
+];
+
+pub(crate) static SEMANTIC_TOKENS_LEGEND: Lazy<lsp::SemanticTokensLegend> =
+  Lazy::new(|| lsp::SemanticTokensLegend {
+    token_types: TOKEN_TYPES
+      .iter()
+      .map(|name| lsp::SemanticTokenType::new(*name))
+      .collect(),
+    token_modifiers: TOKEN_MODIFIERS
+      .iter()
+      .map(|name| lsp::SemanticTokenModifier::new(*name))
+      .collect(),
+  });
+
+static HIGHLIGHT_CONFIGURATION: Lazy<HighlightConfiguration> =
+  Lazy::new(|| {
+    let mut configuration = HighlightConfiguration::new(
+      unsafe { tree_sitter_just() },
+      "just",
+      HIGHLIGHTS_QUERY,
+      INJECTIONS_QUERY,
+      LOCALS_QUERY,
+    )
+    .expect("Failed to create highlight configuration");
+
+    configuration.configure(HIGHLIGHT_NAMES);
+
+    configuration
+  });
+
+#[derive(Clone, Copy)]
+struct SemanticTokenMapping {
+  token_type_index: u32,
+  modifiers_bitset: u32,
+}
+
+impl SemanticTokenMapping {
+  fn new(token_type: &str, modifiers: &[&str]) -> Self {
+    Self {
+      token_type_index: token_type_index(token_type),
+      modifiers_bitset: modifier_bitset(modifiers),
+    }
+  }
+}
+
+struct TokenData {
+  line: u32,
+  start_character: u32,
+  length: u32,
+  token_type_index: u32,
+  modifiers_bitset: u32,
+}
+
+static HIGHLIGHT_MAPPINGS: Lazy<Vec<Option<SemanticTokenMapping>>> =
+  Lazy::new(|| {
+    HIGHLIGHT_NAMES
+      .iter()
+      .map(|name| match *name {
+        "keyword"
+        | "keyword.conditional"
+        | "keyword.directive"
+        | "keyword.import" => Some(SemanticTokenMapping::new("keyword", &[])),
+        "module" => Some(SemanticTokenMapping::new("namespace", &[])),
+        "variable" => Some(SemanticTokenMapping::new("variable", &[])),
+        "variable.parameter" => {
+          Some(SemanticTokenMapping::new("parameter", &[]))
+        }
+        "function" => {
+          Some(SemanticTokenMapping::new("function", &["declaration"]))
+        }
+        "function.call" => Some(SemanticTokenMapping::new("function", &[])),
+        "attribute" => Some(SemanticTokenMapping::new("decorator", &[])),
+        "operator"
+        | "punctuation.delimiter"
+        | "punctuation.bracket"
+        | "punctuation.special" => {
+          Some(SemanticTokenMapping::new("operator", &[]))
+        }
+        "boolean" => Some(SemanticTokenMapping::new("boolean", &[])),
+        "string" | "string.escape" => {
+          Some(SemanticTokenMapping::new("string", &[]))
+        }
+        "comment" => Some(SemanticTokenMapping::new("comment", &[])),
+        "error" => Some(SemanticTokenMapping::new("keyword", &["deprecated"])),
+        _ => None,
+      })
+      .collect()
+  });
+
+pub(crate) fn semantic_tokens(
+  document: &Document,
+) -> Result<Vec<lsp::SemanticToken>> {
+  let mut highlighter = Highlighter::new();
+
+  highlighter
+    .parser()
+    .set_language(&unsafe { tree_sitter_just() })
+    .map_err(|error| anyhow!("Failed to configure highlighter: {error}"))?;
+
+  let source = document.content.to_string();
+
+  let highlight_iter = highlighter
+    .highlight(&HIGHLIGHT_CONFIGURATION, source.as_bytes(), None, |_| None)
+    .map_err(|error| anyhow!("Failed to highlight document: {error}"))?;
+
+  let mut highlight_stack = Vec::new();
+  let mut tokens = Vec::new();
+
+  for event in highlight_iter {
+    match event
+      .map_err(|error| anyhow!("Failed to highlight document: {error}"))?
+    {
+      HighlightEvent::HighlightStart(Highlight(index)) => {
+        highlight_stack.push(index);
+      }
+      HighlightEvent::HighlightEnd => {
+        highlight_stack.pop();
+      }
+      HighlightEvent::Source { start, end } => {
+        if start >= end {
+          continue;
+        }
+
+        if let Some(mapping) = highlight_stack.iter().rev().find_map(|index| {
+          HIGHLIGHT_MAPPINGS
+            .get(*index)
+            .and_then(|mapping| mapping.as_ref().copied())
+        }) {
+          push_tokens_for_span(
+            &document.content,
+            start,
+            end,
+            mapping,
+            &mut tokens,
+          );
+        }
+      }
+    }
+  }
+
+  Ok(encode_tokens(tokens))
+}
+
+fn push_tokens_for_span(
+  rope: &Rope,
+  start_byte: usize,
+  end_byte: usize,
+  mapping: SemanticTokenMapping,
+  tokens: &mut Vec<TokenData>,
+) {
+  if start_byte >= end_byte {
+    return;
+  }
+
+  let last_byte = end_byte.saturating_sub(1);
+
+  let start_line = rope.byte_to_line(start_byte);
+  let end_line = rope.byte_to_line(last_byte);
+
+  for line_idx in start_line..=end_line {
+    let line_start_byte = rope.line_to_byte(line_idx);
+    let next_line_idx = (line_idx + 1).min(rope.len_lines());
+    let line_end_byte = rope.line_to_byte(next_line_idx);
+
+    let segment_start = if line_idx == start_line {
+      start_byte
+    } else {
+      line_start_byte
+    };
+
+    let mut segment_end = if line_idx == end_line {
+      end_byte
+    } else {
+      let newline_len = trailing_line_break_len(rope, line_idx);
+      line_end_byte.saturating_sub(newline_len)
+    };
+
+    if segment_end > end_byte {
+      segment_end = end_byte;
+    }
+
+    if segment_end <= segment_start {
+      continue;
+    }
+
+    let line_char_idx = rope.line_to_char(line_idx);
+    let start_char_idx = rope.byte_to_char(segment_start);
+    let end_char_idx = rope.byte_to_char(segment_end);
+
+    let line_utf16 = rope.char_to_utf16_cu(line_char_idx);
+    let start_utf16 = rope.char_to_utf16_cu(start_char_idx);
+    let end_utf16 = rope.char_to_utf16_cu(end_char_idx);
+
+    let start_character = start_utf16.saturating_sub(line_utf16);
+    let end_character = end_utf16.saturating_sub(line_utf16);
+
+    if end_character <= start_character {
+      continue;
+    }
+
+    let length = end_character - start_character;
+
+    let Ok(line) = u32::try_from(line_idx) else {
+      continue;
+    };
+
+    let Ok(start_character) = u32::try_from(start_character) else {
+      continue;
+    };
+
+    let Ok(length) = u32::try_from(length) else {
+      continue;
+    };
+
+    tokens.push(TokenData {
+      line,
+      start_character,
+      length,
+      token_type_index: mapping.token_type_index,
+      modifiers_bitset: mapping.modifiers_bitset,
+    });
+  }
+}
+
+fn encode_tokens(mut tokens: Vec<TokenData>) -> Vec<lsp::SemanticToken> {
+  tokens.sort_by(|left, right| {
+    left
+      .line
+      .cmp(&right.line)
+      .then(left.start_character.cmp(&right.start_character))
+  });
+
+  let mut data = Vec::with_capacity(tokens.len());
+
+  let mut previous_line = 0;
+  let mut previous_start = 0;
+  let mut first = true;
+
+  for token in tokens {
+    let delta_line = if first {
+      token.line
+    } else {
+      token.line.saturating_sub(previous_line)
+    };
+
+    let delta_start = if first || delta_line > 0 {
+      token.start_character
+    } else {
+      token.start_character.saturating_sub(previous_start)
+    };
+
+    data.push(lsp::SemanticToken {
+      delta_line,
+      delta_start,
+      length: token.length,
+      token_type: token.token_type_index,
+      token_modifiers_bitset: token.modifiers_bitset,
+    });
+
+    previous_line = token.line;
+    previous_start = token.start_character;
+    first = false;
+  }
+
+  data
+}
+
+fn token_type_index(token_type: &str) -> u32 {
+  TOKEN_TYPES
+    .iter()
+    .position(|candidate| candidate == &token_type)
+    .map(|index| index as u32)
+    .expect("Token type missing from legend")
+}
+
+fn modifier_index(modifier: &str) -> Option<u32> {
+  TOKEN_MODIFIERS
+    .iter()
+    .position(|candidate| candidate == &modifier)
+    .map(|index| index as u32)
+}
+
+fn modifier_bitset(modifiers: &[&str]) -> u32 {
+  modifiers
+    .iter()
+    .filter_map(|modifier| modifier_index(modifier))
+    .fold(0, |bitset, index| bitset | (1 << index))
+}
+
+fn trailing_line_break_len(rope: &Rope, line_idx: usize) -> usize {
+  let line_start_byte = rope.line_to_byte(line_idx);
+  let line_end_byte = rope.line_to_byte((line_idx + 1).min(rope.len_lines()));
+
+  if line_end_byte <= line_start_byte || line_end_byte == 0 {
+    return 0;
+  }
+
+  let last_byte = line_end_byte - 1;
+
+  let Some(last_char) = char_at_byte(rope, last_byte) else {
+    return 0;
+  };
+
+  if last_char != '\n' {
+    return 0;
+  }
+
+  if last_byte == 0 {
+    return 1;
+  }
+
+  if last_byte <= line_start_byte {
+    return 1;
+  }
+
+  if matches!(char_at_byte(rope, last_byte - 1), Some('\r')) {
+    2
+  } else {
+    1
+  }
+}
+
+fn char_at_byte(rope: &Rope, byte_idx: usize) -> Option<char> {
+  if byte_idx >= rope.len_bytes() {
+    return None;
+  }
+
+  let end = (byte_idx + 4).min(rope.len_bytes());
+
+  rope.byte_slice(byte_idx..end).chars().next()
+}
