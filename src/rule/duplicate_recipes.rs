@@ -14,10 +14,7 @@ impl Rule for DuplicateRecipeRule {
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let allow_duplicates = context.settings().iter().any(|setting| {
-      setting.name == "allow-duplicate-recipes"
-        && matches!(setting.kind, SettingKind::Boolean(true))
-    });
+    let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
 
     if allow_duplicates {
       return Vec::new();

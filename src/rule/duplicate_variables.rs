@@ -14,10 +14,7 @@ impl Rule for DuplicateVariableRule {
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let allow_duplicates = context.settings().iter().any(|setting| {
-      setting.name == "allow-duplicate-variables"
-        && matches!(setting.kind, SettingKind::Boolean(true))
-    });
+    let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
 
     if allow_duplicates {
       return Vec::new();
