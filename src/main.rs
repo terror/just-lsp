@@ -7,20 +7,15 @@ use {
   clap::Parser as Clap,
   command::Command,
   count::Count,
-  document::Document,
   env_logger::Env,
+  just_lsp_document::{Document, NodeExt},
   just_lsp_rope_ext::RopeExt,
   just_lsp_types::{
-    Alias, Attribute, AttributeTarget, Dependency, FunctionCall, Group,
-    Parameter, ParameterJson, ParameterKind, Recipe, Setting, SettingKind,
-    TextNode, Variable,
+    Alias, Attribute, AttributeTarget, FunctionCall, Group, Parameter,
+    ParameterJson, ParameterKind, Recipe, Setting, SettingKind, Variable,
   },
-  node_ext::NodeExt,
   once_cell::sync::OnceCell,
-  point_ext::PointExt,
-  position_ext::PositionExt,
   resolver::Resolver,
-  ropey::Rope,
   rule::{RuleContext, RULES},
   server::Server,
   std::{
@@ -39,7 +34,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{wrappers::LinesStream, StreamExt},
   tower_lsp::{jsonrpc, lsp_types as lsp, Client, LanguageServer, LspService},
-  tree_sitter::{Language, Node, Parser, Point, Tree, TreeCursor},
+  tree_sitter::{Node, Tree, TreeCursor},
 };
 
 mod analyzer;
@@ -48,20 +43,12 @@ mod builtin;
 mod builtins;
 mod command;
 mod count;
-mod document;
-mod node_ext;
-mod point_ext;
-mod position_ext;
 mod resolver;
 mod rule;
 mod server;
 mod subcommand;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
-
-extern "C" {
-  pub(crate) fn tree_sitter_just() -> Language;
-}
 
 #[tokio::main]
 async fn main() {

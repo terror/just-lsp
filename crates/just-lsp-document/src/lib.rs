@@ -1,11 +1,35 @@
-use super::*;
+use {
+  just_lsp_rope_ext::RopeExt,
+  just_lsp_types::{
+    Alias, Attribute, AttributeTarget, Dependency, FunctionCall, Parameter,
+    Recipe, Setting, TextNode, Variable,
+  },
+  point_ext::PointExt,
+  position_ext::PositionExt,
+  ropey::Rope,
+  tower_lsp::lsp_types as lsp,
+  tree_sitter::{Language, LanguageError, Node, Parser, Point, Tree},
+};
+
+pub type Result<T = (), E = Error> = std::result::Result<T, E>;
+
+pub use {error::Error, node_ext::NodeExt};
+
+mod error;
+mod node_ext;
+mod point_ext;
+mod position_ext;
+
+unsafe extern "C" {
+  pub(crate) fn tree_sitter_just() -> Language;
+}
 
 #[derive(Debug)]
 pub struct Document {
-  pub(crate) content: Rope,
-  pub(crate) tree: Option<Tree>,
-  pub(crate) uri: lsp::Url,
-  pub(crate) version: i32,
+  pub content: Rope,
+  pub tree: Option<Tree>,
+  pub uri: lsp::Url,
+  pub version: i32,
 }
 
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
@@ -30,7 +54,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
-  pub(crate) fn aliases(&self) -> Vec<Alias> {
+  pub fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -57,7 +81,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn apply_change(
+  pub fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
@@ -84,7 +108,7 @@ impl Document {
     Ok(())
   }
 
-  pub(crate) fn attributes(&self) -> Vec<Attribute> {
+  pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -124,21 +148,21 @@ impl Document {
     })
   }
 
-  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
+  pub fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .recipes()
       .into_iter()
       .find(|recipe| recipe.name == name)
   }
 
-  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
+  pub fn find_variable(&self, name: &str) -> Option<Variable> {
     self
       .variables()
       .into_iter()
       .find(|var| var.name.value == name)
   }
 
-  pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
+  pub fn function_calls(&self) -> Vec<FunctionCall> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -174,7 +198,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn get_node_text(&self, node: &Node) -> String {
+  pub fn get_node_text(&self, node: &Node) -> String {
     self
       .content
       .slice(
@@ -184,10 +208,7 @@ impl Document {
       .to_string()
   }
 
-  pub(crate) fn node_at_position(
-    &self,
-    position: lsp::Position,
-  ) -> Option<Node<'_>> {
+  pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
       let point = position.point();
       Some(tree.root_node().descendant_for_point_range(point, point)?)
@@ -196,7 +217,7 @@ impl Document {
     }
   }
 
-  pub(crate) fn parse(&mut self) -> Result {
+  pub fn parse(&mut self) -> Result {
     let mut parser = Parser::new();
 
     // SAFETY: tree_sitter_just returns a static language definition.
@@ -209,7 +230,7 @@ impl Document {
     Ok(())
   }
 
-  pub(crate) fn recipes(&self) -> Vec<Recipe> {
+  pub fn recipes(&self) -> Vec<Recipe> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -309,7 +330,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn settings(&self) -> Vec<Setting> {
+  pub fn settings(&self) -> Vec<Setting> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -325,7 +346,7 @@ impl Document {
     })
   }
 
-  pub(crate) fn variables(&self) -> Vec<Variable> {
+  pub fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -354,7 +375,9 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
-    just_lsp_types::{AttributeTarget, ParameterKind, VariadicType},
+    just_lsp_types::{
+      AttributeTarget, ParameterKind, SettingKind, VariadicType,
+    },
     pretty_assertions::assert_eq,
   };
 

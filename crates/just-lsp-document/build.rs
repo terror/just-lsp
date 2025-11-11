@@ -75,7 +75,7 @@ impl Parser<'_> {
 fn main() {
   let parsers = vec![Parser {
     name: "tree-sitter-just",
-    src: "vendor/tree-sitter-just-src",
+    src: "../../vendor/tree-sitter-just-src",
     extra: vec!["scanner.c"],
   }];
 

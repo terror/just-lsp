@@ -558,9 +558,12 @@ dependencies = [
 
 [[package]]
 name = "indoc"
-version = "2.0.6"
+version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4c7245a08504955605670dbf141fceab975f15ca21570696aebe9d2e71576bd"
+checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "io-uring"
@@ -615,16 +618,15 @@ version = "0.2.7"
 dependencies = [
  "anyhow",
  "ariadne",
- "cc",
  "clap",
  "env_logger",
  "indoc",
+ "just-lsp-document",
  "just-lsp-rope-ext",
  "just-lsp-types",
  "log",
  "once_cell",
  "pretty_assertions",
- "ropey",
  "serde",
  "serde_json",
  "target",
@@ -641,6 +643,21 @@ name = "just-lsp-changelog"
 version = "0.0.0"
 dependencies = [
  "regex",
+]
+
+[[package]]
+name = "just-lsp-document"
+version = "0.0.0"
+dependencies = [
+ "cc",
+ "indoc",
+ "just-lsp-rope-ext",
+ "just-lsp-types",
+ "pretty_assertions",
+ "ropey",
+ "thiserror",
+ "tower-lsp",
+ "tree-sitter",
 ]
 
 [[package]]
@@ -935,6 +952,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
 name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1080,6 +1103,26 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
