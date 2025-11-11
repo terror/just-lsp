@@ -4,6 +4,7 @@ static RULES: &[&dyn Rule] = &[
   &SyntaxRule,
   &MissingRecipeForAliasRule,
   &DuplicateAliasRule,
+  &AliasRecipeConflictRule,
   &UnknownAttributeRule,
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
@@ -145,6 +146,40 @@ mod tests {
       "
     })
     .error("Recipe `baz` not found")
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_recipe_then_alias() {
+    Test::new(indoc! {
+      "
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+
+      alias t := other
+      "
+    })
+    .error("Recipe `t` is redefined as an alias")
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_alias_then_recipe() {
+    Test::new(indoc! {
+      "
+      alias t := other
+
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+      "
+    })
+    .error("Alias `t` is redefined as a recipe")
     .run();
   }
 
