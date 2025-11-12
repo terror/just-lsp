@@ -4,7 +4,7 @@
 `src/analyzer.rs`). Each rule emits a Language Server Protocol diagnostic with
 the rule’s identifier in the `code` field so editors can group or filter them.
 
-| Code                              | Name                            | Message                                                                                             |
+| Code                              | Name                            | Description                                                                                         |
 | --------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `syntax-errors`                   | Syntax Errors                   | Parse tree contains errors or missing nodes.                                                        |
 | `missing-recipe-for-alias`        | Missing Recipe for Alias        | Alias points to a recipe that doesn’t exist.                                                        |
