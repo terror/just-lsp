@@ -408,14 +408,14 @@ mod tests {
 
   #[test]
   fn apply_change() {
-    let mut doc = document(indoc! {
+    let mut document = document(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let original_content = doc.content.to_string();
+    let original_content = document.content.to_string();
 
     let change = lsp::DidChangeTextDocumentParams {
       text_document: lsp::VersionedTextDocumentIdentifier {
@@ -429,10 +429,10 @@ mod tests {
       }],
     };
 
-    doc.apply_change(change).unwrap();
+    document.apply_change(change).unwrap();
 
-    assert_ne!(doc.content.to_string(), original_content);
-    assert_eq!(doc.content.to_string(), "foo:\n  echo \"bar\"");
+    assert_ne!(document.content.to_string(), original_content);
+    assert_eq!(document.content.to_string(), "foo:\n  echo \"bar\"");
   }
 
   #[test]
@@ -442,28 +442,28 @@ mod tests {
         echo foo
     "};
 
-    let doc = document(content);
+    let document = document(content);
 
-    assert_eq!(doc.content.to_string(), content);
+    assert_eq!(document.content.to_string(), content);
 
-    assert!(doc.tree.is_some());
+    assert!(document.tree.is_some());
   }
 
   #[test]
   fn find_nonexistent_recipe() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    assert_eq!(doc.find_recipe("nonexistent"), None);
+    assert_eq!(document.find_recipe("nonexistent"), None);
   }
 
   #[test]
   fn find_recipe() {
-    let doc = document(indoc! {"
+    let document = document(indoc! {"
       foo:
         echo \"foo\"
 
@@ -472,7 +472,7 @@ mod tests {
     "});
 
     assert_eq!(
-      doc.find_recipe("foo").unwrap(),
+      document.find_recipe("foo").unwrap(),
       Recipe {
         name: "foo".into(),
         attributes: vec![],
@@ -484,7 +484,7 @@ mod tests {
     );
 
     assert_eq!(
-      doc.find_recipe("bar").unwrap(),
+      document.find_recipe("bar").unwrap(),
       Recipe {
         name: "bar".into(),
         attributes: vec![],
@@ -495,18 +495,19 @@ mod tests {
       }
     );
 
-    assert!(doc.find_recipe("baz").is_none());
+    assert!(document.find_recipe("baz").is_none());
   }
 
   #[test]
   fn get_array_setting() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       set shell := ['foo']
       "
     });
 
-    let settings = doc.settings();
+    let settings = document.settings();
+
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -521,13 +522,13 @@ mod tests {
 
   #[test]
   fn get_basic_alias() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       alias a1 := foo
       "
     });
 
-    let aliases = doc.aliases();
+    let aliases = document.aliases();
     assert_eq!(aliases.len(), 1);
 
     assert_eq!(
@@ -548,13 +549,14 @@ mod tests {
 
   #[test]
   fn get_boolean_flag_setting() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       set export
       "
     });
 
-    let settings = doc.settings();
+    let settings = document.settings();
+
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -569,13 +571,14 @@ mod tests {
 
   #[test]
   fn get_boolean_setting() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       set export := true
       "
     });
 
-    let settings = doc.settings();
+    let settings = document.settings();
+
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -590,14 +593,15 @@ mod tests {
 
   #[test]
   fn get_duplicate_aliases() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       alias duplicate := foo
       alias duplicate := bar
       "
     });
 
-    let aliases = doc.aliases();
+    let aliases = document.aliases();
+
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -633,14 +637,15 @@ mod tests {
 
   #[test]
   fn get_multiple_aliases() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       alias a1 := foo
       alias a2 := bar
       "
     });
 
-    let aliases = doc.aliases();
+    let aliases = document.aliases();
+
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
@@ -676,7 +681,7 @@ mod tests {
 
   #[test]
   fn get_multiple_settings() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       set export := true
       set shell := ['foo']
@@ -684,7 +689,8 @@ mod tests {
       "
     });
 
-    let settings = doc.settings();
+    let settings = document.settings();
+
     assert_eq!(settings.len(), 3);
 
     assert_eq!(
@@ -717,13 +723,14 @@ mod tests {
 
   #[test]
   fn get_string_setting() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       set bar := 'wow!'
       "
     });
 
-    let settings = doc.settings();
+    let settings = document.settings();
+
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
@@ -738,7 +745,7 @@ mod tests {
 
   #[test]
   fn get_variables() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       tmpdir  := `mktemp -d`
       version := \"0.2.7\"
@@ -750,7 +757,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.variables(),
+      document.variables(),
       vec![
         Variable {
           name: TextNode {
@@ -813,14 +820,14 @@ mod tests {
 
   #[test]
   fn private_exported_variable_is_marked_exported() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       [private]
       export PATH := '/usr/local/bin'
       "
     });
 
-    let variables = doc.variables();
+    let variables = document.variables();
 
     assert!(variables[0].export);
 
@@ -829,7 +836,7 @@ mod tests {
 
   #[test]
   fn multiple_recipes() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo:
         echo \"foo\"
@@ -840,7 +847,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("foo"),
+      document.find_recipe("foo"),
       Some(Recipe {
         name: "foo".into(),
         attributes: vec![],
@@ -852,7 +859,7 @@ mod tests {
     );
 
     assert_eq!(
-      doc.find_recipe("bar"),
+      document.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
         attributes: vec![],
@@ -866,7 +873,7 @@ mod tests {
 
   #[test]
   fn node_at_position() {
-    let doc = document(indoc! {"
+    let document = document(indoc! {"
       foo:
         echo \"foo\"
 
@@ -874,7 +881,7 @@ mod tests {
         echo \"bar\"
     "});
 
-    let node = doc
+    let node = document
       .node_at_position(lsp::Position {
         line: 1,
         character: 1,
@@ -882,9 +889,9 @@ mod tests {
       .unwrap();
 
     assert_eq!(node.kind(), "recipe");
-    assert_eq!(doc.get_node_text(&node), "foo:\n  echo \"foo\"\n\n");
+    assert_eq!(document.get_node_text(&node), "foo:\n  echo \"foo\"\n\n");
 
-    let node = doc
+    let node = document
       .node_at_position(lsp::Position {
         line: 4,
         character: 6,
@@ -892,12 +899,12 @@ mod tests {
       .unwrap();
 
     assert_eq!(node.kind(), "text");
-    assert_eq!(doc.get_node_text(&node), "echo \"bar\"");
+    assert_eq!(document.get_node_text(&node), "echo \"bar\"");
   }
 
   #[test]
   fn recipe_with_default_parameter() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       baz first second=\"default\":
         echo \"{{first}} {{second}}\"
@@ -905,7 +912,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("baz"),
+      document.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
         attributes: vec![],
@@ -936,7 +943,7 @@ mod tests {
 
   #[test]
   fn recipe_with_dependency() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo:
         echo \"foo\"
@@ -947,7 +954,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("bar"),
+      document.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
         attributes: vec![],
@@ -965,7 +972,7 @@ mod tests {
 
   #[test]
   fn recipe_with_dependency_arguments() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo arg1 arg2:
         echo \"{{arg1}} {{arg2}}\"
@@ -976,7 +983,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("bar"),
+      document.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
         attributes: vec![],
@@ -1003,7 +1010,7 @@ mod tests {
 
   #[test]
   fn recipe_with_multiple_dependencies() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1017,7 +1024,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("baz"),
+      document.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
         attributes: vec![],
@@ -1042,7 +1049,7 @@ mod tests {
 
   #[test]
   fn recipe_with_parameters() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       bar target $lol:
         echo \"Building {{target}}\"
@@ -1050,7 +1057,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("bar"),
+      document.find_recipe("bar"),
       Some(Recipe {
         name: "bar".into(),
         attributes: vec![],
@@ -1079,7 +1086,7 @@ mod tests {
 
   #[test]
   fn recipe_with_variadic_parameter() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       baz first +second=\"default\":
         echo \"{{first}} {{second}}\"
@@ -1087,7 +1094,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("baz"),
+      document.find_recipe("baz"),
       Some(Recipe {
         name: "baz".into(),
         attributes: vec![],
@@ -1118,7 +1125,7 @@ mod tests {
 
   #[test]
   fn recipe_without_parameters_or_dependencies() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1126,7 +1133,7 @@ mod tests {
     });
 
     assert_eq!(
-      doc.find_recipe("foo"),
+      document.find_recipe("foo"),
       Some(Recipe {
         name: "foo".into(),
         attributes: vec![],
@@ -1140,7 +1147,7 @@ mod tests {
 
   #[test]
   fn recipe_with_attributes() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       [private]
       [description: \"This is a test recipe\"]
@@ -1150,65 +1157,59 @@ mod tests {
       "
     });
 
-    let recipe = doc.find_recipe("foo").unwrap();
+    let recipe = document.find_recipe("foo").unwrap();
 
     assert_eq!(recipe.attributes.len(), 3);
 
     assert_eq!(
-      recipe.attributes[0],
-      Attribute {
-        name: TextNode {
-          value: "private".into(),
-          range: range((0, 1, 0, 8)),
-        },
-        arguments: vec![],
-        target: Some(AttributeTarget::Recipe),
-        range: range((0, 0, 1, 0)),
-      }
-    );
-
-    assert_eq!(
-      recipe.attributes[1],
-      Attribute {
-        name: TextNode {
-          value: "description".into(),
-          range: range((1, 1, 1, 12)),
-        },
-        arguments: vec![TextNode {
-          value: "\"This is a test recipe\"".into(),
-          range: range((1, 14, 1, 37)),
-        }],
-        target: Some(AttributeTarget::Recipe),
-        range: range((1, 0, 2, 0)),
-      }
-    );
-
-    assert_eq!(
-      recipe.attributes[2],
-      Attribute {
-        name: TextNode {
-          value: "tags".into(),
-          range: range((2, 1, 2, 5)),
-        },
-        arguments: vec![
-          TextNode {
-            value: "\"test\"".into(),
-            range: range((2, 6, 2, 12)),
+      recipe.attributes,
+      vec![
+        Attribute {
+          name: TextNode {
+            value: "private".into(),
+            range: range((0, 1, 0, 8)),
           },
-          TextNode {
-            value: "\"example\"".into(),
-            range: range((2, 14, 2, 23)),
-          }
-        ],
-        target: Some(AttributeTarget::Recipe),
-        range: range((2, 0, 3, 0)),
-      }
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: range((0, 0, 1, 0)),
+        },
+        Attribute {
+          name: TextNode {
+            value: "description".into(),
+            range: range((1, 1, 1, 12)),
+          },
+          arguments: vec![TextNode {
+            value: "\"This is a test recipe\"".into(),
+            range: range((1, 14, 1, 37)),
+          }],
+          target: Some(AttributeTarget::Recipe),
+          range: range((1, 0, 2, 0)),
+        },
+        Attribute {
+          name: TextNode {
+            value: "tags".into(),
+            range: range((2, 1, 2, 5)),
+          },
+          arguments: vec![
+            TextNode {
+              value: "\"test\"".into(),
+              range: range((2, 6, 2, 12)),
+            },
+            TextNode {
+              value: "\"example\"".into(),
+              range: range((2, 14, 2, 23)),
+            }
+          ],
+          target: Some(AttributeTarget::Recipe),
+          range: range((2, 0, 3, 0)),
+        }
+      ]
     );
   }
 
   #[test]
   fn list_document_attributes() {
-    let doc = document(indoc! {
+    let document = document(indoc! {
       "
       [private, description: \"desc\"]
       foo:
@@ -1228,49 +1229,114 @@ mod tests {
       "
     });
 
-    let attributes = doc.attributes();
-
-    let names_and_targets = attributes
-      .iter()
-      .map(|attr| (attr.name.value.clone(), attr.target))
-      .collect::<Vec<_>>();
+    let attributes = document.attributes();
 
     assert_eq!(
-      names_and_targets,
+      attributes,
       vec![
-        ("private".into(), Some(AttributeTarget::Recipe)),
-        ("description".into(), Some(AttributeTarget::Recipe)),
-        ("alias_attr".into(), Some(AttributeTarget::Alias)),
-        ("var_attr".into(), Some(AttributeTarget::Assignment)),
-        ("export_attr".into(), Some(AttributeTarget::Assignment)),
-        ("module_attr".into(), Some(AttributeTarget::Module)),
-      ]
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: range((0, 1, 0, 8)),
+          },
+          range: range((0, 0, 1, 0)),
+          target: Some(AttributeTarget::Recipe),
+        },
+        Attribute {
+          arguments: vec![TextNode {
+            value: "\"desc\"".into(),
+            range: range((0, 23, 0, 29)),
+          }],
+          name: TextNode {
+            value: "description".into(),
+            range: range((0, 10, 0, 21)),
+          },
+          range: range((0, 0, 1, 0)),
+          target: Some(AttributeTarget::Recipe),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "alias_attr".into(),
+            range: range((4, 1, 4, 11)),
+          },
+          range: range((4, 0, 5, 0)),
+          target: Some(AttributeTarget::Alias),
+        },
+        Attribute {
+          arguments: vec![TextNode {
+            value: "\"value\"".into(),
+            range: range((7, 10, 7, 17)),
+          }],
+          name: TextNode {
+            value: "var_attr".into(),
+            range: range((7, 1, 7, 9)),
+          },
+          range: range((7, 0, 8, 0)),
+          target: Some(AttributeTarget::Assignment),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "export_attr".into(),
+            range: range((10, 1, 10, 12)),
+          },
+          range: range((10, 0, 11, 0)),
+          target: Some(AttributeTarget::Assignment),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "module_attr".into(),
+            range: range((13, 1, 13, 12)),
+          },
+          range: range((13, 0, 14, 0)),
+          target: Some(AttributeTarget::Module),
+        },
+      ],
     );
-
-    assert_eq!(attributes[1].arguments.len(), 1);
-    assert_eq!(attributes[1].arguments[0].value, "\"desc\"");
-    assert_eq!(attributes[3].arguments.len(), 1);
-    assert_eq!(attributes[3].arguments[0].value, "\"value\"");
   }
 
   #[test]
   fn list_function_calls() {
-    let doc = document(indoc! {"
+    let document = document(indoc! {"
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
     "});
 
-    let calls = doc.function_calls();
+    let calls = document.function_calls();
 
-    assert_eq!(calls.len(), 2);
-
-    assert_eq!(calls[0].name.value, "arch");
-    assert_eq!(calls[0].arguments.len(), 0);
-
-    assert_eq!(calls[1].name.value, "env_var");
-    assert_eq!(calls[1].arguments.len(), 2);
-    assert_eq!(calls[1].arguments[0].value, "\"HOME\"");
-    assert_eq!(calls[1].arguments[1].value, "\"fallback\"");
+    assert_eq!(
+      calls,
+      vec![
+        FunctionCall {
+          arguments: vec![],
+          name: TextNode {
+            value: "arch".into(),
+            range: range((1, 9, 1, 13)),
+          },
+          range: range((1, 9, 1, 15)),
+        },
+        FunctionCall {
+          arguments: vec![
+            TextNode {
+              value: "\"HOME\"".into(),
+              range: range((2, 17, 2, 23)),
+            },
+            TextNode {
+              value: "\"fallback\"".into(),
+              range: range((2, 25, 2, 35)),
+            },
+          ],
+          name: TextNode {
+            value: "env_var".into(),
+            range: range((2, 9, 2, 16)),
+          },
+          range: range((2, 9, 2, 36)),
+        },
+      ],
+    );
   }
 }
