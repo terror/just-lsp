@@ -152,6 +152,7 @@ mod tests {
       name: "graph".into(),
       parameters: vec![],
       range: lsp::Range::default(),
+      shebang: None,
     }
   }
 
