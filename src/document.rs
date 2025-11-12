@@ -315,6 +315,14 @@ impl Document {
                 .collect()
             });
 
+          let shebang =
+            recipe_node
+              .find("recipe_body > shebang")
+              .map(|shebang_node| TextNode {
+                value: self.get_node_text(&shebang_node),
+                range: shebang_node.get_range(),
+              });
+
           Some(Recipe {
             name: recipe_name,
             attributes,
@@ -322,6 +330,7 @@ impl Document {
             content: self.get_node_text(recipe_node).trim().to_string(),
             parameters,
             range: recipe_node.get_range(),
+            shebang,
           })
         })
         .collect()
@@ -479,7 +488,8 @@ mod tests {
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         parameters: vec![],
-        range: range((0, 0, 3, 0))
+        range: range((0, 0, 3, 0)),
+        shebang: None,
       }
     );
 
@@ -491,7 +501,8 @@ mod tests {
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
         parameters: vec![],
-        range: range((3, 0, 5, 0))
+        range: range((3, 0, 5, 0)),
+        shebang: None,
       }
     );
 
@@ -855,6 +866,7 @@ mod tests {
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         range: range((0, 0, 3, 0)),
+        shebang: None,
       })
     );
 
@@ -867,6 +879,7 @@ mod tests {
         parameters: vec![],
         content: "bar:\n  echo \"bar\"".into(),
         range: range((3, 0, 5, 0)),
+        shebang: None,
       })
     );
   }
@@ -937,6 +950,7 @@ mod tests {
           "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
         range: range((0, 0, 2, 0)),
+        shebang: None,
       })
     );
   }
@@ -966,6 +980,7 @@ mod tests {
         parameters: vec![],
         content: "bar: foo\n  echo \"bar\"".into(),
         range: range((3, 0, 5, 0)),
+        shebang: None,
       })
     );
   }
@@ -1004,6 +1019,28 @@ mod tests {
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
         range: range((3, 0, 5, 0)),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_shebang() {
+    let document = document(indoc! {
+      "
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
+      "
+    });
+
+    let recipe = document.find_recipe("foo").unwrap();
+
+    assert_eq!(
+      recipe.shebang,
+      Some(TextNode {
+        value: "#!/usr/bin/env bash".into(),
+        range: range((1, 2, 1, 21)),
       })
     );
   }
@@ -1043,6 +1080,7 @@ mod tests {
         parameters: vec![],
         content: "baz: foo bar\n  echo \"baz\"".into(),
         range: range((6, 0, 8, 0)),
+        shebang: None,
       })
     );
   }
@@ -1080,6 +1118,7 @@ mod tests {
         ],
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
         range: range((0, 0, 2, 0)),
+        shebang: None,
       })
     );
   }
@@ -1119,6 +1158,7 @@ mod tests {
           "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
         range: range((0, 0, 2, 0)),
+        shebang: None,
       })
     );
   }
@@ -1141,6 +1181,7 @@ mod tests {
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         range: range((0, 0, 2, 0)),
+        shebang: None,
       })
     );
   }
