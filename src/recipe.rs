@@ -8,9 +8,19 @@ pub(crate) struct Recipe {
   pub(crate) name: String,
   pub(crate) parameters: Vec<Parameter>,
   pub(crate) range: lsp::Range,
+  pub(crate) shebang: Option<TextNode>,
 }
 
 impl Recipe {
+  #[must_use]
+  pub(crate) fn get_attributes(&self, name: &str) -> Vec<&Attribute> {
+    self
+      .attributes
+      .iter()
+      .filter(|attribute| attribute.name.value == name)
+      .collect()
+  }
+
   #[must_use]
   pub(crate) fn groups(&self) -> HashSet<Group> {
     let mut groups = HashSet::new();
@@ -28,6 +38,14 @@ impl Recipe {
     }
 
     groups
+  }
+
+  #[must_use]
+  pub(crate) fn has_attribute(&self, name: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .any(|attribute| attribute.name.value == name)
   }
 }
 
@@ -59,6 +77,7 @@ mod tests {
       name: "test".to_string(),
       attributes: vec![],
       dependencies: vec![],
+      shebang: None,
       parameters: vec![],
       content: "test:\n  echo test".to_string(),
       range: create_range(0, 0, 2, 0),
@@ -81,6 +100,7 @@ mod tests {
         range: create_range(0, 0, 1, 0),
       }],
       dependencies: vec![],
+      shebang: None,
       parameters: vec![],
       content: "[linux]\ntest:\n  echo test".to_string(),
       range: create_range(0, 0, 3, 0),
@@ -114,6 +134,7 @@ mod tests {
         },
       ],
       dependencies: vec![],
+      shebang: None,
       parameters: vec![],
       content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
       range: create_range(0, 0, 4, 0),
@@ -177,6 +198,7 @@ mod tests {
         },
       ],
       dependencies: vec![],
+      shebang: None,
       parameters: vec![],
       content:
         "[linux]\n[windows]\n[macos]\n[unix]\n[openbsd]\ntest:\n  echo test"
@@ -209,6 +231,7 @@ mod tests {
         range: create_range(0, 0, 1, 0),
       }],
       dependencies: vec![],
+      shebang: None,
       parameters: vec![],
       content: "[private]\ntest:\n  echo test".to_string(),
       range: create_range(0, 0, 3, 0),

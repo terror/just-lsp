@@ -66,7 +66,12 @@ impl InconsistentIndentationRule {
     document: &Document,
     recipe_node: &Node<'_>,
   ) -> Option<lsp::Diagnostic> {
+    if recipe_node.find("recipe_body > shebang").is_some() {
+      return None;
+    }
+
     let mut expected_indent: Option<(String, IndentKind)> = None;
+    let mut previous_line_continues = false;
 
     let header_node = recipe_node.find("recipe_header")?;
 
@@ -81,6 +86,7 @@ impl InconsistentIndentationRule {
       let line = line_text.trim_end_matches(['\r', '\n']);
 
       if line.trim().is_empty() {
+        previous_line_continues = false;
         line_idx += 1;
         continue;
       }
@@ -95,24 +101,31 @@ impl InconsistentIndentationRule {
         .collect::<String>();
 
       if indent.is_empty() {
+        previous_line_continues = false;
         line_idx += 1;
         continue;
       }
 
+      let line_continues = line.trim_end().ends_with('\\');
+
       let Some(kind) = IndentKind::from_indent(&indent) else {
+        previous_line_continues = line_continues;
         line_idx += 1;
         continue;
       };
 
       match &mut expected_indent {
-        None => expected_indent = Some((indent, kind)),
+        None => {
+          expected_indent = Some((indent, kind));
+        }
         Some((expected, expected_kind)) => {
           if *expected_kind != kind {
+            previous_line_continues = line_continues;
             line_idx += 1;
             continue;
           }
 
-          if *expected != indent {
+          if *expected != indent && !previous_line_continues {
             return Some(self.diagnostic_for_line(
               expected.as_str(),
               &indent,
@@ -122,6 +135,7 @@ impl InconsistentIndentationRule {
         }
       }
 
+      previous_line_continues = line_continues;
       line_idx += 1;
     }
 

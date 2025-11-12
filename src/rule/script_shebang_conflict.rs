@@ -13,32 +13,12 @@ impl Rule for ScriptShebangConflictRule {
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let Some(tree) = context.tree() else {
-      return Vec::new();
-    };
-
-    let root = tree.root_node();
-    let recipe_nodes = root.find_all("recipe");
-
     let mut diagnostics = Vec::new();
 
     for recipe in context.recipes() {
-      let script_attributes = recipe
-        .attributes
-        .iter()
-        .filter(|attribute| attribute.name.value == "script")
-        .collect::<Vec<_>>();
+      let script_attributes = recipe.get_attributes("script");
 
-      if script_attributes.is_empty() {
-        continue;
-      }
-
-      let has_shebang = recipe_nodes.iter().any(|node| {
-        node.get_range() == recipe.range
-          && node.find("recipe_body > shebang").is_some()
-      });
-
-      if !has_shebang {
+      if script_attributes.is_empty() || recipe.shebang.is_none() {
         continue;
       }
 
