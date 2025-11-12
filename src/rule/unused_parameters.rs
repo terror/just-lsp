@@ -116,6 +116,7 @@ impl UnusedParameterRule {
           }
 
           i += advance + 1;
+
           continue;
         }
 
