@@ -585,6 +585,34 @@ mod tests {
   }
 
   #[test]
+  fn recipe_line_continuations_allow_extra_indentation() {
+    Test::new(indoc! {
+      "
+      update-mdbook-theme:
+        curl \\
+          https://example.com/resource \\
+          > docs/theme/index.hbs
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn shebang_recipe_is_exempt_from_inconsistent_indentation() {
+    Test::new(indoc! {
+      "
+      build-docs:
+        #!/usr/bin/env bash
+        mdbook build docs -d build
+        for language in ar de; do
+          echo $language
+        done
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid() {
     Test::new(indoc! {
       "
