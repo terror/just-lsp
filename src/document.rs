@@ -377,6 +377,23 @@ mod tests {
     pretty_assertions::assert_eq,
   };
 
+  type RangeSpec = (u32, u32, u32, u32);
+
+  fn range(
+    (start_line, start_character, end_line, end_character): RangeSpec,
+  ) -> lsp::Range {
+    lsp::Range {
+      start: lsp::Position {
+        line: start_line,
+        character: start_character,
+      },
+      end: lsp::Position {
+        line: end_line,
+        character: end_character,
+      },
+    }
+  }
+
   fn document(content: &str) -> Document {
     Document::try_from(lsp::DidOpenTextDocumentParams {
       text_document: lsp::TextDocumentItem {
@@ -406,16 +423,7 @@ mod tests {
         version: 2,
       },
       content_changes: vec![lsp::TextDocumentContentChangeEvent {
-        range: Some(lsp::Range {
-          start: lsp::Position {
-            line: 1,
-            character: 7,
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 13,
-          },
-        }),
+        range: Some(range((1, 7, 1, 13))),
         range_length: None,
         text: "\"bar\"".to_string(),
       }],
@@ -471,16 +479,7 @@ mod tests {
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         parameters: vec![],
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 0
-          },
-        }
+        range: range((0, 0, 3, 0))
       }
     );
 
@@ -492,16 +491,7 @@ mod tests {
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
         parameters: vec![],
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 5,
-            character: 0
-          },
-        }
+        range: range((3, 0, 5, 0))
       }
     );
 
@@ -524,16 +514,7 @@ mod tests {
       Setting {
         name: "shell".into(),
         kind: SettingKind::Array,
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0))
       }
     );
   }
@@ -554,40 +535,13 @@ mod tests {
       Alias {
         name: TextNode {
           value: "a1".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 6
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 8
-            },
-          }
+          range: range((0, 6, 0, 8))
         },
         value: TextNode {
           value: "foo".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 12
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 15
-            },
-          }
+          range: range((0, 12, 0, 15))
         },
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 15
-          },
-        }
+        range: range((0, 0, 0, 15))
       }
     );
   }
@@ -608,16 +562,7 @@ mod tests {
       Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0))
       }
     );
   }
@@ -638,16 +583,7 @@ mod tests {
       Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0))
       }
     );
   }
@@ -669,40 +605,13 @@ mod tests {
       Alias {
         name: TextNode {
           value: "duplicate".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 6
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 15
-            },
-          }
+          range: range((0, 6, 0, 15))
         },
         value: TextNode {
           value: "foo".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 19
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 22
-            },
-          }
+          range: range((0, 19, 0, 22))
         },
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 22
-          },
-        }
+        range: range((0, 0, 0, 22))
       }
     );
 
@@ -711,40 +620,13 @@ mod tests {
       Alias {
         name: TextNode {
           value: "duplicate".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 6
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 15
-            },
-          }
+          range: range((1, 6, 1, 15))
         },
         value: TextNode {
           value: "bar".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 19
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 22
-            },
-          }
+          range: range((1, 19, 1, 22))
         },
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 1,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 22
-          },
-        }
+        range: range((1, 0, 1, 22))
       }
     );
   }
@@ -766,40 +648,13 @@ mod tests {
       Alias {
         name: TextNode {
           value: "a1".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 6
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 8
-            },
-          }
+          range: range((0, 6, 0, 8)),
         },
         value: TextNode {
           value: "foo".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 12
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 15
-            },
-          }
+          range: range((0, 12, 0, 15)),
         },
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 15
-          },
-        }
+        range: range((0, 0, 0, 15)),
       }
     );
 
@@ -808,40 +663,13 @@ mod tests {
       Alias {
         name: TextNode {
           value: "a2".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 6
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 8
-            },
-          }
+          range: range((1, 6, 1, 8)),
         },
         value: TextNode {
           value: "bar".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 12
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 15
-            },
-          }
+          range: range((1, 12, 1, 15)),
         },
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 1,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 15
-          },
-        }
+        range: range((1, 0, 1, 15)),
       }
     );
   }
@@ -864,16 +692,7 @@ mod tests {
       Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0)),
       }
     );
 
@@ -882,16 +701,7 @@ mod tests {
       Setting {
         name: "shell".into(),
         kind: SettingKind::Array,
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 1,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((1, 0, 2, 0)),
       }
     );
 
@@ -900,16 +710,7 @@ mod tests {
       Setting {
         name: "bar".into(),
         kind: SettingKind::String,
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 2,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 0
-          },
-        }
+        range: range((2, 0, 3, 0)),
       }
     );
   }
@@ -930,16 +731,7 @@ mod tests {
       Setting {
         name: "bar".into(),
         kind: SettingKind::String,
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0)),
       }
     );
   }
@@ -963,165 +755,57 @@ mod tests {
         Variable {
           name: TextNode {
             value: "tmpdir".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 0,
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 6,
-              },
-            },
+            range: range((0, 0, 0, 6)),
           },
           export: false,
           content: "tmpdir  := `mktemp -d`".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 0,
-            },
-          },
+          range: range((0, 0, 1, 0)),
         },
         Variable {
           name: TextNode {
             value: "version".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 1,
-                character: 0,
-              },
-              end: lsp::Position {
-                line: 1,
-                character: 7,
-              },
-            },
+            range: range((1, 0, 1, 7)),
           },
           export: false,
           content: "version := \"0.2.7\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 2,
-              character: 0,
-            },
-          },
+          range: range((1, 0, 2, 0)),
         },
         Variable {
           name: TextNode {
             value: "tardir".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 2,
-                character: 0,
-              },
-              end: lsp::Position {
-                line: 2,
-                character: 6,
-              },
-            },
+            range: range((2, 0, 2, 6)),
           },
           export: false,
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 2,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 3,
-              character: 0,
-            },
-          },
+          range: range((2, 0, 3, 0)),
         },
         Variable {
           name: TextNode {
             value: "tarball".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 3,
-                character: 0,
-              },
-              end: lsp::Position {
-                line: 3,
-                character: 7,
-              },
-            },
+            range: range((3, 0, 3, 7)),
           },
           export: false,
           content: "tarball := tardir + \".tar.gz\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 3,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 4,
-              character: 0,
-            },
-          },
+          range: range((3, 0, 4, 0)),
         },
         Variable {
           name: TextNode {
             value: "config".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 4,
-                character: 0,
-              },
-              end: lsp::Position {
-                line: 4,
-                character: 6,
-              },
-            },
+            range: range((4, 0, 4, 6)),
           },
           export: false,
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 4,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 5,
-              character: 0,
-            },
-          },
+          range: range((4, 0, 5, 0)),
         },
         Variable {
           name: TextNode {
             value: "EDITOR".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 5,
-                character: 7,
-              },
-              end: lsp::Position {
-                line: 5,
-                character: 13,
-              },
-            },
+            range: range((5, 7, 5, 13)),
           },
           export: true,
           content: "EDITOR := 'nvim'".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 5,
-              character: 7,
-            },
-            end: lsp::Position {
-              line: 6,
-              character: 0,
-            },
-          },
+          range: range((5, 7, 6, 0)),
         },
       ]
     );
@@ -1163,16 +847,7 @@ mod tests {
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 0
-          },
-        }
+        range: range((0, 0, 3, 0)),
       })
     );
 
@@ -1184,16 +859,7 @@ mod tests {
         dependencies: vec![],
         parameters: vec![],
         content: "bar:\n  echo \"bar\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 5,
-            character: 0
-          },
-        }
+        range: range((3, 0, 5, 0)),
       })
     );
   }
@@ -1250,47 +916,20 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "first".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 4
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 9
-              },
-            }
+            range: range((0, 4, 0, 9)),
           },
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Normal,
             default_value: Some("\"default\"".into()),
             content: "second=\"default\"".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 10
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 26
-              },
-            }
+            range: range((0, 10, 0, 26)),
           }
         ],
         content:
           "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((0, 0, 2, 0)),
       })
     );
   }
@@ -1315,29 +954,11 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![],
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 3,
-              character: 5
-            },
-            end: lsp::Position {
-              line: 3,
-              character: 8
-            },
-          }
+          range: range((3, 5, 3, 8)),
         }],
         parameters: vec![],
         content: "bar: foo\n  echo \"bar\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 5,
-            character: 0
-          },
-        }
+        range: range((3, 0, 5, 0)),
       })
     );
   }
@@ -1364,54 +985,18 @@ mod tests {
           arguments: vec![
             TextNode {
               value: "'value1'".into(),
-              range: lsp::Range {
-                start: lsp::Position {
-                  line: 3,
-                  character: 10
-                },
-                end: lsp::Position {
-                  line: 3,
-                  character: 18
-                },
-              }
+              range: range((3, 10, 3, 18)),
             },
             TextNode {
               value: "'value2'".into(),
-              range: lsp::Range {
-                start: lsp::Position {
-                  line: 3,
-                  character: 19
-                },
-                end: lsp::Position {
-                  line: 3,
-                  character: 27
-                },
-              }
+              range: range((3, 19, 3, 27)),
             }
           ],
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 3,
-              character: 5
-            },
-            end: lsp::Position {
-              line: 3,
-              character: 28
-            },
-          }
+          range: range((3, 5, 3, 28)),
         }],
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 5,
-            character: 0
-          },
-        }
+        range: range((3, 0, 5, 0)),
       })
     );
   }
@@ -1440,44 +1025,17 @@ mod tests {
           Dependency {
             name: "foo".into(),
             arguments: vec![],
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 6,
-                character: 5
-              },
-              end: lsp::Position {
-                line: 6,
-                character: 8
-              },
-            }
+            range: range((6, 5, 6, 8)),
           },
           Dependency {
             name: "bar".into(),
             arguments: vec![],
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 6,
-                character: 9
-              },
-              end: lsp::Position {
-                line: 6,
-                character: 12
-              },
-            }
+            range: range((6, 9, 6, 12)),
           }
         ],
         parameters: vec![],
         content: "baz: foo bar\n  echo \"baz\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 6,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 8,
-            character: 0
-          },
-        }
+        range: range((6, 0, 8, 0)),
       })
     );
   }
@@ -1503,45 +1061,18 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "target".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 4
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 10
-              },
-            }
+            range: range((0, 4, 0, 10)),
           },
           Parameter {
             name: "lol".into(),
             kind: ParameterKind::Export,
             default_value: None,
             content: "$lol".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 11
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 15
-              },
-            }
+            range: range((0, 11, 0, 15)),
           }
         ],
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((0, 0, 2, 0)),
       })
     );
   }
@@ -1567,47 +1098,20 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "first".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 4
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 9
-              },
-            }
+            range: range((0, 4, 0, 9)),
           },
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Variadic(VariadicType::OneOrMore),
             default_value: Some("\"default\"".into()),
             content: "+second=\"default\"".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 0,
-                character: 10
-              },
-              end: lsp::Position {
-                line: 0,
-                character: 27
-              },
-            }
+            range: range((0, 10, 0, 27)),
           }
         ],
         content:
           "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((0, 0, 2, 0)),
       })
     );
   }
@@ -1629,16 +1133,7 @@ mod tests {
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((0, 0, 2, 0)),
       })
     );
   }
@@ -1664,29 +1159,11 @@ mod tests {
       Attribute {
         name: TextNode {
           value: "private".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 1
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 8
-            },
-          }
+          range: range((0, 1, 0, 8)),
         },
         arguments: vec![],
         target: Some(AttributeTarget::Recipe),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 1,
-            character: 0
-          },
-        }
+        range: range((0, 0, 1, 0)),
       }
     );
 
@@ -1695,41 +1172,14 @@ mod tests {
       Attribute {
         name: TextNode {
           value: "description".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 1
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 12
-            },
-          }
+          range: range((1, 1, 1, 12)),
         },
         arguments: vec![TextNode {
           value: "\"This is a test recipe\"".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 14
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 37
-            },
-          }
+          range: range((1, 14, 1, 37)),
         }],
         target: Some(AttributeTarget::Recipe),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 1,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 0
-          },
-        }
+        range: range((1, 0, 2, 0)),
       }
     );
 
@@ -1738,56 +1188,20 @@ mod tests {
       Attribute {
         name: TextNode {
           value: "tags".into(),
-          range: lsp::Range {
-            start: lsp::Position {
-              line: 2,
-              character: 1
-            },
-            end: lsp::Position {
-              line: 2,
-              character: 5
-            },
-          }
+          range: range((2, 1, 2, 5)),
         },
         arguments: vec![
           TextNode {
             value: "\"test\"".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 2,
-                character: 6
-              },
-              end: lsp::Position {
-                line: 2,
-                character: 12
-              },
-            }
+            range: range((2, 6, 2, 12)),
           },
           TextNode {
             value: "\"example\"".into(),
-            range: lsp::Range {
-              start: lsp::Position {
-                line: 2,
-                character: 14
-              },
-              end: lsp::Position {
-                line: 2,
-                character: 23
-              },
-            }
+            range: range((2, 14, 2, 23)),
           }
         ],
         target: Some(AttributeTarget::Recipe),
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 2,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 0
-          },
-        }
+        range: range((2, 0, 3, 0)),
       }
     );
   }
