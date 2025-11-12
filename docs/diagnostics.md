@@ -1,4 +1,4 @@
-# Diagnostics
+## Diagnostics
 
 `just-lsp` runs the following diagnostics on every open document (see
 `src/analyzer.rs`). Each rule emits a Language Server Protocol diagnostic with
