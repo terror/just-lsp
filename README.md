@@ -40,6 +40,11 @@ Otherwise, see below for the complete package list:
       <td><a href=https://crates.io/crates/just-lsp>just-lsp</a></td>
       <td><code>cargo install just-lsp</code></td>
     </tr>
+    <tr>
+      <td><a href=https://brew.sh>Homebrew</a></td>
+      <td><a href=https://github.com/terror/homebrew-tap>terror/tap/just-lsp</a></td>
+      <td><code>brew install terror/tap/just-lsp</code></td>
+    </tr>
   </tbody>
 </table>
 
