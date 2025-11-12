@@ -275,20 +275,19 @@ impl Document {
                   let dependency_name =
                     self.get_node_text(&dependency_node.find("identifier")?);
 
-                  let arguments = if let Some(dep_expr_node) =
-                    dependency_node.find("dependency_expression")
-                  {
-                    dep_expr_node
-                      .find_all("^expression")
-                      .iter()
-                      .map(|argument_node| TextNode {
-                        value: self.get_node_text(argument_node),
-                        range: argument_node.get_range(),
-                      })
-                      .collect::<Vec<_>>()
-                  } else {
-                    vec![]
-                  };
+                  let arguments = dependency_node
+                    .find("dependency_expression")
+                    .map(|dependency_expression_node| {
+                      dependency_expression_node
+                        .find_all("^expression")
+                        .iter()
+                        .map(|argument_node| TextNode {
+                          value: self.get_node_text(argument_node),
+                          range: argument_node.get_range(),
+                        })
+                        .collect()
+                    })
+                    .unwrap_or_default();
 
                   Some(Dependency {
                     name: dependency_name,
@@ -306,10 +305,10 @@ impl Document {
               parameters_node
                 .find_all("^parameter, ^variadic_parameter")
                 .iter()
-                .filter_map(|param_node| {
+                .filter_map(|parameter_node| {
                   Parameter::parse(
-                    &self.get_node_text(param_node),
-                    param_node.get_range(),
+                    &self.get_node_text(parameter_node),
+                    parameter_node.get_range(),
                   )
                 })
                 .collect()
