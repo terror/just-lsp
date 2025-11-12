@@ -71,7 +71,7 @@ mod tests {
 
   #[derive(Debug)]
   enum Message<'a> {
-    Range { text: &'a str, range: RangeSpec },
+    Scoped { text: &'a str, range: RangeSpec },
     Text(&'a str),
   }
 
@@ -115,6 +115,14 @@ mod tests {
 
       let diagnostics = analyzer.analyze();
 
+      assert_eq!(
+        diagnostics.len(),
+        messages.len(),
+        "Expected diagnostics {:?} but got {:?}",
+        messages,
+        diagnostics,
+      );
+
       for (diagnostic, (expected_message, expected_severity)) in
         diagnostics.into_iter().zip(messages.into_iter())
       {
@@ -122,7 +130,7 @@ mod tests {
 
         match expected_message {
           Text(expected) => assert_eq!(diagnostic.message, *expected),
-          Range { text, range } => {
+          Scoped { text, range } => {
             assert_eq!(diagnostic.message, *text);
             assert_eq!(diagnostic.range, to_lsp_range(range));
           }
@@ -167,11 +175,11 @@ mod tests {
       alias bar := foo
       "
     })
-    .error(Range {
+    .error(Message::Scoped {
       text: "Duplicate alias `bar`",
       range: (4, 0, 4, 16),
     })
-    .error(Range {
+    .error(Message::Scoped {
       text: "Duplicate alias `bar`",
       range: (5, 0, 5, 16),
     })
@@ -188,7 +196,7 @@ mod tests {
       alias bar := baz
       "
     })
-    .error(Text("Recipe `baz` not found"))
+    .error(Message::Text("Recipe `baz` not found"))
     .run();
   }
 
@@ -205,7 +213,7 @@ mod tests {
       alias t := other
       "
     })
-    .error(Text("Recipe `t` is redefined as an alias"))
+    .error(Message::Text("Recipe `t` is redefined as an alias"))
     .run();
   }
 
@@ -222,7 +230,7 @@ mod tests {
         echo \"recipe\"
       "
     })
-    .error(Text("Alias `t` is redefined as a recipe"))
+    .error(Message::Text("Alias `t` is redefined as a recipe"))
     .run();
   }
 
@@ -239,8 +247,8 @@ mod tests {
       alias baz := nonexistent
       "
     })
-    .error(Text("Recipe `nonexistent` not found"))
-    .error(Text("Recipe `missing` not found"))
+    .error(Message::Text("Recipe `nonexistent` not found"))
+    .error(Message::Text("Recipe `missing` not found"))
     .run();
   }
 
@@ -279,7 +287,7 @@ mod tests {
         echo \"ci\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module"),
     )
     .run();
@@ -295,7 +303,7 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module"),
     )
     .run();
@@ -310,7 +318,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Attribute `linux` got 1 argument but takes 0 arguments",
     ))
     .run();
@@ -322,7 +330,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Attribute `default` got 1 argument but takes 0 arguments",
     ))
     .run();
@@ -337,7 +345,9 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Attribute `doc` got 0 arguments but takes 1 argument"))
+    .error(Message::Text(
+      "Attribute `doc` got 0 arguments but takes 1 argument",
+    ))
     .run();
   }
 
@@ -391,7 +401,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Unknown attribute `unknown_attribute`"))
+    .error(Message::Text("Unknown attribute `unknown_attribute`"))
     .run();
   }
 
@@ -405,7 +415,7 @@ mod tests {
         echo \"publish\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `publish` has both shebang line and `[script]` attribute",
     ))
     .run();
@@ -434,7 +444,9 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Attribute `group` cannot be applied to alias target"))
+    .error(Message::Text(
+      "Attribute `group` cannot be applied to alias target",
+    ))
     .run();
   }
 
@@ -447,7 +459,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Unknown attribute `foo`"))
+    .error(Message::Text("Unknown attribute `foo`"))
     .run();
   }
 
@@ -483,7 +495,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Attribute `group` got 2 arguments but takes 1 argument",
     ))
     .run();
@@ -541,7 +553,7 @@ mod tests {
         echo {{ replace() }}
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Function `replace` requires at least 3 arguments, but 0 provided",
     ))
     .run();
@@ -555,7 +567,7 @@ mod tests {
         echo {{ uppercase(\"hello\", \"extra\") }}
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Function `uppercase` accepts 1 argument, but 2 provided",
     ))
     .run();
@@ -569,7 +581,7 @@ mod tests {
         echo {{ unknown_function() }}
       "
     })
-    .error(Text("Unknown function `unknown_function`"))
+    .error(Message::Text("Unknown function `unknown_function`"))
     .run();
   }
 
@@ -592,7 +604,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Syntax error"))
+    .error(Message::Text("Syntax error"))
     .run();
   }
 
@@ -605,7 +617,9 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text("Recipe `foo` mixes tabs and spaces for indentation"))
+    .error(Message::Text(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+    ))
     .run();
   }
 
@@ -617,14 +631,16 @@ mod tests {
    \t  echo \"foo\"
       "
     })
-    .error(Text("Recipe `foo` mixes tabs and spaces for indentation"))
+    .error(Message::Text(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+    ))
     .run();
   }
 
   #[test]
   fn recipe_inconsistent_indentation_between_lines() {
     Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
-    .error(Text(
+    .error(Message::Text(
       "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`"),
     )
     .run();
@@ -699,7 +715,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text("Recipe `baz` not found"))
+    .error(Message::Text("Recipe `baz` not found"))
     .run();
   }
 
@@ -714,8 +730,8 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text("Recipe `missing1` not found"))
-    .error(Text("Recipe `missing2` not found"))
+    .error(Message::Text("Recipe `missing1` not found"))
+    .error(Message::Text("Recipe `missing2` not found"))
     .run();
   }
 
@@ -744,7 +760,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Dependency `foo` requires 2 arguments, but 0 provided",
     ))
     .run();
@@ -761,7 +777,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Dependency `foo` requires 2 arguments, but 1 provided",
     ))
     .run();
@@ -778,7 +794,9 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text("Dependency `foo` accepts 1 argument, but 3 provided"))
+    .error(Message::Text(
+      "Dependency `foo` accepts 1 argument, but 3 provided",
+    ))
     .run();
   }
 
@@ -793,7 +811,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text("Variable `wow` not found"))
+    .error(Message::Text("Variable `wow` not found"))
     .run();
   }
 
@@ -874,7 +892,7 @@ mod tests {
         echo \"{{arg1}}\"
       "
     })
-    .error(Text("Duplicate parameter `arg1`"))
+    .error(Message::Text("Duplicate parameter `arg1`"))
     .run();
   }
 
@@ -886,7 +904,7 @@ mod tests {
         echo \"{{arg1}} {{arg2}}\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Required parameter `arg2` follows a parameter with a default value",
     ))
     .run();
@@ -951,7 +969,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Setting `export` expects a boolean value"))
+    .error(Message::Text("Setting `export` expects a boolean value"))
     .run();
   }
 
@@ -967,7 +985,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Duplicate setting `export`"))
+    .error(Message::Text("Duplicate setting `export`"))
     .run();
   }
 
@@ -984,8 +1002,8 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Unknown setting `unknown-setting`"))
-    .error(Text("Duplicate setting `export`"))
+    .error(Message::Text("Unknown setting `unknown-setting`"))
+    .error(Message::Text("Duplicate setting `export`"))
     .run();
   }
 
@@ -1012,7 +1030,9 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Setting `dotenv-path` expects a string value"))
+    .error(Message::Text(
+      "Setting `dotenv-path` expects a string value",
+    ))
     .run();
   }
 
@@ -1026,7 +1046,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Unknown setting `unknown-setting`"))
+    .error(Message::Text("Unknown setting `unknown-setting`"))
     .run();
   }
 
@@ -1051,7 +1071,7 @@ mod tests {
         echo {{ var }}
       "
     })
-    .error(Text("Variable `var` not found"))
+    .error(Message::Text("Variable `var` not found"))
     .run();
   }
 
@@ -1063,7 +1083,7 @@ mod tests {
         echo foo
       "
     })
-    .warning(Text("Parameter `bar` appears unused"))
+    .warning(Message::Text("Parameter `bar` appears unused"))
     .run();
 
     Test::new(indoc! {
@@ -1082,7 +1102,7 @@ mod tests {
         echo foo
       "
     })
-    .warning(Text("Parameter `bar` appears unused"))
+    .warning(Message::Text("Parameter `bar` appears unused"))
     .run();
 
     Test::new(indoc! {
@@ -1129,7 +1149,7 @@ mod tests {
         ./bin/graph $1
       "
     })
-    .warning(Text("Parameter `log` appears unused"))
+    .warning(Message::Text("Parameter `log` appears unused"))
     .run();
   }
 
@@ -1143,7 +1163,7 @@ mod tests {
         ./bin/graph $2
       "
     })
-    .warning(Text("Parameter `first` appears unused"))
+    .warning(Message::Text("Parameter `first` appears unused"))
     .run();
   }
 
@@ -1161,6 +1181,23 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_setting_handles_multiple_parameters_unused() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third fourth:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .warning(Message::Scoped {
+      text: "Parameter `fourth` appears unused",
+      range: (2, 25, 2, 31),
+    })
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_attribute_scope_is_limited() {
     Test::new(indoc! {
       "
@@ -1172,7 +1209,7 @@ mod tests {
         ./bin/graph $1
       "
     })
-    .warning(Text("Parameter `data` appears unused"))
+    .warning(Message::Text("Parameter `data` appears unused"))
     .run();
   }
 
@@ -1190,8 +1227,8 @@ mod tests {
         echo foo
       "
     })
-    .error(Text("Duplicate recipe name `foo`"))
-    .error(Text("Duplicate recipe name `foo`"))
+    .error(Message::Text("Duplicate recipe name `foo`"))
+    .error(Message::Text("Duplicate recipe name `foo`"))
     .run();
   }
 
@@ -1206,7 +1243,7 @@ mod tests {
         echo {{ bar }}
       "
     })
-    .warning(Text("Variable `foo` appears unused"))
+    .warning(Message::Text("Variable `foo` appears unused"))
     .run();
   }
 
@@ -1221,7 +1258,7 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .error(Text("Duplicate variable `foo`"))
+    .error(Message::Text("Duplicate variable `foo`"))
     .run();
   }
 
@@ -1289,7 +1326,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning(Text("Variable `unused` appears unused"))
+    .warning(Message::Text("Variable `unused` appears unused"))
     .run();
   }
 
@@ -1350,7 +1387,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .error(Text("Variable `foo` not found"))
+    .error(Message::Text("Variable `foo` not found"))
     .run();
   }
 
@@ -1368,7 +1405,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning(Text("Variable `unused_var` appears unused"))
+    .warning(Message::Text("Variable `unused_var` appears unused"))
     .run();
   }
 
@@ -1385,7 +1422,7 @@ mod tests {
         echo {{ other }}
       "
     })
-    .warning(Text("Variable `param` appears unused"))
+    .warning(Message::Text("Variable `param` appears unused"))
     .run();
   }
 
@@ -1407,7 +1444,7 @@ mod tests {
         echo {{ only_in_second }}
       "
     })
-    .warning(Text("Variable `never_used` appears unused"))
+    .warning(Message::Text("Variable `never_used` appears unused"))
     .run();
   }
 
@@ -1423,7 +1460,7 @@ mod tests {
         echo {{ baz }}
       "
     })
-    .warning(Text("Variable `foo` appears unused"))
+    .warning(Message::Text("Variable `foo` appears unused"))
     .run();
   }
 
@@ -1460,7 +1497,7 @@ mod tests {
         echo \"Building on Linux version 2\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1476,7 +1513,7 @@ mod tests {
         echo \"Building on any OS\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1492,7 +1529,7 @@ mod tests {
         echo \"Building on every OS\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1509,7 +1546,7 @@ mod tests {
         echo \"Building on macOS specifically\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1542,7 +1579,7 @@ mod tests {
         echo \"Building on Unix systems\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1600,7 +1637,7 @@ mod tests {
         echo \"Building on macOS\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1618,7 +1655,7 @@ mod tests {
         echo \"Building on Linux again\"
       "
     })
-    .error(Text("Duplicate recipe name `build`"))
+    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
@@ -1649,7 +1686,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Text("Recipe `foo` depends on itself"))
+    .error(Message::Text("Recipe `foo` depends on itself"))
     .run();
   }
 
@@ -1664,10 +1701,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `foo` has circular dependency `foo -> bar -> foo`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `bar` has circular dependency `bar -> foo -> bar`",
     ))
     .run();
@@ -1687,13 +1724,13 @@ mod tests {
         echo \"baz\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`",
     ))
     .run();
@@ -1713,10 +1750,10 @@ mod tests {
         echo \"baz\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `bar` has circular dependency `bar -> baz -> bar`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `baz` has circular dependency `baz -> bar -> baz`",
     ))
     .run();
@@ -1739,13 +1776,13 @@ mod tests {
         echo \"qux\"
       "
     })
-    .error(Text(
+    .error(Message::Text(
       "Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`",
     ))
     .run();
@@ -1771,15 +1808,19 @@ mod tests {
         echo \"z\"
       "
     })
-    .error(Text("Recipe `a` has circular dependency `a -> b -> a`"))
-    .error(Text("Recipe `b` has circular dependency `b -> a -> b`"))
-    .error(Text(
+    .error(Message::Text(
+      "Recipe `a` has circular dependency `a -> b -> a`",
+    ))
+    .error(Message::Text(
+      "Recipe `b` has circular dependency `b -> a -> b`",
+    ))
+    .error(Message::Text(
       "Recipe `x` has circular dependency `x -> y -> z -> x`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `y` has circular dependency `y -> z -> x -> y`",
     ))
-    .error(Text(
+    .error(Message::Text(
       "Recipe `z` has circular dependency `z -> x -> y -> z`",
     ))
     .run();
