@@ -1040,6 +1040,31 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_setting_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn duplicate_recipe_names() {
     Test::new(indoc! {
       "
