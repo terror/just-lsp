@@ -52,9 +52,26 @@ impl<'a> Analyzer<'a> {
 mod tests {
   use {super::*, Message::*, indoc::indoc, pretty_assertions::assert_eq};
 
+  type RangeSpec = (u32, u32, u32, u32);
+
+  fn to_lsp_range(
+    (start_line, start_character, end_line, end_character): RangeSpec,
+  ) -> lsp::Range {
+    lsp::Range {
+      start: lsp::Position {
+        line: start_line,
+        character: start_character,
+      },
+      end: lsp::Position {
+        line: end_line,
+        character: end_character,
+      },
+    }
+  }
+
   #[derive(Debug)]
   enum Message<'a> {
-    Range { text: &'a str, range: lsp::Range },
+    Range { text: &'a str, range: RangeSpec },
     Text(&'a str),
   }
 
@@ -107,7 +124,7 @@ mod tests {
           Text(expected) => assert_eq!(diagnostic.message, *expected),
           Range { text, range } => {
             assert_eq!(diagnostic.message, *text);
-            assert_eq!(diagnostic.range, range.clone());
+            assert_eq!(diagnostic.range, to_lsp_range(range));
           }
         }
       }
@@ -150,8 +167,14 @@ mod tests {
       alias bar := foo
       "
     })
-    .error(Text("Duplicate alias `bar`"))
-    .error(Text("Duplicate alias `bar`"))
+    .error(Range {
+      text: "Duplicate alias `bar`",
+      range: (4, 0, 4, 16),
+    })
+    .error(Range {
+      text: "Duplicate alias `bar`",
+      range: (5, 0, 5, 16),
+    })
     .run();
   }
 
