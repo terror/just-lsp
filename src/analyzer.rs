@@ -54,7 +54,7 @@ mod tests {
 
   type RangeSpec = (u32, u32, u32, u32);
 
-  fn range(
+  fn to_lsp_range(
     (start_line, start_character, end_line, end_character): RangeSpec,
   ) -> lsp::Range {
     lsp::Range {
@@ -132,7 +132,7 @@ mod tests {
           Text(expected) => assert_eq!(diagnostic.message, *expected),
           Scoped { text, range } => {
             assert_eq!(diagnostic.message, *text);
-            assert_eq!(diagnostic.range, range(range));
+            assert_eq!(diagnostic.range, to_lsp_range(range));
           }
         }
       }
