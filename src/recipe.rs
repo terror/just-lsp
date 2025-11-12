@@ -29,6 +29,14 @@ impl Recipe {
 
     groups
   }
+
+  #[must_use]
+  pub(crate) fn has_attribute(&self, name: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .any(|attribute| attribute.name.value == name)
+  }
 }
 
 #[cfg(test)]

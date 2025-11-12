@@ -1040,6 +1040,86 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_setting_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_disabled_still_warns() {
+    Test::new(indoc! {
+      "
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .warning("Parameter `log` appears unused")
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_only_mark_used_indices() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second:
+        ./bin/graph $2
+      "
+    })
+    .warning("Parameter `first` appears unused")
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_handles_multiple_parameters() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_scope_is_limited() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+
+      other data:
+        ./bin/graph $1
+      "
+    })
+    .warning("Parameter `data` appears unused")
+    .run();
+  }
+
+  #[test]
   fn duplicate_recipe_names() {
     Test::new(indoc! {
       "
