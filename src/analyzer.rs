@@ -353,6 +353,20 @@ mod tests {
   }
 
   #[test]
+  fn attributes_duplicate_group_attribute() {
+    Test::new(indoc! {
+      "
+      [group('dev')]
+      [group('dev')]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `group` is duplicated"))
+    .run();
+  }
+
+  #[test]
   fn attributes_extra_arguments() {
     Test::new(indoc! {
       "

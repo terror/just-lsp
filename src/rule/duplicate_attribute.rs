@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, Debug)]
 enum DuplicateScope {
   /// Attribute must be unique within the entire document.
   Module,
@@ -8,108 +8,119 @@ enum DuplicateScope {
   Recipe,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum DuplicateKey {
+  Name,
+  Argument,
+}
+
+#[derive(Debug)]
 struct DuplicateConstraint {
   name: &'static str,
   scope: DuplicateScope,
+  key: DuplicateKey,
 }
 
 const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
   DuplicateConstraint {
     name: "default",
     scope: DuplicateScope::Module,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "confirm",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "doc",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "extension",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "metadata",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
+    name: "group",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Argument,
   },
   DuplicateConstraint {
     name: "linux",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "macos",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "no-cd",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "no-exit-message",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "no-quiet",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "openbsd",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "parallel",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "positional-arguments",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "private",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "script",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "unix",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "windows",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
   DuplicateConstraint {
     name: "working-directory",
     scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
   },
 ];
 
 /// Reports duplicate usages of attributes that must be unique.
 pub(crate) struct DuplicateAttributeRule;
-
-impl DuplicateAttributeRule {
-  fn constraint(name: &str) -> Option<&'static DuplicateConstraint> {
-    DUPLICATE_CONSTRAINTS
-      .iter()
-      .find(|constraint| constraint.name == name)
-  }
-
-  fn message(constraint: &DuplicateConstraint, recipe: &Recipe) -> String {
-    match constraint.scope {
-      DuplicateScope::Module => format!(
-        "Recipe `{}` has duplicate `[{}]` attribute, which may only appear once per module",
-        recipe.name, constraint.name
-      ),
-      DuplicateScope::Recipe => {
-        format!("Recipe attribute `{}` is duplicated", constraint.name)
-      }
-    }
-  }
-}
 
 impl Rule for DuplicateAttributeRule {
   fn display_name(&self) -> &'static str {
@@ -122,10 +133,13 @@ impl Rule for DuplicateAttributeRule {
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
     let mut diagnostics = Vec::new();
-    let mut module_seen: HashSet<&'static str> = HashSet::new();
+
+    let mut module_seen: HashMap<&'static str, HashSet<String>> =
+      HashMap::new();
 
     for recipe in context.recipes() {
-      let mut recipe_seen: HashSet<&'static str> = HashSet::new();
+      let mut recipe_seen: HashMap<&'static str, HashSet<String>> =
+        HashMap::new();
 
       for attribute in &recipe.attributes {
         let attribute_name = attribute.name.value.as_str();
@@ -134,12 +148,20 @@ impl Rule for DuplicateAttributeRule {
           continue;
         };
 
-        let already_seen = match constraint.scope {
-          DuplicateScope::Module => !module_seen.insert(constraint.name),
-          DuplicateScope::Recipe => !recipe_seen.insert(constraint.name),
+        let Some(key) = Self::key(constraint, attribute) else {
+          continue;
         };
 
-        if already_seen {
+        let seen = match constraint.scope {
+          DuplicateScope::Module => module_seen
+            .entry(constraint.name)
+            .or_insert_with(HashSet::new),
+          DuplicateScope::Recipe => recipe_seen
+            .entry(constraint.name)
+            .or_insert_with(HashSet::new),
+        };
+
+        if !seen.insert(key.clone()) {
           diagnostics.push(self.diagnostic(lsp::Diagnostic {
             range: attribute.range,
             severity: Some(lsp::DiagnosticSeverity::ERROR),
@@ -151,5 +173,38 @@ impl Rule for DuplicateAttributeRule {
     }
 
     diagnostics
+  }
+}
+
+impl DuplicateAttributeRule {
+  fn constraint(name: &str) -> Option<&'static DuplicateConstraint> {
+    DUPLICATE_CONSTRAINTS
+      .iter()
+      .find(|constraint| constraint.name == name)
+  }
+
+  fn key(
+    constraint: &DuplicateConstraint,
+    attribute: &Attribute,
+  ) -> Option<String> {
+    match constraint.key {
+      DuplicateKey::Name => Some(attribute.name.value.clone()),
+      DuplicateKey::Argument => attribute
+        .arguments
+        .first()
+        .map(|argument| argument.value.clone()),
+    }
+  }
+
+  fn message(constraint: &DuplicateConstraint, recipe: &Recipe) -> String {
+    match constraint.scope {
+      DuplicateScope::Module => format!(
+        "Recipe `{}` has duplicate `[{}]` attribute, which may only appear once per module",
+        recipe.name, constraint.name
+      ),
+      DuplicateScope::Recipe => {
+        format!("Recipe attribute `{}` is duplicated", constraint.name)
+      }
+    }
   }
 }
