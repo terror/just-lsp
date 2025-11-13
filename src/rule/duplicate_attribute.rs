@@ -10,15 +10,15 @@ enum DuplicateScope {
 
 #[derive(Clone, Copy, Debug)]
 enum DuplicateKey {
-  Name,
   Argument,
+  Name,
 }
 
 #[derive(Debug)]
 struct DuplicateConstraint {
+  key: DuplicateKey,
   name: &'static str,
   scope: DuplicateScope,
-  key: DuplicateKey,
 }
 
 const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
@@ -153,12 +153,12 @@ impl Rule for DuplicateAttributeRule {
         };
 
         let seen = match constraint.scope {
-          DuplicateScope::Module => module_seen
-            .entry(constraint.name)
-            .or_insert_with(HashSet::new),
-          DuplicateScope::Recipe => recipe_seen
-            .entry(constraint.name)
-            .or_insert_with(HashSet::new),
+          DuplicateScope::Module => {
+            module_seen.entry(constraint.name).or_default()
+          }
+          DuplicateScope::Recipe => {
+            recipe_seen.entry(constraint.name).or_default()
+          }
         };
 
         if !seen.insert(key.clone()) {
