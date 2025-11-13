@@ -381,7 +381,7 @@ impl Document {
 #[cfg(test)]
 mod tests {
   use {
-    super::*, indoc::indoc, parameter::VariadicType,
+    super::*, crate::rope_ext::RopeExt, indoc::indoc, parameter::VariadicType,
     pretty_assertions::assert_eq,
   };
 
@@ -914,6 +914,28 @@ mod tests {
 
     assert_eq!(node.kind(), "text");
     assert_eq!(document.get_node_text(&node), "echo \"bar\"");
+  }
+
+  #[test]
+  fn node_at_position_handles_emojis() {
+    let document = document(indoc! {"
+      foo:
+        \"😀 emoji\"
+    "});
+
+    let byte_offset = document
+      .content
+      .to_string()
+      .find("emoji")
+      .unwrap();
+
+    let position = document.content.byte_to_lsp_position(byte_offset);
+
+    let node = document
+      .node_at_position(position).unwrap();
+
+    assert_eq!(node.kind(), "text");
+    assert_eq!(document.get_node_text(&node), "\"😀 emoji\"");
   }
 
   #[test]

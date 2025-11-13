@@ -1,8 +1,8 @@
 //! Extensions that bridge `ropey::Rope` with Language Server Protocol positions
 //! and tree-sitter edit bookkeeping.
 //!
-//! The [`RopeExt`] trait is used inside `just-lsp` to keep three different
-//! coordinate spaces (bytes, UTF-16 code units, and tree-sitter points) in sync
+//! The [`RopeExt`] trait is used inside `just-lsp` to keep multiple coordinate
+//! spaces (bytes, Unicode scalar indices, and tree-sitter points) in sync
 //! whenever an editor sends a `textDocument/didChange` notification.
 //!
 //! ```
@@ -37,8 +37,6 @@ pub(crate) struct Position {
   pub(crate) byte: usize,
   /// Absolute Unicode scalar index used by `ropey` for slicing.
   pub(crate) char: usize,
-  /// Absolute UTF-16 code-unit offset for LSP column conversions.
-  pub(crate) code: usize,
   /// Tree-sitter line/column (column measured in bytes from line start).
   pub(crate) point: Point,
 }
@@ -50,7 +48,6 @@ impl From<&Rope> for Position {
     Self {
       byte: end_byte,
       char: end_char,
-      code: value.char_to_utf16_cu(end_char),
       point: value.byte_to_tree_sitter_point(end_byte),
     }
   }
@@ -81,20 +78,20 @@ pub(crate) trait RopeExt {
   ) -> Edit<'a>;
 
   /// Maps an absolute byte offset into an LSP line/character pair where the
-  /// column is expressed in UTF-16 code units as required by the spec.
+  /// column is expressed in UTF-8 bytes (per the server's advertised encoding).
   fn byte_to_lsp_position(&self, offset: usize) -> lsp::Position;
 
   /// Maps an absolute byte offset into a tree-sitter [`Point`] (line and utf8
   /// column measured in bytes).
   fn byte_to_tree_sitter_point(&self, offset: usize) -> Point;
 
-  /// Converts an LSP position back into absolute byte/char/code offsets and a
+  /// Converts an LSP position back into absolute byte/char offsets and a
   /// tree-sitter point so downstream consumers can choose whichever coordinate
   /// space they need.
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
 
-  /// Converts an LSP `Range` (UTF-16 line/column pairs) into our richer
-  /// [`Position`] objects so we know the corresponding byte/char/code/point
+  /// Converts an LSP `Range` (UTF-8 line/column pairs) into our richer
+  /// [`Position`] objects so we know the corresponding byte/char/point
   /// offsets for both the start and end of the change span.
   fn lsp_range_to_range(&self, range: lsp::Range) -> (Position, Position) {
     (
@@ -144,17 +141,12 @@ impl RopeExt for Rope {
   fn byte_to_lsp_position(&self, byte_idx: usize) -> lsp::Position {
     let line_idx = self.byte_to_line(byte_idx);
 
-    let line_char_idx = self.line_to_char(line_idx);
-    let line_utf16_cu_idx = self.char_to_utf16_cu(line_char_idx);
-
-    let char_idx = self.byte_to_char(byte_idx);
-    let char_utf16_cu_idx = self.char_to_utf16_cu(char_idx);
-
-    let character = char_utf16_cu_idx - line_utf16_cu_idx;
+    let line_start_byte = self.line_to_byte(line_idx);
 
     lsp::Position::new(
       u32::try_from(line_idx).expect("line index exceeds u32::MAX"),
-      u32::try_from(character).expect("character offset exceeds u32::MAX"),
+      u32::try_from(byte_idx.saturating_sub(line_start_byte))
+        .expect("character offset exceeds u32::MAX"),
     )
   }
 
@@ -172,23 +164,16 @@ impl RopeExt for Rope {
       cmp::min(position.line as usize, line_count - 1)
     };
 
-    let row_char_idx = self.line_to_char(row_idx);
     let row_byte_idx = self.line_to_byte(row_idx);
-    let row_code_idx = self.char_to_utf16_cu(row_char_idx);
 
-    let col_code_offset = cmp::min(
-      position.character as usize,
-      self.line(row_idx).len_utf16_cu(),
-    );
+    let col_byte_offset =
+      cmp::min(position.character as usize, self.line(row_idx).len_bytes());
 
-    let col_code_idx = row_code_idx + col_code_offset;
-    let col_char_idx = self.utf16_cu_to_char(col_code_idx);
-    let col_byte_idx = self.char_to_byte(col_char_idx);
+    let col_byte_idx = row_byte_idx + col_byte_offset;
 
     Position {
-      char: col_char_idx,
+      char: self.byte_to_char(col_byte_idx),
       byte: col_byte_idx,
-      code: col_code_idx,
       point: Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
   }
@@ -224,7 +209,7 @@ mod tests {
   }
 
   #[test]
-  fn round_trip_handles_utf16_columns() {
+  fn round_trip_handles_multibyte_columns() {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let after_emoji = rope.to_string().find('b').unwrap();
@@ -235,7 +220,6 @@ mod tests {
 
     assert_eq!(core.byte, after_emoji);
     assert_eq!(core.char, rope.byte_to_char(after_emoji));
-    assert_eq!(core.code, rope.char_to_utf16_cu(core.char));
     assert_eq!(core.point, rope.byte_to_tree_sitter_point(after_emoji));
   }
 
@@ -353,12 +337,10 @@ mod tests {
     let last_line_idx = rope.len_lines() - 1;
     let last_line_char = rope.line_to_char(last_line_idx);
     let last_line_byte = rope.line_to_byte(last_line_idx);
-    let last_line_code = rope.char_to_utf16_cu(last_line_char);
 
     assert_eq!(core.point, Point::new(last_line_idx, 0));
     assert_eq!(core.byte, last_line_byte);
     assert_eq!(core.char, last_line_char);
-    assert_eq!(core.code, last_line_code);
   }
 
   #[test]
@@ -377,7 +359,6 @@ mod tests {
 
     let line_end_char = rope.line_to_char(line_idx + 1);
     let line_end_byte = rope.char_to_byte(line_end_char);
-    let line_end_code = rope.char_to_utf16_cu(line_end_char);
 
     assert_eq!(
       core.point,
@@ -386,6 +367,5 @@ mod tests {
 
     assert_eq!(core.byte, line_end_byte);
     assert_eq!(core.char, line_end_char);
-    assert_eq!(core.code, line_end_code);
   }
 }

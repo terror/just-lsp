@@ -226,7 +226,7 @@ impl<'doc> Tokenizer<'doc> {
   }
 
   /// Breaks a highlighted span into per-line semantic token entries expressed in
-  /// UTF-16 coordinates, pushing them into `tokens`.
+  /// UTF-8 byte coordinates, pushing them into `tokens`.
   fn push_tokens_for_span(
     rope: &Rope,
     start_byte: usize,
@@ -269,16 +269,8 @@ impl<'doc> Tokenizer<'doc> {
         continue;
       }
 
-      let line_char_idx = rope.line_to_char(line_idx);
-      let start_char_idx = rope.byte_to_char(segment_start);
-      let end_char_idx = rope.byte_to_char(segment_end);
-
-      let line_utf16 = rope.char_to_utf16_cu(line_char_idx);
-      let start_utf16 = rope.char_to_utf16_cu(start_char_idx);
-      let end_utf16 = rope.char_to_utf16_cu(end_char_idx);
-
-      let start_character = start_utf16.saturating_sub(line_utf16);
-      let end_character = end_utf16.saturating_sub(line_utf16);
+      let start_character = segment_start.saturating_sub(line_start_byte);
+      let end_character = segment_end.saturating_sub(line_start_byte);
 
       if end_character <= start_character {
         continue;

@@ -28,6 +28,7 @@ impl Server {
         lsp::FoldingRangeProviderCapability::Simple(true),
       ),
       hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
+      position_encoding: Some(lsp::PositionEncodingKind::UTF8),
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Left(true)),
       semantic_tokens_provider: Some(
