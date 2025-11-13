@@ -89,28 +89,33 @@ impl RopeExt for Rope {
     let text = change.text.as_str();
     let text_end_byte_idx = text.len();
 
-    let range = change.range.unwrap_or_else(|| lsp::Range {
-      start: self.byte_to_lsp_position(0),
-      end: self.byte_to_lsp_position(text_end_byte_idx),
-    });
+    let (start, old_end) = if let Some(range) = change.range {
+      let start = self.lsp_position_to_core(range.start);
+      let old_end = self.lsp_position_to_core(range.end);
+      (start, old_end)
+    } else {
+      let doc_end_char = self.len_chars();
+      let doc_end_byte = self.len_bytes();
 
-    let start = self.lsp_position_to_core(range.start);
-    let old_end = self.lsp_position_to_core(range.end);
+      let start = TextPosition {
+        byte: 0,
+        char: 0,
+        code: 0,
+        point: Point::new(0, 0),
+      };
+
+      let old_end = TextPosition {
+        char: doc_end_char,
+        byte: doc_end_byte,
+        code: self.char_to_utf16_cu(doc_end_char),
+        point: self.byte_to_tree_sitter_point(doc_end_byte),
+      };
+
+      (start, old_end)
+    };
 
     let new_end_byte = start.byte + text_end_byte_idx;
-
-    let new_end_position = if new_end_byte >= self.len_bytes() {
-      let line_idx = text.lines().count();
-
-      let line_byte_idx = ropey::str_utils::line_to_byte_idx(text, line_idx);
-
-      Point::new(
-        self.len_lines() + line_idx,
-        text_end_byte_idx - line_byte_idx,
-      )
-    } else {
-      self.byte_to_tree_sitter_point(new_end_byte)
-    };
+    let new_end_position = point_after_insertion(start.point, text);
 
     let input_edit = InputEdit {
       start_byte: start.byte,
@@ -170,6 +175,22 @@ impl RopeExt for Rope {
       point: tree_sitter::Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
   }
+}
+
+fn point_after_insertion(start: Point, text: &str) -> Point {
+  let mut row = start.row;
+  let mut column = start.column;
+
+  for byte in text.bytes() {
+    if byte == b'\n' {
+      row += 1;
+      column = 0;
+    } else {
+      column += 1;
+    }
+  }
+
+  Point::new(row, column)
 }
 
 #[cfg(test)]
@@ -245,5 +266,65 @@ mod tests {
     assert_eq!(edit.input_edit.start_position, Point::new(1, 0));
     assert_eq!(edit.input_edit.old_end_position, Point::new(1, 5));
     assert_eq!(edit.input_edit.new_end_position, Point::new(1, 4));
+  }
+
+  #[test]
+  fn build_edit_handles_whole_document_replace() {
+    let rope = Rope::from_str("hello\nworld\n");
+    let replacement = "only\nnew";
+
+    let change = lsp::TextDocumentContentChangeEvent {
+      range: None,
+      range_length: None,
+      text: replacement.into(),
+    };
+
+    let edit = rope.build_edit(&change);
+
+    assert_eq!(edit.start_char_idx, 0);
+    assert_eq!(edit.end_char_idx, rope.len_chars());
+
+    assert_eq!(edit.input_edit.start_byte, 0);
+    assert_eq!(edit.input_edit.old_end_byte, rope.len_bytes());
+    assert_eq!(edit.input_edit.new_end_byte, replacement.len());
+    assert_eq!(edit.input_edit.start_position, Point::new(0, 0));
+
+    assert_eq!(
+      edit.input_edit.old_end_position,
+      rope.byte_to_tree_sitter_point(rope.len_bytes()),
+    );
+
+    assert_eq!(edit.input_edit.new_end_position, Point::new(1, 3));
+    assert_eq!(edit.text, replacement);
+  }
+
+  #[test]
+  fn build_edit_computes_new_point_from_inserted_text() {
+    let rope = Rope::from_str("hello\nworld\n");
+
+    let insertion = "\nbrave\nnew";
+
+    let change = change_event(
+      lsp::Range {
+        start: lsp::Position::new(0, 5),
+        end: lsp::Position::new(0, 5),
+      },
+      insertion,
+    );
+
+    let edit = rope.build_edit(&change);
+
+    let line_start_byte = rope.line_to_byte(0);
+
+    assert_eq!(edit.input_edit.start_byte, line_start_byte + 5);
+
+    assert_eq!(
+      edit.input_edit.new_end_byte,
+      line_start_byte + 5 + insertion.len(),
+    );
+
+    assert_eq!(edit.input_edit.start_position, Point::new(0, 5));
+    assert_eq!(edit.input_edit.new_end_position, Point::new(2, 3));
+    assert_eq!(edit.input_edit.old_end_position, Point::new(0, 5));
   }
 }
