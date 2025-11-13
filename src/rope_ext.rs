@@ -94,8 +94,7 @@ impl RopeExt for Rope {
       let old_end = self.lsp_position_to_core(range.end);
       (start, old_end)
     } else {
-      let doc_end_char = self.len_chars();
-      let doc_end_byte = self.len_bytes();
+      let (doc_end_char, doc_end_byte) = (self.len_chars(), self.len_bytes());
 
       let start = TextPosition {
         byte: 0,
@@ -178,8 +177,7 @@ impl RopeExt for Rope {
 }
 
 fn point_after_insertion(start: Point, text: &str) -> Point {
-  let mut row = start.row;
-  let mut column = start.column;
+  let (mut row, mut column) = (start.row, start.column);
 
   for byte in text.bytes() {
     if byte == b'\n' {
