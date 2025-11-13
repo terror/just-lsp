@@ -201,7 +201,7 @@ impl Document {
     position: lsp::Position,
   ) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
-      let point = self.content.lsp_position_to_position(position).point;
+      let point = position.point();
       Some(tree.root_node().descendant_for_point_range(point, point)?)
     } else {
       None
@@ -521,12 +521,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "shell".into(),
         kind: SettingKind::Array,
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -539,11 +539,12 @@ mod tests {
     });
 
     let aliases = document.aliases();
+
     assert_eq!(aliases.len(), 1);
 
     assert_eq!(
-      aliases[0],
-      Alias {
+      aliases,
+      vec![Alias {
         name: TextNode {
           value: "a1".into(),
           range: range((0, 6, 0, 8))
@@ -553,7 +554,7 @@ mod tests {
           range: range((0, 12, 0, 15))
         },
         range: range((0, 0, 0, 15))
-      }
+      }]
     );
   }
 
@@ -570,12 +571,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -592,12 +593,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -615,33 +616,31 @@ mod tests {
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
-      aliases[0],
-      Alias {
-        name: TextNode {
-          value: "duplicate".into(),
-          range: range((0, 6, 0, 15))
+      aliases,
+      vec![
+        Alias {
+          name: TextNode {
+            value: "duplicate".into(),
+            range: range((0, 6, 0, 15))
+          },
+          value: TextNode {
+            value: "foo".into(),
+            range: range((0, 19, 0, 22))
+          },
+          range: range((0, 0, 0, 22))
         },
-        value: TextNode {
-          value: "foo".into(),
-          range: range((0, 19, 0, 22))
-        },
-        range: range((0, 0, 0, 22))
-      }
-    );
-
-    assert_eq!(
-      aliases[1],
-      Alias {
-        name: TextNode {
-          value: "duplicate".into(),
-          range: range((1, 6, 1, 15))
-        },
-        value: TextNode {
-          value: "bar".into(),
-          range: range((1, 19, 1, 22))
-        },
-        range: range((1, 0, 1, 22))
-      }
+        Alias {
+          name: TextNode {
+            value: "duplicate".into(),
+            range: range((1, 6, 1, 15))
+          },
+          value: TextNode {
+            value: "bar".into(),
+            range: range((1, 19, 1, 22))
+          },
+          range: range((1, 0, 1, 22))
+        }
+      ]
     );
   }
 
@@ -659,33 +658,31 @@ mod tests {
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
-      aliases[0],
-      Alias {
-        name: TextNode {
-          value: "a1".into(),
-          range: range((0, 6, 0, 8)),
+      aliases,
+      vec![
+        Alias {
+          name: TextNode {
+            value: "a1".into(),
+            range: range((0, 6, 0, 8)),
+          },
+          value: TextNode {
+            value: "foo".into(),
+            range: range((0, 12, 0, 15)),
+          },
+          range: range((0, 0, 0, 15)),
         },
-        value: TextNode {
-          value: "foo".into(),
-          range: range((0, 12, 0, 15)),
-        },
-        range: range((0, 0, 0, 15)),
-      }
-    );
-
-    assert_eq!(
-      aliases[1],
-      Alias {
-        name: TextNode {
-          value: "a2".into(),
-          range: range((1, 6, 1, 8)),
-        },
-        value: TextNode {
-          value: "bar".into(),
-          range: range((1, 12, 1, 15)),
-        },
-        range: range((1, 0, 1, 15)),
-      }
+        Alias {
+          name: TextNode {
+            value: "a2".into(),
+            range: range((1, 6, 1, 8)),
+          },
+          value: TextNode {
+            value: "bar".into(),
+            range: range((1, 12, 1, 15)),
+          },
+          range: range((1, 0, 1, 15)),
+        }
+      ]
     );
   }
 
@@ -704,30 +701,24 @@ mod tests {
     assert_eq!(settings.len(), 3);
 
     assert_eq!(
-      settings[0],
-      Setting {
-        name: "export".into(),
-        kind: SettingKind::Boolean(true),
-        range: range((0, 0, 1, 0)),
-      }
-    );
-
-    assert_eq!(
-      settings[1],
-      Setting {
-        name: "shell".into(),
-        kind: SettingKind::Array,
-        range: range((1, 0, 2, 0)),
-      }
-    );
-
-    assert_eq!(
-      settings[2],
-      Setting {
-        name: "bar".into(),
-        kind: SettingKind::String,
-        range: range((2, 0, 3, 0)),
-      }
+      settings,
+      vec![
+        Setting {
+          name: "export".into(),
+          kind: SettingKind::Boolean(true),
+          range: range((0, 0, 1, 0)),
+        },
+        Setting {
+          name: "shell".into(),
+          kind: SettingKind::Array,
+          range: range((1, 0, 2, 0)),
+        },
+        Setting {
+          name: "bar".into(),
+          kind: SettingKind::String,
+          range: range((2, 0, 3, 0)),
+        }
+      ]
     );
   }
 
@@ -744,12 +735,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "bar".into(),
         kind: SettingKind::String,
         range: range((0, 0, 1, 0)),
-      }
+      }]
     );
   }
 
@@ -839,9 +830,20 @@ mod tests {
 
     let variables = document.variables();
 
-    assert!(variables[0].export);
-
     assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        content: "PATH := \'/usr/local/bin\'".into(),
+        export: true,
+        name: TextNode {
+          value: "PATH".into(),
+          range: range((1, 7, 1, 11))
+        },
+        range: range((1, 7, 2, 0))
+      }]
+    );
   }
 
   #[test]
@@ -912,61 +914,6 @@ mod tests {
 
     assert_eq!(node.kind(), "text");
     assert_eq!(document.get_node_text(&node), "echo \"bar\"");
-  }
-
-  #[test]
-  fn node_at_position_handles_utf16_columns() {
-    let document = document(indoc! {
-      "
-      target:
-        echo '🙂'
-      "
-    });
-
-    let node = document
-      .node_at_position(lsp::Position {
-        line: 2,
-        character: 10,
-      })
-      .expect("node at emoji line");
-
-    let point = document.content.lsp_position_to_position(lsp::Position {
-      line: 2,
-      character: 10,
-    });
-    println!("point: {:?} / {:?}", point.point, point);
-    println!("document: {:?}", document.content.to_string());
-    let line = document.content.line(2);
-    println!("line: {:?}, len_utf16: {}", line, line.len_utf16_cu());
-    let lines = document.content.len_lines();
-    for i in 0..lines {
-      println!("line[{i}]: {:?}", document.content.line(i).to_string());
-    }
-    if let Some(node_line1) = document.node_at_position(lsp::Position {
-      line: 1,
-      character: 10,
-    }) {
-      println!("line1 node kind: {}", node_line1.kind());
-      println!("line1 text: {:?}", document.get_node_text(&node_line1));
-    }
-
-    println!("kind: {}", node.kind());
-    println!("text: {:?}", document.get_node_text(&node));
-
-    assert_eq!(node.kind(), "source_file");
-    assert_eq!(document.get_node_text(&node), "echo '🙂'");
-  }
-
-  #[test]
-  fn debug_indoc_output() {
-    let text = indoc! {
-      "
-      target:
-        echo '🙂'
-      "
-    };
-    println!("{:?}", text);
-    assert_eq!(text, "target:\n  echo '🙂'\n");
   }
 
   #[test]

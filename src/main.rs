@@ -20,6 +20,7 @@ use {
   once_cell::sync::{Lazy, OnceCell},
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
+  position_ext::PositionExt,
   recipe::Recipe,
   resolver::Resolver,
   rope_ext::RopeExt,
@@ -71,6 +72,7 @@ mod group;
 mod node_ext;
 mod parameter;
 mod point_ext;
+mod position_ext;
 mod recipe;
 mod resolver;
 mod rope_ext;
