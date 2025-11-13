@@ -31,6 +31,8 @@
 
 use super::*;
 
+pub(crate) type Range = (Position, Position);
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Position {
   /// Absolute UTF-8 byte offset into the rope (start-of-doc origin).
@@ -93,7 +95,7 @@ pub(crate) trait RopeExt {
   /// Converts an LSP `Range` (UTF-8 line/column pairs) into our richer
   /// [`Position`] objects so we know the corresponding byte/char/point
   /// offsets for both the start and end of the change span.
-  fn lsp_range_to_range(&self, range: lsp::Range) -> (Position, Position) {
+  fn lsp_range_to_range(&self, range: lsp::Range) -> Range {
     (
       self.lsp_position_to_position(range.start),
       self.lsp_position_to_position(range.end),
