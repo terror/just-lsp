@@ -90,9 +90,10 @@ impl RopeExt for Rope {
     let text_end_byte_idx = text.len();
 
     let (start, old_end) = if let Some(range) = change.range {
-      let start = self.lsp_position_to_core(range.start);
-      let old_end = self.lsp_position_to_core(range.end);
-      (start, old_end)
+      (
+        self.lsp_position_to_core(range.start),
+        self.lsp_position_to_core(range.end),
+      )
     } else {
       let (doc_end_char, doc_end_byte) = (self.len_chars(), self.len_bytes());
 
@@ -157,13 +158,27 @@ impl RopeExt for Rope {
   }
 
   fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition {
-    let row_idx = position.line as usize;
+    let requested_row = position.line as usize;
+
+    let line_count = self.len_lines();
+    let row_idx = requested_row.min(line_count.saturating_sub(1));
+
     let row_char_idx = self.line_to_char(row_idx);
     let row_byte_idx = self.line_to_byte(row_idx);
     let row_code_idx = self.char_to_utf16_cu(row_char_idx);
 
+    let row_end_char_idx = if row_idx + 1 < line_count {
+      self.line_to_char(row_idx + 1)
+    } else {
+      self.len_chars()
+    };
+
+    let row_end_code_idx = self.char_to_utf16_cu(row_end_char_idx);
+
     let col_code_offset = position.character as usize;
-    let col_code_idx = row_code_idx + col_code_offset;
+    let unclamped_code_idx = row_code_idx + col_code_offset;
+    let col_code_idx = unclamped_code_idx.min(row_end_code_idx);
+
     let col_char_idx = self.utf16_cu_to_char(col_code_idx);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 
@@ -324,5 +339,48 @@ mod tests {
     assert_eq!(edit.input_edit.start_position, Point::new(0, 5));
     assert_eq!(edit.input_edit.new_end_position, Point::new(2, 3));
     assert_eq!(edit.input_edit.old_end_position, Point::new(0, 5));
+  }
+
+  #[test]
+  fn lsp_position_to_core_clamps_line_index() {
+    let rope = Rope::from_str("hello\nworld");
+
+    let line_past_end = lsp::Position::new(42, 0);
+
+    let core = rope.lsp_position_to_core(line_past_end);
+
+    let last_line_idx = rope.len_lines() - 1;
+    let last_line_char = rope.line_to_char(last_line_idx);
+    let last_line_byte = rope.line_to_byte(last_line_idx);
+    let last_line_code = rope.char_to_utf16_cu(last_line_char);
+
+    assert_eq!(core.point, Point::new(last_line_idx, 0));
+    assert_eq!(core.byte, last_line_byte);
+    assert_eq!(core.char, last_line_char);
+    assert_eq!(core.code, last_line_code);
+  }
+
+  #[test]
+  fn lsp_position_to_core_clamps_column_index() {
+    let rope = Rope::from_str("a😊b\nsecond");
+
+    let line_idx = 0;
+    let far_past_line = lsp::Position::new(line_idx as u32, 100);
+
+    let core = rope.lsp_position_to_core(far_past_line);
+
+    let line_start_char = rope.line_to_char(line_idx);
+    let line_end_char = rope.line_to_char(line_idx + 1);
+    let line_start_byte = rope.char_to_byte(line_start_char);
+    let line_end_byte = rope.char_to_byte(line_end_char);
+    let line_end_code = rope.char_to_utf16_cu(line_end_char);
+
+    assert_eq!(
+      core.point,
+      Point::new(line_idx, line_end_byte - line_start_byte)
+    );
+    assert_eq!(core.byte, line_end_byte);
+    assert_eq!(core.char, line_end_char);
+    assert_eq!(core.code, line_end_code);
   }
 }
