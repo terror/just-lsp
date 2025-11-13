@@ -194,12 +194,25 @@ impl RopeExt for Rope {
 fn point_after_insertion(start: Point, text: &str) -> Point {
   let (mut row, mut column) = (start.row, start.column);
 
-  for byte in text.bytes() {
-    if byte == b'\n' {
-      row += 1;
-      column = 0;
-    } else {
-      column += 1;
+  let mut chars = text.chars().peekable();
+
+  while let Some(ch) = chars.next() {
+    match ch {
+      '\r' => {
+        if matches!(chars.peek().copied(), Some('\n')) {
+          chars.next();
+        }
+
+        row += 1;
+        column = 0;
+      }
+      '\n' | '\u{000B}' | '\u{000C}' | '\u{0085}' | '\u{2028}' | '\u{2029}' => {
+        row += 1;
+        column = 0;
+      }
+      _ => {
+        column += ch.len_utf8();
+      }
     }
   }
 
@@ -342,6 +355,38 @@ mod tests {
   }
 
   #[test]
+  fn build_edit_handles_crlf_and_multibyte_insertions() {
+    let rope = Rope::from_str("hello\nworld\n");
+
+    let insertion = "\r\n😊é";
+
+    let change = change_event(
+      lsp::Range {
+        start: lsp::Position::new(0, 5),
+        end: lsp::Position::new(0, 5),
+      },
+      insertion,
+    );
+
+    let edit = rope.build_edit(&change);
+
+    let start_byte = rope.line_to_byte(0) + 5;
+    let start_char = rope.line_to_char(0) + 5;
+    let multibyte_tail = "😊é";
+
+    assert_eq!(edit.start_char_idx, start_char);
+    assert_eq!(edit.end_char_idx, start_char);
+    assert_eq!(edit.input_edit.start_byte, start_byte);
+    assert_eq!(edit.input_edit.new_end_byte, start_byte + insertion.len());
+    assert_eq!(edit.input_edit.start_position, Point::new(0, 5));
+
+    assert_eq!(
+      edit.input_edit.new_end_position,
+      Point::new(1, multibyte_tail.len()),
+    );
+  }
+
+  #[test]
   fn lsp_position_to_core_clamps_line_index() {
     let rope = Rope::from_str("hello\nworld");
 
@@ -365,13 +410,16 @@ mod tests {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let line_idx = 0;
-    let far_past_line = lsp::Position::new(line_idx as u32, 100);
 
-    let core = rope.lsp_position_to_core(far_past_line);
+    let core = rope.lsp_position_to_core(lsp::Position::new(
+      u32::try_from(line_idx).unwrap(),
+      100,
+    ));
 
     let line_start_char = rope.line_to_char(line_idx);
-    let line_end_char = rope.line_to_char(line_idx + 1);
     let line_start_byte = rope.char_to_byte(line_start_char);
+
+    let line_end_char = rope.line_to_char(line_idx + 1);
     let line_end_byte = rope.char_to_byte(line_end_char);
     let line_end_code = rope.char_to_utf16_cu(line_end_char);
 
@@ -379,6 +427,7 @@ mod tests {
       core.point,
       Point::new(line_idx, line_end_byte - line_start_byte)
     );
+
     assert_eq!(core.byte, line_end_byte);
     assert_eq!(core.char, line_end_char);
     assert_eq!(core.code, line_end_code);
