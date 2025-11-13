@@ -324,6 +324,35 @@ mod tests {
   }
 
   #[test]
+  fn attributes_duplicate_working_directory_attribute() {
+    Test::new(indoc! {
+      "
+      [working-directory: 'foo']
+      [working-directory: 'bar']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text(
+      "Recipe attribute `working-directory` is duplicated",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn attributes_multiple_group_attributes_allowed() {
+    Test::new(indoc! {
+      "
+      [group('lint')]
+      [group('rust')]
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_extra_arguments() {
     Test::new(indoc! {
       "

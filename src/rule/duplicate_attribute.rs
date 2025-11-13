@@ -19,7 +19,71 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     scope: DuplicateScope::Module,
   },
   DuplicateConstraint {
+    name: "confirm",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "doc",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "extension",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "metadata",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "linux",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "macos",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "no-cd",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "no-exit-message",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "no-quiet",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "openbsd",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "parallel",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "positional-arguments",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "private",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
     name: "script",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "unix",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "windows",
+    scope: DuplicateScope::Recipe,
+  },
+  DuplicateConstraint {
+    name: "working-directory",
     scope: DuplicateScope::Recipe,
   },
 ];
