@@ -343,7 +343,7 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_core_clamps_line_index() {
+  fn lsp_position_to_position_clamps_line_index() {
     let rope = Rope::from_str("hello\nworld");
 
     let line_past_end = lsp::Position::new(42, 0);
@@ -362,7 +362,7 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_core_clamps_column_index() {
+  fn lsp_position_to_position_clamps_column_index() {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let line_idx = 0;
