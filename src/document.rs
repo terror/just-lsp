@@ -923,16 +923,11 @@ mod tests {
         \"😀 emoji\"
     "});
 
-    let byte_offset = document
-      .content
-      .to_string()
-      .find("emoji")
-      .unwrap();
+    let byte_offset = document.content.to_string().find("emoji").unwrap();
 
     let position = document.content.byte_to_lsp_position(byte_offset);
 
-    let node = document
-      .node_at_position(position).unwrap();
+    let node = document.node_at_position(position).unwrap();
 
     assert_eq!(node.kind(), "text");
     assert_eq!(document.get_node_text(&node), "\"😀 emoji\"");
