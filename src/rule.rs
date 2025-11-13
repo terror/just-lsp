@@ -7,7 +7,7 @@ pub(crate) use {
   attribute_target_support::AttributeTargetSupportRule,
   dependency_arguments::DependencyArgumentRule,
   duplicate_alias::DuplicateAliasRule,
-  duplicate_default_attribute::DuplicateDefaultAttributeRule,
+  duplicate_attribute::DuplicateAttributeRule,
   duplicate_recipes::DuplicateRecipeRule,
   duplicate_setting::DuplicateSettingRule,
   duplicate_variables::DuplicateVariableRule,
@@ -32,7 +32,7 @@ mod attribute_invalid_target;
 mod attribute_target_support;
 mod dependency_arguments;
 mod duplicate_alias;
-mod duplicate_default_attribute;
+mod duplicate_attribute;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;

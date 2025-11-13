@@ -9,8 +9,8 @@ static RULES: &[&dyn Rule] = &[
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
   &AttributeTargetSupportRule,
+  &DuplicateAttributeRule,
   &ScriptShebangConflictRule,
-  &DuplicateDefaultAttributeRule,
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
   &RecipeParameterRule,
@@ -306,6 +306,20 @@ mod tests {
     .error(Message::Text(
       "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module"),
     )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_recipe_attribute() {
+    Test::new(indoc! {
+      "
+      [script]
+      [script]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `script` is duplicated"))
     .run();
   }
 
