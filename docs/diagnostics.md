@@ -14,7 +14,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `attribute-arguments`             | Attribute Arguments             | Attribute invocation uses the wrong number of arguments.                                            |
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                              |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind (recipe, alias, module, etc.).                      |
-| `duplicate-default-attribute`     | Duplicate Default Attribute     | Multiple `[default]` attributes defined in the same justfile.                                       |
+| `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique (e.g., `[default]`, `[script]`) appear more than once.               |
 | `script-shebang-conflict`         | Script Shebang Conflict         | Recipe combines a shebang line with the `[script]` attribute.                                       |
 | `duplicate-recipes`               | Duplicate Recipes               | Recipe name collides with another recipe for overlapping targets (unless duplicates allowed).       |
 | `recipe-parameters`               | Recipe Parameters               | Parameter list has duplicates, required-after-default parameters, or misplaced variadic parameters. |

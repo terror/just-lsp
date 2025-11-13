@@ -13,12 +13,11 @@ pub(crate) struct Recipe {
 
 impl Recipe {
   #[must_use]
-  pub(crate) fn get_attributes(&self, name: &str) -> Vec<&Attribute> {
+  pub(crate) fn find_attribute(&self, name: &str) -> Option<&Attribute> {
     self
       .attributes
       .iter()
-      .filter(|attribute| attribute.name.value == name)
-      .collect()
+      .find(|attribute| attribute.name.value == name)
   }
 
   #[must_use]

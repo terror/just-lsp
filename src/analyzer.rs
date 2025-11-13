@@ -9,8 +9,8 @@ static RULES: &[&dyn Rule] = &[
   &AttributeArgumentsRule,
   &AttributeInvalidTargetRule,
   &AttributeTargetSupportRule,
+  &DuplicateAttributeRule,
   &ScriptShebangConflictRule,
-  &DuplicateDefaultAttributeRule,
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
   &RecipeParameterRule,
@@ -306,6 +306,63 @@ mod tests {
     .error(Message::Text(
       "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module"),
     )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_recipe_attribute() {
+    Test::new(indoc! {
+      "
+      [script]
+      [script]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `script` is duplicated"))
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_working_directory_attribute() {
+    Test::new(indoc! {
+      "
+      [working-directory: 'foo']
+      [working-directory: 'bar']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text(
+      "Recipe attribute `working-directory` is duplicated",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn attributes_multiple_group_attributes_allowed() {
+    Test::new(indoc! {
+      "
+      [group('lint')]
+      [group('rust')]
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_attribute() {
+    Test::new(indoc! {
+      "
+      [group('dev')]
+      [group('dev')]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `group` is duplicated"))
     .run();
   }
 

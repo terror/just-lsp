@@ -16,23 +16,23 @@ impl Rule for ScriptShebangConflictRule {
     let mut diagnostics = Vec::new();
 
     for recipe in context.recipes() {
-      let script_attributes = recipe.get_attributes("script");
+      let Some(script_attribute) = recipe.find_attribute("script") else {
+        continue;
+      };
 
-      if script_attributes.is_empty() || recipe.shebang.is_none() {
+      if recipe.shebang.is_none() {
         continue;
       }
 
-      for attribute in script_attributes {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
-            "Recipe `{}` has both shebang line and `[script]` attribute",
-            recipe.name
-          ),
-          ..Default::default()
-        }));
-      }
+      diagnostics.push(self.diagnostic(lsp::Diagnostic {
+        range: script_attribute.range,
+        severity: Some(lsp::DiagnosticSeverity::ERROR),
+        message: format!(
+          "Recipe `{}` has both shebang line and `[script]` attribute",
+          recipe.name
+        ),
+        ..Default::default()
+      }));
     }
 
     diagnostics
