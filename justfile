@@ -11,7 +11,7 @@ alias t := test
 
 all: build test clippy fmt-check
 
-[group: 'dev']
+[group: '🚧']
 build:
   cargo build
 

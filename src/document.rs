@@ -201,7 +201,7 @@ impl Document {
     position: lsp::Position,
   ) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
-      let point = position.point();
+      let point = self.content.lsp_position_to_position(position).point;
       Some(tree.root_node().descendant_for_point_range(point, point)?)
     } else {
       None
@@ -912,6 +912,61 @@ mod tests {
 
     assert_eq!(node.kind(), "text");
     assert_eq!(document.get_node_text(&node), "echo \"bar\"");
+  }
+
+  #[test]
+  fn node_at_position_handles_utf16_columns() {
+    let document = document(indoc! {
+      "
+      target:
+        echo '🙂'
+      "
+    });
+
+    let node = document
+      .node_at_position(lsp::Position {
+        line: 2,
+        character: 10,
+      })
+      .expect("node at emoji line");
+
+    let point = document.content.lsp_position_to_position(lsp::Position {
+      line: 2,
+      character: 10,
+    });
+    println!("point: {:?} / {:?}", point.point, point);
+    println!("document: {:?}", document.content.to_string());
+    let line = document.content.line(2);
+    println!("line: {:?}, len_utf16: {}", line, line.len_utf16_cu());
+    let lines = document.content.len_lines();
+    for i in 0..lines {
+      println!("line[{i}]: {:?}", document.content.line(i).to_string());
+    }
+    if let Some(node_line1) = document.node_at_position(lsp::Position {
+      line: 1,
+      character: 10,
+    }) {
+      println!("line1 node kind: {}", node_line1.kind());
+      println!("line1 text: {:?}", document.get_node_text(&node_line1));
+    }
+
+    println!("kind: {}", node.kind());
+    println!("text: {:?}", document.get_node_text(&node));
+
+    assert_eq!(node.kind(), "source_file");
+    assert_eq!(document.get_node_text(&node), "echo '🙂'");
+  }
+
+  #[test]
+  fn debug_indoc_output() {
+    let text = indoc! {
+      "
+      target:
+        echo '🙂'
+      "
+    };
+    println!("{:?}", text);
+    assert_eq!(text, "target:\n  echo '🙂'\n");
   }
 
   #[test]

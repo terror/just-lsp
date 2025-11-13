@@ -164,27 +164,24 @@ impl RopeExt for Rope {
   }
 
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
-    let requested_row = position.line as usize;
-
     let line_count = self.len_lines();
-    let row_idx = requested_row.min(line_count.saturating_sub(1));
+
+    let row_idx = if line_count == 0 {
+      0
+    } else {
+      cmp::min(position.line as usize, line_count - 1)
+    };
 
     let row_char_idx = self.line_to_char(row_idx);
     let row_byte_idx = self.line_to_byte(row_idx);
     let row_code_idx = self.char_to_utf16_cu(row_char_idx);
 
-    let row_end_char_idx = if row_idx + 1 < line_count {
-      self.line_to_char(row_idx + 1)
-    } else {
-      self.len_chars()
-    };
+    let col_code_offset = cmp::min(
+      position.character as usize,
+      self.line(row_idx).len_utf16_cu(),
+    );
 
-    let row_end_code_idx = self.char_to_utf16_cu(row_end_char_idx);
-
-    let col_code_offset = position.character as usize;
-    let unclamped_code_idx = row_code_idx + col_code_offset;
-    let col_code_idx = unclamped_code_idx.min(row_end_code_idx);
-
+    let col_code_idx = row_code_idx + col_code_offset;
     let col_char_idx = self.utf16_cu_to_char(col_code_idx);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 
@@ -267,6 +264,7 @@ mod tests {
   #[test]
   fn build_edit_handles_whole_document_replace() {
     let rope = Rope::from_str("hello\nworld\n");
+
     let replacement = "only\nnew";
 
     let change = lsp::TextDocumentContentChangeEvent {
@@ -345,7 +343,7 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_position_clamps_line_index() {
+  fn lsp_position_to_core_clamps_line_index() {
     let rope = Rope::from_str("hello\nworld");
 
     let line_past_end = lsp::Position::new(42, 0);
@@ -364,7 +362,7 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_position_clamps_column_index() {
+  fn lsp_position_to_core_clamps_column_index() {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let line_idx = 0;
