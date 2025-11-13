@@ -31,33 +31,54 @@
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TextPosition {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Position {
+  /// Absolute UTF-8 byte offset into the rope (start-of-doc origin).
   pub(crate) byte: usize,
+  /// Absolute Unicode scalar index used by `ropey` for slicing.
   pub(crate) char: usize,
+  /// Absolute UTF-16 code-unit offset for LSP column conversions.
   pub(crate) code: usize,
+  /// Tree-sitter line/column (column measured in bytes from line start).
   pub(crate) point: Point,
 }
 
+impl From<&Rope> for Position {
+  fn from(value: &Rope) -> Self {
+    let (end_byte, end_char) = (value.len_bytes(), value.len_chars());
+
+    Self {
+      byte: end_byte,
+      char: end_char,
+      code: value.char_to_utf16_cu(end_char),
+      point: value.byte_to_tree_sitter_point(end_byte),
+    }
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TextEdit<'a> {
+pub(crate) struct Edit<'a> {
+  /// Rope character index where the edit starts.
   pub(crate) end_char_idx: usize,
+  /// Tree-sitter edit metadata (byte + point bookkeeping).
   pub(crate) input_edit: InputEdit,
+  /// Rope character index where the edit ends (exclusive).
   pub(crate) start_char_idx: usize,
+  /// Replacement text from the LSP change event.
   pub(crate) text: &'a str,
 }
 
 pub(crate) trait RopeExt {
-  /// Applies a previously constructed [`TextEdit`] to the rope, keeping both
+  /// Applies a previously constructed [`Edit`] to the rope, keeping both
   /// the textual contents and the internal tree-sitter offsets in sync.
-  fn apply_edit(&mut self, edit: &TextEdit);
+  fn apply_edit(&mut self, edit: &Edit);
 
-  /// Converts an LSP `textDocument/didChange` event into a [`TextEdit`] that
+  /// Converts an LSP `textDocument/didChange` event into a [`Edit`] that
   /// can be consumed both by `ropey` and tree-sitter.
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
-  ) -> TextEdit<'a>;
+  ) -> Edit<'a>;
 
   /// Maps an absolute byte offset into an LSP line/character pair where the
   /// column is expressed in UTF-16 code units as required by the spec.
@@ -70,11 +91,21 @@ pub(crate) trait RopeExt {
   /// Converts an LSP position back into absolute byte/char/code offsets and a
   /// tree-sitter point so downstream consumers can choose whichever coordinate
   /// space they need.
-  fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition;
+  fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
+
+  /// Converts an LSP `Range` (UTF-16 line/column pairs) into our richer
+  /// [`Position`] objects so we know the corresponding byte/char/code/point
+  /// offsets for both the start and end of the change span.
+  fn lsp_range_to_range(&self, range: lsp::Range) -> (Position, Position) {
+    (
+      self.lsp_position_to_position(range.start),
+      self.lsp_position_to_position(range.end),
+    )
+  }
 }
 
 impl RopeExt for Rope {
-  fn apply_edit(&mut self, edit: &TextEdit) {
+  fn apply_edit(&mut self, edit: &Edit) {
     self.remove(edit.start_char_idx..edit.end_char_idx);
 
     if !edit.text.is_empty() {
@@ -85,51 +116,27 @@ impl RopeExt for Rope {
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
-  ) -> TextEdit<'a> {
+  ) -> Edit<'a> {
     let text = change.text.as_str();
-    let text_end_byte_idx = text.len();
 
-    let (start, old_end) = if let Some(range) = change.range {
-      (
-        self.lsp_position_to_core(range.start),
-        self.lsp_position_to_core(range.end),
-      )
-    } else {
-      let (doc_end_char, doc_end_byte) = (self.len_chars(), self.len_bytes());
-
-      let start = TextPosition {
-        byte: 0,
-        char: 0,
-        code: 0,
-        point: Point::new(0, 0),
-      };
-
-      let old_end = TextPosition {
-        char: doc_end_char,
-        byte: doc_end_byte,
-        code: self.char_to_utf16_cu(doc_end_char),
-        point: self.byte_to_tree_sitter_point(doc_end_byte),
-      };
-
-      (start, old_end)
+    let (start, old_end) = match change.range {
+      Some(range) => self.lsp_range_to_range(range),
+      None => (Position::default(), Position::from(self)),
     };
-
-    let new_end_byte = start.byte + text_end_byte_idx;
-    let new_end_position = point_after_insertion(start.point, text);
 
     let input_edit = InputEdit {
-      start_byte: start.byte,
+      new_end_byte: start.byte + text.len(),
+      new_end_position: start.point.advance(text.point_delta()),
       old_end_byte: old_end.byte,
-      new_end_byte,
-      start_position: start.point,
       old_end_position: old_end.point,
-      new_end_position,
+      start_byte: start.byte,
+      start_position: start.point,
     };
 
-    TextEdit {
+    Edit {
+      end_char_idx: old_end.char,
       input_edit,
       start_char_idx: start.char,
-      end_char_idx: old_end.char,
       text,
     }
   }
@@ -153,11 +160,10 @@ impl RopeExt for Rope {
 
   fn byte_to_tree_sitter_point(&self, byte_idx: usize) -> Point {
     let line_idx = self.byte_to_line(byte_idx);
-    let line_byte_idx = self.line_to_byte(line_idx);
-    Point::new(line_idx, byte_idx - line_byte_idx)
+    Point::new(line_idx, byte_idx - self.line_to_byte(line_idx))
   }
 
-  fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition {
+  fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
     let requested_row = position.line as usize;
 
     let line_count = self.len_lines();
@@ -182,53 +188,30 @@ impl RopeExt for Rope {
     let col_char_idx = self.utf16_cu_to_char(col_code_idx);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 
-    TextPosition {
+    Position {
       char: col_char_idx,
       byte: col_byte_idx,
       code: col_code_idx,
-      point: tree_sitter::Point::new(row_idx, col_byte_idx - row_byte_idx),
+      point: Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
   }
-}
-
-fn point_after_insertion(start: Point, text: &str) -> Point {
-  let (mut row, mut column) = (start.row, start.column);
-
-  let mut chars = text.chars().peekable();
-
-  while let Some(ch) = chars.next() {
-    match ch {
-      '\r' => {
-        if matches!(chars.peek().copied(), Some('\n')) {
-          chars.next();
-        }
-
-        row += 1;
-        column = 0;
-      }
-      '\n' | '\u{000B}' | '\u{000C}' | '\u{0085}' | '\u{2028}' | '\u{2029}' => {
-        row += 1;
-        column = 0;
-      }
-      _ => {
-        column += ch.len_utf8();
-      }
-    }
-  }
-
-  Point::new(row, column)
 }
 
 #[cfg(test)]
 mod tests {
   use {super::*, ropey::Rope};
 
+  type Range = (u32, u32, u32, u32);
+
   fn change_event(
-    range: lsp::Range,
     text: &str,
+    (start_line, start_character, end_line, end_character): Range,
   ) -> lsp::TextDocumentContentChangeEvent {
     lsp::TextDocumentContentChangeEvent {
-      range: Some(range),
+      range: Some(lsp::Range {
+        start: lsp::Position::new(start_line, start_character),
+        end: lsp::Position::new(end_line, end_character),
+      }),
       range_length: None,
       text: text.into(),
     }
@@ -238,28 +221,20 @@ mod tests {
   fn apply_edit_updates_rope_contents() {
     let mut rope = Rope::from_str("hello world");
 
-    let change = change_event(
-      lsp::Range {
-        start: lsp::Position::new(0, 6),
-        end: lsp::Position::new(0, 11),
-      },
-      "rope",
-    );
-
-    rope.apply_edit(&rope.build_edit(&change));
+    rope.apply_edit(&rope.build_edit(&change_event("rope", (0, 6, 0, 11))));
 
     assert_eq!(rope.to_string(), "hello rope");
   }
 
   #[test]
-  fn lsp_round_trip_handles_utf16_columns() {
+  fn round_trip_handles_utf16_columns() {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let after_emoji = rope.to_string().find('b').unwrap();
 
     let position = rope.byte_to_lsp_position(after_emoji);
 
-    let core = rope.lsp_position_to_core(position);
+    let core = rope.lsp_position_to_position(position);
 
     assert_eq!(core.byte, after_emoji);
     assert_eq!(core.char, rope.byte_to_char(after_emoji));
@@ -271,13 +246,7 @@ mod tests {
   fn build_edit_populates_input_edit_fields() {
     let rope = Rope::from_str("hello\nworld\n");
 
-    let change = change_event(
-      lsp::Range {
-        start: lsp::Position::new(1, 0),
-        end: lsp::Position::new(1, 5),
-      },
-      "rust",
-    );
+    let change = change_event("rust", (1, 0, 1, 5));
 
     let edit = rope.build_edit(&change);
 
@@ -286,6 +255,7 @@ mod tests {
 
     assert_eq!(edit.start_char_idx, expected_start_char);
     assert_eq!(edit.end_char_idx, expected_start_char + 5);
+
     assert_eq!(edit.input_edit.start_byte, expected_start_byte);
     assert_eq!(edit.input_edit.old_end_byte, expected_start_byte + 5);
     assert_eq!(edit.input_edit.new_end_byte, expected_start_byte + 4);
@@ -330,13 +300,7 @@ mod tests {
 
     let insertion = "\nbrave\nnew";
 
-    let change = change_event(
-      lsp::Range {
-        start: lsp::Position::new(0, 5),
-        end: lsp::Position::new(0, 5),
-      },
-      insertion,
-    );
+    let change = change_event(insertion, (0, 5, 0, 5));
 
     let edit = rope.build_edit(&change);
 
@@ -360,13 +324,7 @@ mod tests {
 
     let insertion = "\r\n😊é";
 
-    let change = change_event(
-      lsp::Range {
-        start: lsp::Position::new(0, 5),
-        end: lsp::Position::new(0, 5),
-      },
-      insertion,
-    );
+    let change = change_event(insertion, (0, 5, 0, 5));
 
     let edit = rope.build_edit(&change);
 
@@ -387,12 +345,12 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_core_clamps_line_index() {
+  fn lsp_position_to_position_clamps_line_index() {
     let rope = Rope::from_str("hello\nworld");
 
     let line_past_end = lsp::Position::new(42, 0);
 
-    let core = rope.lsp_position_to_core(line_past_end);
+    let core = rope.lsp_position_to_position(line_past_end);
 
     let last_line_idx = rope.len_lines() - 1;
     let last_line_char = rope.line_to_char(last_line_idx);
@@ -406,12 +364,12 @@ mod tests {
   }
 
   #[test]
-  fn lsp_position_to_core_clamps_column_index() {
+  fn lsp_position_to_position_clamps_column_index() {
     let rope = Rope::from_str("a😊b\nsecond");
 
     let line_idx = 0;
 
-    let core = rope.lsp_position_to_core(lsp::Position::new(
+    let core = rope.lsp_position_to_position(lsp::Position::new(
       u32::try_from(line_idx).unwrap(),
       100,
     ));
