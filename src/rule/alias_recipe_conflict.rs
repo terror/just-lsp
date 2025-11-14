@@ -103,6 +103,7 @@ impl AliasRecipeConflictRule {
 
     if let Some(tree) = context.tree() {
       let document = context.document();
+
       for recipe_node in tree.root_node().find_all("recipe") {
         if let Some(name_node) = recipe_node.find("recipe_header > identifier")
         {
