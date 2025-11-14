@@ -195,13 +195,33 @@ impl Document {
       .to_string()
   }
 
+  /// Returns the syntax tree node at the given LSP `Position`.
+  ///
+  /// LSP positions use UTF-16 code-unit offsets, while both Ropey and Tree-sitter
+  /// operate on UTF-8 byte offsets. To bridge this mismatch, we:
+  ///
+  /// 1. Convert the UTF-16 line/character offsets into Ropey char indices
+  ///    (`utf16_cu_to_char`).
+  /// 2. Convert those char indices into UTF-8 byte offsets (`char_to_byte`).
+  /// 3. Use the resulting byte-based `(row, column)` as a Tree-sitter `Point`.
+  ///
+  /// This yields the node whose range contains that exact position.
   #[must_use]
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
   ) -> Option<Node<'_>> {
     if let Some(tree) = &self.tree {
-      let point = position.point();
+      let row = self
+        .content
+        .char_to_byte(self.content.utf16_cu_to_char(position.line as usize));
+
+      let column = self.content.char_to_byte(
+        self.content.utf16_cu_to_char(position.character as usize),
+      );
+
+      let point = Point { row, column };
+
       Some(tree.root_node().descendant_for_point_range(point, point)?)
     } else {
       None
