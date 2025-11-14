@@ -106,19 +106,19 @@ impl RopeExt for Rope {
 
   /// Maps an absolute byte offset into an LSP line/character pair where the
   /// column is expressed in UTF-16 code units as required by the spec.
-  fn byte_to_lsp_position(&self, byte_idx: usize) -> lsp::Position {
-    let line_idx = self.byte_to_line(byte_idx);
+  fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position {
+    let line = self.byte_to_line(byte);
 
-    let line_char_idx = self.line_to_char(line_idx);
-    let line_utf16_cu_idx = self.char_to_utf16_cu(line_char_idx);
+    let line_char = self.line_to_char(line);
+    let line_utf16_cu = self.char_to_utf16_cu(line_char);
 
-    let char_idx = self.byte_to_char(byte_idx);
-    let char_utf16_cu_idx = self.char_to_utf16_cu(char_idx);
+    let char = self.byte_to_char(byte);
+    let char_utf16_cu = self.char_to_utf16_cu(char);
 
-    let character = char_utf16_cu_idx - line_utf16_cu_idx;
+    let character = char_utf16_cu - line_utf16_cu;
 
     lsp::Position::new(
-      u32::try_from(line_idx).expect("line index exceeds u32::MAX"),
+      u32::try_from(line).expect("line index exceeds u32::MAX"),
       u32::try_from(character).expect("character offset exceeds u32::MAX"),
     )
   }
@@ -127,21 +127,21 @@ impl RopeExt for Rope {
   /// tree-sitter point so downstream consumers can choose whichever coordinate
   /// space they need.
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
-    let row_idx = position.line as usize;
+    let row = position.line as usize;
 
-    let row_char_idx = self.line_to_char(row_idx);
-    let row_byte_idx = self.line_to_byte(row_idx);
+    let row_char = self.line_to_char(row);
+    let row_byte = self.line_to_byte(row);
 
-    let col_char_idx = self.utf16_cu_to_char(
-      self.char_to_utf16_cu(row_char_idx) + position.character as usize,
+    let col_char = self.utf16_cu_to_char(
+      self.char_to_utf16_cu(row_char) + position.character as usize,
     );
 
-    let col_byte_idx = self.char_to_byte(col_char_idx);
+    let col_byte = self.char_to_byte(col_char);
 
     Position {
-      byte: col_byte_idx,
-      char: col_char_idx,
-      point: Point::new(row_idx, col_byte_idx - row_byte_idx),
+      byte: col_byte,
+      char: col_char,
+      point: Point::new(row, col_byte - row_byte),
     }
   }
 }
