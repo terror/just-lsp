@@ -52,7 +52,7 @@ pub(crate) trait RopeExt {
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> Edit<'a>;
-  fn byte_to_lsp_position(&self, offset: usize) -> lsp::Position;
+  fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position;
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
 }
 
