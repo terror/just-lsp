@@ -40,9 +40,9 @@ pub(crate) struct Position {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Edit<'a> {
-  pub(crate) end_char_idx: usize,
+  pub(crate) end_char: usize,
   pub(crate) input_edit: InputEdit,
-  pub(crate) start_char_idx: usize,
+  pub(crate) start_char: usize,
   pub(crate) text: &'a str,
 }
 
@@ -60,10 +60,10 @@ impl RopeExt for Rope {
   /// Applies a previously constructed [`Edit`] to the rope, keeping both
   /// the textual contents and the internal tree-sitter offsets in sync.
   fn apply_edit(&mut self, edit: &Edit) {
-    self.remove(edit.start_char_idx..edit.end_char_idx);
+    self.remove(edit.start_char..edit.end_char);
 
     if !edit.text.is_empty() {
-      self.insert(edit.start_char_idx, edit.text);
+      self.insert(edit.start_char, edit.text);
     }
   }
 
@@ -75,7 +75,7 @@ impl RopeExt for Rope {
   ) -> Edit<'a> {
     let text = change.text.as_str();
 
-    let text_end_byte_idx = text.len();
+    let text_end_bytes = text.len();
 
     let range = change.range.unwrap_or_else(|| lsp::Range {
       start: self.byte_to_lsp_position(0),
@@ -88,7 +88,7 @@ impl RopeExt for Rope {
     );
 
     let input_edit = InputEdit {
-      new_end_byte: start.byte + text_end_byte_idx,
+      new_end_byte: start.byte + text_end_bytes,
       new_end_position: start.point.advance(text.point_delta()),
       old_end_byte: old_end.byte,
       old_end_position: old_end.point,
@@ -97,9 +97,9 @@ impl RopeExt for Rope {
     };
 
     Edit {
-      end_char_idx: old_end.char,
+      end_char: old_end.char,
       input_edit,
-      start_char_idx: start.char,
+      start_char: start.char,
       text,
     }
   }
@@ -186,8 +186,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 6,
-        end_char_idx: 11,
+        start_char: 6,
+        end_char: 11,
         input_edit: InputEdit {
           new_end_byte: 10,
           new_end_position: Point::new(0, 10),
@@ -216,8 +216,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 1,
-        end_char_idx: 1,
+        start_char: 1,
+        end_char: 1,
         input_edit: InputEdit {
           new_end_byte: 5,
           new_end_position: Point::new(0, 5),
@@ -246,8 +246,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 1,
-        end_char_idx: 2,
+        start_char: 1,
+        end_char: 2,
         input_edit: InputEdit {
           new_end_byte: 1,
           new_end_position: Point::new(0, 1),
@@ -294,8 +294,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 3,
-        end_char_idx: 4,
+        start_char: 3,
+        end_char: 4,
         input_edit: InputEdit {
           start_byte: 3,
           old_end_byte: 7,
@@ -324,8 +324,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 2,
-        end_char_idx: 6,
+        start_char: 2,
+        end_char: 6,
         input_edit: InputEdit {
           start_byte: 2,
           old_end_byte: 9,
@@ -354,8 +354,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 2,
-        end_char_idx: 2,
+        start_char: 2,
+        end_char: 2,
         input_edit: InputEdit {
           start_byte: 2,
           old_end_byte: 2,
@@ -388,8 +388,8 @@ mod tests {
     assert_eq!(
       edit,
       Edit {
-        start_char_idx: 0,
-        end_char_idx: 7,
+        start_char: 0,
+        end_char: 7,
         input_edit: InputEdit {
           start_byte: 0,
           old_end_byte: 10,
