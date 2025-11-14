@@ -5,6 +5,17 @@ pub(crate) trait PositionExt {
 }
 
 impl PositionExt for lsp::Position {
+  /// LSP positions use a zero-based line index for `line` and a UTF-16
+  /// code-unit offset within that line for `character`.
+  ///
+  /// Ropey and Tree-sitter, however, operate on UTF-8 byte offsets. To bridge
+  /// this mismatch, we take the line number directly as the Tree-sitter `row`,
+  /// then look up the corresponding line in the Rope and convert the UTF-16
+  /// `character` offset into a char index and, from there, into a UTF-8 byte
+  /// offset for the `column`.
+  ///
+  /// The resulting `(row, column)` byte position is then used to locate the
+  /// node in the syntax tree.
   fn point(&self, document: &Document) -> Point {
     let row =
       usize::try_from(self.line).expect("line index exceeds usize::MAX");

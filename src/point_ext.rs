@@ -5,6 +5,11 @@ pub(crate) trait PointExt {
 }
 
 impl PointExt for Point {
+  /// Tree-sitter points use a zero-based `row` plus UTF-8 byte offset
+  /// `column`, while the LSP expects UTF-16 code-unit offsets.
+  ///
+  /// We take the document line for the point’s row, convert the byte column
+  /// into a char index, and then into a UTF-16 offset to produce an `lsp::Position`.
   fn position(&self, document: &Document) -> lsp::Position {
     let line = document.content.line(self.row);
 
