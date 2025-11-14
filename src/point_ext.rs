@@ -6,6 +6,8 @@ pub(crate) trait PointExt {
 }
 
 impl PointExt for Point {
+  /// Returns a new point shifted by `delta`, resetting the column when the
+  /// delta moves to a different row.
   fn advance(self, delta: Point) -> Self {
     if delta.row == 0 {
       Point::new(self.row, self.column + delta.column)
