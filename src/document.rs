@@ -935,6 +935,24 @@ mod tests {
   }
 
   #[test]
+  fn node_at_position_handles_utf16_columns() {
+    let document = document(indoc! {"
+      foo:
+        echo \"a🧪b\"
+    "});
+
+    let node = document
+      .node_at_position(lsp::Position {
+        line: 2,
+        character: 11,
+      })
+      .unwrap();
+
+    assert_eq!(node.kind(), "text");
+    assert_eq!(document.get_node_text(&node), "echo \"a🧪b\"");
+  }
+
+  #[test]
   fn recipe_with_default_parameter() {
     let document = document(indoc! {
       "
