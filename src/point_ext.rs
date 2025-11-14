@@ -39,7 +39,8 @@ mod tests {
     let document = document("a𐐀b");
 
     assert_eq!(
-      Point::new(0, document.content.line(0).char_to_byte(2)).position(&document),
+      Point::new(0, document.content.line(0).char_to_byte(2))
+        .position(&document),
       lsp::Position {
         line: 0,
         character: 3

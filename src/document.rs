@@ -1,4 +1,5 @@
 use super::*;
+use crate::position_ext::PositionExt;
 
 #[derive(Debug)]
 pub(crate) struct Document {
@@ -214,17 +215,7 @@ impl Document {
     position: lsp::Position,
   ) -> Option<Node<'_>> {
     let tree = self.tree.as_ref()?;
-
-    let row = position.line as usize;
-
-    let line = self.content.line(row);
-
-    let point = Point {
-      row,
-      column: line
-        .char_to_byte(line.utf16_cu_to_char(position.character as usize)),
-    };
-
+    let point = position.point(self);
     tree.root_node().descendant_for_point_range(point, point)
   }
 
