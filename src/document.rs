@@ -943,7 +943,7 @@ mod tests {
 
     let node = document
       .node_at_position(lsp::Position {
-        line: 2,
+        line: 1,
         character: 11,
       })
       .unwrap();
