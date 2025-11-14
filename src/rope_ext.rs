@@ -115,11 +115,10 @@ impl RopeExt for Rope {
     let char = self.byte_to_char(byte);
     let char_utf16_cu = self.char_to_utf16_cu(char);
 
-    let character = char_utf16_cu - line_utf16_cu;
-
     lsp::Position::new(
       u32::try_from(line).expect("line index exceeds u32::MAX"),
-      u32::try_from(character).expect("character offset exceeds u32::MAX"),
+      u32::try_from(char_utf16_cu - line_utf16_cu)
+        .expect("character offset exceeds u32::MAX"),
     )
   }
 
