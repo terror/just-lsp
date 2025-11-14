@@ -176,6 +176,36 @@ mod tests {
   }
 
   #[test]
+  fn apply_insert_into_empty_document() {
+    let mut rope = Rope::from_str("");
+
+    let change = change("🧪\nnew", (0, 0, 0, 0));
+
+    let edit = rope.build_edit(&change);
+
+    assert_eq!(
+      edit,
+      Edit {
+        start_char: 0,
+        end_char: 0,
+        input_edit: InputEdit {
+          start_byte: 0,
+          old_end_byte: 0,
+          new_end_byte: "🧪\nnew".len(),
+          start_position: Point::new(0, 0),
+          old_end_position: Point::new(0, 0),
+          new_end_position: Point::new(1, 3),
+        },
+        text: "🧪\nnew",
+      }
+    );
+
+    rope.apply_edit(&edit);
+
+    assert_eq!(rope.to_string(), "🧪\nnew");
+  }
+
+  #[test]
   fn apply_insert_edit_updates_rope_contents() {
     let mut rope = Rope::from_str("hello world");
 
