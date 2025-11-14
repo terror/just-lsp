@@ -89,7 +89,7 @@ impl RopeExt for Rope {
 
     let input_edit = InputEdit {
       new_end_byte: start.byte + text_end_byte_idx,
-      new_end_position: advance_point(start.point, text),
+      new_end_position: start.point.advance(text.point_delta()),
       old_end_byte: old_end.byte,
       old_end_position: old_end.point,
       start_byte: start.byte,
@@ -144,19 +144,6 @@ impl RopeExt for Rope {
       point: Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
   }
-}
-
-fn advance_point(mut point: Point, text: &str) -> Point {
-  for ch in text.chars() {
-    if ch == '\n' {
-      point.row += 1;
-      point.column = 0;
-    } else {
-      point.column += ch.len_utf8();
-    }
-  }
-
-  point
 }
 
 #[cfg(test)]
