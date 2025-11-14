@@ -32,15 +32,14 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TextPosition {
+pub(crate) struct Position {
   pub(crate) byte: usize,
   pub(crate) char: usize,
-  pub(crate) code: usize,
   pub(crate) point: Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TextEdit<'a> {
+pub(crate) struct Edit<'a> {
   pub(crate) end_char_idx: usize,
   pub(crate) input_edit: InputEdit,
   pub(crate) start_char_idx: usize,
@@ -50,14 +49,14 @@ pub(crate) struct TextEdit<'a> {
 pub(crate) trait RopeExt {
   /// Applies a previously constructed [`TextEdit`] to the rope, keeping both
   /// the textual contents and the internal tree-sitter offsets in sync.
-  fn apply_edit(&mut self, edit: &TextEdit);
+  fn apply_edit(&mut self, edit: &Edit);
 
   /// Converts an LSP `textDocument/didChange` event into a [`TextEdit`] that
   /// can be consumed both by `ropey` and tree-sitter.
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
-  ) -> TextEdit<'a>;
+  ) -> Edit<'a>;
 
   /// Maps an absolute byte offset into an LSP line/character pair where the
   /// column is expressed in UTF-16 code units as required by the spec.
@@ -70,11 +69,11 @@ pub(crate) trait RopeExt {
   /// Converts an LSP position back into absolute byte/char/code offsets and a
   /// tree-sitter point so downstream consumers can choose whichever coordinate
   /// space they need.
-  fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition;
+  fn lsp_position_to_core(&self, position: lsp::Position) -> Position;
 }
 
 impl RopeExt for Rope {
-  fn apply_edit(&mut self, edit: &TextEdit) {
+  fn apply_edit(&mut self, edit: &Edit) {
     self.remove(edit.start_char_idx..edit.end_char_idx);
 
     if !edit.text.is_empty() {
@@ -85,7 +84,7 @@ impl RopeExt for Rope {
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
-  ) -> TextEdit<'a> {
+  ) -> Edit<'a> {
     let text = change.text.as_str();
     let text_end_byte_idx = text.len();
 
@@ -121,7 +120,7 @@ impl RopeExt for Rope {
       new_end_position,
     };
 
-    TextEdit {
+    Edit {
       input_edit,
       start_char_idx: start.char,
       end_char_idx: old_end.char,
@@ -152,21 +151,19 @@ impl RopeExt for Rope {
     Point::new(line_idx, byte_idx - line_byte_idx)
   }
 
-  fn lsp_position_to_core(&self, position: lsp::Position) -> TextPosition {
+  fn lsp_position_to_core(&self, position: lsp::Position) -> Position {
     let row_idx = position.line as usize;
     let row_char_idx = self.line_to_char(row_idx);
     let row_byte_idx = self.line_to_byte(row_idx);
-    let row_code_idx = self.char_to_utf16_cu(row_char_idx);
 
     let col_code_offset = position.character as usize;
-    let col_code_idx = row_code_idx + col_code_offset;
-    let col_char_idx = self.utf16_cu_to_char(col_code_idx);
+    let col_char_idx = self
+      .utf16_cu_to_char(self.char_to_utf16_cu(row_char_idx) + col_code_offset);
     let col_byte_idx = self.char_to_byte(col_char_idx);
 
-    TextPosition {
+    Position {
       char: col_char_idx,
       byte: col_byte_idx,
-      code: col_code_idx,
       point: tree_sitter::Point::new(row_idx, col_byte_idx - row_byte_idx),
     }
   }
@@ -216,7 +213,6 @@ mod tests {
 
     assert_eq!(core.byte, after_emoji);
     assert_eq!(core.char, rope.byte_to_char(after_emoji));
-    assert_eq!(core.code, rope.char_to_utf16_cu(core.char));
     assert_eq!(core.point, rope.byte_to_tree_sitter_point(after_emoji));
   }
 
