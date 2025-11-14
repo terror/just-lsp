@@ -195,17 +195,37 @@ impl Document {
       .to_string()
   }
 
+  /// Returns the syntax tree node at the given LSP `Position`.
+  ///
+  /// LSP positions use a zero-based line index for `line` and a UTF-16
+  /// code-unit offset within that line for `character`.
+  ///
+  /// Ropey and Tree-sitter, however, operate on UTF-8 byte offsets. To bridge
+  /// this mismatch, we take the line number directly as the Tree-sitter `row`,
+  /// then look up the corresponding line in the Rope and convert the UTF-16
+  /// `character` offset into a char index and, from there, into a UTF-8 byte
+  /// offset for the `column`.
+  ///
+  /// The resulting `(row, column)` byte position is then used to locate the
+  /// node in the syntax tree.
   #[must_use]
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
   ) -> Option<Node<'_>> {
-    if let Some(tree) = &self.tree {
-      let point = position.point();
-      Some(tree.root_node().descendant_for_point_range(point, point)?)
-    } else {
-      None
-    }
+    let tree = self.tree.as_ref()?;
+
+    let row = position.line as usize;
+
+    let line = self.content.line(row);
+
+    let point = Point {
+      row,
+      column: line
+        .char_to_byte(line.utf16_cu_to_char(position.character as usize)),
+    };
+
+    tree.root_node().descendant_for_point_range(point, point)
   }
 
   /// Parses the current document contents and updates the cached syntax tree.
@@ -912,6 +932,24 @@ mod tests {
 
     assert_eq!(node.kind(), "text");
     assert_eq!(document.get_node_text(&node), "echo \"bar\"");
+  }
+
+  #[test]
+  fn node_at_position_handles_utf16_columns() {
+    let document = document(indoc! {"
+      foo:
+        echo \"a🧪b\"
+    "});
+
+    let node = document
+      .node_at_position(lsp::Position {
+        line: 1,
+        character: 11,
+      })
+      .unwrap();
+
+    assert_eq!(node.kind(), "text");
+    assert_eq!(document.get_node_text(&node), "echo \"a🧪b\"");
   }
 
   #[test]
