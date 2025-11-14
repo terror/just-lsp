@@ -40,6 +40,7 @@ use {
     sync::{Arc, atomic::AtomicBool},
     time::Instant,
   },
+  str_ext::StrExt,
   subcommand::Subcommand,
   tempfile::tempdir,
   text_node::TextNode,
@@ -69,6 +70,7 @@ mod group;
 mod node_ext;
 mod parameter;
 mod point_ext;
+mod position_ext;
 mod recipe;
 mod resolver;
 mod rope_ext;
@@ -76,6 +78,7 @@ mod rule;
 mod rule_context;
 mod server;
 mod setting;
+mod str_ext;
 mod subcommand;
 mod text_node;
 mod tokenizer;

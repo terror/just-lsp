@@ -75,7 +75,7 @@ impl InconsistentIndentationRule {
 
     let header_node = recipe_node.find("recipe_header")?;
 
-    let header_end_line = header_node.get_range().end.line;
+    let header_end_line = header_node.get_range(document).end.line;
 
     let mut line_idx =
       usize::try_from(header_end_line.saturating_add(1)).ok()?;

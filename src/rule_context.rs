@@ -100,7 +100,7 @@ impl IdentifierAnalysis {
     if !value_names.contains(&identifier_name) {
       unresolved_identifiers.push(UnresolvedIdentifier {
         name: identifier_name,
-        range: identifier.get_range(),
+        range: identifier.get_range(document),
       });
     }
   }

@@ -67,13 +67,13 @@ impl Analyze {
 
       let start = document
         .content
-        .lsp_position_to_core(diagnostic.range.start)
+        .lsp_position_to_position(diagnostic.range.start)
         .char
         .min(source_len);
 
       let end = document
         .content
-        .lsp_position_to_core(diagnostic.range.end)
+        .lsp_position_to_position(diagnostic.range.end)
         .char
         .min(source_len);
 

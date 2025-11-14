@@ -1,4 +1,5 @@
 use super::*;
+use crate::position_ext::PositionExt;
 
 #[derive(Debug)]
 pub(crate) struct Document {
@@ -45,13 +46,13 @@ impl Document {
           Some(Alias {
             name: TextNode {
               value: self.get_node_text(&left_node),
-              range: left_node.get_range(),
+              range: left_node.get_range(self),
             },
             value: TextNode {
               value: self.get_node_text(&right_node),
-              range: right_node.get_range(),
+              range: right_node.get_range(self),
             },
-            range: alias_node.get_range(),
+            range: alias_node.get_range(self),
           })
         })
         .collect()
@@ -111,18 +112,18 @@ impl Document {
                 .into_iter()
                 .map(|argument_node| TextNode {
                   value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(),
+                  range: argument_node.get_range(self),
                 })
                 .collect::<Vec<_>>();
 
               Attribute {
                 name: TextNode {
                   value: self.get_node_text(&identifier_node),
-                  range: identifier_node.get_range(),
+                  range: identifier_node.get_range(self),
                 },
                 arguments,
                 target,
-                range: attribute_node.get_range(),
+                range: attribute_node.get_range(self),
               }
             })
             .collect::<Vec<_>>()
@@ -165,7 +166,7 @@ impl Document {
                 .into_iter()
                 .map(|argument_node| TextNode {
                   value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(),
+                  range: argument_node.get_range(self),
                 })
                 .collect::<Vec<_>>()
             })
@@ -174,10 +175,10 @@ impl Document {
           Some(FunctionCall {
             name: TextNode {
               value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(),
+              range: identifier_node.get_range(self),
             },
             arguments,
-            range: function_call_node.get_range(),
+            range: function_call_node.get_range(self),
           })
         })
         .collect()
@@ -196,35 +197,13 @@ impl Document {
   }
 
   /// Returns the syntax tree node at the given LSP `Position`.
-  ///
-  /// LSP positions use a zero-based line index for `line` and a UTF-16
-  /// code-unit offset within that line for `character`.
-  ///
-  /// Ropey and Tree-sitter, however, operate on UTF-8 byte offsets. To bridge
-  /// this mismatch, we take the line number directly as the Tree-sitter `row`,
-  /// then look up the corresponding line in the Rope and convert the UTF-16
-  /// `character` offset into a char index and, from there, into a UTF-8 byte
-  /// offset for the `column`.
-  ///
-  /// The resulting `(row, column)` byte position is then used to locate the
-  /// node in the syntax tree.
   #[must_use]
   pub(crate) fn node_at_position(
     &self,
     position: lsp::Position,
   ) -> Option<Node<'_>> {
     let tree = self.tree.as_ref()?;
-
-    let row = position.line as usize;
-
-    let line = self.content.line(row);
-
-    let point = Point {
-      row,
-      column: line
-        .char_to_byte(line.utf16_cu_to_char(position.character as usize)),
-    };
-
+    let point = position.point(self);
     tree.root_node().descendant_for_point_range(point, point)
   }
 
@@ -269,18 +248,18 @@ impl Document {
                 .iter()
                 .map(|argument_node| TextNode {
                   value: self.get_node_text(argument_node),
-                  range: argument_node.get_range(),
+                  range: argument_node.get_range(self),
                 })
                 .collect::<Vec<_>>();
 
               Some(Attribute {
                 name: TextNode {
                   value: self.get_node_text(&identifier),
-                  range: identifier.get_range(),
+                  range: identifier.get_range(self),
                 },
                 arguments,
                 target: Some(AttributeTarget::Recipe),
-                range: attribute_node.get_range(),
+                range: attribute_node.get_range(self),
               })
             })
             .collect::<Vec<_>>();
@@ -303,7 +282,7 @@ impl Document {
                         .iter()
                         .map(|argument_node| TextNode {
                           value: self.get_node_text(argument_node),
-                          range: argument_node.get_range(),
+                          range: argument_node.get_range(self),
                         })
                         .collect()
                     })
@@ -312,7 +291,7 @@ impl Document {
                   Some(Dependency {
                     name: dependency_name,
                     arguments,
-                    range: dependency_node.get_range(),
+                    range: dependency_node.get_range(self),
                   })
                 })
                 .collect::<Vec<_>>()
@@ -328,7 +307,7 @@ impl Document {
                 .filter_map(|parameter_node| {
                   Parameter::parse(
                     &self.get_node_text(parameter_node),
-                    parameter_node.get_range(),
+                    parameter_node.get_range(self),
                   )
                 })
                 .collect()
@@ -339,7 +318,7 @@ impl Document {
               .find("recipe_body > shebang")
               .map(|shebang_node| TextNode {
                 value: self.get_node_text(&shebang_node),
-                range: shebang_node.get_range(),
+                range: shebang_node.get_range(self),
               });
 
           Some(Recipe {
@@ -348,7 +327,7 @@ impl Document {
             dependencies,
             content: self.get_node_text(recipe_node).trim().to_string(),
             parameters,
-            range: recipe_node.get_range(),
+            range: recipe_node.get_range(self),
             shebang,
           })
         })
@@ -366,7 +345,7 @@ impl Document {
         .filter_map(|setting_node| {
           Setting::parse(
             &self.get_node_text(setting_node),
-            setting_node.get_range(),
+            setting_node.get_range(self),
           )
         })
         .collect()
@@ -386,11 +365,11 @@ impl Document {
           Some(Variable {
             name: TextNode {
               value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(),
+              range: identifier_node.get_range(self),
             },
             export: identifier_node.get_parent("export").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
-            range: assignment_node.get_range(),
+            range: assignment_node.get_range(self),
           })
         })
         .collect()
