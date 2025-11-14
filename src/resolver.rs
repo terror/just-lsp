@@ -80,7 +80,7 @@ impl<'a> Resolver<'a> {
           Builtin::Constant { name, .. } if identifier_name == name => {
             return Some(lsp::Location {
               uri: self.document.uri.clone(),
-              range: identifier.get_range(),
+              range: identifier.get_range(self.document),
             });
           }
           _ => {}
@@ -96,7 +96,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         Builtin::Function { name, .. }
@@ -105,7 +105,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         Builtin::Setting { name, .. }
@@ -113,7 +113,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         _ => {}
@@ -127,14 +127,14 @@ impl<'a> Resolver<'a> {
         if recipe_node.kind() == "recipe" {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: recipe_node.get_range(),
+            range: recipe_node.get_range(self.document),
           });
         }
       }
       "assignment" | "parameter" | "variadic_parameter" => {
         return Some(lsp::Location {
           uri: self.document.uri.clone(),
-          range: identifier.parent()?.get_range(),
+          range: identifier.parent()?.get_range(self.document),
         });
       }
       _ => {}
@@ -173,7 +173,7 @@ impl<'a> Resolver<'a> {
           kind: lsp::MarkupKind::PlainText,
           value: recipe.content,
         }),
-        range: Some(identifier.get_range()),
+        range: Some(identifier.get_range(self.document)),
       });
     }
 
@@ -194,7 +194,7 @@ impl<'a> Resolver<'a> {
                 kind: lsp::MarkupKind::PlainText,
                 value: parameter.content,
               }),
-              range: Some(identifier.get_range()),
+              range: Some(identifier.get_range(self.document)),
             });
           }
         }
@@ -209,7 +209,7 @@ impl<'a> Resolver<'a> {
               kind: lsp::MarkupKind::PlainText,
               value: variable.content,
             }),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
       }
@@ -219,7 +219,7 @@ impl<'a> Resolver<'a> {
           Builtin::Constant { name, .. } if text == name => {
             return Some(lsp::Hover {
               contents: lsp::HoverContents::Markup(builtin.documentation()),
-              range: Some(identifier.get_range()),
+              range: Some(identifier.get_range(self.document)),
             });
           }
           _ => {}
@@ -235,7 +235,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         Builtin::Function { name, .. }
@@ -244,7 +244,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         Builtin::Setting { name, .. }
@@ -253,7 +253,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         _ => {}
@@ -396,7 +396,7 @@ impl<'a> Resolver<'a> {
       })
       .map(|found| lsp::Location {
         uri: self.document.uri.clone(),
-        range: found.get_range(),
+        range: found.get_range(self.document),
       })
       .collect()
   }
@@ -985,7 +985,7 @@ mod tests {
       .resolve_identifier_definition(&builtin_usage)
       .unwrap();
 
-    assert_eq!(definition.range, builtin_usage.get_range());
+    assert_eq!(definition.range, builtin_usage.get_range(&doc));
   }
 
   #[test]

@@ -77,7 +77,7 @@ impl MixedIndentationRule {
     let mut indent_style: Option<IndentStyle> = None;
 
     for line_node in recipe_node.find_all("recipe_line") {
-      let line_range = line_node.get_range();
+      let line_range = line_node.get_range(document);
 
       let Ok(line_idx) = usize::try_from(line_range.start.line) else {
         continue;

@@ -102,12 +102,13 @@ impl AliasRecipeConflictRule {
     let mut lookup = HashMap::new();
 
     if let Some(tree) = context.tree() {
+      let document = context.document();
       for recipe_node in tree.root_node().find_all("recipe") {
         if let Some(name_node) = recipe_node.find("recipe_header > identifier")
         {
           lookup.insert(
-            RangeKey::from(recipe_node.get_range()),
-            name_node.get_range(),
+            RangeKey::from(recipe_node.get_range(document)),
+            name_node.get_range(document),
           );
         }
       }

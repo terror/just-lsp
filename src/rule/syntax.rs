@@ -17,8 +17,9 @@ impl Rule for SyntaxRule {
     let mut diagnostics = Vec::new();
 
     if let Some(tree) = context.tree() {
+      let document = context.document();
       let mut cursor = tree.root_node().walk();
-      self.collect(&mut cursor, &mut diagnostics);
+      self.collect(document, &mut cursor, &mut diagnostics);
     }
 
     diagnostics
@@ -28,6 +29,7 @@ impl Rule for SyntaxRule {
 impl SyntaxRule {
   fn collect(
     &self,
+    document: &Document,
     cursor: &mut TreeCursor<'_>,
     diagnostics: &mut Vec<lsp::Diagnostic>,
   ) {
@@ -35,7 +37,7 @@ impl SyntaxRule {
 
     if node.is_error() {
       diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: node.get_range(),
+        range: node.get_range(document),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
         message: "Syntax error".to_string(),
         ..Default::default()
@@ -44,7 +46,7 @@ impl SyntaxRule {
 
     if node.is_missing() {
       diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: node.get_range(),
+        range: node.get_range(document),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
         message: "Missing syntax element".to_string(),
         ..Default::default()
@@ -53,7 +55,7 @@ impl SyntaxRule {
 
     if cursor.goto_first_child() {
       loop {
-        self.collect(cursor, diagnostics);
+        self.collect(document, cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;

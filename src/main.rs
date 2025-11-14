@@ -76,6 +76,7 @@ mod rule;
 mod rule_context;
 mod server;
 mod setting;
+mod position_ext;
 mod subcommand;
 mod text_node;
 mod tokenizer;

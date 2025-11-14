@@ -5,7 +5,7 @@ pub(crate) trait NodeExt {
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
   fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
-  fn get_range(&self) -> lsp::Range;
+  fn get_range(&self, document: &Document) -> lsp::Range;
 }
 
 fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
@@ -180,10 +180,10 @@ impl NodeExt for Node<'_> {
     None
   }
 
-  fn get_range(&self) -> lsp::Range {
+  fn get_range(&self, document: &Document) -> lsp::Range {
     lsp::Range {
-      start: self.start_position().position(),
-      end: self.end_position().position(),
+      start: self.start_position().position(document),
+      end: self.end_position().position(document),
     }
   }
 }
