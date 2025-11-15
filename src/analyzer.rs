@@ -20,6 +20,7 @@ static RULES: &[&dyn Rule] = &[
   &RecipeDependencyCycleRule,
   &MissingDependencyRule,
   &DependencyArgumentRule,
+  &ParallelDependenciesRule,
   &UnknownSettingRule,
   &InvalidSettingKindRule,
   &DuplicateSettingRule,
@@ -197,6 +198,39 @@ mod tests {
       "
     })
     .error(Message::Text("Recipe `baz` not found"))
+    .run();
+  }
+
+  #[test]
+  fn parallel_without_dependencies_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(Message::Text(
+      "Recipe `foo` has no dependencies, so `[parallel]` has no effect",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+      "
+    })
+    .warning(Message::Text(
+      "Recipe `foo` has only one dependency, so `[parallel]` has no effect",
+    ))
     .run();
   }
 

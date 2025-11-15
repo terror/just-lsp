@@ -21,6 +21,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `recipe-dependency-cycles`        | Recipe Dependency Cycles        | Recipe participates in a circular dependency chain.                                                 |
 | `missing-dependencies`            | Missing Dependencies            | Recipe depends on another recipe that is missing.                                                   |
 | `dependency-arguments`            | Dependency Arguments            | Dependency invocation provides the wrong number of arguments.                                       |
+| `parallel-dependencies`           | Parallel Dependencies           | Warning: `[parallel]` is applied to a recipe with fewer than two dependencies, so it has no effect. |
 | `mixed-recipe-indentation`        | Mixed Recipe Indentation        | Recipe body mixes tabs and spaces for indentation.                                                  |
 | `inconsistent-recipe-indentation` | Inconsistent Recipe Indentation | Recipe indentation width changes after the first indented line.                                     |
 | `unknown-function`                | Unknown Function                | Call targets a function that isn’t part of the builtin set.                                         |
