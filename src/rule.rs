@@ -25,6 +25,7 @@ pub(crate) use {
   unknown_attribute::UnknownAttributeRule,
   unknown_function::UnknownFunctionRule, unknown_setting::UnknownSettingRule,
   unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
+  working_directory_conflict::WorkingDirectoryConflictRule,
 };
 
 mod alias_recipe_conflict;
@@ -54,6 +55,7 @@ mod unknown_function;
 mod unknown_setting;
 mod unused_parameters;
 mod unused_variables;
+mod working_directory_conflict;
 
 pub(crate) trait Rule: Sync {
   /// Helper to annotate diagnostics with rule information.

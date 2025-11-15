@@ -11,6 +11,7 @@ static RULES: &[&dyn Rule] = &[
   &AttributeTargetSupportRule,
   &DuplicateAttributeRule,
   &ScriptShebangConflictRule,
+  &WorkingDirectoryConflictRule,
   &UnknownFunctionRule,
   &FunctionArgumentsRule,
   &RecipeParameterRule,
@@ -370,6 +371,36 @@ mod tests {
     .error(Message::Text(
       "Recipe attribute `working-directory` is duplicated",
     ))
+    .run();
+  }
+
+  #[test]
+  fn attributes_working_directory_conflicts_with_no_cd() {
+    Test::new(indoc! {
+      "
+      [no-cd]
+      [working-directory: '/tmp']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(Message::Text(
+      "Recipe `build` can't combine `[working-directory]` with `[no-cd]`",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn attributes_no_cd_allowed_with_global_working_directory() {
+    Test::new(indoc! {
+      "
+      set working-directory := '/tmp'
+
+      [no-cd]
+      build:
+        echo \"build\"
+      "
+    })
     .run();
   }
 
