@@ -17,6 +17,7 @@ pub(crate) use {
   missing_dependencies::MissingDependencyRule,
   missing_recipe_for_alias::MissingRecipeForAliasRule,
   mixed_indentation::MixedIndentationRule,
+  parallel_dependencies::ParallelDependenciesRule,
   recipe_dependency_cycles::RecipeDependencyCycleRule,
   recipe_parameters::RecipeParameterRule,
   script_shebang_conflict::ScriptShebangConflictRule, syntax::SyntaxRule,
@@ -42,6 +43,7 @@ mod invalid_setting_kind;
 mod missing_dependencies;
 mod missing_recipe_for_alias;
 mod mixed_indentation;
+mod parallel_dependencies;
 mod recipe_dependency_cycles;
 mod recipe_parameters;
 mod script_shebang_conflict;
