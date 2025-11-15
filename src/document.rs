@@ -414,6 +414,20 @@ mod tests {
   }
 
   #[test]
+  fn create_document() {
+    let content = indoc! {"
+      foo:
+        echo foo
+    "};
+
+    let document = document(content);
+
+    assert_eq!(document.content.to_string(), content);
+
+    assert!(document.tree.is_some());
+  }
+
+  #[test]
   fn apply_change() {
     let mut document = document(indoc! {
       "
@@ -440,20 +454,6 @@ mod tests {
 
     assert_ne!(document.content.to_string(), original_content);
     assert_eq!(document.content.to_string(), "foo:\n  echo \"bar\"");
-  }
-
-  #[test]
-  fn create_document() {
-    let content = indoc! {"
-      foo:
-        echo foo
-    "};
-
-    let document = document(content);
-
-    assert_eq!(document.content.to_string(), content);
-
-    assert!(document.tree.is_some());
   }
 
   #[test]
@@ -520,12 +520,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "shell".into(),
         kind: SettingKind::Array,
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -538,11 +538,12 @@ mod tests {
     });
 
     let aliases = document.aliases();
+
     assert_eq!(aliases.len(), 1);
 
     assert_eq!(
-      aliases[0],
-      Alias {
+      aliases,
+      vec![Alias {
         name: TextNode {
           value: "a1".into(),
           range: range((0, 6, 0, 8))
@@ -552,7 +553,7 @@ mod tests {
           range: range((0, 12, 0, 15))
         },
         range: range((0, 0, 0, 15))
-      }
+      }]
     );
   }
 
@@ -569,12 +570,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -591,12 +592,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "export".into(),
         kind: SettingKind::Boolean(true),
         range: range((0, 0, 1, 0))
-      }
+      }]
     );
   }
 
@@ -614,33 +615,31 @@ mod tests {
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
-      aliases[0],
-      Alias {
-        name: TextNode {
-          value: "duplicate".into(),
-          range: range((0, 6, 0, 15))
+      aliases,
+      vec![
+        Alias {
+          name: TextNode {
+            value: "duplicate".into(),
+            range: range((0, 6, 0, 15))
+          },
+          value: TextNode {
+            value: "foo".into(),
+            range: range((0, 19, 0, 22))
+          },
+          range: range((0, 0, 0, 22))
         },
-        value: TextNode {
-          value: "foo".into(),
-          range: range((0, 19, 0, 22))
-        },
-        range: range((0, 0, 0, 22))
-      }
-    );
-
-    assert_eq!(
-      aliases[1],
-      Alias {
-        name: TextNode {
-          value: "duplicate".into(),
-          range: range((1, 6, 1, 15))
-        },
-        value: TextNode {
-          value: "bar".into(),
-          range: range((1, 19, 1, 22))
-        },
-        range: range((1, 0, 1, 22))
-      }
+        Alias {
+          name: TextNode {
+            value: "duplicate".into(),
+            range: range((1, 6, 1, 15))
+          },
+          value: TextNode {
+            value: "bar".into(),
+            range: range((1, 19, 1, 22))
+          },
+          range: range((1, 0, 1, 22))
+        }
+      ]
     );
   }
 
@@ -658,33 +657,31 @@ mod tests {
     assert_eq!(aliases.len(), 2);
 
     assert_eq!(
-      aliases[0],
-      Alias {
-        name: TextNode {
-          value: "a1".into(),
-          range: range((0, 6, 0, 8)),
+      aliases,
+      vec![
+        Alias {
+          name: TextNode {
+            value: "a1".into(),
+            range: range((0, 6, 0, 8)),
+          },
+          value: TextNode {
+            value: "foo".into(),
+            range: range((0, 12, 0, 15)),
+          },
+          range: range((0, 0, 0, 15)),
         },
-        value: TextNode {
-          value: "foo".into(),
-          range: range((0, 12, 0, 15)),
-        },
-        range: range((0, 0, 0, 15)),
-      }
-    );
-
-    assert_eq!(
-      aliases[1],
-      Alias {
-        name: TextNode {
-          value: "a2".into(),
-          range: range((1, 6, 1, 8)),
-        },
-        value: TextNode {
-          value: "bar".into(),
-          range: range((1, 12, 1, 15)),
-        },
-        range: range((1, 0, 1, 15)),
-      }
+        Alias {
+          name: TextNode {
+            value: "a2".into(),
+            range: range((1, 6, 1, 8)),
+          },
+          value: TextNode {
+            value: "bar".into(),
+            range: range((1, 12, 1, 15)),
+          },
+          range: range((1, 0, 1, 15)),
+        }
+      ]
     );
   }
 
@@ -703,30 +700,24 @@ mod tests {
     assert_eq!(settings.len(), 3);
 
     assert_eq!(
-      settings[0],
-      Setting {
-        name: "export".into(),
-        kind: SettingKind::Boolean(true),
-        range: range((0, 0, 1, 0)),
-      }
-    );
-
-    assert_eq!(
-      settings[1],
-      Setting {
-        name: "shell".into(),
-        kind: SettingKind::Array,
-        range: range((1, 0, 2, 0)),
-      }
-    );
-
-    assert_eq!(
-      settings[2],
-      Setting {
-        name: "bar".into(),
-        kind: SettingKind::String,
-        range: range((2, 0, 3, 0)),
-      }
+      settings,
+      vec![
+        Setting {
+          name: "export".into(),
+          kind: SettingKind::Boolean(true),
+          range: range((0, 0, 1, 0)),
+        },
+        Setting {
+          name: "shell".into(),
+          kind: SettingKind::Array,
+          range: range((1, 0, 2, 0)),
+        },
+        Setting {
+          name: "bar".into(),
+          kind: SettingKind::String,
+          range: range((2, 0, 3, 0)),
+        }
+      ]
     );
   }
 
@@ -743,12 +734,12 @@ mod tests {
     assert_eq!(settings.len(), 1);
 
     assert_eq!(
-      settings[0],
-      Setting {
+      settings,
+      vec![Setting {
         name: "bar".into(),
         kind: SettingKind::String,
         range: range((0, 0, 1, 0)),
-      }
+      }]
     );
   }
 
@@ -838,9 +829,20 @@ mod tests {
 
     let variables = document.variables();
 
-    assert!(variables[0].export);
-
     assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        name: TextNode {
+          value: "PATH".into(),
+          range: range((1, 7, 1, 11)),
+        },
+        export: true,
+        content: "PATH := '/usr/local/bin'".into(),
+        range: range((1, 7, 2, 0)),
+      }]
+    );
   }
 
   #[test]
