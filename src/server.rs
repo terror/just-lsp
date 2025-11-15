@@ -1784,6 +1784,60 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn did_change_without_open_document_is_ignored() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidChangeNotification {
+        uri: "file:///missing.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 0,
+            },
+          }),
+          range_length: None,
+          text: "\"updated\"".into(),
+        }],
+      })
+      .notification(DidOpenNotification {
+        uri: "file:///missing.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///missing.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
