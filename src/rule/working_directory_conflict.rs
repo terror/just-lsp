@@ -21,11 +21,11 @@ impl Rule for WorkingDirectoryConflictRule {
 
       let no_cd_attribute = recipe.find_attribute("no-cd");
 
-      if let (Some(working_dir), Some(_)) =
+      if let (Some(attribute), Some(_)) =
         (working_directory_attribute, no_cd_attribute)
       {
         diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: working_dir.range,
+          range: attribute.range,
           severity: Some(lsp::DiagnosticSeverity::ERROR),
           message: format!(
             "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
