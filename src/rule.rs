@@ -59,10 +59,12 @@ mod working_directory_conflict;
 
 pub(crate) trait Rule: Sync {
   /// Helper to annotate diagnostics with rule information.
-  fn diagnostic(&self, mut diagnostic: lsp::Diagnostic) -> lsp::Diagnostic {
-    diagnostic.source = Some(format!("just-lsp ({})", self.display_name()));
-    diagnostic.code = Some(lsp::NumberOrString::String(self.id().to_string()));
-    diagnostic
+  fn diagnostic(&self, diagnostic: lsp::Diagnostic) -> lsp::Diagnostic {
+    lsp::Diagnostic {
+      code: Some(lsp::NumberOrString::String(self.id().to_string())),
+      source: Some(format!("just-lsp ({})", self.display_name())),
+      ..diagnostic
+    }
   }
 
   /// Human-readable name for the rule.
