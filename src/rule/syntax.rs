@@ -160,3 +160,42 @@ impl SyntaxRule {
     truncated
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn describe_kind_formats_identifier_like_kinds() {
+    assert_eq!(
+      SyntaxRule::describe_kind("recipe_body_line"),
+      "recipe body line"
+    );
+  }
+
+  #[test]
+  fn describe_kind_handles_newline_kind() {
+    assert_eq!(SyntaxRule::describe_kind("\n"), "newline");
+  }
+
+  #[test]
+  fn snippet_preview_collapses_whitespace() {
+    assert_eq!(
+      SyntaxRule::snippet_preview("  foo\t\tbar \n baz  "),
+      Some("foo bar baz".to_string())
+    );
+  }
+
+  #[test]
+  fn snippet_preview_returns_none_for_blank() {
+    assert_eq!(SyntaxRule::snippet_preview("   \n\t  "), None);
+  }
+
+  #[test]
+  fn truncate_limits_length() {
+    assert_eq!(
+      SyntaxRule::truncate("abcdefghijklmnopqrstuvwxyz", 5),
+      "abcde..."
+    );
+  }
+}
