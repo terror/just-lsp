@@ -71,8 +71,8 @@ impl SyntaxRule {
       return "newline".to_string();
     }
 
-    if kind.chars().all(|ch| {
-      ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == ' '
+    if kind.chars().all(|char| {
+      char.is_ascii_alphanumeric() || char == '_' || char == '-' || char == ' '
     }) {
       let mut name = kind.replace('_', " ");
 
