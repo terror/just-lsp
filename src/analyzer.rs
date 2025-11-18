@@ -203,6 +203,18 @@ mod tests {
   }
 
   #[test]
+  fn aliases_missing_target() {
+    Test::new(indoc! {
+      "
+      alias foo :=
+      "
+    })
+    .error(Message::Text("Missing identifier in alias"))
+    .error(Message::Text("Recipe `` not found"))
+    .run();
+  }
+
+  #[test]
   fn parallel_without_dependencies_warns() {
     Test::new(indoc! {
       "
@@ -726,7 +738,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Syntax error"))
+    .error(Message::Text("Syntax error near `foo echo \"foo\"`"))
     .run();
   }
 
