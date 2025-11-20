@@ -14,44 +14,31 @@ impl Rule for ParallelDependenciesRule {
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
-    let mut diagnostics = Vec::new();
+    context
+      .recipes()
+      .iter()
+      .filter_map(|recipe| {
+        let attribute = recipe.find_attribute("parallel")?;
 
-    for recipe in context.recipes() {
-      let Some(attribute) = recipe.find_attribute("parallel") else {
-        continue;
-      };
+        let message = match recipe.dependencies.len() {
+          0 => format!(
+            "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
+            recipe.name
+          ),
+          1 => format!(
+            "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
+            recipe.name
+          ),
+          _ => return None,
+        };
 
-      match recipe.dependencies.len() {
-        0 | 1 => {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: attribute.range,
-            severity: Some(lsp::DiagnosticSeverity::WARNING),
-            message: Self::message(recipe.dependencies.len(), recipe),
-            ..Default::default()
-          }));
-        }
-        _ => {}
-      }
-    }
-
-    diagnostics
-  }
-}
-
-impl ParallelDependenciesRule {
-  fn message(count: usize, recipe: &Recipe) -> String {
-    match count {
-      0 => format!(
-        "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
-        recipe.name
-      ),
-      1 => format!(
-        "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
-        recipe.name
-      ),
-      _ => unreachable!(
-        "parallel dependency warning only applies to 0 or 1 dependencies"
-      ),
-    }
+        Some(self.diagnostic(lsp::Diagnostic {
+          message,
+          range: attribute.range,
+          severity: Some(lsp::DiagnosticSeverity::WARNING),
+          ..Default::default()
+        }))
+      })
+      .collect()
   }
 }
