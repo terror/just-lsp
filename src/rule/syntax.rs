@@ -39,7 +39,7 @@ impl SyntaxRule {
       diagnostics.push(self.diagnostic(lsp::Diagnostic {
         range: node.get_range(document),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: "Syntax error".to_string(),
+        message: Self::error_message(document, &node),
         ..Default::default()
       }));
     }
@@ -48,7 +48,7 @@ impl SyntaxRule {
       diagnostics.push(self.diagnostic(lsp::Diagnostic {
         range: node.get_range(document),
         severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: "Missing syntax element".to_string(),
+        message: Self::missing_message(&node),
         ..Default::default()
       }));
     }
@@ -64,5 +64,138 @@ impl SyntaxRule {
 
       cursor.goto_parent();
     }
+  }
+
+  fn describe_kind(kind: &str) -> String {
+    if kind == "\n" {
+      return "newline".to_string();
+    }
+
+    if kind.chars().all(|char| {
+      char.is_ascii_alphanumeric() || char == '_' || char == '-' || char == ' '
+    }) {
+      let mut name = kind.replace('_', " ");
+
+      if name.is_empty() {
+        name = "syntax element".to_string();
+      }
+
+      return name;
+    }
+
+    format!("`{kind}`")
+  }
+
+  fn error_message(document: &Document, node: &Node<'_>) -> String {
+    let preview = Self::snippet_preview(&document.get_node_text(node));
+
+    if let Some(snippet) = preview {
+      format!("Syntax error near `{snippet}`")
+    } else if let Some(parent) = node.parent() {
+      format!("Syntax error in {}", Self::describe_kind(parent.kind()))
+    } else {
+      "Syntax error".to_string()
+    }
+  }
+
+  fn missing_message(node: &Node<'_>) -> String {
+    let missing = Self::describe_kind(node.kind());
+
+    if let Some(parent) = node.parent() {
+      let context = Self::describe_kind(parent.kind());
+
+      if missing == context {
+        format!("Missing {missing}")
+      } else {
+        format!("Missing {missing} in {context}")
+      }
+    } else {
+      format!("Missing {missing}")
+    }
+  }
+
+  fn snippet_preview(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+
+    if trimmed.is_empty() {
+      return None;
+    }
+
+    let mut collapsed = String::new();
+    let mut previous_space = false;
+
+    for char in trimmed.chars() {
+      if char.is_whitespace() {
+        if !previous_space {
+          collapsed.push(' ');
+          previous_space = true;
+        }
+      } else {
+        collapsed.push(char);
+        previous_space = false;
+      }
+    }
+
+    let collapsed = collapsed.trim();
+
+    if collapsed.is_empty() {
+      return None;
+    }
+
+    Some(Self::truncate(collapsed, 40))
+  }
+
+  fn truncate(text: &str, max_chars: usize) -> String {
+    let mut truncated = String::new();
+
+    for (char_count, ch) in text.chars().enumerate() {
+      if char_count >= max_chars {
+        truncated.push_str("...");
+        return truncated;
+      }
+
+      truncated.push(ch);
+    }
+
+    truncated
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn describe_kind_formats_identifier_like_kinds() {
+    assert_eq!(
+      SyntaxRule::describe_kind("recipe_body_line"),
+      "recipe body line"
+    );
+  }
+
+  #[test]
+  fn describe_kind_handles_newline_kind() {
+    assert_eq!(SyntaxRule::describe_kind("\n"), "newline");
+  }
+
+  #[test]
+  fn snippet_preview_collapses_whitespace() {
+    assert_eq!(
+      SyntaxRule::snippet_preview("  foo\t\tbar \n baz  "),
+      Some("foo bar baz".to_string())
+    );
+  }
+
+  #[test]
+  fn snippet_preview_returns_none_for_blank() {
+    assert_eq!(SyntaxRule::snippet_preview("   \n\t  "), None);
+  }
+
+  #[test]
+  fn truncate_limits_length() {
+    assert_eq!(
+      SyntaxRule::truncate("abcdefghijklmnopqrstuvwxyz", 5),
+      "abcde..."
+    );
   }
 }
