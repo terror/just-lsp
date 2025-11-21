@@ -124,6 +124,7 @@ impl SemanticTokenMapping {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 struct Token {
   length: u32,
   line: u32,
@@ -418,109 +419,9 @@ impl<'doc> Tokenizer<'doc> {
 mod tests {
   use super::*;
 
-  fn document(text: &str) -> Document {
-    let params = lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///tokenizer.just").unwrap(),
-        language_id: "just".into(),
-        version: 1,
-        text: text.into(),
-      },
-    };
-
-    Document::try_from(params).expect("document creation succeeds")
-  }
-
-  #[test]
-  fn token_type_index_matches_expected_order() {
-    assert_eq!(Tokenizer::token_type_index("comment"), 0);
-    assert_eq!(Tokenizer::token_type_index("keyword"), 1);
-    assert_eq!(Tokenizer::token_type_index("function"), 6);
-  }
-
-  #[test]
-  fn modifier_bitset_combines_flags() {
-    assert_eq!(Tokenizer::modifier_bitset(&["declaration"]), 1);
-    assert_eq!(Tokenizer::modifier_bitset(&["deprecated"]), 2);
-    assert_eq!(
-      Tokenizer::modifier_bitset(&["declaration", "deprecated"]),
-      3
-    );
-  }
-
-  #[test]
-  fn push_tokens_for_span_handles_multiline_segments() {
-    let text = "alpha\nbeta\n";
-    let rope = Rope::from_str(text);
-    let mapping = SemanticTokenMapping::new("keyword", &[]);
-
-    let mut tokens = Vec::new();
-
-    let end_byte = text.len() - 1;
-
-    Tokenizer::push_tokens_for_span(&rope, 0, end_byte, mapping, &mut tokens);
-
-    assert_eq!(tokens.len(), 2);
-
-    assert_eq!(tokens[0].line, 0);
-    assert_eq!(tokens[0].start_character, 0);
-    assert_eq!(tokens[0].length, 5);
-
-    assert_eq!(tokens[1].line, 1);
-    assert_eq!(tokens[1].start_character, 0);
-    assert_eq!(tokens[1].length, 4);
-  }
-
-  #[test]
-  fn encode_tokens_sorts_and_computes_deltas() {
-    let tokens = vec![
-      Token {
-        line: 2,
-        start_character: 1,
-        length: 2,
-        token_type_index: 0,
-        modifiers_bitset: 0,
-      },
-      Token {
-        line: 0,
-        start_character: 5,
-        length: 3,
-        token_type_index: 1,
-        modifiers_bitset: 0,
-      },
-      Token {
-        line: 1,
-        start_character: 0,
-        length: 4,
-        token_type_index: 2,
-        modifiers_bitset: 0,
-      },
-    ];
-
-    let encoded = Tokenizer::encode_tokens(tokens);
-
-    assert_eq!(encoded.len(), 3);
-
-    assert_eq!(encoded[0].delta_line, 0);
-    assert_eq!(encoded[0].delta_start, 5);
-
-    assert_eq!(encoded[1].delta_line, 1);
-    assert_eq!(encoded[1].delta_start, 0);
-
-    assert_eq!(encoded[2].delta_line, 1);
-    assert_eq!(encoded[2].delta_start, 1);
-  }
-
-  #[test]
-  fn trailing_line_break_len_detects_crlf() {
-    let rope = Rope::from_str("foo\r\nbar");
-    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 2);
-    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 1), 0);
-  }
-
   #[test]
   fn tokenizer_emits_expected_tokens() {
-    let document = document("foo:\n  echo \"bar\"\n");
+    let document = Document::from("foo:\n  echo \"bar\"\n");
 
     assert_eq!(
       Tokenizer::new(&document).tokenize().unwrap(),
@@ -541,5 +442,120 @@ mod tests {
         },
       ],
     );
+  }
+
+  #[test]
+  fn push_tokens_for_span_handles_multiline_segments() {
+    let text = "alpha\nbeta\n";
+
+    let mut tokens = Vec::new();
+
+    Tokenizer::push_tokens_for_span(
+      &text.into(),
+      0,
+      text.len() - 1,
+      SemanticTokenMapping::new("keyword", &[]),
+      &mut tokens,
+    );
+
+    assert_eq!(
+      tokens,
+      vec![
+        Token {
+          length: 5,
+          line: 0,
+          modifiers_bitset: 0,
+          start_character: 0,
+          token_type_index: Tokenizer::token_type_index("keyword"),
+        },
+        Token {
+          length: 4,
+          line: 1,
+          modifiers_bitset: 0,
+          start_character: 0,
+          token_type_index: Tokenizer::token_type_index("keyword"),
+        }
+      ]
+    );
+  }
+
+  #[test]
+  fn encode_tokens_sorts_and_computes_deltas() {
+    let tokens = vec![
+      Token {
+        length: 2,
+        line: 2,
+        modifiers_bitset: 0,
+        start_character: 1,
+        token_type_index: 0,
+      },
+      Token {
+        length: 3,
+        line: 0,
+        modifiers_bitset: 0,
+        start_character: 5,
+        token_type_index: 1,
+      },
+      Token {
+        length: 4,
+        line: 1,
+        modifiers_bitset: 0,
+        start_character: 0,
+        token_type_index: 2,
+      },
+    ];
+
+    let encoded = Tokenizer::encode_tokens(tokens);
+
+    assert_eq!(
+      encoded,
+      vec![
+        lsp::SemanticToken {
+          delta_line: 0,
+          delta_start: 5,
+          length: 3,
+          token_modifiers_bitset: 0,
+          token_type: 1,
+        },
+        lsp::SemanticToken {
+          delta_line: 1,
+          delta_start: 0,
+          length: 4,
+          token_modifiers_bitset: 0,
+          token_type: 2,
+        },
+        lsp::SemanticToken {
+          delta_line: 1,
+          delta_start: 1,
+          length: 2,
+          token_modifiers_bitset: 0,
+          token_type: 0,
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn token_type_index_matches_expected_order() {
+    assert_eq!(Tokenizer::token_type_index("comment"), 0);
+    assert_eq!(Tokenizer::token_type_index("keyword"), 1);
+    assert_eq!(Tokenizer::token_type_index("function"), 6);
+  }
+
+  #[test]
+  fn modifier_bitset_combines_flags() {
+    assert_eq!(Tokenizer::modifier_bitset(&["declaration"]), 1);
+    assert_eq!(Tokenizer::modifier_bitset(&["deprecated"]), 2);
+    assert_eq!(
+      Tokenizer::modifier_bitset(&["declaration", "deprecated"]),
+      3
+    );
+  }
+
+  #[test]
+  fn trailing_line_break_len_detects_crlf() {
+    let rope = Rope::from_str("foo\r\nbar");
+    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 2);
+    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 1), 0);
   }
 }
