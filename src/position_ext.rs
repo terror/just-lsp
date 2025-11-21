@@ -36,28 +36,16 @@ impl PositionExt for lsp::Position {
 mod tests {
   use {super::*, pretty_assertions::assert_eq};
 
-  fn document(content: &str) -> Document {
-    Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        language_id: "just".to_string(),
-        version: 1,
-        text: content.to_string(),
-      },
-    })
-    .unwrap()
-  }
-
   #[test]
   fn converts_utf16_offsets_to_utf8_columns() {
-    let doc = document("a🧪b");
+    let document = Document::from("a🧪b");
 
     let position = lsp::Position {
       line: 0,
       character: 3,
     };
 
-    let point = position.point(&doc);
+    let point = position.point(&document);
 
     assert_eq!(point, Point { row: 0, column: 5 });
   }

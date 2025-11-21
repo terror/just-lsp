@@ -9,6 +9,22 @@ pub(crate) struct Document {
   pub(crate) version: i32,
 }
 
+#[cfg(test)]
+impl From<&str> for Document {
+  fn from(value: &str) -> Self {
+    let mut document = Self {
+      content: value.into(),
+      tree: None,
+      uri: lsp::Url::parse("file:///test.just").unwrap(),
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    document
+  }
+}
+
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
   type Error = Error;
 
@@ -401,18 +417,6 @@ mod tests {
     }
   }
 
-  fn document(content: &str) -> Document {
-    Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        language_id: "just".to_string(),
-        version: 1,
-        text: content.to_string(),
-      },
-    })
-    .unwrap()
-  }
-
   #[test]
   fn create_document() {
     let content = indoc! {"
@@ -420,7 +424,7 @@ mod tests {
         echo foo
     "};
 
-    let document = document(content);
+    let document = Document::from(content);
 
     assert_eq!(document.content.to_string(), content);
 
@@ -429,7 +433,7 @@ mod tests {
 
   #[test]
   fn apply_change() {
-    let mut document = document(indoc! {
+    let mut document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -458,7 +462,7 @@ mod tests {
 
   #[test]
   fn find_nonexistent_recipe() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -470,7 +474,7 @@ mod tests {
 
   #[test]
   fn find_recipe() {
-    let document = document(indoc! {"
+    let document = Document::from(indoc! {"
       foo:
         echo \"foo\"
 
@@ -509,7 +513,7 @@ mod tests {
 
   #[test]
   fn get_array_setting() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set shell := ['foo']
       "
@@ -531,7 +535,7 @@ mod tests {
 
   #[test]
   fn get_basic_alias() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       alias a1 := foo
       "
@@ -559,7 +563,7 @@ mod tests {
 
   #[test]
   fn get_boolean_flag_setting() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set export
       "
@@ -581,7 +585,7 @@ mod tests {
 
   #[test]
   fn get_boolean_setting() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set export := true
       "
@@ -603,7 +607,7 @@ mod tests {
 
   #[test]
   fn get_duplicate_aliases() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       alias duplicate := foo
       alias duplicate := bar
@@ -645,7 +649,7 @@ mod tests {
 
   #[test]
   fn get_multiple_aliases() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       alias a1 := foo
       alias a2 := bar
@@ -687,7 +691,7 @@ mod tests {
 
   #[test]
   fn get_multiple_settings() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set export := true
       set shell := ['foo']
@@ -723,7 +727,7 @@ mod tests {
 
   #[test]
   fn get_string_setting() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set bar := 'wow!'
       "
@@ -745,7 +749,7 @@ mod tests {
 
   #[test]
   fn get_variables() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       tmpdir  := `mktemp -d`
       version := \"0.2.7\"
@@ -820,7 +824,7 @@ mod tests {
 
   #[test]
   fn private_exported_variable_is_marked_exported() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       [private]
       export PATH := '/usr/local/bin'
@@ -847,7 +851,7 @@ mod tests {
 
   #[test]
   fn multiple_recipes() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -886,7 +890,7 @@ mod tests {
 
   #[test]
   fn node_at_position() {
-    let document = document(indoc! {"
+    let document = Document::from(indoc! {"
       foo:
         echo \"foo\"
 
@@ -917,7 +921,7 @@ mod tests {
 
   #[test]
   fn node_at_position_handles_utf16_columns() {
-    let document = document(indoc! {"
+    let document = Document::from(indoc! {"
       foo:
         echo \"a🧪b\"
     "});
@@ -935,7 +939,7 @@ mod tests {
 
   #[test]
   fn recipe_with_default_parameter() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       baz first second=\"default\":
         echo \"{{first}} {{second}}\"
@@ -975,7 +979,7 @@ mod tests {
 
   #[test]
   fn recipe_with_dependency() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1005,7 +1009,7 @@ mod tests {
 
   #[test]
   fn recipe_with_dependency_arguments() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo arg1 arg2:
         echo \"{{arg1}} {{arg2}}\"
@@ -1044,7 +1048,7 @@ mod tests {
 
   #[test]
   fn recipe_with_shebang() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         #!/usr/bin/env bash
@@ -1065,7 +1069,7 @@ mod tests {
 
   #[test]
   fn recipe_with_multiple_dependencies() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1105,7 +1109,7 @@ mod tests {
 
   #[test]
   fn recipe_with_parameters() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       bar target $lol:
         echo \"Building {{target}}\"
@@ -1143,7 +1147,7 @@ mod tests {
 
   #[test]
   fn recipe_with_variadic_parameter() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       baz first +second=\"default\":
         echo \"{{first}} {{second}}\"
@@ -1183,7 +1187,7 @@ mod tests {
 
   #[test]
   fn recipe_without_parameters_or_dependencies() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1206,7 +1210,7 @@ mod tests {
 
   #[test]
   fn recipe_with_attributes() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       [private]
       [description: \"This is a test recipe\"]
@@ -1268,7 +1272,7 @@ mod tests {
 
   #[test]
   fn list_document_attributes() {
-    let document = document(indoc! {
+    let document = Document::from(indoc! {
       "
       [private, description: \"desc\"]
       foo:
@@ -1359,7 +1363,7 @@ mod tests {
 
   #[test]
   fn list_function_calls() {
-    let document = document(indoc! {"
+    let document = Document::from(indoc! {"
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
