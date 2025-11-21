@@ -192,21 +192,9 @@ impl NodeExt for Node<'_> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn document(content: &str) -> Document {
-    Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        language_id: "just".to_string(),
-        version: 1,
-        text: content.to_string(),
-      },
-    })
-    .unwrap()
-  }
-
   #[test]
   fn find_basic_kind() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -216,19 +204,19 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let recipes = root.find_all("recipe");
 
     assert_eq!(recipes.len(), 2);
 
     assert_eq!(
-      doc.get_node_text(&recipes[0]).trim(),
+      document.get_node_text(&recipes[0]).trim(),
       "foo:\n  echo \"foo\""
     );
 
     assert_eq!(
-      doc.get_node_text(&recipes[1]).trim(),
+      document.get_node_text(&recipes[1]).trim(),
       "bar:\n  echo \"bar\""
     );
 
@@ -237,14 +225,14 @@ mod tests {
     assert!(first_recipe.is_some());
 
     assert_eq!(
-      doc.get_node_text(&first_recipe.unwrap()).trim(),
+      document.get_node_text(&first_recipe.unwrap()).trim(),
       "foo:\n  echo \"foo\""
     );
   }
 
   #[test]
   fn find_indexed_nodes() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -257,14 +245,14 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let first_recipe = root.find("recipe[0]");
 
     assert!(first_recipe.is_some());
 
     assert_eq!(
-      doc.get_node_text(&first_recipe.unwrap()).trim(),
+      document.get_node_text(&first_recipe.unwrap()).trim(),
       "foo:\n  echo \"foo\""
     );
 
@@ -273,7 +261,7 @@ mod tests {
     assert!(second_recipe.is_some());
 
     assert_eq!(
-      doc.get_node_text(&second_recipe.unwrap()).trim(),
+      document.get_node_text(&second_recipe.unwrap()).trim(),
       "bar:\n  echo \"bar\""
     );
 
@@ -282,7 +270,7 @@ mod tests {
     assert!(third_recipe.is_some());
 
     assert_eq!(
-      doc.get_node_text(&third_recipe.unwrap()).trim(),
+      document.get_node_text(&third_recipe.unwrap()).trim(),
       "baz:\n  echo \"baz\""
     );
 
@@ -293,7 +281,7 @@ mod tests {
 
   #[test]
   fn find_direct_child() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -303,7 +291,7 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let recipe_header_identifiers = root.find_all("recipe_header > identifier");
 
@@ -324,7 +312,7 @@ mod tests {
 
   #[test]
   fn find_descendant() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -334,7 +322,7 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let all_identifiers = root.find_all("identifier");
     assert!(all_identifiers.len() >= 4);
@@ -351,7 +339,7 @@ mod tests {
 
   #[test]
   fn find_union() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := \"value\"
 
@@ -363,7 +351,7 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let recipes_and_assignments = root.find_all("recipe, assignment");
 
@@ -384,7 +372,7 @@ mod tests {
 
   #[test]
   fn find_direct_child_marker() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -394,7 +382,7 @@ mod tests {
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let second_recipe = root.find("recipe[1]").unwrap();
 
@@ -403,20 +391,20 @@ mod tests {
     let direct_parameters = parameters_node.find_all("^parameter");
     assert_eq!(direct_parameters.len(), 2);
 
-    assert_eq!(doc.get_node_text(&direct_parameters[0]), "arg1");
-    assert_eq!(doc.get_node_text(&direct_parameters[1]), "arg2");
+    assert_eq!(document.get_node_text(&direct_parameters[0]), "arg1");
+    assert_eq!(document.get_node_text(&direct_parameters[1]), "arg2");
   }
 
   #[test]
   fn find_nonexistent() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let tree = doc.tree.as_ref().unwrap();
+    let tree = document.tree.as_ref().unwrap();
     let root = tree.root_node();
 
     let nonexistent = root.find("nonexistent_kind");
@@ -431,13 +419,13 @@ mod tests {
 
   #[test]
   fn find_nth_occurrence() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       alias foo := bar
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let alias = root.find("alias");
     assert!(alias.is_some());
@@ -453,20 +441,20 @@ mod tests {
 
   #[test]
   fn find_nested_child() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo: (bar baz):
         echo foo
       "
     });
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier =
       root.find("dependency_expression > expression > value > identifier");
 
     assert!(identifier.is_some());
 
-    assert_eq!(doc.get_node_text(&identifier.unwrap()), "baz");
+    assert_eq!(document.get_node_text(&identifier.unwrap()), "baz");
   }
 }
