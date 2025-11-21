@@ -406,21 +406,9 @@ impl<'a> Resolver<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn document(content: &str) -> Document {
-    Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        language_id: "just".to_string(),
-        version: 1,
-        text: content.to_string(),
-      },
-    })
-    .unwrap()
-  }
-
   #[test]
   fn resolve_recipe_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -432,9 +420,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("recipe_header > identifier").unwrap();
 
@@ -486,7 +474,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_parameter_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := 'bar'
 
@@ -501,9 +489,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("parameter > identifier").unwrap();
 
@@ -555,7 +543,7 @@ mod tests {
 
   #[test]
   fn resolve_value_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := \"foo\"
 
@@ -564,9 +552,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("value > identifier").unwrap();
 
@@ -605,7 +593,7 @@ mod tests {
       ]
     );
 
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := \"foo\"
 
@@ -614,9 +602,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("value > identifier").unwrap();
 
@@ -668,7 +656,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := 'bar'
 
@@ -687,9 +675,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("assignment > identifier").unwrap();
 
@@ -751,7 +739,7 @@ mod tests {
 
   #[test]
   fn resolve_dependency_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       all: foo
 
@@ -760,9 +748,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("dependency > identifier").unwrap();
 
@@ -804,7 +792,7 @@ mod tests {
 
   #[test]
   fn resolve_dependency_argument_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       a := 'foo'
 
@@ -816,9 +804,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root
       .find("dependency_expression > expression > value > identifier")
@@ -862,7 +850,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -872,9 +860,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let foo_dependency = root.find("dependency > identifier").unwrap();
 
@@ -899,7 +887,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       var := \"value\"
 
@@ -908,9 +896,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let var_usage = root.find("value > identifier").unwrap();
 
@@ -934,16 +922,16 @@ mod tests {
 
   #[test]
   fn resolve_parameter_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo param=\"default\":
         echo {{ param }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let param_usage = root.find("value > identifier").unwrap();
 
@@ -968,16 +956,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_identifier_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ arch() }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let builtin_usage = root.find("function_call > identifier").unwrap();
 
@@ -985,21 +973,21 @@ mod tests {
       .resolve_identifier_definition(&builtin_usage)
       .unwrap();
 
-    assert_eq!(definition.range, builtin_usage.get_range(&doc));
+    assert_eq!(definition.range, builtin_usage.get_range(&document));
   }
 
   #[test]
   fn resolve_self_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let recipe_name = root.find("recipe_header > identifier").unwrap();
 
@@ -1024,7 +1012,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1034,9 +1022,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(
@@ -1067,7 +1055,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_hover_in_alias() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1076,9 +1064,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("alias > identifier[1]").unwrap())
@@ -1095,16 +1083,16 @@ mod tests {
 
   #[test]
   fn resolve_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo param=\"default\":
         echo {{ param }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1121,16 +1109,16 @@ mod tests {
 
   #[test]
   fn resolve_variadic_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo +args:
         echo {{ args }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1147,16 +1135,16 @@ mod tests {
 
   #[test]
   fn resolve_export_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo $env_var:
         echo {{ env_var }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1173,7 +1161,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       var := \"value\"
 
@@ -1182,9 +1170,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1201,7 +1189,7 @@ mod tests {
 
   #[test]
   fn resolve_export_variable_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       export VERSION := \"1.0.0\"
 
@@ -1210,9 +1198,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1229,16 +1217,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_function_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ arch() }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(
@@ -1257,16 +1245,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_constant_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ RED }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1282,7 +1270,7 @@ mod tests {
 
   #[test]
   fn resolve_builtin_attribute_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       [no-cd]
       foo:
@@ -1290,9 +1278,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("attribute > identifier").unwrap())
@@ -1309,7 +1297,7 @@ mod tests {
 
   #[test]
   fn resolve_builtin_setting_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set export
 
@@ -1318,9 +1306,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("setting > identifier").unwrap())
@@ -1336,7 +1324,7 @@ mod tests {
 
   #[test]
   fn resolve_same_name_confusion() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       arch := \"custom_arch\"
 
@@ -1346,9 +1334,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1378,7 +1366,7 @@ mod tests {
 
   #[test]
   fn resolve_parameter_over_variable() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       param := \"global value\"
 
@@ -1387,9 +1375,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1406,16 +1394,16 @@ mod tests {
 
   #[test]
   fn resolve_hover_non_identifier() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     assert!(
       resolver
@@ -1426,16 +1414,16 @@ mod tests {
 
   #[test]
   fn resolve_hover_nonexistent_variable() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ nonexistent }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let nonexistent = root.find("value > identifier").unwrap();
 
