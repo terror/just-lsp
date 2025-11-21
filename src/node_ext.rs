@@ -210,22 +210,23 @@ mod tests {
 
     assert_eq!(recipes.len(), 2);
 
+    let recipe_texts = recipes
+      .iter()
+      .map(|recipe| document.get_node_text(recipe).trim().to_string())
+      .collect::<Vec<_>>();
+
     assert_eq!(
-      document.get_node_text(&recipes[0]).trim(),
-      "foo:\n  echo \"foo\""
+      recipe_texts,
+      vec![
+        "foo:\n  echo \"foo\"".to_string(),
+        "bar:\n  echo \"bar\"".to_string()
+      ]
     );
 
-    assert_eq!(
-      document.get_node_text(&recipes[1]).trim(),
-      "bar:\n  echo \"bar\""
-    );
-
-    let first_recipe = root.find("recipe");
-
-    assert!(first_recipe.is_some());
+    let first_recipe = root.find("recipe").unwrap();
 
     assert_eq!(
-      document.get_node_text(&first_recipe.unwrap()).trim(),
+      document.get_node_text(&first_recipe).trim(),
       "foo:\n  echo \"foo\""
     );
   }
@@ -247,36 +248,28 @@ mod tests {
 
     let root = document.tree.as_ref().unwrap().root_node();
 
-    let first_recipe = root.find("recipe[0]");
+    let selectors = ["recipe[0]", "recipe[1]", "recipe[2]"];
 
-    assert!(first_recipe.is_some());
-
-    assert_eq!(
-      document.get_node_text(&first_recipe.unwrap()).trim(),
-      "foo:\n  echo \"foo\""
-    );
-
-    let second_recipe = root.find("recipe[1]");
-
-    assert!(second_recipe.is_some());
-
-    assert_eq!(
-      document.get_node_text(&second_recipe.unwrap()).trim(),
-      "bar:\n  echo \"bar\""
-    );
-
-    let third_recipe = root.find("recipe[2]");
-
-    assert!(third_recipe.is_some());
+    let recipe_texts = selectors
+      .iter()
+      .map(|selector| {
+        document
+          .get_node_text(&root.find(selector).unwrap())
+          .trim()
+          .to_string()
+      })
+      .collect::<Vec<_>>();
 
     assert_eq!(
-      document.get_node_text(&third_recipe.unwrap()).trim(),
-      "baz:\n  echo \"baz\""
+      recipe_texts,
+      vec![
+        "foo:\n  echo \"foo\"".to_string(),
+        "bar:\n  echo \"bar\"".to_string(),
+        "baz:\n  echo \"baz\"".to_string()
+      ]
     );
 
-    let non_existent = root.find("recipe[10]");
-
-    assert!(non_existent.is_none());
+    assert!(root.find("recipe[10]").is_none());
   }
 
   #[test]
@@ -293,21 +286,30 @@ mod tests {
 
     let root = document.tree.as_ref().unwrap().root_node();
 
-    let recipe_header_identifiers = root.find_all("recipe_header > identifier");
+    let identifiers = root.find_all("recipe_header > identifier");
 
-    assert_eq!(recipe_header_identifiers.len(), 2);
+    let identifier_texts = identifiers
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
 
     let second_recipe = root.find("recipe[1]").unwrap();
 
-    let recipe_header = second_recipe.find("recipe_header");
+    let recipe_header = second_recipe.find("recipe_header").unwrap();
 
-    assert!(recipe_header.is_some());
+    let parameters = recipe_header.find_all("parameters > parameter");
 
-    let recipe_header_node = recipe_header.unwrap();
+    let parameter_texts = parameters
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
 
-    let parameters = recipe_header_node.find_all("parameters > parameter");
-
-    assert_eq!(parameters.len(), 2);
+    assert_eq!(
+      parameter_texts,
+      vec!["arg1".to_string(), "arg2".to_string()]
+    );
   }
 
   #[test]
@@ -324,17 +326,46 @@ mod tests {
 
     let root = document.tree.as_ref().unwrap().root_node();
 
-    let all_identifiers = root.find_all("identifier");
-    assert!(all_identifiers.len() >= 4);
+    let identifier_texts = root
+      .find_all("identifier")
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
 
-    let recipe_identifiers = root.find_all("recipe identifier");
-    assert!(recipe_identifiers.len() >= 4);
+    assert_eq!(
+      identifier_texts,
+      vec![
+        "foo".to_string(),
+        "bar".to_string(),
+        "arg1".to_string(),
+        "arg2".to_string(),
+        "arch".to_string()
+      ]
+    );
 
-    let function_calls = root.find_all("recipe function_call");
-    assert_eq!(function_calls.len(), 1);
+    let recipe_identifier_texts = root
+      .find_all("recipe identifier")
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
 
-    let function_identifiers = root.find_all("function_call identifier");
-    assert_eq!(function_identifiers.len(), 1);
+    assert_eq!(recipe_identifier_texts, identifier_texts);
+
+    let function_call_texts = root
+      .find_all("recipe function_call")
+      .iter()
+      .map(|node| document.get_node_text(node).trim().to_string())
+      .collect::<Vec<_>>();
+
+    assert_eq!(function_call_texts, vec!["arch()".to_string()]);
+
+    let function_identifier_texts = root
+      .find_all("function_call identifier")
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(function_identifier_texts, vec!["arch".to_string()]);
   }
 
   #[test]
@@ -355,8 +386,6 @@ mod tests {
 
     let recipes_and_assignments = root.find_all("recipe, assignment");
 
-    assert_eq!(recipes_and_assignments.len(), 3);
-
     let kinds = recipes_and_assignments
       .iter()
       .map(Node::kind)
@@ -364,10 +393,27 @@ mod tests {
 
     assert_eq!(kinds, ["recipe", "recipe", "assignment"]);
 
-    let identifiers =
-      root.find_all("recipe_header > identifier, function_call > identifier");
+    let node_texts = recipes_and_assignments
+      .iter()
+      .map(|node| document.get_node_text(node).trim().to_string())
+      .collect::<Vec<_>>();
 
-    assert_eq!(identifiers.len(), 2);
+    assert_eq!(
+      node_texts,
+      vec![
+        "foo:\n  echo \"foo\"".to_string(),
+        "bar:\n  echo \"bar\"".to_string(),
+        "foo := \"value\"".to_string()
+      ]
+    );
+
+    let identifier_texts = root
+      .find_all("recipe_header > identifier, function_call > identifier")
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
   }
 
   #[test]
@@ -388,11 +434,20 @@ mod tests {
 
     let recipe_header = second_recipe.find("recipe_header").unwrap();
     let parameters_node = recipe_header.find("parameters").unwrap();
+
     let direct_parameters = parameters_node.find_all("^parameter");
+
     assert_eq!(direct_parameters.len(), 2);
 
-    assert_eq!(document.get_node_text(&direct_parameters[0]), "arg1");
-    assert_eq!(document.get_node_text(&direct_parameters[1]), "arg2");
+    let parameter_texts = direct_parameters
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      parameter_texts,
+      vec!["arg1".to_string(), "arg2".to_string()]
+    );
   }
 
   #[test]
@@ -427,16 +482,13 @@ mod tests {
 
     let root = document.tree.as_ref().unwrap().root_node();
 
-    let alias = root.find("alias");
-    assert!(alias.is_some());
+    let alias = root.find("alias").unwrap();
 
-    let alias = alias.unwrap();
+    let first_identifier = alias.find("identifier[0]").unwrap();
+    let second_identifier = alias.find("identifier[1]").unwrap();
 
-    let first_identifier = alias.find("identifier[0]");
-    assert!(first_identifier.is_some());
-
-    let second_identifier = alias.find("identifier[1]");
-    assert!(second_identifier.is_some());
+    assert_eq!(document.get_node_text(&first_identifier), "foo");
+    assert_eq!(document.get_node_text(&second_identifier), "bar");
   }
 
   #[test]
@@ -453,8 +505,8 @@ mod tests {
     let identifier =
       root.find("dependency_expression > expression > value > identifier");
 
-    assert!(identifier.is_some());
+    let identifier = identifier.unwrap();
 
-    assert_eq!(document.get_node_text(&identifier.unwrap()), "baz");
+    assert_eq!(document.get_node_text(&identifier), "baz");
   }
 }
