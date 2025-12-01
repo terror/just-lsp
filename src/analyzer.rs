@@ -38,7 +38,7 @@ pub(crate) struct Analyzer<'a> {
 
 impl<'a> Analyzer<'a> {
   /// Analyzes the document and returns a list of diagnostics.
-  pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
+  pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
     RULES
@@ -52,7 +52,6 @@ impl<'a> Analyzer<'a> {
             display: rule.message().to_string(),
             ..diagnostic
           })
-          .map(lsp::Diagnostic::from)
       })
       .collect()
   }
@@ -129,7 +128,11 @@ mod tests {
 
       let analyzer = Analyzer::new(&document);
 
-      let diagnostics = analyzer.analyze();
+      let diagnostics = analyzer
+        .analyze()
+        .into_iter()
+        .map(lsp::Diagnostic::from)
+        .collect::<Vec<lsp::Diagnostic>>();
 
       assert_eq!(
         diagnostics.len(),

@@ -652,7 +652,15 @@ impl Inner {
       match documents.get(uri) {
         Some(document) => {
           let analyzer = Analyzer::new(document);
-          (analyzer.analyze(), document.version)
+
+          (
+            analyzer
+              .analyze()
+              .into_iter()
+              .map(lsp::Diagnostic::from)
+              .collect(),
+            document.version,
+          )
         }
         None => return,
       }
