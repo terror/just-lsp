@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct AttributeArgumentsRule;
 
 impl Rule for AttributeArgumentsRule {
-  fn display_name(&self) -> &'static str {
-    "Attribute Arguments"
-  }
-
   fn id(&self) -> &'static str {
     "attribute-arguments"
+  }
+
+  fn message(&self) -> &'static str {
+    "Attribute Arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

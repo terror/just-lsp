@@ -62,16 +62,16 @@ pub(crate) trait Rule: Sync {
   fn diagnostic(&self, diagnostic: lsp::Diagnostic) -> lsp::Diagnostic {
     lsp::Diagnostic {
       code: Some(lsp::NumberOrString::String(self.id().to_string())),
-      source: Some(format!("just-lsp ({})", self.display_name())),
+      source: Some(format!("just-lsp ({})", self.message())),
       ..diagnostic
     }
   }
 
-  /// Human-readable name for the rule.
-  fn display_name(&self) -> &'static str;
-
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
+
+  /// Human-readable name for the rule.
+  fn message(&self) -> &'static str;
 
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic>;

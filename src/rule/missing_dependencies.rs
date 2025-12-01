@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct MissingDependencyRule;
 
 impl Rule for MissingDependencyRule {
-  fn display_name(&self) -> &'static str {
-    "Missing Dependencies"
-  }
-
   fn id(&self) -> &'static str {
     "missing-dependencies"
+  }
+
+  fn message(&self) -> &'static str {
+    "Missing Dependencies"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

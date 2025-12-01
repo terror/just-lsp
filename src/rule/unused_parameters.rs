@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct UnusedParameterRule;
 
 impl Rule for UnusedParameterRule {
-  fn display_name(&self) -> &'static str {
-    "Unused Parameters"
-  }
-
   fn id(&self) -> &'static str {
     "unused-parameters"
+  }
+
+  fn message(&self) -> &'static str {
+    "Unused Parameters"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

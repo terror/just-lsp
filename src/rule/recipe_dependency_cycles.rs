@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct RecipeDependencyCycleRule;
 
 impl Rule for RecipeDependencyCycleRule {
-  fn display_name(&self) -> &'static str {
-    "Recipe Dependency Cycles"
-  }
-
   fn id(&self) -> &'static str {
     "recipe-dependency-cycles"
+  }
+
+  fn message(&self) -> &'static str {
+    "Recipe Dependency Cycles"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

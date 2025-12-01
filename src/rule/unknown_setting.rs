@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct UnknownSettingRule;
 
 impl Rule for UnknownSettingRule {
-  fn display_name(&self) -> &'static str {
-    "Unknown Setting"
-  }
-
   fn id(&self) -> &'static str {
     "unknown-setting"
+  }
+
+  fn message(&self) -> &'static str {
+    "Unknown Setting"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

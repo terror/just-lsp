@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct DuplicateRecipeRule;
 
 impl Rule for DuplicateRecipeRule {
-  fn display_name(&self) -> &'static str {
-    "Duplicate Recipes"
-  }
-
   fn id(&self) -> &'static str {
     "duplicate-recipes"
+  }
+
+  fn message(&self) -> &'static str {
+    "Duplicate Recipes"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

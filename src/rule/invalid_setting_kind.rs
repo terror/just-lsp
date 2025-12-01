@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct InvalidSettingKindRule;
 
 impl Rule for InvalidSettingKindRule {
-  fn display_name(&self) -> &'static str {
-    "Invalid Setting Kind"
-  }
-
   fn id(&self) -> &'static str {
     "invalid-setting-kind"
+  }
+
+  fn message(&self) -> &'static str {
+    "Invalid Setting Kind"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

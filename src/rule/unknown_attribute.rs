@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct UnknownAttributeRule;
 
 impl Rule for UnknownAttributeRule {
-  fn display_name(&self) -> &'static str {
-    "Unknown Attribute"
-  }
-
   fn id(&self) -> &'static str {
     "unknown-attribute"
+  }
+
+  fn message(&self) -> &'static str {
+    "Unknown Attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

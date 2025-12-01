@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct ParallelDependenciesRule;
 
 impl Rule for ParallelDependenciesRule {
-  fn display_name(&self) -> &'static str {
-    "Parallel Dependencies"
-  }
-
   fn id(&self) -> &'static str {
     "parallel-dependencies"
+  }
+
+  fn message(&self) -> &'static str {
+    "Parallel Dependencies"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

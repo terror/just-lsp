@@ -123,12 +123,12 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
 pub(crate) struct DuplicateAttributeRule;
 
 impl Rule for DuplicateAttributeRule {
-  fn display_name(&self) -> &'static str {
-    "Duplicate Attribute"
-  }
-
   fn id(&self) -> &'static str {
     "duplicate-attribute"
+  }
+
+  fn message(&self) -> &'static str {
+    "Duplicate Attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
