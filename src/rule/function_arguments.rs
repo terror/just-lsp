@@ -10,7 +10,7 @@ impl Rule for FunctionArgumentsRule {
   }
 
   fn message(&self) -> &'static str {
-    "Function Arguments"
+    "function arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

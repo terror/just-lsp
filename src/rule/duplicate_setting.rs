@@ -9,7 +9,7 @@ impl Rule for DuplicateSettingRule {
   }
 
   fn message(&self) -> &'static str {
-    "Duplicate Setting"
+    "duplicate setting"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

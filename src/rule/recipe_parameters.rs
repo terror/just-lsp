@@ -10,7 +10,7 @@ impl Rule for RecipeParameterRule {
   }
 
   fn message(&self) -> &'static str {
-    "Recipe Parameters"
+    "recipe parameters"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

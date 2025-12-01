@@ -10,7 +10,7 @@ impl Rule for UnusedParameterRule {
   }
 
   fn message(&self) -> &'static str {
-    "Unused Parameters"
+    "unused parameters"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

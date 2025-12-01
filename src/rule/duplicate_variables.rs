@@ -10,7 +10,7 @@ impl Rule for DuplicateVariableRule {
   }
 
   fn message(&self) -> &'static str {
-    "Duplicate Variable"
+    "duplicate variable"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

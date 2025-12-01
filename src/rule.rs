@@ -70,7 +70,7 @@ pub(crate) trait Rule: Sync {
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
 
-  /// Human-readable name for the rule.
+  /// What to show the user in the header of the diagnostics.
   fn message(&self) -> &'static str;
 
   /// Execute the rule and return diagnostics.

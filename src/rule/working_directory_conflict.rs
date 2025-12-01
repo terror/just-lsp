@@ -9,7 +9,7 @@ impl Rule for WorkingDirectoryConflictRule {
   }
 
   fn message(&self) -> &'static str {
-    "Working Directory Conflict"
+    "working directory conflict"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

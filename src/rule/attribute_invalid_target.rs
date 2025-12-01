@@ -10,7 +10,7 @@ impl Rule for AttributeInvalidTargetRule {
   }
 
   fn message(&self) -> &'static str {
-    "Attribute Invalid Target"
+    "attribute invalid target"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

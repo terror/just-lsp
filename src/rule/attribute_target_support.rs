@@ -10,7 +10,7 @@ impl Rule for AttributeTargetSupportRule {
   }
 
   fn message(&self) -> &'static str {
-    "Attribute Target Support"
+    "attribute target support"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

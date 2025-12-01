@@ -10,7 +10,7 @@ impl Rule for MixedIndentationRule {
   }
 
   fn message(&self) -> &'static str {
-    "Mixed Recipe Indentation"
+    "mixed recipe indentation"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

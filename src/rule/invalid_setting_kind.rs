@@ -10,7 +10,7 @@ impl Rule for InvalidSettingKindRule {
   }
 
   fn message(&self) -> &'static str {
-    "Invalid Setting Kind"
+    "invalid setting kind"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

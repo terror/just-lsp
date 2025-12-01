@@ -9,7 +9,7 @@ impl Rule for UnknownAttributeRule {
   }
 
   fn message(&self) -> &'static str {
-    "Unknown Attribute"
+    "unknown attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

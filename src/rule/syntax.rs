@@ -10,7 +10,7 @@ impl Rule for SyntaxRule {
   }
 
   fn message(&self) -> &'static str {
-    "Syntax Errors"
+    "syntax errors"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

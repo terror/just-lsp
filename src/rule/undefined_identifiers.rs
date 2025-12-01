@@ -10,7 +10,7 @@ impl Rule for UndefinedIdentifierRule {
   }
 
   fn message(&self) -> &'static str {
-    "Undefined Identifiers"
+    "undefined identifiers"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

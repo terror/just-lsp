@@ -10,7 +10,7 @@ impl Rule for RecipeDependencyCycleRule {
   }
 
   fn message(&self) -> &'static str {
-    "Recipe Dependency Cycles"
+    "recipe dependency cycles"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

@@ -10,7 +10,7 @@ impl Rule for UnusedVariableRule {
   }
 
   fn message(&self) -> &'static str {
-    "Unused Variables"
+    "unused variables"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

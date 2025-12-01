@@ -128,7 +128,7 @@ impl Rule for DuplicateAttributeRule {
   }
 
   fn message(&self) -> &'static str {
-    "Duplicate Attribute"
+    "duplicate attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

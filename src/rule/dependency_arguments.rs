@@ -10,7 +10,7 @@ impl Rule for DependencyArgumentRule {
   }
 
   fn message(&self) -> &'static str {
-    "Dependency Arguments"
+    "dependency arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

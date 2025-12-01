@@ -10,7 +10,7 @@ impl Rule for UnknownFunctionRule {
   }
 
   fn message(&self) -> &'static str {
-    "Unknown Function"
+    "unknown function"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

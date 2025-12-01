@@ -10,7 +10,7 @@ impl Rule for AttributeArgumentsRule {
   }
 
   fn message(&self) -> &'static str {
-    "Attribute Arguments"
+    "attribute arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

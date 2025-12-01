@@ -10,7 +10,7 @@ impl Rule for DuplicateRecipeRule {
   }
 
   fn message(&self) -> &'static str {
-    "Duplicate Recipes"
+    "duplicate recipes"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

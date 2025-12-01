@@ -10,7 +10,7 @@ impl Rule for UnknownSettingRule {
   }
 
   fn message(&self) -> &'static str {
-    "Unknown Setting"
+    "unknown setting"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

@@ -9,7 +9,7 @@ impl Rule for DuplicateAliasRule {
   }
 
   fn message(&self) -> &'static str {
-    "Duplicate Alias"
+    "duplicate alias"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
