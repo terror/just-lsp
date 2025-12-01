@@ -1,38 +1,32 @@
 use super::*;
 
-/// Detects recipes that mix tabs and spaces for indentation, which often
-/// results in confusing or invalid `just` bodies.
-pub(crate) struct MixedIndentationRule;
+define_rule! {
+  /// Detects recipes that mix tabs and spaces for indentation, which often
+  /// results in confusing or invalid `just` bodies.
+  MixedIndentationRule {
+    id: "mixed-recipe-indentation",
+    message: "mixed indentation",
+    run(context) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for MixedIndentationRule {
-  fn id(&self) -> &'static str {
-    "mixed-recipe-indentation"
-  }
+      let Some(tree) = context.tree() else {
+        return diagnostics;
+      };
 
-  fn message(&self) -> &'static str {
-    "mixed indentation"
-  }
+      let document = context.document();
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
+      for recipe_node in tree.root_node().find_all("recipe") {
+        if recipe_node.find("recipe_body").is_none() {
+          continue;
+        }
 
-    let Some(tree) = context.tree() else {
-      return diagnostics;
-    };
-
-    let document = context.document();
-
-    for recipe_node in tree.root_node().find_all("recipe") {
-      if recipe_node.find("recipe_body").is_none() {
-        continue;
+        if let Some(diagnostic) = MixedIndentationRule::inspect_recipe(document, &recipe_node) {
+          diagnostics.push(diagnostic);
+        }
       }
 
-      if let Some(diagnostic) = Self::inspect_recipe(document, &recipe_node) {
-        diagnostics.push(diagnostic);
-      }
+      diagnostics
     }
-
-    diagnostics
   }
 }
 
@@ -110,7 +104,7 @@ impl MixedIndentationRule {
       }
 
       if has_space && has_tab {
-        return Some(Self::diagnostic_for_line(
+        return Some(MixedIndentationRule::diagnostic_for_line(
           &recipe_name,
           line_range.start.line,
           indent_length,
@@ -128,7 +122,7 @@ impl MixedIndentationRule {
       match indent_style {
         None => indent_style = Some(current_style),
         Some(style) if style != current_style => {
-          return Some(Self::diagnostic_for_line(
+          return Some(MixedIndentationRule::diagnostic_for_line(
             &recipe_name,
             line_range.start.line,
             indent_length,

@@ -1,34 +1,28 @@
 use super::*;
 
-/// Warns when recipe lines use indentation that differs from the first recipe
-/// line, matching the behavior of the `just` parser.
-pub(crate) struct InconsistentIndentationRule;
+define_rule! {
+  /// Warns when recipe lines use indentation that differs from the first recipe
+  /// line, matching the behavior of the `just` parser.
+  InconsistentIndentationRule {
+    id: "inconsistent-recipe-indentation",
+    message: "inconsistent indentation",
+    run(context) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for InconsistentIndentationRule {
-  fn id(&self) -> &'static str {
-    "inconsistent-recipe-indentation"
-  }
+      let Some(tree) = context.tree() else {
+        return diagnostics;
+      };
 
-  fn message(&self) -> &'static str {
-    "inconsistent indentation"
-  }
+      let document = context.document();
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let Some(tree) = context.tree() else {
-      return diagnostics;
-    };
-
-    let document = context.document();
-
-    for recipe_node in tree.root_node().find_all("recipe") {
-      if let Some(diagnostic) = Self::inspect_recipe(document, &recipe_node) {
-        diagnostics.push(diagnostic);
+      for recipe_node in tree.root_node().find_all("recipe") {
+        if let Some(diagnostic) = InconsistentIndentationRule::inspect_recipe(document, &recipe_node) {
+          diagnostics.push(diagnostic);
+        }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }
 
@@ -47,8 +41,8 @@ impl InconsistentIndentationRule {
     Diagnostic::error(
       format!(
         "Recipe line has inconsistent leading whitespace. Recipe started with `{}` but found line with `{}`",
-        Self::visualize_whitespace(expected),
-        Self::visualize_whitespace(found)
+        InconsistentIndentationRule::visualize_whitespace(expected),
+        InconsistentIndentationRule::visualize_whitespace(found)
       ),
       range,
     )
@@ -118,7 +112,7 @@ impl InconsistentIndentationRule {
           }
 
           if *expected != indent && !previous_line_continues {
-            return Some(Self::diagnostic_for_line(
+            return Some(InconsistentIndentationRule::diagnostic_for_line(
               expected.as_str(),
               &indent,
               u32::try_from(line_idx).unwrap_or(u32::MAX),

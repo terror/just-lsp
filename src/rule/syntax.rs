@@ -1,28 +1,22 @@
 use super::*;
 
-/// Surfaces tree-sitter syntax errors and missing nodes so users get feedback
-/// on malformed `justfile` syntax before other rules run.
-pub(crate) struct SyntaxRule;
+define_rule! {
+  /// Surfaces tree-sitter syntax errors and missing nodes so users get feedback
+  /// on malformed `justfile` syntax before other rules run.
+  SyntaxRule {
+    id: "syntax-errors",
+    message: "syntax errors",
+    run(context) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for SyntaxRule {
-  fn id(&self) -> &'static str {
-    "syntax-errors"
-  }
+      if let Some(tree) = context.tree() {
+        let document = context.document();
+        let mut cursor = tree.root_node().walk();
+        SyntaxRule::collect(document, &mut cursor, &mut diagnostics);
+      }
 
-  fn message(&self) -> &'static str {
-    "syntax errors"
-  }
-
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    if let Some(tree) = context.tree() {
-      let document = context.document();
-      let mut cursor = tree.root_node().walk();
-      Self::collect(document, &mut cursor, &mut diagnostics);
+      diagnostics
     }
-
-    diagnostics
   }
 }
 
@@ -36,21 +30,21 @@ impl SyntaxRule {
 
     if node.is_error() {
       diagnostics.push(Diagnostic::error(
-        Self::error_message(document, &node),
+        SyntaxRule::error_message(document, &node),
         node.get_range(document),
       ));
     }
 
     if node.is_missing() {
       diagnostics.push(Diagnostic::error(
-        Self::missing_message(&node),
+        SyntaxRule::missing_message(&node),
         node.get_range(document),
       ));
     }
 
     if cursor.goto_first_child() {
       loop {
-        Self::collect(document, cursor, diagnostics);
+        SyntaxRule::collect(document, cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;
@@ -82,22 +76,25 @@ impl SyntaxRule {
   }
 
   fn error_message(document: &Document, node: &Node<'_>) -> String {
-    let preview = Self::snippet_preview(&document.get_node_text(node));
+    let preview = SyntaxRule::snippet_preview(&document.get_node_text(node));
 
     if let Some(snippet) = preview {
       format!("Syntax error near `{snippet}`")
     } else if let Some(parent) = node.parent() {
-      format!("Syntax error in {}", Self::describe_kind(parent.kind()))
+      format!(
+        "Syntax error in {}",
+        SyntaxRule::describe_kind(parent.kind())
+      )
     } else {
       "Syntax error".to_string()
     }
   }
 
   fn missing_message(node: &Node<'_>) -> String {
-    let missing = Self::describe_kind(node.kind());
+    let missing = SyntaxRule::describe_kind(node.kind());
 
     if let Some(parent) = node.parent() {
-      let context = Self::describe_kind(parent.kind());
+      let context = SyntaxRule::describe_kind(parent.kind());
 
       if missing == context {
         format!("Missing {missing}")
@@ -137,7 +134,7 @@ impl SyntaxRule {
       return None;
     }
 
-    Some(Self::truncate(collapsed, 40))
+    Some(SyntaxRule::truncate(collapsed, 40))
   }
 
   fn truncate(text: &str, max_chars: usize) -> String {

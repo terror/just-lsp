@@ -119,58 +119,52 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
   },
 ];
 
-/// Reports duplicate usages of attributes that must be unique.
-pub(crate) struct DuplicateAttributeRule;
+define_rule! {
+  /// Reports duplicate usages of attributes that must be unique.
+  DuplicateAttributeRule {
+    id: "duplicate-attribute",
+    message: "duplicate attribute",
+    run(context) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for DuplicateAttributeRule {
-  fn id(&self) -> &'static str {
-    "duplicate-attribute"
-  }
-
-  fn message(&self) -> &'static str {
-    "duplicate attribute"
-  }
-
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let mut module_seen: HashMap<&'static str, HashSet<String>> =
-      HashMap::new();
-
-    for recipe in context.recipes() {
-      let mut recipe_seen: HashMap<&'static str, HashSet<String>> =
+      let mut module_seen: HashMap<&'static str, HashSet<String>> =
         HashMap::new();
 
-      for attribute in &recipe.attributes {
-        let attribute_name = attribute.name.value.as_str();
+      for recipe in context.recipes() {
+        let mut recipe_seen: HashMap<&'static str, HashSet<String>> =
+          HashMap::new();
 
-        let Some(constraint) = Self::constraint(attribute_name) else {
-          continue;
-        };
+        for attribute in &recipe.attributes {
+          let attribute_name = attribute.name.value.as_str();
 
-        let Some(key) = Self::key(constraint, attribute) else {
-          continue;
-        };
+          let Some(constraint) = DuplicateAttributeRule::constraint(attribute_name) else {
+            continue;
+          };
 
-        let seen = match constraint.scope {
-          DuplicateScope::Module => {
-            module_seen.entry(constraint.name).or_default()
+          let Some(key) = DuplicateAttributeRule::key(constraint, attribute) else {
+            continue;
+          };
+
+          let seen = match constraint.scope {
+            DuplicateScope::Module => {
+              module_seen.entry(constraint.name).or_default()
+            }
+            DuplicateScope::Recipe => {
+              recipe_seen.entry(constraint.name).or_default()
+            }
+          };
+
+          if !seen.insert(key.clone()) {
+            diagnostics.push(Diagnostic::error(
+              DuplicateAttributeRule::message(constraint, recipe),
+              attribute.range,
+            ));
           }
-          DuplicateScope::Recipe => {
-            recipe_seen.entry(constraint.name).or_default()
-          }
-        };
-
-        if !seen.insert(key.clone()) {
-          diagnostics.push(Diagnostic::error(
-            Self::message(constraint, recipe),
-            attribute.range,
-          ));
         }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }
 

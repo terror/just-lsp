@@ -1,56 +1,50 @@
 use super::*;
 
-/// Highlights recipe parameters that never get read anywhere in the recipe body
-/// (unless `set export` is on).
-pub(crate) struct UnusedParameterRule;
+define_rule! {
+  /// Highlights recipe parameters that never get read anywhere in the recipe body
+  /// (unless `set export` is on).
+  UnusedParameterRule {
+    id: "unused-parameters",
+    message: "unused parameter",
+    run(context) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for UnusedParameterRule {
-  fn id(&self) -> &'static str {
-    "unused-parameters"
-  }
+      let exported = context.setting_enabled("export");
 
-  fn message(&self) -> &'static str {
-    "unused parameter"
-  }
+      let positional_arguments_enabled =
+        context.setting_enabled("positional-arguments");
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
+      for (recipe_name, identifiers) in context.recipe_identifier_usage() {
+        if let Some(recipe) = context.recipe(recipe_name) {
+          let recipe_enables_positional_arguments = positional_arguments_enabled
+            || recipe.has_attribute("positional-arguments");
 
-    let exported = context.setting_enabled("export");
+          let positional_argument_usage = if recipe_enables_positional_arguments {
+            UnusedParameterRule::positional_argument_indices(recipe)
+          } else {
+            HashSet::new()
+          };
 
-    let positional_arguments_enabled =
-      context.setting_enabled("positional-arguments");
+          for (index, parameter) in recipe.parameters.iter().enumerate() {
+            let used_via_position =
+              positional_argument_usage.contains(&(index + 1));
 
-    for (recipe_name, identifiers) in context.recipe_identifier_usage() {
-      if let Some(recipe) = context.recipe(recipe_name) {
-        let recipe_enables_positional_arguments = positional_arguments_enabled
-          || recipe.has_attribute("positional-arguments");
-
-        let positional_argument_usage = if recipe_enables_positional_arguments {
-          Self::positional_argument_indices(recipe)
-        } else {
-          HashSet::new()
-        };
-
-        for (index, parameter) in recipe.parameters.iter().enumerate() {
-          let used_via_position =
-            positional_argument_usage.contains(&(index + 1));
-
-          if !identifiers.contains(&parameter.name)
-            && parameter.kind != ParameterKind::Export
-            && !exported
-            && !used_via_position
-          {
-            diagnostics.push(Diagnostic::warning(
-              format!("Parameter `{}` appears unused", parameter.name),
-              parameter.range,
-            ));
+            if !identifiers.contains(&parameter.name)
+              && parameter.kind != ParameterKind::Export
+              && !exported
+              && !used_via_position
+            {
+              diagnostics.push(Diagnostic::warning(
+                format!("Parameter `{}` appears unused", parameter.name),
+                parameter.range,
+              ));
+            }
           }
         }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }
 

@@ -20,7 +20,7 @@ impl Subcommand {
 
       if !current_dir.pop() {
         bail!(
-          "could not find `pyproject.toml` in current directory or any parent directory"
+          "could not find `justfile` in current directory or any parent directory"
         );
       }
     }
