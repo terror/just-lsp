@@ -13,7 +13,7 @@ impl Rule for AttributeArgumentsRule {
     "invalid attribute arguments"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for attribute in context.attributes() {
@@ -51,16 +51,14 @@ impl Rule for AttributeArgumentsRule {
           })
           .unwrap_or(0);
 
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
+        diagnostics.push(Diagnostic::error(
+          format!(
             "Attribute `{attribute_name}` got {argument_count} {} but takes {required_argument_count} {}",
             Count("argument", argument_count),
             Count("argument", required_argument_count),
           ),
-          ..Default::default()
-        }));
+          attribute.range,
+        ));
       }
     }
 

@@ -13,7 +13,7 @@ impl Rule for UnusedParameterRule {
     "unused parameter"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let exported = context.setting_enabled("export");
@@ -41,12 +41,10 @@ impl Rule for UnusedParameterRule {
             && !exported
             && !used_via_position
           {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: parameter.range,
-              severity: Some(lsp::DiagnosticSeverity::WARNING),
-              message: format!("Parameter `{}` appears unused", parameter.name),
-              ..Default::default()
-            }));
+            diagnostics.push(Diagnostic::warning(
+              format!("Parameter `{}` appears unused", parameter.name),
+              parameter.range,
+            ));
           }
         }
       }

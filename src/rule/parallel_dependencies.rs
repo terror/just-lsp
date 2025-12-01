@@ -13,7 +13,7 @@ impl Rule for ParallelDependenciesRule {
     "unnecessary parallel attribute"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
       .recipes()
       .iter()
@@ -32,12 +32,7 @@ impl Rule for ParallelDependenciesRule {
           _ => return None,
         };
 
-        Some(self.diagnostic(lsp::Diagnostic {
-          message,
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::WARNING),
-          ..Default::default()
-        }))
+        Some(Diagnostic::warning(message, attribute.range))
       })
       .collect()
   }

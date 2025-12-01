@@ -13,7 +13,7 @@ impl Rule for AttributeInvalidTargetRule {
     "invalid attribute target"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for attribute in context.attributes() {
@@ -24,14 +24,10 @@ impl Rule for AttributeInvalidTargetRule {
       }
 
       if attribute.target.is_none() {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
-            "Attribute `{attribute_name}` applied to invalid target",
-          ),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Attribute `{attribute_name}` applied to invalid target",),
+          attribute.range,
+        ));
       }
     }
 

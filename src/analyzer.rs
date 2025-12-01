@@ -40,7 +40,21 @@ impl<'a> Analyzer<'a> {
   /// Analyzes the document and returns a list of diagnostics.
   pub(crate) fn analyze(&self) -> Vec<lsp::Diagnostic> {
     let context = RuleContext::new(self.document);
-    RULES.iter().flat_map(|rule| rule.run(&context)).collect()
+
+    RULES
+      .iter()
+      .flat_map(|rule| {
+        rule
+          .run(&context)
+          .into_iter()
+          .map(move |diagnostic| Diagnostic {
+            id: rule.id().to_string(),
+            display: rule.message().to_string(),
+            ..diagnostic
+          })
+          .map(lsp::Diagnostic::from)
+      })
+      .collect()
   }
 
   /// Creates a new analyzer for the given document.

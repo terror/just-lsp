@@ -13,16 +13,14 @@ impl Rule for UndefinedIdentifierRule {
     "undefined identifier"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for unresolved in context.unresolved_identifiers() {
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: unresolved.range,
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: format!("Variable `{}` not found", unresolved.name),
-        ..Default::default()
-      }));
+      diagnostics.push(Diagnostic::error(
+        format!("Variable `{}` not found", unresolved.name),
+        unresolved.range,
+      ));
     }
 
     diagnostics

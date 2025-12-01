@@ -13,7 +13,7 @@ impl Rule for InvalidSettingKindRule {
     "invalid setting kind"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for setting in context.settings() {
@@ -27,12 +27,10 @@ impl Rule for InvalidSettingKindRule {
         continue;
       }
 
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: setting.range,
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: format!("Setting `{}` expects a {kind} value", setting.name,),
-        ..Default::default()
-      }));
+      diagnostics.push(Diagnostic::error(
+        format!("Setting `{}` expects a {kind} value", setting.name,),
+        setting.range,
+      ));
     }
 
     diagnostics

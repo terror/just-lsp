@@ -13,7 +13,7 @@ impl Rule for UnusedVariableRule {
     "unused variable"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     if context.tree().is_none() {
@@ -34,12 +34,10 @@ impl Rule for UnusedVariableRule {
         continue;
       }
 
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: variable.name.range,
-        severity: Some(lsp::DiagnosticSeverity::WARNING),
-        message: format!("Variable `{variable_name}` appears unused"),
-        ..Default::default()
-      }));
+      diagnostics.push(Diagnostic::warning(
+        format!("Variable `{variable_name}` appears unused"),
+        variable.name.range,
+      ));
     }
 
     diagnostics

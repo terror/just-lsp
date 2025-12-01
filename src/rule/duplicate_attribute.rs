@@ -131,7 +131,7 @@ impl Rule for DuplicateAttributeRule {
     "duplicate attribute"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let mut module_seen: HashMap<&'static str, HashSet<String>> =
@@ -162,12 +162,10 @@ impl Rule for DuplicateAttributeRule {
         };
 
         if !seen.insert(key.clone()) {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: attribute.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: Self::message(constraint, recipe),
-            ..Default::default()
-          }));
+          diagnostics.push(Diagnostic::error(
+            Self::message(constraint, recipe),
+            attribute.range,
+          ));
         }
       }
     }

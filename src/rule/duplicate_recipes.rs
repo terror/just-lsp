@@ -13,7 +13,7 @@ impl Rule for DuplicateRecipeRule {
     "duplicate recipes"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
 
     if allow_duplicates {
@@ -43,12 +43,10 @@ impl Rule for DuplicateRecipeRule {
             a.iter().any(|a| b.iter().any(|b| a.conflicts_with(*b)));
 
           if has_conflict {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: *range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              message: format!("Duplicate recipe name `{recipe_name}`"),
-              ..Default::default()
-            }));
+            diagnostics.push(Diagnostic::error(
+              format!("Duplicate recipe name `{recipe_name}`"),
+              *range,
+            ));
 
             break;
           }

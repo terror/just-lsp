@@ -13,7 +13,7 @@ impl Rule for SyntaxRule {
     "syntax errors"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     if let Some(tree) = context.tree() {
@@ -31,26 +31,22 @@ impl SyntaxRule {
     &self,
     document: &Document,
     cursor: &mut TreeCursor<'_>,
-    diagnostics: &mut Vec<lsp::Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
   ) {
     let node = cursor.node();
 
     if node.is_error() {
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: node.get_range(document),
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: Self::error_message(document, &node),
-        ..Default::default()
-      }));
+      diagnostics.push(Diagnostic::error(
+        Self::error_message(document, &node),
+        node.get_range(document),
+      ));
     }
 
     if node.is_missing() {
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: node.get_range(document),
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: Self::missing_message(&node),
-        ..Default::default()
-      }));
+      diagnostics.push(Diagnostic::error(
+        Self::missing_message(&node),
+        node.get_range(document),
+      ));
     }
 
     if cursor.goto_first_child() {

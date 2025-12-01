@@ -13,7 +13,7 @@ impl Rule for MixedIndentationRule {
     "mixed indentation"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let Some(tree) = context.tree() else {
@@ -42,7 +42,7 @@ impl MixedIndentationRule {
     recipe_name: &str,
     line: u32,
     indent_length: usize,
-  ) -> lsp::Diagnostic {
+  ) -> Diagnostic {
     let indent = u32::try_from(indent_length).unwrap_or(u32::MAX);
 
     let range = lsp::Range {
@@ -53,21 +53,17 @@ impl MixedIndentationRule {
       },
     };
 
-    self.diagnostic(lsp::Diagnostic {
+    Diagnostic::error(
+      format!("Recipe `{recipe_name}` mixes tabs and spaces for indentation"),
       range,
-      severity: Some(lsp::DiagnosticSeverity::ERROR),
-      message: format!(
-        "Recipe `{recipe_name}` mixes tabs and spaces for indentation"
-      ),
-      ..Default::default()
-    })
+    )
   }
 
   fn inspect_recipe(
     &self,
     document: &Document,
     recipe_node: &Node<'_>,
-  ) -> Option<lsp::Diagnostic> {
+  ) -> Option<Diagnostic> {
     let recipe_name =
       recipe_node.find("recipe_header > identifier").map_or_else(
         || "recipe".to_string(),

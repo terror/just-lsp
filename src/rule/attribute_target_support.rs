@@ -13,7 +13,7 @@ impl Rule for AttributeTargetSupportRule {
     "unsupported attribute target"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for attribute in context.attributes() {
@@ -38,14 +38,12 @@ impl Rule for AttributeTargetSupportRule {
       });
 
       if !is_valid_target {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
+        diagnostics.push(Diagnostic::error(
+          format!(
             "Attribute `{attribute_name}` cannot be applied to {target_type} target",
           ),
-          ..Default::default()
-        }));
+          attribute.range,
+        ));
       }
     }
 

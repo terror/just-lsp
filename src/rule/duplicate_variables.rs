@@ -13,7 +13,7 @@ impl Rule for DuplicateVariableRule {
     "duplicate variable"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
 
     if allow_duplicates {
@@ -25,12 +25,10 @@ impl Rule for DuplicateVariableRule {
 
     for variable in context.variables() {
       if !seen.insert(variable.name.value.clone()) {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: variable.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!("Duplicate variable `{}`", variable.name.value),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate variable `{}`", variable.name.value),
+          variable.range,
+        ));
       }
     }
 

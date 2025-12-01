@@ -13,7 +13,7 @@ impl Rule for MissingDependencyRule {
     "missing dependency"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let recipe_names = context.recipe_names();
@@ -21,12 +21,10 @@ impl Rule for MissingDependencyRule {
     for recipe in context.recipes() {
       for dependency in &recipe.dependencies {
         if !recipe_names.contains(&dependency.name) {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: dependency.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!("Recipe `{}` not found", dependency.name),
-            ..Default::default()
-          }));
+          diagnostics.push(Diagnostic::error(
+            format!("Recipe `{}` not found", dependency.name),
+            dependency.range,
+          ));
         }
       }
     }

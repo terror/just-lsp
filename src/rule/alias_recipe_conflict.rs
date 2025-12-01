@@ -13,7 +13,7 @@ impl Rule for AliasRecipeConflictRule {
     "name conflict"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let (aliases, recipes) = (context.aliases(), context.recipes());
 
     if aliases.is_empty() || recipes.is_empty() {
@@ -55,15 +55,13 @@ impl Rule for AliasRecipeConflictRule {
         let recipe_range = recipe_name_ranges[recipe_index];
 
         if Self::is_after(&alias.name.range, &recipe_range) {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: alias.name.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
+          diagnostics.push(Diagnostic::error(
+            format!(
               "Recipe `{}` is redefined as an alias",
               recipes[recipe_index].name
             ),
-            ..Default::default()
-          }));
+            alias.name.range,
+          ));
         }
       }
     }
@@ -74,15 +72,10 @@ impl Rule for AliasRecipeConflictRule {
           (recipe_name_ranges[index], aliases[alias_index].name.range);
 
         if Self::is_after(&recipe_range, &alias_range) {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: recipe_range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
-              "Alias `{}` is redefined as a recipe",
-              recipe.name
-            ),
-            ..Default::default()
-          }));
+          diagnostics.push(Diagnostic::error(
+            format!("Alias `{}` is redefined as a recipe", recipe.name),
+            recipe_range,
+          ));
         }
       }
     }

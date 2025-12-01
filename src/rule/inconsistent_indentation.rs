@@ -13,7 +13,7 @@ impl Rule for InconsistentIndentationRule {
     "inconsistent indentation"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let Some(tree) = context.tree() else {
@@ -38,7 +38,7 @@ impl InconsistentIndentationRule {
     expected: &str,
     found: &str,
     line: u32,
-  ) -> lsp::Diagnostic {
+  ) -> Diagnostic {
     let indent_chars = u32::try_from(found.chars().count()).unwrap_or(u32::MAX);
 
     let range = lsp::Range {
@@ -49,23 +49,21 @@ impl InconsistentIndentationRule {
       },
     };
 
-    self.diagnostic(lsp::Diagnostic {
-      range,
-      severity: Some(lsp::DiagnosticSeverity::ERROR),
-      message: format!(
+    Diagnostic::error(
+      format!(
         "Recipe line has inconsistent leading whitespace. Recipe started with `{}` but found line with `{}`",
         Self::visualize_whitespace(expected),
         Self::visualize_whitespace(found)
       ),
-      ..Default::default()
-    })
+      range,
+    )
   }
 
   fn inspect_recipe(
     &self,
     document: &Document,
     recipe_node: &Node<'_>,
-  ) -> Option<lsp::Diagnostic> {
+  ) -> Option<Diagnostic> {
     if recipe_node.find("recipe_body > shebang").is_some() {
       return None;
     }

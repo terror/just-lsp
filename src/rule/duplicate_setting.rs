@@ -12,19 +12,17 @@ impl Rule for DuplicateSettingRule {
     "duplicate setting"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let mut seen = HashSet::new();
 
     for setting in context.settings() {
       if !seen.insert(setting.name.clone()) {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: setting.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!("Duplicate setting `{}`", setting.name),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate setting `{}`", setting.name),
+          setting.range,
+        ));
       }
     }
 
