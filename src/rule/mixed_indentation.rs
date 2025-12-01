@@ -27,7 +27,7 @@ impl Rule for MixedIndentationRule {
         continue;
       }
 
-      if let Some(diagnostic) = self.inspect_recipe(document, &recipe_node) {
+      if let Some(diagnostic) = Self::inspect_recipe(document, &recipe_node) {
         diagnostics.push(diagnostic);
       }
     }
@@ -38,7 +38,6 @@ impl Rule for MixedIndentationRule {
 
 impl MixedIndentationRule {
   fn diagnostic_for_line(
-    &self,
     recipe_name: &str,
     line: u32,
     indent_length: usize,
@@ -60,7 +59,6 @@ impl MixedIndentationRule {
   }
 
   fn inspect_recipe(
-    &self,
     document: &Document,
     recipe_node: &Node<'_>,
   ) -> Option<Diagnostic> {
@@ -112,7 +110,7 @@ impl MixedIndentationRule {
       }
 
       if has_space && has_tab {
-        return Some(self.diagnostic_for_line(
+        return Some(Self::diagnostic_for_line(
           &recipe_name,
           line_range.start.line,
           indent_length,
@@ -130,7 +128,7 @@ impl MixedIndentationRule {
       match indent_style {
         None => indent_style = Some(current_style),
         Some(style) if style != current_style => {
-          return Some(self.diagnostic_for_line(
+          return Some(Self::diagnostic_for_line(
             &recipe_name,
             line_range.start.line,
             indent_length,

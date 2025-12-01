@@ -23,7 +23,7 @@ impl Rule for InconsistentIndentationRule {
     let document = context.document();
 
     for recipe_node in tree.root_node().find_all("recipe") {
-      if let Some(diagnostic) = self.inspect_recipe(document, &recipe_node) {
+      if let Some(diagnostic) = Self::inspect_recipe(document, &recipe_node) {
         diagnostics.push(diagnostic);
       }
     }
@@ -33,12 +33,7 @@ impl Rule for InconsistentIndentationRule {
 }
 
 impl InconsistentIndentationRule {
-  fn diagnostic_for_line(
-    &self,
-    expected: &str,
-    found: &str,
-    line: u32,
-  ) -> Diagnostic {
+  fn diagnostic_for_line(expected: &str, found: &str, line: u32) -> Diagnostic {
     let indent_chars = u32::try_from(found.chars().count()).unwrap_or(u32::MAX);
 
     let range = lsp::Range {
@@ -60,7 +55,6 @@ impl InconsistentIndentationRule {
   }
 
   fn inspect_recipe(
-    &self,
     document: &Document,
     recipe_node: &Node<'_>,
   ) -> Option<Diagnostic> {
@@ -124,7 +118,7 @@ impl InconsistentIndentationRule {
           }
 
           if *expected != indent && !previous_line_continues {
-            return Some(self.diagnostic_for_line(
+            return Some(Self::diagnostic_for_line(
               expected.as_str(),
               &indent,
               u32::try_from(line_idx).unwrap_or(u32::MAX),

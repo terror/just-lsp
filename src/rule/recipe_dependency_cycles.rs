@@ -40,7 +40,7 @@ impl Rule for RecipeDependencyCycleRule {
         reported_recipes: &mut reported_recipes,
       };
 
-      self.detect_cycle(
+      Self::detect_cycle(
         &recipe.name,
         &dependency_graph,
         &mut diagnostics,
@@ -61,7 +61,6 @@ struct TraversalState<'a> {
 
 impl RecipeDependencyCycleRule {
   fn detect_cycle(
-    &self,
     recipe_name: &str,
     graph: &HashMap<String, Vec<String>>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -114,7 +113,7 @@ impl RecipeDependencyCycleRule {
 
     if let Some(dependencies) = graph.get(recipe_name) {
       for dependency in dependencies {
-        self.detect_cycle(dependency, graph, diagnostics, context, traversal);
+        Self::detect_cycle(dependency, graph, diagnostics, context, traversal);
       }
     }
 

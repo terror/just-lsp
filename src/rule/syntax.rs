@@ -19,7 +19,7 @@ impl Rule for SyntaxRule {
     if let Some(tree) = context.tree() {
       let document = context.document();
       let mut cursor = tree.root_node().walk();
-      self.collect(document, &mut cursor, &mut diagnostics);
+      Self::collect(document, &mut cursor, &mut diagnostics);
     }
 
     diagnostics
@@ -28,7 +28,6 @@ impl Rule for SyntaxRule {
 
 impl SyntaxRule {
   fn collect(
-    &self,
     document: &Document,
     cursor: &mut TreeCursor<'_>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -51,7 +50,7 @@ impl SyntaxRule {
 
     if cursor.goto_first_child() {
       loop {
-        self.collect(document, cursor, diagnostics);
+        Self::collect(document, cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;
