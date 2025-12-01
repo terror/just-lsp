@@ -6,13 +6,13 @@ define_rule! {
   UnknownFunctionRule {
     id: "unknown-function",
     message: "unknown function",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for function_call in ctx.function_calls() {
+      for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if ctx.builtin_function(function_name.as_str()).is_none() {
+        if context.builtin_function(function_name.as_str()).is_none() {
           diagnostics.push(Diagnostic::error(
             format!("Unknown function `{function_name}`"),
             function_call.name.range,

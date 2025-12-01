@@ -5,12 +5,12 @@ define_rule! {
   DuplicateSettingRule {
     id: "duplicate-setting",
     message: "duplicate setting",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
       let mut seen = HashSet::new();
 
-      for setting in ctx.settings() {
+      for setting in context.settings() {
         if !seen.insert(setting.name.clone()) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate setting `{}`", setting.name),

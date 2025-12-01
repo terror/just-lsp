@@ -6,11 +6,11 @@ define_rule! {
   UnknownSettingRule {
     id: "unknown-setting",
     message: "unknown setting",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in ctx.settings() {
-        if ctx.builtin_setting(&setting.name).is_none() {
+      for setting in context.settings() {
+        if context.builtin_setting(&setting.name).is_none() {
           diagnostics.push(Diagnostic::error(
             format!("Unknown setting `{}`", setting.name),
             setting.range,

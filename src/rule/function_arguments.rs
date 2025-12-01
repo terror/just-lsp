@@ -6,17 +6,17 @@ define_rule! {
   FunctionArgumentsRule {
     id: "function-arguments",
     message: "invalid function arguments",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for function_call in ctx.function_calls() {
+      for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
         if let Some(Builtin::Function {
           required_args,
           accepts_variadic,
           ..
-        }) = ctx.builtin_function(function_name.as_str())
+        }) = context.builtin_function(function_name.as_str())
         {
           let arg_count = function_call.arguments.len();
 

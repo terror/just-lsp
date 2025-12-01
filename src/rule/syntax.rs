@@ -6,11 +6,11 @@ define_rule! {
   SyntaxRule {
     id: "syntax-errors",
     message: "syntax errors",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      if let Some(tree) = ctx.tree() {
-        let document = ctx.document();
+      if let Some(tree) = context.tree() {
+        let document = context.document();
         let mut cursor = tree.root_node().walk();
         SyntaxRule::collect(document, &mut cursor, &mut diagnostics);
       }

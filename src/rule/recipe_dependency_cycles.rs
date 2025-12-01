@@ -6,11 +6,11 @@ define_rule! {
   RecipeDependencyCycleRule {
     id: "recipe-dependency-cycles",
     message: "circular dependency",
-    run(ctx) {
+    run(context) {
       let mut dependency_graph = HashMap::new();
       let mut diagnostics = Vec::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         dependency_graph.insert(
           recipe.name.clone(),
           recipe
@@ -23,7 +23,7 @@ define_rule! {
 
       let mut reported_recipes = HashSet::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         let mut path = Vec::new();
         let mut visited = HashSet::new();
 
@@ -37,7 +37,7 @@ define_rule! {
           &recipe.name,
           &dependency_graph,
           &mut diagnostics,
-          ctx,
+          context,
           &mut traversal_state,
         );
       }

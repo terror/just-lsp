@@ -5,12 +5,12 @@ define_rule! {
   DuplicateAliasRule {
     id: "duplicate-alias",
     message: "duplicate alias",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
       let mut seen = HashSet::new();
 
-      for alias in ctx.aliases() {
+      for alias in context.aliases() {
         if !seen.insert(alias.name.value.clone()) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate alias `{}`", alias.name.value),

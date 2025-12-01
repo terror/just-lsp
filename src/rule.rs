@@ -6,7 +6,7 @@ macro_rules! define_rule {
     $name:ident {
       id: $id:literal,
       message: $message:literal,
-      run($ctx:ident) $body:block
+      run($context:ident) $body:block
     }
   ) => {
     $(#[$doc])*
@@ -21,7 +21,7 @@ macro_rules! define_rule {
         $message
       }
 
-      fn run(&self, $ctx: &RuleContext<'_>) -> Vec<Diagnostic> {
+      fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
         $body
       }
     }

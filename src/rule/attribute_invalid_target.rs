@@ -6,13 +6,13 @@ define_rule! {
   AttributeInvalidTargetRule {
     id: "attribute-invalid-target",
     message: "invalid attribute target",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for attribute in ctx.attributes() {
+      for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        if ctx.builtin_attributes(attribute_name).is_empty() {
+        if context.builtin_attributes(attribute_name).is_empty() {
           continue;
         }
 

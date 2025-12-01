@@ -6,14 +6,14 @@ define_rule! {
   InconsistentIndentationRule {
     id: "inconsistent-recipe-indentation",
     message: "inconsistent indentation",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      let Some(tree) = ctx.tree() else {
+      let Some(tree) = context.tree() else {
         return diagnostics;
       };
 
-      let document = ctx.document();
+      let document = context.document();
 
       for recipe_node in tree.root_node().find_all("recipe") {
         if let Some(diagnostic) = InconsistentIndentationRule::inspect_recipe(document, &recipe_node) {

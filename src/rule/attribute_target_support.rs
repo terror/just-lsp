@@ -6,13 +6,13 @@ define_rule! {
   AttributeTargetSupportRule {
     id: "attribute-target-support",
     message: "unsupported attribute target",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for attribute in ctx.attributes() {
+      for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        let matching = ctx.builtin_attributes(attribute_name);
+        let matching = context.builtin_attributes(attribute_name);
 
         if matching.is_empty() {
           continue;

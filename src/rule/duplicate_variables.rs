@@ -6,8 +6,8 @@ define_rule! {
   DuplicateVariableRule {
     id: "duplicate-variable",
     message: "duplicate variable",
-    run(ctx) {
-      let allow_duplicates = ctx.setting_enabled("allow-duplicate-variables");
+    run(context) {
+      let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
 
       if allow_duplicates {
         return Vec::new();
@@ -16,7 +16,7 @@ define_rule! {
       let mut diagnostics = Vec::new();
       let mut seen = HashSet::new();
 
-      for variable in ctx.variables() {
+      for variable in context.variables() {
         if !seen.insert(variable.name.value.clone()) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate variable `{}`", variable.name.value),

@@ -6,12 +6,12 @@ define_rule! {
   InvalidSettingKindRule {
     id: "invalid-setting-kind",
     message: "invalid setting kind",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in ctx.settings() {
+      for setting in context.settings() {
         let Some(Builtin::Setting { kind, .. }) =
-          ctx.builtin_setting(&setting.name)
+          context.builtin_setting(&setting.name)
         else {
           continue;
         };

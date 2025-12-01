@@ -124,13 +124,13 @@ define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
     message: "duplicate attribute",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
       let mut module_seen: HashMap<&'static str, HashSet<String>> =
         HashMap::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         let mut recipe_seen: HashMap<&'static str, HashSet<String>> =
           HashMap::new();
 

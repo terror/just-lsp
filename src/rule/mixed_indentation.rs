@@ -6,14 +6,14 @@ define_rule! {
   MixedIndentationRule {
     id: "mixed-recipe-indentation",
     message: "mixed indentation",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      let Some(tree) = ctx.tree() else {
+      let Some(tree) = context.tree() else {
         return diagnostics;
       };
 
-      let document = ctx.document();
+      let document = context.document();
 
       for recipe_node in tree.root_node().find_all("recipe") {
         if recipe_node.find("recipe_body").is_none() {

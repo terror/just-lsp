@@ -5,12 +5,12 @@ define_rule! {
   MissingRecipeForAliasRule {
     id: "missing-recipe-for-alias",
     message: "alias target not found",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      let recipe_names = ctx.recipe_names();
+      let recipe_names = context.recipe_names();
 
-      for alias in ctx.aliases() {
+      for alias in context.aliases() {
         if !recipe_names.contains(&alias.value.value) {
           diagnostics.push(Diagnostic::error(
             format!("Recipe `{}` not found", alias.value.value),

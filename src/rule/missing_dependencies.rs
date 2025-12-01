@@ -6,12 +6,12 @@ define_rule! {
   MissingDependencyRule {
     id: "missing-dependencies",
     message: "missing dependency",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      let recipe_names = ctx.recipe_names();
+      let recipe_names = context.recipe_names();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
           if !recipe_names.contains(&dependency.name) {
             diagnostics.push(Diagnostic::error(

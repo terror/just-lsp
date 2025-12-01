@@ -6,14 +6,14 @@ define_rule! {
   AliasRecipeConflictRule {
     id: "alias-recipe-conflict",
     message: "name conflict",
-    run(ctx) {
-      let (aliases, recipes) = (ctx.aliases(), ctx.recipes());
+    run(context) {
+      let (aliases, recipes) = (context.aliases(), context.recipes());
 
       if aliases.is_empty() || recipes.is_empty() {
         return Vec::new();
       }
 
-      let recipe_name_lookup = AliasRecipeConflictRule::recipe_name_ranges(ctx);
+      let recipe_name_lookup = AliasRecipeConflictRule::recipe_name_ranges(context);
 
       let recipe_name_ranges = recipes
         .iter()

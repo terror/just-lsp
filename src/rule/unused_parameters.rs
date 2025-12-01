@@ -6,16 +6,16 @@ define_rule! {
   UnusedParameterRule {
     id: "unused-parameters",
     message: "unused parameter",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      let exported = ctx.setting_enabled("export");
+      let exported = context.setting_enabled("export");
 
       let positional_arguments_enabled =
-        ctx.setting_enabled("positional-arguments");
+        context.setting_enabled("positional-arguments");
 
-      for (recipe_name, identifiers) in ctx.recipe_identifier_usage() {
-        if let Some(recipe) = ctx.recipe(recipe_name) {
+      for (recipe_name, identifiers) in context.recipe_identifier_usage() {
+        if let Some(recipe) = context.recipe(recipe_name) {
           let recipe_enables_positional_arguments = positional_arguments_enabled
             || recipe.has_attribute("positional-arguments");
 

@@ -6,8 +6,8 @@ define_rule! {
   ParallelDependenciesRule {
     id: "parallel-dependencies",
     message: "unnecessary parallel attribute",
-    run(ctx) {
-      ctx
+    run(context) {
+      context
         .recipes()
         .iter()
         .filter_map(|recipe| {

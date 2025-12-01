@@ -6,10 +6,10 @@ define_rule! {
   UndefinedIdentifierRule {
     id: "undefined-identifiers",
     message: "undefined identifier",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for unresolved in ctx.unresolved_identifiers() {
+      for unresolved in context.unresolved_identifiers() {
         diagnostics.push(Diagnostic::error(
           format!("Variable `{}` not found", unresolved.name),
           unresolved.range,

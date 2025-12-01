@@ -5,10 +5,10 @@ define_rule! {
   ScriptShebangConflictRule {
     id: "script-shebang-conflict",
     message: "shebang conflict",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         let Some(script_attribute) = recipe.find_attribute("script") else {
           continue;
         };

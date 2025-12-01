@@ -6,8 +6,8 @@ define_rule! {
   DuplicateRecipeRule {
     id: "duplicate-recipes",
     message: "duplicate recipes",
-    run(ctx) {
-      let allow_duplicates = ctx.setting_enabled("allow-duplicate-recipes");
+    run(context) {
+      let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
 
       if allow_duplicates {
         return Vec::new();
@@ -18,7 +18,7 @@ define_rule! {
       let mut recipe_groups: HashMap<String, Vec<(lsp::Range, HashSet<Group>)>> =
         HashMap::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         recipe_groups
           .entry(recipe.name.clone())
           .or_default()

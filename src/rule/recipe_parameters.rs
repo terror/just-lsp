@@ -6,10 +6,10 @@ define_rule! {
   RecipeParameterRule {
     id: "recipe-parameters",
     message: "invalid recipe parameters",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         let mut seen = HashSet::new();
 
         let (mut passed_default, mut passed_variadic) = (false, false);

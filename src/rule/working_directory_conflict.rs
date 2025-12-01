@@ -5,10 +5,10 @@ define_rule! {
   WorkingDirectoryConflictRule {
     id: "working-directory-conflict",
     message: "conflicting directory attributes",
-    run(ctx) {
+    run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in ctx.recipes() {
+      for recipe in context.recipes() {
         let working_directory_attribute =
           recipe.find_attribute("working-directory");
 
