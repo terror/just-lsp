@@ -1,38 +1,32 @@
 use super::*;
 
-/// Ensures each `set` statement uses the correct value type (boolean, string,
-/// or array) for the targeted builtin setting.
-pub(crate) struct InvalidSettingKindRule;
+define_rule! {
+  /// Ensures each `set` statement uses the correct value type (boolean, string,
+  /// or array) for the targeted builtin setting.
+  InvalidSettingKindRule {
+    id: "invalid-setting-kind",
+    message: "invalid setting kind",
+    run(ctx) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for InvalidSettingKindRule {
-  fn id(&self) -> &'static str {
-    "invalid-setting-kind"
-  }
+      for setting in ctx.settings() {
+        let Some(Builtin::Setting { kind, .. }) =
+          ctx.builtin_setting(&setting.name)
+        else {
+          continue;
+        };
 
-  fn message(&self) -> &'static str {
-    "invalid setting kind"
-  }
+        if setting.kind == *kind {
+          continue;
+        }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    for setting in context.settings() {
-      let Some(Builtin::Setting { kind, .. }) =
-        context.builtin_setting(&setting.name)
-      else {
-        continue;
-      };
-
-      if setting.kind == *kind {
-        continue;
+        diagnostics.push(Diagnostic::error(
+          format!("Setting `{}` expects a {kind} value", setting.name,),
+          setting.range,
+        ));
       }
 
-      diagnostics.push(Diagnostic::error(
-        format!("Setting `{}` expects a {kind} value", setting.name,),
-        setting.range,
-      ));
+      diagnostics
     }
-
-    diagnostics
   }
 }

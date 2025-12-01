@@ -1,86 +1,80 @@
 use super::*;
 
-/// Reports aliases and recipes that share the same name, since they shadow
-/// each other at runtime.
-pub(crate) struct AliasRecipeConflictRule;
+define_rule! {
+  /// Reports aliases and recipes that share the same name, since they shadow
+  /// each other at runtime.
+  AliasRecipeConflictRule {
+    id: "alias-recipe-conflict",
+    message: "name conflict",
+    run(ctx) {
+      let (aliases, recipes) = (ctx.aliases(), ctx.recipes());
 
-impl Rule for AliasRecipeConflictRule {
-  fn id(&self) -> &'static str {
-    "alias-recipe-conflict"
-  }
+      if aliases.is_empty() || recipes.is_empty() {
+        return Vec::new();
+      }
 
-  fn message(&self) -> &'static str {
-    "name conflict"
-  }
+      let recipe_name_lookup = AliasRecipeConflictRule::recipe_name_ranges(ctx);
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let (aliases, recipes) = (context.aliases(), context.recipes());
+      let recipe_name_ranges = recipes
+        .iter()
+        .map(|recipe| {
+          recipe_name_lookup
+            .get(&RangeKey::from(recipe.range))
+            .copied()
+            .unwrap_or(recipe.range)
+        })
+        .collect::<Vec<_>>();
 
-    if aliases.is_empty() || recipes.is_empty() {
-      return Vec::new();
-    }
+      let mut first_alias_index: HashMap<String, usize> = HashMap::new();
 
-    let recipe_name_lookup = Self::recipe_name_ranges(context);
+      for (index, alias) in aliases.iter().enumerate() {
+        first_alias_index
+          .entry(alias.name.value.clone())
+          .or_insert(index);
+      }
 
-    let recipe_name_ranges = recipes
-      .iter()
-      .map(|recipe| {
-        recipe_name_lookup
-          .get(&RangeKey::from(recipe.range))
-          .copied()
-          .unwrap_or(recipe.range)
-      })
-      .collect::<Vec<_>>();
+      let mut first_recipe_index: HashMap<String, usize> = HashMap::new();
 
-    let mut first_alias_index: HashMap<String, usize> = HashMap::new();
+      for (index, recipe) in recipes.iter().enumerate() {
+        first_recipe_index
+          .entry(recipe.name.clone())
+          .or_insert(index);
+      }
 
-    for (index, alias) in aliases.iter().enumerate() {
-      first_alias_index
-        .entry(alias.name.value.clone())
-        .or_insert(index);
-    }
+      let mut diagnostics = Vec::new();
 
-    let mut first_recipe_index: HashMap<String, usize> = HashMap::new();
+      for alias in aliases {
+        if let Some(&recipe_index) = first_recipe_index.get(&alias.name.value) {
+          let recipe_range = recipe_name_ranges[recipe_index];
 
-    for (index, recipe) in recipes.iter().enumerate() {
-      first_recipe_index
-        .entry(recipe.name.clone())
-        .or_insert(index);
-    }
-
-    let mut diagnostics = Vec::new();
-
-    for alias in aliases {
-      if let Some(&recipe_index) = first_recipe_index.get(&alias.name.value) {
-        let recipe_range = recipe_name_ranges[recipe_index];
-
-        if Self::is_after(&alias.name.range, &recipe_range) {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Recipe `{}` is redefined as an alias",
-              recipes[recipe_index].name
-            ),
-            alias.name.range,
-          ));
+          if AliasRecipeConflictRule::is_after(&alias.name.range, &recipe_range) {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Recipe `{}` is redefined as an alias",
+                recipes[recipe_index].name
+              ),
+              alias.name.range,
+            ));
+          }
         }
       }
-    }
 
-    for (index, recipe) in recipes.iter().enumerate() {
-      if let Some(&alias_index) = first_alias_index.get(&recipe.name) {
-        let (recipe_range, alias_range) =
-          (recipe_name_ranges[index], aliases[alias_index].name.range);
+      for (index, recipe) in recipes.iter().enumerate() {
+        if let Some(&alias_index) = first_alias_index.get(&recipe.name) {
+          let (recipe_range, alias_range) =
+            (recipe_name_ranges[index], aliases[alias_index].name.range);
 
-        if Self::is_after(&recipe_range, &alias_range) {
-          diagnostics.push(Diagnostic::error(
-            format!("Alias `{}` is redefined as a recipe", recipe.name),
-            recipe_range,
-          ));
+          if AliasRecipeConflictRule::is_after(&recipe_range, &alias_range) {
+            diagnostics.push(Diagnostic::error(
+              format!("Alias `{}` is redefined as a recipe", recipe.name),
+              recipe_range,
+            ));
+          }
         }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }
 

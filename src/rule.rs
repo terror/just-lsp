@@ -1,5 +1,33 @@
 use super::*;
 
+macro_rules! define_rule {
+  (
+    $(#[$doc:meta])*
+    $name:ident {
+      id: $id:literal,
+      message: $message:literal,
+      run($ctx:ident) $body:block
+    }
+  ) => {
+    $(#[$doc])*
+    pub(crate) struct $name;
+
+    impl Rule for $name {
+      fn id(&self) -> &'static str {
+        $id
+      }
+
+      fn message(&self) -> &'static str {
+        $message
+      }
+
+      fn run(&self, $ctx: &RuleContext<'_>) -> Vec<Diagnostic> {
+        $body
+      }
+    }
+  };
+}
+
 pub(crate) use {
   alias_recipe_conflict::AliasRecipeConflictRule,
   attribute_arguments::AttributeArgumentsRule,

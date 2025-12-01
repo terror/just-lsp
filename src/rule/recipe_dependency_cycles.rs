@@ -1,55 +1,49 @@
 use super::*;
 
-/// Detects circular dependency chains between recipes to prevent infinite
-/// execution loops.
-pub(crate) struct RecipeDependencyCycleRule;
+define_rule! {
+  /// Detects circular dependency chains between recipes to prevent infinite
+  /// execution loops.
+  RecipeDependencyCycleRule {
+    id: "recipe-dependency-cycles",
+    message: "circular dependency",
+    run(ctx) {
+      let mut dependency_graph = HashMap::new();
+      let mut diagnostics = Vec::new();
 
-impl Rule for RecipeDependencyCycleRule {
-  fn id(&self) -> &'static str {
-    "recipe-dependency-cycles"
-  }
+      for recipe in ctx.recipes() {
+        dependency_graph.insert(
+          recipe.name.clone(),
+          recipe
+            .dependencies
+            .iter()
+            .map(|dep| dep.name.clone())
+            .collect::<Vec<_>>(),
+        );
+      }
 
-  fn message(&self) -> &'static str {
-    "circular dependency"
-  }
+      let mut reported_recipes = HashSet::new();
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut dependency_graph = HashMap::new();
-    let mut diagnostics = Vec::new();
+      for recipe in ctx.recipes() {
+        let mut path = Vec::new();
+        let mut visited = HashSet::new();
 
-    for recipe in context.recipes() {
-      dependency_graph.insert(
-        recipe.name.clone(),
-        recipe
-          .dependencies
-          .iter()
-          .map(|dep| dep.name.clone())
-          .collect::<Vec<_>>(),
-      );
+        let mut traversal_state = TraversalState {
+          visited: &mut visited,
+          path: &mut path,
+          reported_recipes: &mut reported_recipes,
+        };
+
+        RecipeDependencyCycleRule::detect_cycle(
+          &recipe.name,
+          &dependency_graph,
+          &mut diagnostics,
+          ctx,
+          &mut traversal_state,
+        );
+      }
+
+      diagnostics
     }
-
-    let mut reported_recipes = HashSet::new();
-
-    for recipe in context.recipes() {
-      let mut path = Vec::new();
-      let mut visited = HashSet::new();
-
-      let mut traversal_state = TraversalState {
-        visited: &mut visited,
-        path: &mut path,
-        reported_recipes: &mut reported_recipes,
-      };
-
-      Self::detect_cycle(
-        &recipe.name,
-        &dependency_graph,
-        &mut diagnostics,
-        context,
-        &mut traversal_state,
-      );
-    }
-
-    diagnostics
   }
 }
 
@@ -113,7 +107,13 @@ impl RecipeDependencyCycleRule {
 
     if let Some(dependencies) = graph.get(recipe_name) {
       for dependency in dependencies {
-        Self::detect_cycle(dependency, graph, diagnostics, context, traversal);
+        RecipeDependencyCycleRule::detect_cycle(
+          dependency,
+          graph,
+          diagnostics,
+          context,
+          traversal,
+        );
       }
     }
 

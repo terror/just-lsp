@@ -1,31 +1,25 @@
 use super::*;
 
-/// Emits diagnostics when the same `set` option is declared more than once.
-pub(crate) struct DuplicateSettingRule;
+define_rule! {
+  /// Emits diagnostics when the same `set` option is declared more than once.
+  DuplicateSettingRule {
+    id: "duplicate-setting",
+    message: "duplicate setting",
+    run(ctx) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for DuplicateSettingRule {
-  fn id(&self) -> &'static str {
-    "duplicate-setting"
-  }
+      let mut seen = HashSet::new();
 
-  fn message(&self) -> &'static str {
-    "duplicate setting"
-  }
-
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let mut seen = HashSet::new();
-
-    for setting in context.settings() {
-      if !seen.insert(setting.name.clone()) {
-        diagnostics.push(Diagnostic::error(
-          format!("Duplicate setting `{}`", setting.name),
-          setting.range,
-        ));
+      for setting in ctx.settings() {
+        if !seen.insert(setting.name.clone()) {
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate setting `{}`", setting.name),
+            setting.range,
+          ));
+        }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }

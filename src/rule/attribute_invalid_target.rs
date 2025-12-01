@@ -1,36 +1,30 @@
 use super::*;
 
-/// Ensures attributes only appear on syntax nodes that actually accept
-/// attributes.
-pub(crate) struct AttributeInvalidTargetRule;
+define_rule! {
+  /// Ensures attributes only appear on syntax nodes that actually accept
+  /// attributes.
+  AttributeInvalidTargetRule {
+    id: "attribute-invalid-target",
+    message: "invalid attribute target",
+    run(ctx) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for AttributeInvalidTargetRule {
-  fn id(&self) -> &'static str {
-    "attribute-invalid-target"
-  }
+      for attribute in ctx.attributes() {
+        let attribute_name = &attribute.name.value;
 
-  fn message(&self) -> &'static str {
-    "invalid attribute target"
-  }
+        if ctx.builtin_attributes(attribute_name).is_empty() {
+          continue;
+        }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    for attribute in context.attributes() {
-      let attribute_name = &attribute.name.value;
-
-      if context.builtin_attributes(attribute_name).is_empty() {
-        continue;
+        if attribute.target.is_none() {
+          diagnostics.push(Diagnostic::error(
+            format!("Attribute `{attribute_name}` applied to invalid target",),
+            attribute.range,
+          ));
+        }
       }
 
-      if attribute.target.is_none() {
-        diagnostics.push(Diagnostic::error(
-          format!("Attribute `{attribute_name}` applied to invalid target",),
-          attribute.range,
-        ));
-      }
+      diagnostics
     }
-
-    diagnostics
   }
 }

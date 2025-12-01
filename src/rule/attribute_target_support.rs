@@ -1,52 +1,46 @@
 use super::*;
 
-/// Validates that each attribute is attached to a supported target kind
-/// (recipe, module, alias, etc.) according to the builtin metadata.
-pub(crate) struct AttributeTargetSupportRule;
+define_rule! {
+  /// Validates that each attribute is attached to a supported target kind
+  /// (recipe, module, alias, etc.) according to the builtin metadata.
+  AttributeTargetSupportRule {
+    id: "attribute-target-support",
+    message: "unsupported attribute target",
+    run(ctx) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for AttributeTargetSupportRule {
-  fn id(&self) -> &'static str {
-    "attribute-target-support"
-  }
+      for attribute in ctx.attributes() {
+        let attribute_name = &attribute.name.value;
 
-  fn message(&self) -> &'static str {
-    "unsupported attribute target"
-  }
+        let matching = ctx.builtin_attributes(attribute_name);
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    for attribute in context.attributes() {
-      let attribute_name = &attribute.name.value;
-
-      let matching = context.builtin_attributes(attribute_name);
-
-      if matching.is_empty() {
-        continue;
-      }
-
-      let Some(target_type) = attribute.target else {
-        continue;
-      };
-
-      let is_valid_target = matching.iter().copied().any(|attr| {
-        if let Builtin::Attribute { targets, .. } = attr {
-          targets.contains(&target_type)
-        } else {
-          false
+        if matching.is_empty() {
+          continue;
         }
-      });
 
-      if !is_valid_target {
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Attribute `{attribute_name}` cannot be applied to {target_type} target",
-          ),
-          attribute.range,
-        ));
+        let Some(target_type) = attribute.target else {
+          continue;
+        };
+
+        let is_valid_target = matching.iter().copied().any(|attr| {
+          if let Builtin::Attribute { targets, .. } = attr {
+            targets.contains(&target_type)
+          } else {
+            false
+          }
+        });
+
+        if !is_valid_target {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "Attribute `{attribute_name}` cannot be applied to {target_type} target",
+            ),
+            attribute.range,
+          ));
+        }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }

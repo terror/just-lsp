@@ -1,31 +1,25 @@
 use super::*;
 
-/// Flags alias declarations that reuse the same name multiple times.
-pub(crate) struct DuplicateAliasRule;
+define_rule! {
+  /// Flags alias declarations that reuse the same name multiple times.
+  DuplicateAliasRule {
+    id: "duplicate-alias",
+    message: "duplicate alias",
+    run(ctx) {
+      let mut diagnostics = Vec::new();
 
-impl Rule for DuplicateAliasRule {
-  fn id(&self) -> &'static str {
-    "duplicate-alias"
-  }
+      let mut seen = HashSet::new();
 
-  fn message(&self) -> &'static str {
-    "duplicate alias"
-  }
-
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let mut seen = HashSet::new();
-
-    for alias in context.aliases() {
-      if !seen.insert(alias.name.value.clone()) {
-        diagnostics.push(Diagnostic::error(
-          format!("Duplicate alias `{}`", alias.name.value),
-          alias.range,
-        ));
+      for alias in ctx.aliases() {
+        if !seen.insert(alias.name.value.clone()) {
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate alias `{}`", alias.name.value),
+            alias.range,
+          ));
+        }
       }
-    }
 
-    diagnostics
+      diagnostics
+    }
   }
 }
