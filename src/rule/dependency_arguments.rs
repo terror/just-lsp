@@ -13,7 +13,7 @@ impl Rule for DependencyArgumentRule {
     "invalid dependency arguments"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let recipe_parameters = context.recipe_parameters();
@@ -37,27 +37,23 @@ impl Rule for DependencyArgumentRule {
           let arg_count = dependency.arguments.len();
 
           if arg_count < required_params {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: dependency.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              message: format!(
+            diagnostics.push(Diagnostic::error(
+              format!(
                 "Dependency `{}` requires {required_params} {}, but {arg_count} provided",
                 dependency.name,
                 Count("argument", required_params)
               ),
-              ..Default::default()
-            }));
+              dependency.range,
+            ));
           } else if !has_variadic && arg_count > total_params {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: dependency.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              message: format!(
+            diagnostics.push(Diagnostic::error(
+              format!(
                 "Dependency `{}` accepts {total_params} {}, but {arg_count} provided",
                 dependency.name,
                 Count("argument", total_params)
               ),
-              ..Default::default()
-            }));
+              dependency.range,
+            ));
           }
         }
       }

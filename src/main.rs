@@ -12,6 +12,7 @@ use {
   command::Command,
   count::Count,
   dependency::Dependency,
+  diagnostic::Diagnostic,
   document::Document,
   env_logger::Env,
   function_call::FunctionCall,
@@ -64,6 +65,7 @@ mod builtins;
 mod command;
 mod count;
 mod dependency;
+mod diagnostic;
 mod document;
 mod function_call;
 mod group;

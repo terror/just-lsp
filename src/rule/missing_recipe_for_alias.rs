@@ -12,19 +12,17 @@ impl Rule for MissingRecipeForAliasRule {
     "alias target not found"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let recipe_names = context.recipe_names();
 
     for alias in context.aliases() {
       if !recipe_names.contains(&alias.value.value) {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: alias.value.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!("Recipe `{}` not found", alias.value.value),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Recipe `{}` not found", alias.value.value),
+          alias.value.range,
+        ));
       }
     }
 

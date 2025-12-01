@@ -13,7 +13,7 @@ impl Rule for FunctionArgumentsRule {
     "invalid function arguments"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for function_call in context.function_calls() {
@@ -28,25 +28,21 @@ impl Rule for FunctionArgumentsRule {
         let arg_count = function_call.arguments.len();
 
         if arg_count < *required_args {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: function_call.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
+          diagnostics.push(Diagnostic::error(
+            format!(
               "Function `{function_name}` requires at least {required_args} {}, but {arg_count} provided",
               Count("argument", *required_args)
             ),
-            ..Default::default()
-          }));
+            function_call.range,
+          ));
         } else if !accepts_variadic && arg_count > *required_args {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: function_call.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
+          diagnostics.push(Diagnostic::error(
+            format!(
               "Function `{function_name}` accepts {required_args} {}, but {arg_count} provided",
               Count("argument", *required_args)
             ),
-            ..Default::default()
-          }));
+            function_call.range,
+          ));
         }
       }
     }

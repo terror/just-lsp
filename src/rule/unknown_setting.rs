@@ -13,17 +13,15 @@ impl Rule for UnknownSettingRule {
     "unknown setting"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for setting in context.settings() {
       if context.builtin_setting(&setting.name).is_none() {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: setting.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!("Unknown setting `{}`", setting.name),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Unknown setting `{}`", setting.name),
+          setting.range,
+        ));
       }
     }
 

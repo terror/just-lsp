@@ -13,7 +13,7 @@ impl Rule for RecipeDependencyCycleRule {
     "circular dependency"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut dependency_graph = HashMap::new();
     let mut diagnostics = Vec::new();
 
@@ -40,7 +40,7 @@ impl Rule for RecipeDependencyCycleRule {
         reported_recipes: &mut reported_recipes,
       };
 
-      self.detect_cycle(
+      Self::detect_cycle(
         &recipe.name,
         &dependency_graph,
         &mut diagnostics,
@@ -61,10 +61,9 @@ struct TraversalState<'a> {
 
 impl RecipeDependencyCycleRule {
   fn detect_cycle(
-    &self,
     recipe_name: &str,
     graph: &HashMap<String, Vec<String>>,
-    diagnostics: &mut Vec<lsp::Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
     context: &RuleContext<'_>,
     traversal: &mut TraversalState<'_>,
   ) {
@@ -100,12 +99,7 @@ impl RecipeDependencyCycleRule {
           return;
         }
 
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: recipe.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message,
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(message, recipe.range));
       }
 
       return;
@@ -119,7 +113,7 @@ impl RecipeDependencyCycleRule {
 
     if let Some(dependencies) = graph.get(recipe_name) {
       for dependency in dependencies {
-        self.detect_cycle(dependency, graph, diagnostics, context, traversal);
+        Self::detect_cycle(dependency, graph, diagnostics, context, traversal);
       }
     }
 

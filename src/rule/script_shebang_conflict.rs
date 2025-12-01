@@ -12,7 +12,7 @@ impl Rule for ScriptShebangConflictRule {
     "shebang conflict"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for recipe in context.recipes() {
@@ -24,15 +24,13 @@ impl Rule for ScriptShebangConflictRule {
         continue;
       }
 
-      diagnostics.push(self.diagnostic(lsp::Diagnostic {
-        range: script_attribute.range,
-        severity: Some(lsp::DiagnosticSeverity::ERROR),
-        message: format!(
+      diagnostics.push(Diagnostic::error(
+        format!(
           "Recipe `{}` has both shebang line and `[script]` attribute",
           recipe.name
         ),
-        ..Default::default()
-      }));
+        script_attribute.range,
+      ));
     }
 
     diagnostics

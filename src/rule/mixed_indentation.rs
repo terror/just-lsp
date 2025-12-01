@@ -13,7 +13,7 @@ impl Rule for MixedIndentationRule {
     "mixed indentation"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let Some(tree) = context.tree() else {
@@ -27,7 +27,7 @@ impl Rule for MixedIndentationRule {
         continue;
       }
 
-      if let Some(diagnostic) = self.inspect_recipe(document, &recipe_node) {
+      if let Some(diagnostic) = Self::inspect_recipe(document, &recipe_node) {
         diagnostics.push(diagnostic);
       }
     }
@@ -38,11 +38,10 @@ impl Rule for MixedIndentationRule {
 
 impl MixedIndentationRule {
   fn diagnostic_for_line(
-    &self,
     recipe_name: &str,
     line: u32,
     indent_length: usize,
-  ) -> lsp::Diagnostic {
+  ) -> Diagnostic {
     let indent = u32::try_from(indent_length).unwrap_or(u32::MAX);
 
     let range = lsp::Range {
@@ -53,21 +52,16 @@ impl MixedIndentationRule {
       },
     };
 
-    self.diagnostic(lsp::Diagnostic {
+    Diagnostic::error(
+      format!("Recipe `{recipe_name}` mixes tabs and spaces for indentation"),
       range,
-      severity: Some(lsp::DiagnosticSeverity::ERROR),
-      message: format!(
-        "Recipe `{recipe_name}` mixes tabs and spaces for indentation"
-      ),
-      ..Default::default()
-    })
+    )
   }
 
   fn inspect_recipe(
-    &self,
     document: &Document,
     recipe_node: &Node<'_>,
-  ) -> Option<lsp::Diagnostic> {
+  ) -> Option<Diagnostic> {
     let recipe_name =
       recipe_node.find("recipe_header > identifier").map_or_else(
         || "recipe".to_string(),
@@ -116,7 +110,7 @@ impl MixedIndentationRule {
       }
 
       if has_space && has_tab {
-        return Some(self.diagnostic_for_line(
+        return Some(Self::diagnostic_for_line(
           &recipe_name,
           line_range.start.line,
           indent_length,
@@ -134,7 +128,7 @@ impl MixedIndentationRule {
       match indent_style {
         None => indent_style = Some(current_style),
         Some(style) if style != current_style => {
-          return Some(self.diagnostic_for_line(
+          return Some(Self::diagnostic_for_line(
             &recipe_name,
             line_range.start.line,
             indent_length,

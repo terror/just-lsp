@@ -12,7 +12,7 @@ impl Rule for WorkingDirectoryConflictRule {
     "conflicting directory attributes"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for recipe in context.recipes() {
@@ -24,15 +24,13 @@ impl Rule for WorkingDirectoryConflictRule {
       if let (Some(attribute), Some(_)) =
         (working_directory_attribute, no_cd_attribute)
       {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: attribute.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!(
+        diagnostics.push(Diagnostic::error(
+          format!(
             "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
             recipe.name
           ),
-          ..Default::default()
-        }));
+          attribute.range,
+        ));
       }
     }
 

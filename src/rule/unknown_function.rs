@@ -13,19 +13,17 @@ impl Rule for UnknownFunctionRule {
     "unknown function"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
       if context.builtin_function(function_name.as_str()).is_none() {
-        diagnostics.push(self.diagnostic(lsp::Diagnostic {
-          range: function_call.name.range,
-          severity: Some(lsp::DiagnosticSeverity::ERROR),
-          message: format!("Unknown function `{function_name}`"),
-          ..Default::default()
-        }));
+        diagnostics.push(Diagnostic::error(
+          format!("Unknown function `{function_name}`"),
+          function_call.name.range,
+        ));
       }
     }
 

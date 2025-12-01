@@ -13,7 +13,7 @@ impl Rule for RecipeParameterRule {
     "invalid recipe parameters"
   }
 
-  fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for recipe in context.recipes() {
@@ -23,27 +23,23 @@ impl Rule for RecipeParameterRule {
 
       for (index, param) in recipe.parameters.iter().enumerate() {
         if !seen.insert(param.name.clone()) {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!("Duplicate parameter `{}`", param.name),
-            ..Default::default()
-          }));
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate parameter `{}`", param.name),
+            param.range,
+          ));
         }
 
         let has_default = param.default_value.is_some();
 
         if matches!(param.kind, ParameterKind::Variadic(_)) {
           if index < recipe.parameters.len() - 1 {
-            diagnostics.push(self.diagnostic(lsp::Diagnostic {
-              range: param.range,
-              severity: Some(lsp::DiagnosticSeverity::ERROR),
-              message: format!(
+            diagnostics.push(Diagnostic::error(
+              format!(
                 "Variadic parameter `{}` must be the last parameter",
                 param.name
               ),
-              ..Default::default()
-            }));
+              param.range,
+            ));
           }
 
           passed_variadic = true;
@@ -53,27 +49,20 @@ impl Rule for RecipeParameterRule {
           && !has_default
           && !matches!(param.kind, ParameterKind::Variadic(_))
         {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
+          diagnostics.push(Diagnostic::error(
+            format!(
               "Required parameter `{}` follows a parameter with a default value",
               param.name
             ),
-            ..Default::default()
-          }));
+            param.range,
+          ));
         }
 
         if passed_variadic && index < recipe.parameters.len() - 1 {
-          diagnostics.push(self.diagnostic(lsp::Diagnostic {
-            range: param.range,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            message: format!(
-              "Parameter `{}` follows a variadic parameter",
-              param.name
-            ),
-            ..Default::default()
-          }));
+          diagnostics.push(Diagnostic::error(
+            format!("Parameter `{}` follows a variadic parameter", param.name),
+            param.range,
+          ));
         }
 
         if has_default {
