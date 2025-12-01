@@ -9,7 +9,7 @@ impl Rule for MissingRecipeForAliasRule {
   }
 
   fn message(&self) -> &'static str {
-    "missing recipe for alias"
+    "alias target not found"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

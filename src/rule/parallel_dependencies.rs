@@ -10,7 +10,7 @@ impl Rule for ParallelDependenciesRule {
   }
 
   fn message(&self) -> &'static str {
-    "parallel dependencies"
+    "unnecessary parallel attribute"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

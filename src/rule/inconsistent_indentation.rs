@@ -10,7 +10,7 @@ impl Rule for InconsistentIndentationRule {
   }
 
   fn message(&self) -> &'static str {
-    "inconsistent recipe indentation"
+    "inconsistent indentation"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

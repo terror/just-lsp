@@ -9,7 +9,7 @@ impl Rule for ScriptShebangConflictRule {
   }
 
   fn message(&self) -> &'static str {
-    "script shebang conflict"
+    "shebang conflict"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

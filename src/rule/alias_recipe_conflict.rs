@@ -10,7 +10,7 @@ impl Rule for AliasRecipeConflictRule {
   }
 
   fn message(&self) -> &'static str {
-    "alias/recipe conflicts"
+    "name conflict"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

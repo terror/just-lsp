@@ -10,7 +10,7 @@ impl Rule for AttributeArgumentsRule {
   }
 
   fn message(&self) -> &'static str {
-    "attribute arguments"
+    "invalid attribute arguments"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

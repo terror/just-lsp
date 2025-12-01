@@ -10,7 +10,7 @@ impl Rule for MissingDependencyRule {
   }
 
   fn message(&self) -> &'static str {
-    "missing dependencies"
+    "missing dependency"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
