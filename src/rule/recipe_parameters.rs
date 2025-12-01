@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct RecipeParameterRule;
 
 impl Rule for RecipeParameterRule {
-  fn display_name(&self) -> &'static str {
-    "Recipe Parameters"
-  }
-
   fn id(&self) -> &'static str {
     "recipe-parameters"
+  }
+
+  fn message(&self) -> &'static str {
+    "invalid recipe parameters"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct DuplicateVariableRule;
 
 impl Rule for DuplicateVariableRule {
-  fn display_name(&self) -> &'static str {
-    "Duplicate Variable"
-  }
-
   fn id(&self) -> &'static str {
     "duplicate-variable"
+  }
+
+  fn message(&self) -> &'static str {
+    "duplicate variable"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

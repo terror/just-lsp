@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct AliasRecipeConflictRule;
 
 impl Rule for AliasRecipeConflictRule {
-  fn display_name(&self) -> &'static str {
-    "Alias/Recipe Conflicts"
-  }
-
   fn id(&self) -> &'static str {
     "alias-recipe-conflict"
+  }
+
+  fn message(&self) -> &'static str {
+    "name conflict"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

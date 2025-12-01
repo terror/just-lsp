@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct MissingRecipeForAliasRule;
 
 impl Rule for MissingRecipeForAliasRule {
-  fn display_name(&self) -> &'static str {
-    "Missing Recipe for Alias"
-  }
-
   fn id(&self) -> &'static str {
     "missing-recipe-for-alias"
+  }
+
+  fn message(&self) -> &'static str {
+    "alias target not found"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

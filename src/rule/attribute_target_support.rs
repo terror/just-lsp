@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct AttributeTargetSupportRule;
 
 impl Rule for AttributeTargetSupportRule {
-  fn display_name(&self) -> &'static str {
-    "Attribute Target Support"
-  }
-
   fn id(&self) -> &'static str {
     "attribute-target-support"
+  }
+
+  fn message(&self) -> &'static str {
+    "unsupported attribute target"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

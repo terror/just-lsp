@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct InconsistentIndentationRule;
 
 impl Rule for InconsistentIndentationRule {
-  fn display_name(&self) -> &'static str {
-    "Inconsistent Recipe Indentation"
-  }
-
   fn id(&self) -> &'static str {
     "inconsistent-recipe-indentation"
+  }
+
+  fn message(&self) -> &'static str {
+    "inconsistent indentation"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

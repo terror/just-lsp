@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct UnknownFunctionRule;
 
 impl Rule for UnknownFunctionRule {
-  fn display_name(&self) -> &'static str {
-    "Unknown Function"
-  }
-
   fn id(&self) -> &'static str {
     "unknown-function"
+  }
+
+  fn message(&self) -> &'static str {
+    "unknown function"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

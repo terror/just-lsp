@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct DuplicateSettingRule;
 
 impl Rule for DuplicateSettingRule {
-  fn display_name(&self) -> &'static str {
-    "Duplicate Setting"
-  }
-
   fn id(&self) -> &'static str {
     "duplicate-setting"
+  }
+
+  fn message(&self) -> &'static str {
+    "duplicate setting"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

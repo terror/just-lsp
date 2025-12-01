@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct DuplicateAliasRule;
 
 impl Rule for DuplicateAliasRule {
-  fn display_name(&self) -> &'static str {
-    "Duplicate Alias"
-  }
-
   fn id(&self) -> &'static str {
     "duplicate-alias"
+  }
+
+  fn message(&self) -> &'static str {
+    "duplicate alias"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

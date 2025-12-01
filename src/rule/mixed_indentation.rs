@@ -5,12 +5,12 @@ use super::*;
 pub(crate) struct MixedIndentationRule;
 
 impl Rule for MixedIndentationRule {
-  fn display_name(&self) -> &'static str {
-    "Mixed Recipe Indentation"
-  }
-
   fn id(&self) -> &'static str {
     "mixed-recipe-indentation"
+  }
+
+  fn message(&self) -> &'static str {
+    "mixed indentation"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

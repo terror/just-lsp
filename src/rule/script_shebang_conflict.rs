@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct ScriptShebangConflictRule;
 
 impl Rule for ScriptShebangConflictRule {
-  fn display_name(&self) -> &'static str {
-    "Script Shebang Conflict"
-  }
-
   fn id(&self) -> &'static str {
     "script-shebang-conflict"
+  }
+
+  fn message(&self) -> &'static str {
+    "shebang conflict"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {

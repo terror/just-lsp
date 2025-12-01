@@ -4,12 +4,12 @@ use super::*;
 pub(crate) struct WorkingDirectoryConflictRule;
 
 impl Rule for WorkingDirectoryConflictRule {
-  fn display_name(&self) -> &'static str {
-    "Working Directory Conflict"
-  }
-
   fn id(&self) -> &'static str {
     "working-directory-conflict"
+  }
+
+  fn message(&self) -> &'static str {
+    "conflicting directory attributes"
   }
 
   fn run(&self, context: &RuleContext<'_>) -> Vec<lsp::Diagnostic> {
