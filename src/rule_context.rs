@@ -282,7 +282,7 @@ impl<'a> RuleContext<'a> {
       self
         .recipes()
         .iter()
-        .map(|r| r.name.value.clone())
+        .map(|recipe| recipe.name.value.clone())
         .collect()
     })
   }
