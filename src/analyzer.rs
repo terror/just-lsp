@@ -1293,6 +1293,19 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_dollar_at_marks_all_as_used() {
+    Test::new(indoc! {
+      r#"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env bash
+        exec "$@"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_disabled_still_warns() {
     Test::new(indoc! {
       "

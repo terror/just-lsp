@@ -7,128 +7,106 @@ define_rule! {
     id: "unused-parameters",
     message: "unused parameter",
     run(context) {
-      let mut diagnostics = Vec::new();
-
       let exported = context.setting_enabled("export");
 
-      let positional_arguments_enabled =
-        context.setting_enabled("positional-arguments");
+      let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
-      for (recipe_name, identifiers) in context.recipe_identifier_usage() {
-        if let Some(recipe) = context.recipe(recipe_name) {
-          let recipe_enables_positional_arguments = positional_arguments_enabled
-            || recipe.has_attribute("positional-arguments");
+      context
+        .recipe_identifier_usage()
+        .iter()
+        .filter_map(|(recipe_name, identifiers)| {
+          context.recipe(recipe_name).map(|recipe| (recipe, identifiers))
+        })
+        .flat_map(|(recipe, identifiers): (&Recipe, _)| {
+          let recipe_enables_positional_arguments =
+            positional_arguments_enabled || recipe.has_attribute("positional-arguments");
 
-          let positional_argument_usage = if recipe_enables_positional_arguments {
-            UnusedParameterRule::positional_argument_indices(recipe)
+          let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
+            (
+              UnusedParameterRule::positional_argument_indices(recipe),
+              UnusedParameterRule::uses_all_positional_arguments(recipe),
+            )
           } else {
-            HashSet::new()
+            (HashSet::new(), false)
           };
 
-          for (index, parameter) in recipe.parameters.iter().enumerate() {
-            let used_via_position =
-              positional_argument_usage.contains(&(index + 1));
+          recipe.parameters.iter().enumerate().filter_map(move |(index, parameter)| {
+            let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
-            if !identifiers.contains(&parameter.name)
+            let is_unused = !identifiers.contains(&parameter.name)
               && parameter.kind != ParameterKind::Export
               && !exported
-              && !used_via_position
-            {
-              diagnostics.push(Diagnostic::warning(
+              && !used_via_position;
+
+            is_unused.then(|| {
+              Diagnostic::warning(
                 format!("Parameter `{}` appears unused", parameter.name),
                 parameter.range,
-              ));
-            }
-          }
-        }
-      }
-
-      diagnostics
+              )
+            })
+          })
+        })
+        .collect()
     }
   }
 }
 
 impl UnusedParameterRule {
-  fn parse_digits(
-    bytes: &[u8],
-    mut index: usize,
-    len: usize,
-    expect_braces: bool,
-  ) -> Option<(usize, usize)> {
-    if expect_braces {
-      if index >= len || bytes[index] != b'{' {
-        return None;
-      }
+  fn is_unescaped_dollar(bytes: &[u8], i: usize) -> bool {
+    bytes[i] == b'$' && (i == 0 || bytes[i - 1] != b'\\')
+  }
 
-      index += 1;
-    }
+  fn parse_positional(bytes: &[u8], braced: bool) -> Option<usize> {
+    let inner = if braced {
+      bytes.strip_prefix(b"{").and_then(|b| b.strip_suffix(b"}"))
+    } else {
+      Some(bytes)
+    }?;
 
-    let start = index;
-
-    while index < len && bytes[index].is_ascii_digit() {
-      index += 1;
-    }
-
-    if start == index {
+    if inner.is_empty() || !inner.iter().all(u8::is_ascii_digit) {
       return None;
     }
 
-    if expect_braces {
-      if index >= len || bytes[index] != b'}' {
-        return None;
-      }
-
-      Some((
-        (index - start) + 2,
-        str::from_utf8(&bytes[start..index]).ok()?.parse().ok()?,
-      ))
-    } else {
-      Some((
-        index - start,
-        str::from_utf8(&bytes[start..index]).ok()?.parse().ok()?,
-      ))
-    }
+    str::from_utf8(inner).ok()?.parse().ok().filter(|&n| n > 0)
   }
 
   fn positional_argument_indices(recipe: &Recipe) -> HashSet<usize> {
-    let mut indices = HashSet::new();
-
     let bytes = recipe.content.as_bytes();
-    let len = bytes.len();
 
-    let mut i = 0;
+    bytes
+      .iter()
+      .enumerate()
+      .filter(|&(i, _)| Self::is_unescaped_dollar(bytes, i))
+      .filter_map(|(i, _)| {
+        let rest = &bytes[i + 1..];
 
-    while i < len {
-      if bytes[i] == b'$' && (i == 0 || bytes[i - 1] != b'\\') {
-        if let Some((advance, value)) =
-          Self::parse_digits(bytes, i + 1, len, false)
-        {
-          if value > 0 {
-            indices.insert(value);
-          }
+        let unbraced_end =
+          rest.iter().take_while(|b| b.is_ascii_digit()).count();
 
-          i += advance + 1;
-
-          continue;
+        if unbraced_end > 0 {
+          return Self::parse_positional(&rest[..unbraced_end], false);
         }
 
-        if let Some((advance, value)) =
-          Self::parse_digits(bytes, i + 1, len, true)
-        {
-          if value > 0 {
-            indices.insert(value);
-          }
+        let brace_end = rest.iter().position(|&b| b == b'}')?;
 
-          i += advance + 1;
+        Self::parse_positional(&rest[..=brace_end], true)
+      })
+      .collect()
+  }
 
-          continue;
-        }
+  fn uses_all_positional_arguments(recipe: &Recipe) -> bool {
+    let bytes = recipe.content.as_bytes();
+
+    bytes.iter().enumerate().any(|(i, _)| {
+      if !Self::is_unescaped_dollar(bytes, i) {
+        return false;
       }
 
-      i += 1;
-    }
+      let rest = &bytes[i + 1..];
 
-    indices
+      matches!(rest.first(), Some(b'@' | b'*'))
+        || matches!(rest, [b'{', b'@' | b'*', b'}', ..])
+    })
   }
 }
 
@@ -179,42 +157,75 @@ mod tests {
   }
 
   #[test]
-  fn parse_digits_without_braces_extracts_number() {
-    let bytes = b"12 rest";
-
+  fn parse_positional_without_braces_extracts_number() {
     assert_eq!(
-      UnusedParameterRule::parse_digits(bytes, 0, bytes.len(), false),
-      Some((2, 12))
+      UnusedParameterRule::parse_positional(b"12", false),
+      Some(12)
     );
   }
 
   #[test]
-  fn parse_digits_with_braces_extracts_number() {
-    let bytes = b"{34} rest";
-
+  fn parse_positional_with_braces_extracts_number() {
     assert_eq!(
-      UnusedParameterRule::parse_digits(bytes, 0, bytes.len(), true),
-      Some((4, 34))
+      UnusedParameterRule::parse_positional(b"{34}", true),
+      Some(34)
     );
   }
 
   #[test]
-  fn parse_digits_rejects_missing_digits() {
-    let bytes = b"rest";
-
-    assert_eq!(
-      UnusedParameterRule::parse_digits(bytes, 0, bytes.len(), false),
-      None
-    );
+  fn parse_positional_rejects_missing_digits() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"rest", false), None);
   }
 
   #[test]
-  fn parse_digits_rejects_incomplete_braced() {
-    let bytes = b"{56";
+  fn parse_positional_rejects_incomplete_braced() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"{56", true), None);
+  }
 
-    assert_eq!(
-      UnusedParameterRule::parse_digits(bytes, 0, bytes.len(), true),
-      None
-    );
+  #[test]
+  fn parse_positional_rejects_zero() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"0", false), None);
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_dollar_at() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo \"$@\""
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_dollar_star() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo $*"
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_braced_at() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo \"${@}\""
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_braced_star() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo ${*}"
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_ignores_escaped() {
+    assert!(!UnusedParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo \\$@")
+    ));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_returns_false_when_absent() {
+    assert!(!UnusedParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo $1 $2")
+    ));
   }
 }
