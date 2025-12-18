@@ -20,7 +20,7 @@ define_rule! {
         diagnostics.push(Diagnostic::error(
           format!(
             "Recipe `{}` has both shebang line and `[script]` attribute",
-            recipe.name
+            recipe.name.value
           ),
           script_attribute.range,
         ));

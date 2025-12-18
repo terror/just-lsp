@@ -221,7 +221,7 @@ impl Inner {
           .map(ParameterJson::from)
           .collect::<Vec<ParameterJson>>();
 
-        let recipe_name = serde_json::to_value(&recipe.name)
+        let recipe_name = serde_json::to_value(&recipe.name.value)
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
         let uri = serde_json::to_value(uri)
@@ -231,10 +231,10 @@ impl Inner {
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
         actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-          title: recipe.name.clone(),
+          title: recipe.name.value.clone(),
           kind: Some(lsp::CodeActionKind::SOURCE),
           command: Some(lsp::Command {
-            title: recipe.name.clone(),
+            title: recipe.name.value.clone(),
             command: Command::RunRecipe.to_string(),
             arguments: Some(vec![recipe_name, uri, parameters]),
           }),
@@ -263,7 +263,7 @@ impl Inner {
 
       for recipe in recipes {
         completion_items.push(lsp::CompletionItem {
-          label: recipe.name.clone(),
+          label: recipe.name.value.clone(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
@@ -271,7 +271,7 @@ impl Inner {
               value: recipe.content,
             },
           )),
-          insert_text: Some(recipe.name),
+          insert_text: Some(recipe.name.value),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           ..Default::default()
         });

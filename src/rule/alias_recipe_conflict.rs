@@ -1,5 +1,40 @@
 use super::*;
 
+enum Item<'a> {
+  Alias(&'a Alias),
+  Recipe(&'a Recipe),
+}
+
+impl Item<'_> {
+  fn conflict_message(&self, name: &str) -> String {
+    match self {
+      Item::Alias(_) => format!("Alias `{name}` is redefined as a recipe"),
+      Item::Recipe(_) => format!("Recipe `{name}` is redefined as an alias"),
+    }
+  }
+
+  fn is_same_kind(&self, other: &Self) -> bool {
+    matches!(
+      (self, other),
+      (Item::Alias(_), Item::Alias(_)) | (Item::Recipe(_), Item::Recipe(_))
+    )
+  }
+
+  fn name(&self) -> &str {
+    match self {
+      Item::Alias(alias) => &alias.name.value,
+      Item::Recipe(recipe) => &recipe.name.value,
+    }
+  }
+
+  fn range(&self) -> lsp::Range {
+    match self {
+      Item::Alias(alias) => alias.name.range,
+      Item::Recipe(recipe) => recipe.name.range,
+    }
+  }
+}
+
 define_rule! {
   /// Reports aliases and recipes that share the same name, since they shadow
   /// each other at runtime.
@@ -13,114 +48,37 @@ define_rule! {
         return Vec::new();
       }
 
-      let recipe_name_lookup = AliasRecipeConflictRule::recipe_name_ranges(context);
-
-      let recipe_name_ranges = recipes
+      let mut items = aliases
         .iter()
-        .map(|recipe| {
-          recipe_name_lookup
-            .get(&RangeKey::from(recipe.range))
-            .copied()
-            .unwrap_or(recipe.range)
-        })
+        .map(Item::Alias)
+        .chain(recipes.iter().map(Item::Recipe))
         .collect::<Vec<_>>();
 
-      let mut first_alias_index: HashMap<String, usize> = HashMap::new();
+      items.sort_by_key(|item| {
+        let range = item.range();
+        (range.start.line, range.start.character)
+      });
 
-      for (index, alias) in aliases.iter().enumerate() {
-        first_alias_index
-          .entry(alias.name.value.clone())
-          .or_insert(index);
-      }
+      items
+        .iter()
+        .fold(
+          (HashMap::<&str, &Item>::new(), Vec::new()),
+          |(mut seen, mut diagnostics), item| {
+            let name = item.name();
 
-      let mut first_recipe_index: HashMap<String, usize> = HashMap::new();
-
-      for (index, recipe) in recipes.iter().enumerate() {
-        first_recipe_index
-          .entry(recipe.name.clone())
-          .or_insert(index);
-      }
-
-      let mut diagnostics = Vec::new();
-
-      for alias in aliases {
-        if let Some(&recipe_index) = first_recipe_index.get(&alias.name.value) {
-          let recipe_range = recipe_name_ranges[recipe_index];
-
-          if AliasRecipeConflictRule::is_after(&alias.name.range, &recipe_range) {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "Recipe `{}` is redefined as an alias",
-                recipes[recipe_index].name
-              ),
-              alias.name.range,
-            ));
-          }
-        }
-      }
-
-      for (index, recipe) in recipes.iter().enumerate() {
-        if let Some(&alias_index) = first_alias_index.get(&recipe.name) {
-          let (recipe_range, alias_range) =
-            (recipe_name_ranges[index], aliases[alias_index].name.range);
-
-          if AliasRecipeConflictRule::is_after(&recipe_range, &alias_range) {
-            diagnostics.push(Diagnostic::error(
-              format!("Alias `{}` is redefined as a recipe", recipe.name),
-              recipe_range,
-            ));
-          }
-        }
-      }
-
-      diagnostics
-    }
-  }
-}
-
-impl AliasRecipeConflictRule {
-  fn is_after(a: &lsp::Range, b: &lsp::Range) -> bool {
-    (a.start.line, a.start.character) > (b.start.line, b.start.character)
-  }
-
-  fn recipe_name_ranges(
-    context: &RuleContext<'_>,
-  ) -> HashMap<RangeKey, lsp::Range> {
-    let mut lookup = HashMap::new();
-
-    if let Some(tree) = context.tree() {
-      let document = context.document();
-
-      for recipe_node in tree.root_node().find_all("recipe") {
-        if let Some(name_node) = recipe_node.find("recipe_header > identifier")
-        {
-          lookup.insert(
-            RangeKey::from(recipe_node.get_range(document)),
-            name_node.get_range(document),
-          );
-        }
-      }
-    }
-
-    lookup
-  }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-struct RangeKey {
-  end_character: u32,
-  end_line: u32,
-  start_character: u32,
-  start_line: u32,
-}
-
-impl From<lsp::Range> for RangeKey {
-  fn from(range: lsp::Range) -> Self {
-    Self {
-      start_line: range.start.line,
-      start_character: range.start.character,
-      end_line: range.end.line,
-      end_character: range.end.character,
+            match seen.get(name) {
+              Some(first) if !first.is_same_kind(item) => {
+                diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
+              }
+              None => {
+                seen.insert(name, item);
+              }
+              _ => {}
+            }
+            (seen, diagnostics)
+          },
+        )
+        .1
     }
   }
 }

@@ -192,7 +192,7 @@ impl DuplicateAttributeRule {
     match constraint.scope {
       DuplicateScope::Module => format!(
         "Recipe `{}` has duplicate `[{}]` attribute, which may only appear once per module",
-        recipe.name, constraint.name
+        recipe.name.value, constraint.name
       ),
       DuplicateScope::Recipe => {
         format!("Recipe attribute `{}` is duplicated", constraint.name)
