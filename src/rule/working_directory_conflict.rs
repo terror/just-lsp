@@ -20,7 +20,7 @@ define_rule! {
           diagnostics.push(Diagnostic::error(
             format!(
               "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
-              recipe.name
+              recipe.name.value
             ),
             attribute.range,
           ));

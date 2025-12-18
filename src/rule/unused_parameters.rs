@@ -119,7 +119,10 @@ mod tests {
       attributes: vec![],
       content: content.into(),
       dependencies: vec![],
-      name: "graph".into(),
+      name: TextNode {
+        value: "graph".into(),
+        range: lsp::Range::default(),
+      },
       parameters: vec![],
       range: lsp::Range::default(),
       shebang: None,

@@ -20,7 +20,7 @@ define_rule! {
 
       for recipe in context.recipes() {
         recipe_groups
-          .entry(recipe.name.clone())
+          .entry(recipe.name.value.clone())
           .or_default()
           .push((recipe.range, recipe.groups()));
       }

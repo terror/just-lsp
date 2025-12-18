@@ -16,11 +16,11 @@ define_rule! {
           let message = match recipe.dependencies.len() {
             0 => format!(
               "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
-              recipe.name
+              recipe.name.value
             ),
             1 => format!(
               "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
-              recipe.name
+              recipe.name.value
             ),
             _ => return None,
           };

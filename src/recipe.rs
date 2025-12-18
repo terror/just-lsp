@@ -5,7 +5,7 @@ pub(crate) struct Recipe {
   pub(crate) attributes: Vec<Attribute>,
   pub(crate) content: String,
   pub(crate) dependencies: Vec<Dependency>,
-  pub(crate) name: String,
+  pub(crate) name: TextNode,
   pub(crate) parameters: Vec<Parameter>,
   pub(crate) range: lsp::Range,
   pub(crate) shebang: Option<TextNode>,
@@ -73,7 +73,10 @@ mod tests {
   #[test]
   fn recipe_groups_no_attributes() {
     let recipe = Recipe {
-      name: "test".to_string(),
+      name: TextNode {
+        value: "test".into(),
+        range: create_range(0, 0, 0, 4),
+      },
       attributes: vec![],
       dependencies: vec![],
       shebang: None,
@@ -88,7 +91,10 @@ mod tests {
   #[test]
   fn recipe_groups_single_attribute() {
     let recipe = Recipe {
-      name: "test".to_string(),
+      name: TextNode {
+        value: "test".into(),
+        range: create_range(1, 0, 1, 4),
+      },
       attributes: vec![Attribute {
         name: TextNode {
           value: "linux".to_string(),
@@ -111,7 +117,10 @@ mod tests {
   #[test]
   fn recipe_groups_multiple_attributes() {
     let recipe = Recipe {
-      name: "test".to_string(),
+      name: TextNode {
+        value: "test".into(),
+        range: create_range(2, 0, 2, 4),
+      },
       attributes: vec![
         Attribute {
           name: TextNode {
@@ -148,7 +157,10 @@ mod tests {
   #[test]
   fn recipe_groups_all_attributes() {
     let recipe = Recipe {
-      name: "test".to_string(),
+      name: TextNode {
+        value: "test".into(),
+        range: create_range(5, 0, 5, 4),
+      },
       attributes: vec![
         Attribute {
           name: TextNode {
@@ -219,7 +231,10 @@ mod tests {
   #[test]
   fn recipe_groups_non_os_attributes() {
     let recipe = Recipe {
-      name: "test".to_string(),
+      name: TextNode {
+        value: "test".into(),
+        range: create_range(1, 0, 1, 4),
+      },
       attributes: vec![Attribute {
         name: TextNode {
           value: "private".to_string(),

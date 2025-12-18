@@ -23,7 +23,7 @@ impl IdentifierAnalysis {
     let mut recipe_identifier_usage = context
       .recipes()
       .iter()
-      .map(|recipe| (recipe.name.clone(), HashSet::new()))
+      .map(|recipe| (recipe.name.value.clone(), HashSet::new()))
       .collect::<HashMap<_, _>>();
 
     let mut unresolved_identifiers = Vec::new();
@@ -82,13 +82,16 @@ impl IdentifierAnalysis {
 
     if let Some(recipe) = context.recipe(&recipe_name) {
       recipe_identifier_usage
-        .entry(recipe.name.clone())
+        .entry(recipe.name.value.clone())
         .or_default()
         .insert(identifier_name.clone());
 
-      if recipe_parameters.get(&recipe.name).is_some_and(|params| {
-        params.iter().any(|param| param.name == identifier_name)
-      }) {
+      if recipe_parameters
+        .get(&recipe.name.value)
+        .is_some_and(|params| {
+          params.iter().any(|param| param.name == identifier_name)
+        })
+      {
         return;
       }
     }
@@ -262,7 +265,10 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn recipe(&self, name: &str) -> Option<&Recipe> {
-    self.recipes().iter().find(|recipe| recipe.name == name)
+    self
+      .recipes()
+      .iter()
+      .find(|recipe| recipe.name.value == name)
   }
 
   pub(crate) fn recipe_identifier_usage(
@@ -272,9 +278,13 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn recipe_names(&self) -> &HashSet<String> {
-    self
-      .recipe_names
-      .get_or_init(|| self.recipes().iter().map(|r| r.name.clone()).collect())
+    self.recipe_names.get_or_init(|| {
+      self
+        .recipes()
+        .iter()
+        .map(|r| r.name.value.clone())
+        .collect()
+    })
   }
 
   pub(crate) fn recipe_parameters(&self) -> &HashMap<String, Vec<Parameter>> {
@@ -282,7 +292,7 @@ impl<'a> RuleContext<'a> {
       self
         .recipes()
         .iter()
-        .map(|recipe| (recipe.name.clone(), recipe.parameters.clone()))
+        .map(|recipe| (recipe.name.value.clone(), recipe.parameters.clone()))
         .collect()
     })
   }

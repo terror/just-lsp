@@ -12,7 +12,7 @@ define_rule! {
 
       for recipe in context.recipes() {
         dependency_graph.insert(
-          recipe.name.clone(),
+          recipe.name.value.clone(),
           recipe
             .dependencies
             .iter()
@@ -34,7 +34,7 @@ define_rule! {
         };
 
         RecipeDependencyCycleRule::detect_cycle(
-          &recipe.name,
+          &recipe.name.value,
           &dependency_graph,
           &mut diagnostics,
           context,

@@ -153,7 +153,7 @@ impl Document {
     self
       .recipes()
       .into_iter()
-      .find(|recipe| recipe.name == name)
+      .find(|recipe| recipe.name.value == name)
   }
 
   #[must_use]
@@ -250,8 +250,12 @@ impl Document {
         .find_all("recipe")
         .iter()
         .filter_map(|recipe_node| {
-          let recipe_name = self
-            .get_node_text(&recipe_node.find("recipe_header > identifier")?);
+          let name_node = recipe_node.find("recipe_header > identifier")?;
+
+          let recipe_name = TextNode {
+            value: self.get_node_text(&name_node),
+            range: name_node.get_range(self),
+          };
 
           let attributes = recipe_node
             .find_all("attribute")
@@ -485,7 +489,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("foo").unwrap(),
       Recipe {
-        name: "foo".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
@@ -498,7 +505,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("bar").unwrap(),
       Recipe {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: range((3, 0, 3, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
@@ -864,7 +874,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("foo"),
       Some(Recipe {
-        name: "foo".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
@@ -877,7 +890,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("bar"),
       Some(Recipe {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: range((3, 0, 3, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
@@ -949,7 +965,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("baz"),
       Some(Recipe {
-        name: "baz".into(),
+        name: TextNode {
+          value: "baz".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![
@@ -992,7 +1011,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("bar"),
       Some(Recipe {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: range((3, 0, 3, 3))
+        },
         attributes: vec![],
         dependencies: vec![Dependency {
           name: "foo".into(),
@@ -1022,7 +1044,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("bar"),
       Some(Recipe {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: range((3, 0, 3, 3))
+        },
         attributes: vec![],
         dependencies: vec![Dependency {
           name: "foo".into(),
@@ -1085,7 +1110,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("baz"),
       Some(Recipe {
-        name: "baz".into(),
+        name: TextNode {
+          value: "baz".into(),
+          range: range((6, 0, 6, 3))
+        },
         attributes: vec![],
         dependencies: vec![
           Dependency {
@@ -1119,7 +1147,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("bar"),
       Some(Recipe {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![
@@ -1157,7 +1188,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("baz"),
       Some(Recipe {
-        name: "baz".into(),
+        name: TextNode {
+          value: "baz".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![
@@ -1197,7 +1231,10 @@ mod tests {
     assert_eq!(
       document.find_recipe("foo"),
       Some(Recipe {
-        name: "foo".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 0, 0, 3))
+        },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
