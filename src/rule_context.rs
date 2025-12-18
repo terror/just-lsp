@@ -88,8 +88,10 @@ impl IdentifierAnalysis {
 
       if recipe_parameters
         .get(&recipe.name.value)
-        .is_some_and(|params| {
-          params.iter().any(|param| param.name == identifier_name)
+        .is_some_and(|parameters| {
+          parameters
+            .iter()
+            .any(|parameter| parameter.name == identifier_name)
         })
       {
         return;
