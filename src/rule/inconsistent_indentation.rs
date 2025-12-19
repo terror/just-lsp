@@ -1,5 +1,82 @@
 use super::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IndentKind {
+  Spaces,
+  Tabs,
+}
+
+impl IndentKind {
+  fn from_indent(indent: &str) -> Option<Self> {
+    let first_char = indent.chars().next()?;
+
+    if !indent.chars().all(|c| c == first_char) {
+      return None;
+    }
+
+    match first_char {
+      ' ' => Some(Self::Spaces),
+      '\t' => Some(Self::Tabs),
+      _ => None,
+    }
+  }
+}
+
+#[derive(Debug)]
+struct RecipeLine {
+  continues: bool,
+  indent: String,
+  kind: IndentKind,
+  relative_line: u32,
+}
+
+impl RecipeLine {
+  fn parse(relative_line: u32, line: &str) -> Option<Self> {
+    if line.trim().is_empty() {
+      return None;
+    }
+
+    let indent: String = line
+      .chars()
+      .take_while(|c| *c == ' ' || *c == '\t')
+      .collect();
+
+    let kind = IndentKind::from_indent(&indent)?;
+
+    Some(Self {
+      continues: line.trim_end().ends_with('\\'),
+      indent,
+      kind,
+      relative_line,
+    })
+  }
+}
+
+#[derive(Debug)]
+struct ScanState {
+  expected_indent: String,
+  expected_kind: IndentKind,
+  previous_continues: bool,
+}
+
+impl ScanState {
+  fn check(&self, line: &RecipeLine, absolute_line: u32) -> Option<Diagnostic> {
+    if self.expected_kind != line.kind {
+      return None;
+    }
+
+    if self.expected_indent != line.indent && !self.previous_continues {
+      return Some(InconsistentIndentationRule::make_diagnostic(
+        &self.expected_indent,
+        &line.indent,
+        absolute_line,
+      ));
+    }
+
+    None
+  }
+}
+
 define_rule! {
   /// Warns when recipe lines use indentation that differs from the first recipe
   /// line, matching the behavior of the `just` parser.
@@ -7,27 +84,46 @@ define_rule! {
     id: "inconsistent-recipe-indentation",
     message: "inconsistent indentation",
     run(context) {
-      let mut diagnostics = Vec::new();
-
-      let Some(tree) = context.tree() else {
-        return diagnostics;
-      };
-
-      let document = context.document();
-
-      for recipe_node in tree.root_node().find_all("recipe") {
-        if let Some(diagnostic) = InconsistentIndentationRule::inspect_recipe(document, &recipe_node) {
-          diagnostics.push(diagnostic);
-        }
-      }
-
-      diagnostics
+      context
+        .recipes()
+        .iter()
+        .filter(|recipe| recipe.shebang.is_none())
+        .filter_map(Self::find_inconsistent_indentation)
+        .collect()
     }
   }
 }
 
 impl InconsistentIndentationRule {
-  fn diagnostic_for_line(expected: &str, found: &str, line: u32) -> Diagnostic {
+  fn find_inconsistent_indentation(recipe: &Recipe) -> Option<Diagnostic> {
+    let body_start_line = recipe.range.start.line + 1;
+
+    Self::recipe_body_lines(&recipe.content)
+      .try_fold(None, |state: Option<ScanState>, line| {
+        let absolute_line = body_start_line + line.relative_line;
+
+        match state {
+          None => ControlFlow::Continue(Some(ScanState {
+            expected_indent: line.indent,
+            expected_kind: line.kind,
+            previous_continues: line.continues,
+          })),
+          Some(state) => {
+            if let Some(diagnostic) = state.check(&line, absolute_line) {
+              return ControlFlow::Break(diagnostic);
+            }
+
+            ControlFlow::Continue(Some(ScanState {
+              previous_continues: line.continues,
+              ..state
+            }))
+          }
+        }
+      })
+      .break_value()
+  }
+
+  fn make_diagnostic(expected: &str, found: &str, line: u32) -> Diagnostic {
     let indent_chars = u32::try_from(found.chars().count()).unwrap_or(u32::MAX);
 
     let range = lsp::Range {
@@ -40,92 +136,26 @@ impl InconsistentIndentationRule {
 
     Diagnostic::error(
       format!(
-        "Recipe line has inconsistent leading whitespace. Recipe started with `{}` but found line with `{}`",
-        InconsistentIndentationRule::visualize_whitespace(expected),
-        InconsistentIndentationRule::visualize_whitespace(found)
+        "Recipe line has inconsistent leading whitespace. \
+       Recipe started with `{}` but found line with `{}`",
+        Self::visualize_whitespace(expected),
+        Self::visualize_whitespace(found)
       ),
       range,
     )
   }
 
-  fn inspect_recipe(
-    document: &Document,
-    recipe_node: &Node<'_>,
-  ) -> Option<Diagnostic> {
-    if recipe_node.find("recipe_body > shebang").is_some() {
-      return None;
-    }
-
-    let mut expected_indent: Option<(String, IndentKind)> = None;
-    let mut previous_line_continues = false;
-
-    let header_node = recipe_node.find("recipe_header")?;
-
-    let header_end_line = header_node.get_range(document).end.line;
-
-    let mut line_idx =
-      usize::try_from(header_end_line.saturating_add(1)).ok()?;
-
-    while line_idx < document.content.len_lines() {
-      let line_text = document.content.line(line_idx).to_string();
-
-      let line = line_text.trim_end_matches(['\r', '\n']);
-
-      if line.trim().is_empty() {
-        previous_line_continues = false;
-        line_idx += 1;
-        continue;
-      }
-
-      if !matches!(line.chars().next(), Some(' ' | '\t')) {
-        break;
-      }
-
-      let indent = line
-        .chars()
-        .take_while(|c| *c == ' ' || *c == '\t')
-        .collect::<String>();
-
-      if indent.is_empty() {
-        previous_line_continues = false;
-        line_idx += 1;
-        continue;
-      }
-
-      let line_continues = line.trim_end().ends_with('\\');
-
-      let Some(kind) = IndentKind::from_indent(&indent) else {
-        previous_line_continues = line_continues;
-        line_idx += 1;
-        continue;
-      };
-
-      match &mut expected_indent {
-        None => {
-          expected_indent = Some((indent, kind));
-        }
-        Some((expected, expected_kind)) => {
-          if *expected_kind != kind {
-            previous_line_continues = line_continues;
-            line_idx += 1;
-            continue;
-          }
-
-          if *expected != indent && !previous_line_continues {
-            return Some(InconsistentIndentationRule::diagnostic_for_line(
-              expected.as_str(),
-              &indent,
-              u32::try_from(line_idx).unwrap_or(u32::MAX),
-            ));
-          }
-        }
-      }
-
-      previous_line_continues = line_continues;
-      line_idx += 1;
-    }
-
-    None
+  fn recipe_body_lines(content: &str) -> impl Iterator<Item = RecipeLine> + '_ {
+    content
+    .lines()
+    .enumerate()
+    .skip(1) // Skip header line
+    .take_while(|(_, line)| {
+      line.is_empty() || matches!(line.chars().next(), Some(' ' | '\t'))
+    })
+    .filter_map(|(idx, line)| {
+      RecipeLine::parse(u32::try_from(idx).unwrap_or(u32::MAX), line)
+    })
   }
 
   fn visualize_whitespace(indent: &str) -> String {
@@ -141,30 +171,5 @@ impl InconsistentIndentationRule {
         other => other,
       })
       .collect()
-  }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum IndentKind {
-  Spaces,
-  Tabs,
-}
-
-impl IndentKind {
-  fn from_indent(indent: &str) -> Option<Self> {
-    if indent.is_empty() {
-      return None;
-    }
-
-    let (has_space, has_tab) = (
-      indent.chars().any(|ch| ch == ' '),
-      indent.chars().any(|ch| ch == '\t'),
-    );
-
-    match (has_space, has_tab) {
-      (true, false) => Some(Self::Spaces),
-      (false, true) => Some(Self::Tabs),
-      (true, true) | (false, false) => None,
-    }
   }
 }

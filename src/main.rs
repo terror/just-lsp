@@ -36,6 +36,7 @@ use {
     env,
     fmt::{self, Debug, Display, Formatter, Write},
     fs,
+    ops::ControlFlow,
     path::PathBuf,
     process,
     sync::{Arc, atomic::AtomicBool},
