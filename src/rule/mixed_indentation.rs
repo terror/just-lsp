@@ -1,5 +1,50 @@
 use super::*;
 
+use std::ops::ControlFlow;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IndentKind {
+  Spaces,
+  Tabs,
+}
+
+#[derive(Debug)]
+struct RecipeLine {
+  indent_length: usize,
+  kind: Option<IndentKind>,
+  relative_line: u32,
+}
+
+impl RecipeLine {
+  fn parse(relative_line: u32, line: &str) -> Option<Self> {
+    if line.trim().is_empty() {
+      return None;
+    }
+
+    let indent: String = line
+      .chars()
+      .take_while(|c| *c == ' ' || *c == '\t')
+      .collect();
+
+    if indent.is_empty() {
+      return None;
+    }
+
+    let kind = match (indent.contains(' '), indent.contains('\t')) {
+      (true, true) => None,
+      (true, false) => Some(IndentKind::Spaces),
+      (false, true) => Some(IndentKind::Tabs),
+      (false, false) => return None,
+    };
+
+    Some(Self {
+      indent_length: indent.len(),
+      kind,
+      relative_line,
+    })
+  }
+}
+
 define_rule! {
   /// Detects recipes that mix tabs and spaces for indentation, which often
   /// results in confusing or invalid `just` bodies.
@@ -7,31 +52,48 @@ define_rule! {
     id: "mixed-recipe-indentation",
     message: "mixed indentation",
     run(context) {
-      let mut diagnostics = Vec::new();
-
-      let Some(tree) = context.tree() else {
-        return diagnostics;
-      };
-
-      let document = context.document();
-
-      for recipe_node in tree.root_node().find_all("recipe") {
-        if recipe_node.find("recipe_body").is_none() {
-          continue;
-        }
-
-        if let Some(diagnostic) = MixedIndentationRule::inspect_recipe(document, &recipe_node) {
-          diagnostics.push(diagnostic);
-        }
-      }
-
-      diagnostics
+      context
+        .recipes()
+        .iter()
+        .filter(|recipe| recipe.shebang.is_none())
+        .filter_map(Self::find_mixed_indentation)
+        .collect()
     }
   }
 }
 
 impl MixedIndentationRule {
-  fn diagnostic_for_line(
+  fn find_mixed_indentation(recipe: &Recipe) -> Option<Diagnostic> {
+    let body_start_line = recipe.range.start.line + 1;
+
+    Self::recipe_body_lines(&recipe.content)
+      .try_fold(None, |expected_kind: Option<IndentKind>, line| {
+        let absolute_line = body_start_line + line.relative_line;
+
+        let Some(line_kind) = line.kind else {
+          return ControlFlow::Break(Self::make_diagnostic(
+            &recipe.name.value,
+            absolute_line,
+            line.indent_length,
+          ));
+        };
+
+        match expected_kind {
+          None => ControlFlow::Continue(Some(line_kind)),
+          Some(expected) if expected != line_kind => {
+            ControlFlow::Break(Self::make_diagnostic(
+              &recipe.name.value,
+              absolute_line,
+              line.indent_length,
+            ))
+          }
+          _ => ControlFlow::Continue(expected_kind),
+        }
+      })
+      .break_value()
+  }
+
+  fn make_diagnostic(
     recipe_name: &str,
     line: u32,
     indent_length: usize,
@@ -52,92 +114,16 @@ impl MixedIndentationRule {
     )
   }
 
-  fn inspect_recipe(
-    document: &Document,
-    recipe_node: &Node<'_>,
-  ) -> Option<Diagnostic> {
-    let recipe_name =
-      recipe_node.find("recipe_header > identifier").map_or_else(
-        || "recipe".to_string(),
-        |node| document.get_node_text(&node),
-      );
-
-    let mut indent_style: Option<IndentStyle> = None;
-
-    for line_node in recipe_node.find_all("recipe_line") {
-      let line_range = line_node.get_range(document);
-
-      let Ok(line_idx) = usize::try_from(line_range.start.line) else {
-        continue;
-      };
-
-      if line_idx >= document.content.len_lines() {
-        continue;
-      }
-
-      let line = document.content.line(line_idx).to_string();
-
-      if line.trim().is_empty() {
-        continue;
-      }
-
-      let mut indent_length = 0usize;
-
-      let (mut has_space, mut has_tab) = (false, false);
-
-      for ch in line.chars() {
-        match ch {
-          ' ' => {
-            indent_length += 1;
-            has_space = true;
-          }
-          '\t' => {
-            indent_length += 1;
-            has_tab = true;
-          }
-          _ => break,
-        }
-      }
-
-      if indent_length == 0 {
-        continue;
-      }
-
-      if has_space && has_tab {
-        return Some(MixedIndentationRule::diagnostic_for_line(
-          &recipe_name,
-          line_range.start.line,
-          indent_length,
-        ));
-      }
-
-      let current_style = if has_space {
-        IndentStyle::Spaces
-      } else if has_tab {
-        IndentStyle::Tabs
-      } else {
-        continue;
-      };
-
-      match indent_style {
-        None => indent_style = Some(current_style),
-        Some(style) if style != current_style => {
-          return Some(MixedIndentationRule::diagnostic_for_line(
-            &recipe_name,
-            line_range.start.line,
-            indent_length,
-          ));
-        }
-        _ => {}
-      }
-    }
-
-    None
+  fn recipe_body_lines(content: &str) -> impl Iterator<Item = RecipeLine> + '_ {
+    content
+      .lines()
+      .enumerate()
+      .skip(1) // Skip header line
+      .take_while(|(_, line)| {
+        line.is_empty() || matches!(line.chars().next(), Some(' ' | '\t'))
+      })
+      .filter_map(|(idx, line)| {
+        RecipeLine::parse(u32::try_from(idx).unwrap_or(u32::MAX), line)
+      })
   }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum IndentStyle {
-  Spaces,
-  Tabs,
 }
