@@ -1,7 +1,5 @@
 use super::*;
 
-use std::ops::ControlFlow;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IndentKind {
   Spaces,
