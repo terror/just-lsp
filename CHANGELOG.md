@@ -1,6 +1,58 @@
 # Changelog
 
-## [0.2.8](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-11-11
+## [0.3.0](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-12-26
+
+### Added
+
+- Add general duplicate attribute rule (#164)
+- Add parallel attribute rule for recipes without enough dependencies (#170)
+- Add rule for `[script]` recipes with a shebang (#155)
+- Add rule for alias/recipe conflicts (#146)
+- Add rule for detecting duplicate default attributes (#145)
+- Add rule for detecting working directory attribute conflicts (#172)
+- Add rule for reused variable names (#148)
+- Add rules for mixed indentation (#149)
+- Add support for `textDocument/semanticTokens` (#154)
+- Improve syntax-related error messages (#175)
+
+### Fixed
+
+- Detect catch-all parameters in unused parameters rule (#182)
+- Honor positional arguments when warning about unused parameters (#157)
+- Properly convert positions to tree-sitter points for node selection (#166)
+
+### Misc
+
+- Lift out a `HighlightConfig` for tokenizer (#186)
+- Avoid manual tree traversal in mixed indentation rule (#185)
+- Use `Recipe` in inconsistent indentation rule (#184)
+- Use `TextNode` for recipe name (#183)
+- Refactor rules to use `define_rule` macro (#180)
+- Add custom diagnostic type (#179)
+- Rename `display_name` to `message` for `Rule` (#178)
+- Remove duplicate test document helpers in favour of `Document::from` (#177)
+- Simplify parallel dependency diagnostics generation (#176)
+- Make `Rule::diagnostic` take an immutable reference (#174)
+- Assert entire collections in `Document` tests (#173)
+- Add server test for document change before open (#169)
+- Remove `idx` suffix from intermediate definitions (#168)
+- Encapsulate `Position` and `Point` conversions in extension traits (#167)
+- Expand feature documentation in readme (#163)
+- Replace recipe argument `if let` with `map` (#162)
+- Add shebang field onto `Recipe` (#161)
+- Add homebrew to package manager table (#160)
+- Simplify document test range formatting (#159)
+- Allow ranges to be asserted for analyzer tests (#158)
+- Handle line continuations and shebang recipes in inconsistent indentation rule (#156)
+- Update readme documentation for Neovim 0.11+ (#153)
+- Add newly added builtin constructs (#152)
+- Put builtin extractors onto `RuleContext` (#151)
+- Lift out enabled setting helper onto `RuleContext` (#150)
+- Remove stale entries from changelog (#147)
+- Add documentation to `Resolver` methods (#144)
+- Replace `pub` keyword with `pub(crate)` (#143)
+
+## [0.2.8](https://github.com/terror/just-lsp/releases/tag/0.2.8) - 2025-11-11
 
 ### Added
 
