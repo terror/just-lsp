@@ -1,6 +1,58 @@
 # Changelog
 
-## [0.2.8](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-11-11
+## [0.3.0](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-12-26
+
+### Added
+
+- Add general duplicate attribute rule ([#164](https://github.com/terror/just-lsp/pull/164) by [terror](https://github.com/terror))
+- Add parallel attribute rule for recipes without enough dependencies ([#170](https://github.com/terror/just-lsp/pull/170) by [terror](https://github.com/terror))
+- Add rule for `[script]` recipes with a shebang ([#155](https://github.com/terror/just-lsp/pull/155) by [terror](https://github.com/terror))
+- Add rule for alias/recipe conflicts ([#146](https://github.com/terror/just-lsp/pull/146) by [terror](https://github.com/terror))
+- Add rule for detecting duplicate default attributes ([#145](https://github.com/terror/just-lsp/pull/145) by [terror](https://github.com/terror))
+- Add rule for detecting working directory attribute conflicts ([#172](https://github.com/terror/just-lsp/pull/172) by [terror](https://github.com/terror))
+- Add rule for reused variable names ([#148](https://github.com/terror/just-lsp/pull/148) by [terror](https://github.com/terror))
+- Add rules for mixed indentation ([#149](https://github.com/terror/just-lsp/pull/149) by [terror](https://github.com/terror))
+- Add support for `textDocument/semanticTokens` ([#154](https://github.com/terror/just-lsp/pull/154) by [terror](https://github.com/terror))
+- Improve syntax-related error messages ([#175](https://github.com/terror/just-lsp/pull/175) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Detect catch-all parameters in unused parameters rule ([#182](https://github.com/terror/just-lsp/pull/182) by [terror](https://github.com/terror))
+- Honor positional arguments when warning about unused parameters ([#157](https://github.com/terror/just-lsp/pull/157) by [terror](https://github.com/terror))
+- Properly convert positions to tree-sitter points for node selection ([#166](https://github.com/terror/just-lsp/pull/166) by [terror](https://github.com/terror))
+
+### Misc
+
+- Lift out a `HighlightConfig` for tokenizer ([#186](https://github.com/terror/just-lsp/pull/186) by [terror](https://github.com/terror))
+- Avoid manual tree traversal in mixed indentation rule ([#185](https://github.com/terror/just-lsp/pull/185) by [terror](https://github.com/terror))
+- Use `Recipe` in inconsistent indentation rule ([#184](https://github.com/terror/just-lsp/pull/184) by [terror](https://github.com/terror))
+- Use `TextNode` for recipe name ([#183](https://github.com/terror/just-lsp/pull/183) by [terror](https://github.com/terror))
+- Refactor rules to use `define_rule` macro ([#180](https://github.com/terror/just-lsp/pull/180) by [terror](https://github.com/terror))
+- Add custom diagnostic type ([#179](https://github.com/terror/just-lsp/pull/179) by [terror](https://github.com/terror))
+- Rename `display_name` to `message` for `Rule` ([#178](https://github.com/terror/just-lsp/pull/178) by [terror](https://github.com/terror))
+- Remove duplicate test document helpers in favour of `Document::from` ([#177](https://github.com/terror/just-lsp/pull/177) by [terror](https://github.com/terror))
+- Simplify parallel dependency diagnostics generation ([#176](https://github.com/terror/just-lsp/pull/176) by [terror](https://github.com/terror))
+- Make `Rule::diagnostic` take an immutable reference ([#174](https://github.com/terror/just-lsp/pull/174) by [terror](https://github.com/terror))
+- Assert entire collections in `Document` tests ([#173](https://github.com/terror/just-lsp/pull/173) by [terror](https://github.com/terror))
+- Add server test for document change before open ([#169](https://github.com/terror/just-lsp/pull/169) by [terror](https://github.com/terror))
+- Remove `idx` suffix from intermediate definitions ([#168](https://github.com/terror/just-lsp/pull/168) by [terror](https://github.com/terror))
+- Encapsulate `Position` and `Point` conversions in extension traits ([#167](https://github.com/terror/just-lsp/pull/167) by [terror](https://github.com/terror))
+- Expand feature documentation in readme ([#163](https://github.com/terror/just-lsp/pull/163) by [terror](https://github.com/terror))
+- Replace recipe argument `if let` with `map` ([#162](https://github.com/terror/just-lsp/pull/162) by [terror](https://github.com/terror))
+- Add shebang field onto `Recipe` ([#161](https://github.com/terror/just-lsp/pull/161) by [terror](https://github.com/terror))
+- Add homebrew to package manager table ([#160](https://github.com/terror/just-lsp/pull/160) by [terror](https://github.com/terror))
+- Simplify document test range formatting ([#159](https://github.com/terror/just-lsp/pull/159) by [terror](https://github.com/terror))
+- Allow ranges to be asserted for analyzer tests ([#158](https://github.com/terror/just-lsp/pull/158) by [terror](https://github.com/terror))
+- Handle line continuations and shebang recipes in inconsistent indentation rule ([#156](https://github.com/terror/just-lsp/pull/156) by [terror](https://github.com/terror))
+- Update readme documentation for Neovim 0.11+ ([#153](https://github.com/terror/just-lsp/pull/153) by [terror](https://github.com/terror))
+- Add newly added builtin constructs ([#152](https://github.com/terror/just-lsp/pull/152) by [terror](https://github.com/terror))
+- Put builtin extractors onto `RuleContext` ([#151](https://github.com/terror/just-lsp/pull/151) by [terror](https://github.com/terror))
+- Lift out enabled setting helper onto `RuleContext` ([#150](https://github.com/terror/just-lsp/pull/150) by [terror](https://github.com/terror))
+- Remove stale entries from changelog ([#147](https://github.com/terror/just-lsp/pull/147) by [terror](https://github.com/terror))
+- Add documentation to `Resolver` methods ([#144](https://github.com/terror/just-lsp/pull/144) by [terror](https://github.com/terror))
+- Replace `pub` keyword with `pub(crate)` ([#143](https://github.com/terror/just-lsp/pull/143) by [terror](https://github.com/terror))
+
+## [0.2.8](https://github.com/terror/just-lsp/releases/tag/0.2.8) - 2025-11-11
 
 ### Added
 

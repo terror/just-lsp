@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -euxo pipefail
+
+ROOT_DIR="$(pwd)"
+TMP_DIR="$ROOT_DIR/tmp/release"
+
+cleanup() {
+  if [[ -d "$TMP_DIR" ]]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+
+trap cleanup EXIT
+
+rm -rf "$TMP_DIR"
+mkdir -p "$ROOT_DIR/tmp"
+
+gh repo clone https://github.com/terror/just-lsp "$TMP_DIR"
+
+cd "$TMP_DIR"
+
+VERSION=$(sed -En 's/version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' Cargo.toml | head -1)
+git tag -a "$VERSION" -m "Release $VERSION"
+git push origin "$VERSION"
+
+cargo publish
+
+cd "$ROOT_DIR"
