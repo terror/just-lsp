@@ -16,7 +16,7 @@ fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
   };
 
   let children_matches = (0..node.child_count())
-    .filter_map(|i| node.child(i))
+    .filter_map(|i| child_at(&node, i))
     .flat_map(|child| collect_nodes_by_kind(child, kind))
     .collect::<Vec<_>>();
 
@@ -28,7 +28,7 @@ fn collect_descendants_by_kind<'a>(
   kind: &str,
 ) -> Vec<Node<'a>> {
   (0..node.child_count())
-    .filter_map(|i| node.child(i))
+    .filter_map(|i| child_at(&node, i))
     .flat_map(|child| {
       let self_match = if child.kind() == kind {
         vec![child]
@@ -41,6 +41,10 @@ fn collect_descendants_by_kind<'a>(
       [self_match, descendants].concat()
     })
     .collect()
+}
+
+fn child_at<'a>(node: &Node<'a>, index: usize) -> Option<Node<'a>> {
+  index.try_into().ok().and_then(|index| node.child(index))
 }
 
 impl NodeExt for Node<'_> {
@@ -61,7 +65,7 @@ impl NodeExt for Node<'_> {
       return position_str
         .parse::<usize>()
         .ok()
-        .and_then(|position| self.child(position))
+        .and_then(|position| child_at(self, position))
         .map_or_else(Vec::new, |child| vec![child]);
     }
 
@@ -74,7 +78,7 @@ impl NodeExt for Node<'_> {
 
           if let Ok(index) = index_str.parse::<usize>() {
             let direct_children = (0..self.child_count())
-              .filter_map(|i| self.child(i))
+              .filter_map(|i| child_at(self, i))
               .filter(|child| child.kind() == kind)
               .collect::<Vec<_>>();
 
@@ -87,7 +91,7 @@ impl NodeExt for Node<'_> {
       }
 
       return (0..self.child_count())
-        .filter_map(|i| self.child(i))
+        .filter_map(|i| child_at(self, i))
         .filter(|child| child.kind() == rest)
         .collect();
     }
@@ -118,7 +122,7 @@ impl NodeExt for Node<'_> {
             .iter()
             .flat_map(|parent| {
               (0..parent.child_count())
-                .filter_map(|i| parent.child(i))
+                .filter_map(|i| child_at(parent, i))
                 .filter(|child| child.kind() == child_kind)
                 .collect::<Vec<_>>()
             })

@@ -55,27 +55,27 @@ wildcard_imports = "allow"
 
 [dependencies]
 anyhow = "1.0.100"
-ariadne = "0.5.1"
-clap = { version = "4.5.51", features = ["derive"] }
+ariadne = "0.6.0"
+clap = { version = "4.5.53", features = ["derive"] }
 env_logger = "0.11.8"
-log = "0.4.28"
+log = "0.4.29"
 once_cell = "1.21.3"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
+serde_json = "1.0.148"
 target = "2.1.0"
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 tokio = { version = "1.48.0", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
 tower-lsp = "0.20.0"
-tree-sitter = "0.25.10"
-tree-sitter-highlight = "0.25.10"
+tree-sitter = "0.26.3"
+tree-sitter-highlight = "0.26.3"
 
 [dev-dependencies]
 indoc = "2.0.7"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.145"
+serde_json = "1.0.148"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.45"
+cc = "1.2.51"
