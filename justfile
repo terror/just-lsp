@@ -21,7 +21,7 @@ build-wasm:
   cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
 
 [group: 'check']
-check:
+check: build build
  cargo check
 
 [group: 'check']

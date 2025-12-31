@@ -36,6 +36,7 @@ pub(crate) use {
   dependency_arguments::DependencyArgumentRule,
   duplicate_alias::DuplicateAliasRule,
   duplicate_attribute::DuplicateAttributeRule,
+  duplicate_dependencies::DuplicateDependenciesRule,
   duplicate_recipes::DuplicateRecipeRule,
   duplicate_setting::DuplicateSettingRule,
   duplicate_variables::DuplicateVariableRule,
@@ -63,6 +64,7 @@ mod attribute_target_support;
 mod dependency_arguments;
 mod duplicate_alias;
 mod duplicate_attribute;
+mod duplicate_dependencies;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;
