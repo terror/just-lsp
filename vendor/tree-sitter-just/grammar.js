@@ -90,14 +90,19 @@ module.exports = grammar({
       ),
 
     // alias         : 'alias' NAME ':=' NAME
+    //               | 'alias' NAME ':=' module_path
     alias: ($) =>
       seq(
         repeat($.attribute),
         "alias",
         field("left", $.identifier),
         ":=",
-        field("right", $.identifier),
+        field("right", choice($.module_path, $.identifier)),
       ),
+
+    // module_path   : NAME '::' NAME ('::' NAME)*
+    module_path: ($) =>
+      seq($.identifier, repeat1(seq("::", $.identifier))),
     // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) =>
       seq(
@@ -285,13 +290,24 @@ module.exports = grammar({
     dependencies: ($) => repeat1(seq(optional("&&"), $.dependency)),
 
     // dependency    : NAME
+    //               | module_path
     //               | '(' NAME expression* ')'
+    //               | '(' module_path expression* ')'
     dependency: ($) =>
-      choice(field("name", $.identifier), $.dependency_expression),
+      choice(
+        field("name", $.module_path),
+        field("name", $.identifier),
+        $.dependency_expression,
+      ),
 
     // contents of `(recipe expression)`
     dependency_expression: ($) =>
-      seq("(", field("name", $.identifier), repeat($.expression), ")"),
+      seq(
+        "(",
+        field("name", choice($.module_path, $.identifier)),
+        repeat($.expression),
+        ")",
+      ),
 
     // body          : INDENT line+ DEDENT
     recipe_body: ($) =>
