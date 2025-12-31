@@ -20,6 +20,7 @@ static RULES: &[&dyn Rule] = &[
   &DuplicateRecipeRule,
   &RecipeDependencyCycleRule,
   &MissingDependencyRule,
+  &DuplicateDependenciesRule,
   &DependencyArgumentRule,
   &ParallelDependenciesRule,
   &UnknownSettingRule,
@@ -883,6 +884,54 @@ mod tests {
     })
     .error(Message::Text("Recipe `missing1` not found"))
     .error(Message::Text("Recipe `missing2` not found"))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_warns() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(Message::Text(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_with_arguments_warns() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `a`)
+        echo \"bar\"
+      "
+    })
+    .warning(Message::Text(
+      "Recipe `bar` lists dependency `foo` with the same arguments more than once; just only runs it once, so it's redundant",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_with_different_arguments_no_warning() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `b`)
+        echo \"bar\"
+      "
+    })
     .run();
   }
 

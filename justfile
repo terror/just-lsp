@@ -63,7 +63,7 @@ publish:
 
 [group: 'dev']
 run *args:
-  cargo run -- --{{args}}
+  cargo run {{ args }}
 
 [group: 'test']
 test:
