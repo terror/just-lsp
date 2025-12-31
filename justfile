@@ -21,7 +21,7 @@ build-wasm:
   cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
 
 [group: 'check']
-check: build build
+check:
  cargo check
 
 [group: 'check']
@@ -63,7 +63,7 @@ publish:
 
 [group: 'dev']
 run *args:
-  cargo run -- --{{args}}
+  cargo run {{ args }}
 
 [group: 'test']
 test:
