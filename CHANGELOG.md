@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.1](https://github.com/terror/just-lsp/releases/tag/0.3.1) - 2026-01-01
+
+### Added
+
+- Warn on duplicate recipe dependencies with same arguments ([#191](https://github.com/terror/just-lsp/pull/191) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Extend parser to handle module path syntax ([#193](https://github.com/terror/just-lsp/pull/193) by [terror](https://github.com/terror))
+
+### Misc
+
+- Add dependabot workflow ([#190](https://github.com/terror/just-lsp/pull/190) by [terror](https://github.com/terror))
+- Update dependencies ([#189](https://github.com/terror/just-lsp/pull/189) by [terror](https://github.com/terror))
+- Remove unused `start` script in `/bin` ([#188](https://github.com/terror/just-lsp/pull/188) by [terror](https://github.com/terror))
+
 ## [0.3.0](https://github.com/terror/just-lsp/releases/tag/0.3.0) - 2025-12-26
 
 ### Added
