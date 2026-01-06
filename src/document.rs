@@ -259,28 +259,32 @@ impl Document {
 
           let attributes = recipe_node
             .find_all("attribute")
-            .iter()
-            .filter_map(|attribute_node| {
-              let identifier = attribute_node.find("identifier")?;
+            .into_iter()
+            .flat_map(|attribute_node| {
+              attribute_node
+                .find_all("identifier")
+                .into_iter()
+                .map(|identifier_node| {
+                  let arguments = identifier_node
+                    .find_siblings_until("string", "identifier")
+                    .into_iter()
+                    .map(|argument_node| TextNode {
+                      value: self.get_node_text(&argument_node),
+                      range: argument_node.get_range(self),
+                    })
+                    .collect::<Vec<_>>();
 
-              let arguments = attribute_node
-                .find_all("string")
-                .iter()
-                .map(|argument_node| TextNode {
-                  value: self.get_node_text(argument_node),
-                  range: argument_node.get_range(self),
+                  Attribute {
+                    name: TextNode {
+                      value: self.get_node_text(&identifier_node),
+                      range: identifier_node.get_range(self),
+                    },
+                    arguments,
+                    target: Some(AttributeTarget::Recipe),
+                    range: attribute_node.get_range(self),
+                  }
                 })
-                .collect::<Vec<_>>();
-
-              Some(Attribute {
-                name: TextNode {
-                  value: self.get_node_text(&identifier),
-                  range: identifier.get_range(self),
-                },
-                arguments,
-                target: Some(AttributeTarget::Recipe),
-                range: attribute_node.get_range(self),
-              })
+                .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
