@@ -1,5 +1,7 @@
 set dotenv-load
 
+import './common.just'
+
 export CARGO_MSG_LIMIT := '1'
 
 default:

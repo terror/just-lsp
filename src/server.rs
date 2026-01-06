@@ -484,29 +484,38 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(&self, content: &str) -> Result<String> {
-    let tempdir = tempdir()?;
+  async fn format_document(
+    &self,
+    content: &str,
+    file_path: &Path,
+  ) -> Result<String> {
+    let dir = file_path.parent().unwrap_or(Path::new("."));
 
-    let file = tempdir.path().join("justfile");
+    let temp_file = dir.join(".just-lsp-fmt.tmp");
 
-    fs::write(&file, content.as_bytes())?;
+    fs::write(&temp_file, content.as_bytes())?;
 
-    let mut command = tokio::process::Command::new("just");
+    let result = async {
+      let mut command = tokio::process::Command::new("just");
 
-    command.arg("--fmt").arg("--unstable").arg("--quiet");
+      command.arg("--dump").arg("--justfile").arg(&temp_file);
 
-    command.current_dir(tempdir.path());
+      let output = command.output().await?;
 
-    let output = command.output().await?;
+      if !output.status.success() {
+        bail!(
+          "just formatting failed: {}",
+          String::from_utf8_lossy(&output.stderr)
+        );
+      }
 
-    if !output.status.success() {
-      bail!(
-        "just formatting failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-      );
+      Ok(String::from_utf8(output.stdout)?)
     }
+    .await;
 
-    Ok(fs::read_to_string(&file)?)
+    let _ = fs::remove_file(&temp_file);
+
+    result
   }
 
   async fn formatting(
@@ -514,6 +523,10 @@ impl Inner {
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
+
+    let file_path = uri
+      .to_file_path()
+      .map_err(|()| jsonrpc::Error::invalid_params("URI is not a file path"))?;
 
     let snapshot = {
       let documents = self.documents.read().await;
@@ -530,7 +543,7 @@ impl Inner {
     };
 
     if let Some((content, document_end)) = snapshot {
-      match self.format_document(&content).await {
+      match self.format_document(&content, &file_path).await {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
