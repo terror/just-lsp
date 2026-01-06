@@ -1892,6 +1892,56 @@ mod tests {
   }
 
   #[test]
+  fn comma_separated_os_attributes_no_conflict() {
+    Test::new(indoc! {
+      "
+      [private, unix]
+      hello:
+        @echo 'hello'
+
+      [private, windows]
+      hello:
+        @echo hello
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn comma_separated_os_attributes_with_conflict() {
+    Test::new(indoc! {
+      "
+      [private, linux]
+      hello:
+        @echo 'hello on linux'
+
+      [private, linux]
+      hello:
+        @echo 'hello on linux again'
+      "
+    })
+    .error(Message::Text("Duplicate recipe name `hello`"))
+    .run();
+  }
+
+  #[test]
+  fn comma_separated_unix_windows_no_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      [private]
+      build:
+        @echo 'building on unix'
+
+      [private, windows]
+      build:
+        @echo 'building on windows'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn circular_dependencies_self() {
     Test::new(indoc! {
       "
