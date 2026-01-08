@@ -24,7 +24,7 @@ use {
   resolver::Resolver,
   rope_ext::RopeExt,
   ropey::Rope,
-  rule::*,
+  rule::Rule,
   rule_context::RuleContext,
   serde::{Deserialize, Serialize},
   server::Server,

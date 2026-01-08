@@ -25,37 +25,12 @@ macro_rules! define_rule {
         $body
       }
     }
+
+    inventory::submit!(&$name as &dyn Rule);
   };
 }
 
-pub(crate) use {
-  alias_recipe_conflict::AliasRecipeConflictRule,
-  attribute_arguments::AttributeArgumentsRule,
-  attribute_invalid_target::AttributeInvalidTargetRule,
-  attribute_target_support::AttributeTargetSupportRule,
-  dependency_arguments::DependencyArgumentRule,
-  duplicate_alias::DuplicateAliasRule,
-  duplicate_attribute::DuplicateAttributeRule,
-  duplicate_dependencies::DuplicateDependenciesRule,
-  duplicate_recipes::DuplicateRecipeRule,
-  duplicate_setting::DuplicateSettingRule,
-  duplicate_variables::DuplicateVariableRule,
-  function_arguments::FunctionArgumentsRule,
-  inconsistent_indentation::InconsistentIndentationRule,
-  invalid_setting_kind::InvalidSettingKindRule,
-  missing_dependencies::MissingDependencyRule,
-  missing_recipe_for_alias::MissingRecipeForAliasRule,
-  mixed_indentation::MixedIndentationRule,
-  parallel_dependencies::ParallelDependenciesRule,
-  recipe_dependency_cycles::RecipeDependencyCycleRule,
-  recipe_parameters::RecipeParameterRule,
-  script_shebang_conflict::ScriptShebangConflictRule, syntax::SyntaxRule,
-  undefined_identifiers::UndefinedIdentifierRule,
-  unknown_attribute::UnknownAttributeRule,
-  unknown_function::UnknownFunctionRule, unknown_setting::UnknownSettingRule,
-  unused_parameters::UnusedParameterRule, unused_variables::UnusedVariableRule,
-  working_directory_conflict::WorkingDirectoryConflictRule,
-};
+inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
 mod attribute_arguments;
