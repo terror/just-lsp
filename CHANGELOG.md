@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.2](https://github.com/terror/just-lsp/releases/tag/0.3.2) - 2026-01-08
+
+### Added
+
+- Add deprecation warning for `windows-powershell` setting ([#211](https://github.com/terror/just-lsp/pull/211) by [terror](https://github.com/terror))
+- Add deprecation warnings for `env_var` and `env_var_or_default` functions ([#210](https://github.com/terror/just-lsp/pull/210) by [terror](https://github.com/terror))
+- Add support for `unexport` keyword ([#205](https://github.com/terror/just-lsp/pull/205) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix attribute parsing for comma-separated syntax in recipes ([#198](https://github.com/terror/just-lsp/pull/198) by [terror](https://github.com/terror))
+
+### Misc
+
+- Use `inventory` for rule registration ([#207](https://github.com/terror/just-lsp/pull/207) by [terror](https://github.com/terror))
+- Remove `once_cell` dependency in favor of standard library equivalents ([#206](https://github.com/terror/just-lsp/pull/206) by [terror](https://github.com/terror))
+- Bump tokio from 1.48.0 to 1.49.0 ([#203](https://github.com/terror/just-lsp/pull/203) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tokio-stream from 0.1.17 to 0.1.18 ([#202](https://github.com/terror/just-lsp/pull/202) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.5.53 to 4.5.54 ([#201](https://github.com/terror/just-lsp/pull/201) by [app/dependabot](https://github.com/app/dependabot))
+- Bump serde_json from 1.0.148 to 1.0.149 ([#200](https://github.com/terror/just-lsp/pull/200) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.3.1](https://github.com/terror/just-lsp/releases/tag/0.3.1) - 2026-01-01
 
 ### Added
