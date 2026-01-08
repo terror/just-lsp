@@ -6,4 +6,5 @@ pub(crate) struct Variable {
   pub(crate) export: bool,
   pub(crate) name: TextNode,
   pub(crate) range: lsp::Range,
+  pub(crate) unexport: bool,
 }

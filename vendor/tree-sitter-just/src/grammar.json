@@ -57,6 +57,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "unexport"
+        },
+        {
+          "type": "SYMBOL",
           "name": "import"
         },
         {
@@ -188,6 +192,26 @@
         {
           "type": "STRING",
           "value": "export"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "assignment"
+        }
+      ]
+    },
+    "unexport": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "unexport"
         },
         {
           "type": "SYMBOL",

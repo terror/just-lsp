@@ -790,6 +790,10 @@
         {
           "type": "shebang",
           "named": true
+        },
+        {
+          "type": "unexport",
+          "named": true
         }
       ]
     }
@@ -804,6 +808,25 @@
       "types": [
         {
           "type": "escape_sequence",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unexport",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment",
+          "named": true
+        },
+        {
+          "type": "attribute",
           "named": true
         }
       ]
@@ -1049,6 +1072,10 @@
   },
   {
     "type": "true",
+    "named": false
+  },
+  {
+    "type": "unexport",
     "named": false
   },
   {
