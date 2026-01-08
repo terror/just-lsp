@@ -128,8 +128,8 @@ const HIGHLIGHTS: &[HighlightConfig] = &[
   },
 ];
 
-pub(crate) static SEMANTIC_TOKENS_LEGEND: Lazy<lsp::SemanticTokensLegend> =
-  Lazy::new(|| lsp::SemanticTokensLegend {
+pub(crate) static SEMANTIC_TOKENS_LEGEND: LazyLock<lsp::SemanticTokensLegend> =
+  LazyLock::new(|| lsp::SemanticTokensLegend {
     token_types: TOKEN_TYPES
       .iter()
       .map(|name| lsp::SemanticTokenType::new(name))
@@ -140,8 +140,8 @@ pub(crate) static SEMANTIC_TOKENS_LEGEND: Lazy<lsp::SemanticTokensLegend> =
       .collect(),
   });
 
-static HIGHLIGHT_CONFIGURATION: Lazy<HighlightConfiguration> =
-  Lazy::new(|| {
+static HIGHLIGHT_CONFIGURATION: LazyLock<HighlightConfiguration> =
+  LazyLock::new(|| {
     let mut configuration = HighlightConfiguration::new(
       // SAFETY: tree_sitter_just exposes a static tree-sitter language definition.
       unsafe { tree_sitter_just() },
@@ -162,16 +162,17 @@ static HIGHLIGHT_CONFIGURATION: Lazy<HighlightConfiguration> =
     configuration
   });
 
-static HIGHLIGHT_MAPPINGS: Lazy<Vec<Option<TokenMap>>> = Lazy::new(|| {
-  HIGHLIGHTS
-    .iter()
-    .map(|config| {
-      config
-        .token_type
-        .map(|token_type| TokenMap::new(token_type, config.modifiers))
-    })
-    .collect()
-});
+static HIGHLIGHT_MAPPINGS: LazyLock<Vec<Option<TokenMap>>> =
+  LazyLock::new(|| {
+    HIGHLIGHTS
+      .iter()
+      .map(|config| {
+        config
+          .token_type
+          .map(|token_type| TokenMap::new(token_type, config.modifiers))
+      })
+      .collect()
+  });
 
 #[derive(Debug, PartialEq, Eq)]
 struct Token {

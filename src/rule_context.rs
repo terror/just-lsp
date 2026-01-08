@@ -112,24 +112,24 @@ impl IdentifierAnalysis {
 }
 
 pub(crate) struct RuleContext<'a> {
-  aliases: OnceCell<Vec<Alias>>,
-  attributes: OnceCell<Vec<Attribute>>,
+  aliases: OnceLock<Vec<Alias>>,
+  attributes: OnceLock<Vec<Attribute>>,
   builtin_attributes_map:
-    OnceCell<HashMap<&'static str, Vec<&'static Builtin<'static>>>>,
+    OnceLock<HashMap<&'static str, Vec<&'static Builtin<'static>>>>,
   builtin_function_map:
-    OnceCell<HashMap<&'static str, &'static Builtin<'static>>>,
+    OnceLock<HashMap<&'static str, &'static Builtin<'static>>>,
   builtin_setting_map:
-    OnceCell<HashMap<&'static str, &'static Builtin<'static>>>,
+    OnceLock<HashMap<&'static str, &'static Builtin<'static>>>,
   document: &'a Document,
-  document_variable_names: OnceCell<HashSet<String>>,
-  function_calls: OnceCell<Vec<FunctionCall>>,
-  identifier_analysis: OnceCell<IdentifierAnalysis>,
-  recipe_names: OnceCell<HashSet<String>>,
-  recipe_parameters: OnceCell<HashMap<String, Vec<Parameter>>>,
-  recipes: OnceCell<Vec<Recipe>>,
-  settings: OnceCell<Vec<Setting>>,
-  variable_and_builtin_names: OnceCell<HashSet<String>>,
-  variables: OnceCell<Vec<Variable>>,
+  document_variable_names: OnceLock<HashSet<String>>,
+  function_calls: OnceLock<Vec<FunctionCall>>,
+  identifier_analysis: OnceLock<IdentifierAnalysis>,
+  recipe_names: OnceLock<HashSet<String>>,
+  recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
+  recipes: OnceLock<Vec<Recipe>>,
+  settings: OnceLock<Vec<Setting>>,
+  variable_and_builtin_names: OnceLock<HashSet<String>>,
+  variables: OnceLock<Vec<Variable>>,
 }
 
 impl<'a> RuleContext<'a> {
@@ -248,21 +248,21 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn new(document: &'a Document) -> Self {
     Self {
-      aliases: OnceCell::new(),
-      attributes: OnceCell::new(),
-      builtin_attributes_map: OnceCell::new(),
-      builtin_function_map: OnceCell::new(),
-      builtin_setting_map: OnceCell::new(),
+      aliases: OnceLock::new(),
+      attributes: OnceLock::new(),
+      builtin_attributes_map: OnceLock::new(),
+      builtin_function_map: OnceLock::new(),
+      builtin_setting_map: OnceLock::new(),
       document,
-      document_variable_names: OnceCell::new(),
-      function_calls: OnceCell::new(),
-      identifier_analysis: OnceCell::new(),
-      recipe_names: OnceCell::new(),
-      recipe_parameters: OnceCell::new(),
-      recipes: OnceCell::new(),
-      settings: OnceCell::new(),
-      variable_and_builtin_names: OnceCell::new(),
-      variables: OnceCell::new(),
+      document_variable_names: OnceLock::new(),
+      function_calls: OnceLock::new(),
+      identifier_analysis: OnceLock::new(),
+      recipe_names: OnceLock::new(),
+      recipe_parameters: OnceLock::new(),
+      recipes: OnceLock::new(),
+      settings: OnceLock::new(),
+      variable_and_builtin_names: OnceLock::new(),
+      variables: OnceLock::new(),
     }
   }
 
