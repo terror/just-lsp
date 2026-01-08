@@ -27,6 +27,7 @@ pub(crate) enum Builtin<'a> {
     kind: SettingKind,
     description: &'a str,
     default: &'a str,
+    deprecated: Option<&'a str>,
   },
 }
 
@@ -321,9 +322,18 @@ impl Builtin<'_> {
         kind,
         description,
         default,
-        ..
+        deprecated,
       } => {
-        let mut documentation = format!("**Setting**: {name}\n{description}");
+        let mut documentation = String::new();
+
+        if let Some(replacement) = deprecated {
+          let _ = write!(
+            documentation,
+            "**Deprecated**: Use `{replacement}` instead.\n\n"
+          );
+        }
+
+        let _ = write!(documentation, "**Setting**: {name}\n{description}");
 
         let _ = write!(documentation, "\n**Type**: {kind}");
         let _ = write!(documentation, "\n**Default**: {default}");
