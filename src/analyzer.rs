@@ -1678,6 +1678,23 @@ mod tests {
   }
 
   #[test]
+  fn unexported_variables_still_warned() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      unexport BAR := \"unexported but unused\"
+      baz := \"used value\"
+
+      recipe:
+        echo {{ baz }}
+      "
+    })
+    .warning(Message::Text("Variable `foo` appears unused"))
+    .warning(Message::Text("Variable `BAR` appears unused"))
+    .run();
+  }
+
+  #[test]
   fn os_specific_duplicate_recipes() {
     Test::new(indoc! {
       "

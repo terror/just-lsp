@@ -75,6 +75,7 @@ module.exports = grammar({
     //               | alias
     //               | assignment
     //               | export
+    //               | unexport
     //               | import
     //               | module
     //               | setting
@@ -84,6 +85,7 @@ module.exports = grammar({
         $.alias,
         $.assignment,
         $.export,
+        $.unexport,
         $.import,
         $.module,
         $.setting,
@@ -115,6 +117,9 @@ module.exports = grammar({
 
     // export        : attribute* 'export' assignment
     export: ($) => seq(repeat($.attribute), "export", $.assignment),
+
+    // unexport      : attribute* 'unexport' assignment
+    unexport: ($) => seq(repeat($.attribute), "unexport", $.assignment),
 
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
