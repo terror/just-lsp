@@ -1,37 +1,5 @@
 use super::*;
 
-static RULES: &[&dyn Rule] = &[
-  &SyntaxRule,
-  &MissingRecipeForAliasRule,
-  &DuplicateAliasRule,
-  &AliasRecipeConflictRule,
-  &UnknownAttributeRule,
-  &AttributeArgumentsRule,
-  &AttributeInvalidTargetRule,
-  &AttributeTargetSupportRule,
-  &DuplicateAttributeRule,
-  &ScriptShebangConflictRule,
-  &WorkingDirectoryConflictRule,
-  &UnknownFunctionRule,
-  &FunctionArgumentsRule,
-  &RecipeParameterRule,
-  &MixedIndentationRule,
-  &InconsistentIndentationRule,
-  &DuplicateRecipeRule,
-  &RecipeDependencyCycleRule,
-  &MissingDependencyRule,
-  &DuplicateDependenciesRule,
-  &DependencyArgumentRule,
-  &ParallelDependenciesRule,
-  &UnknownSettingRule,
-  &InvalidSettingKindRule,
-  &DuplicateSettingRule,
-  &DuplicateVariableRule,
-  &UndefinedIdentifierRule,
-  &UnusedVariableRule,
-  &UnusedParameterRule,
-];
-
 #[derive(Debug)]
 pub(crate) struct Analyzer<'a> {
   document: &'a Document,
@@ -42,8 +10,8 @@ impl<'a> Analyzer<'a> {
   pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
-    let mut diagnostics: Vec<Diagnostic> = RULES
-      .iter()
+    let mut diagnostics: Vec<Diagnostic> = inventory::iter::<&dyn Rule>
+      .into_iter()
       .flat_map(|rule| {
         rule
           .run(&context)
