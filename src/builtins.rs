@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 140] = [
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",
@@ -303,6 +303,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get the absolute path relative to `path` in the working directory.",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "append",
@@ -310,6 +311,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Append suffix to strings",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "arch",
@@ -317,6 +319,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Instruction set architecture",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "blake3",
@@ -324,6 +327,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Calculate BLAKE3 hash of string",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "blake3_file",
@@ -331,6 +335,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Calculate BLAKE3 hash of file",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "cache_directory",
@@ -338,6 +343,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User cache directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "canonicalize",
@@ -345,6 +351,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Canonicalize `path` by resolving symlinks and removing `.`, `..`, and extra `/`s where possible.",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "capitalize",
@@ -352,6 +359,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert first character to uppercase",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "choose",
@@ -359,6 +367,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Generate random string from alphabet",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "clean",
@@ -366,6 +375,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Simplify path",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "config_directory",
@@ -373,6 +383,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User config directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "config_local_directory",
@@ -380,6 +391,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User local config directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "data_directory",
@@ -387,6 +399,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User data directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "data_local_directory",
@@ -394,6 +407,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User local data directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "datetime",
@@ -401,6 +415,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get formatted local time",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "datetime_utc",
@@ -408,6 +423,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get formatted UTC time",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "encode_uri_component",
@@ -415,6 +431,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Percent-encode special characters",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "env",
@@ -422,6 +439,23 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Retrieve environment variable",
     required_args: 1,
     accepts_variadic: true,
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "env_var",
+    signature: "env_var(key: string) -> string",
+    description: "Retrieve environment variable. Aborts if not present.",
+    required_args: 1,
+    accepts_variadic: false,
+    deprecated: Some("env"),
+  },
+  Builtin::Function {
+    name: "env_var_or_default",
+    signature: "env_var_or_default(key: string, default: string) -> string",
+    description: "Retrieve environment variable, returning default if not present.",
+    required_args: 2,
+    accepts_variadic: false,
+    deprecated: Some("env"),
   },
   Builtin::Function {
     name: "error",
@@ -429,6 +463,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Abort with error message",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "executable_directory",
@@ -436,6 +471,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User executable directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "extension",
@@ -443,6 +479,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get file extension",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "file_name",
@@ -450,6 +487,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get file name",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "file_stem",
@@ -457,6 +495,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get file name without extension",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "home_directory",
@@ -464,6 +503,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "User home directory",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "invocation_directory",
@@ -471,6 +511,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Current directory when just was invoked",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "invocation_directory_native",
@@ -478,6 +519,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Current directory when just was invoked (native format)",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "is_dependency",
@@ -485,6 +527,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Check if recipe is being run as dependency",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "join",
@@ -492,6 +535,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Join paths",
     required_args: 2,
     accepts_variadic: true,
+    deprecated: None,
   },
   Builtin::Function {
     name: "just_executable",
@@ -499,6 +543,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Path to just executable",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "just_pid",
@@ -506,6 +551,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Process ID of just executable",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "justfile",
@@ -513,6 +559,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Path of current justfile",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "justfile_directory",
@@ -520,6 +567,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Directory of current justfile",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "kebabcase",
@@ -527,6 +575,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to kebab-case",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "lowercase",
@@ -534,6 +583,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to lowercase",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "lowercamelcase",
@@ -541,6 +591,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to lowerCamelCase",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "num_cpus",
@@ -548,6 +599,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Number of logical CPUs",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "os",
@@ -555,6 +607,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Operating system",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "os_family",
@@ -562,6 +615,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Operating system family",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "parent_directory",
@@ -569,6 +623,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get parent directory",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "path_exists",
@@ -576,6 +631,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Check if path exists",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "prepend",
@@ -583,6 +639,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Prepend prefix to strings",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "quote",
@@ -590,6 +647,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Quote string for shell",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "read",
@@ -597,6 +655,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Read file content",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "replace",
@@ -604,6 +663,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Replace substring",
     required_args: 3,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "replace_regex",
@@ -611,6 +671,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Replace with regex",
     required_args: 3,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "require",
@@ -618,6 +679,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Find executable in PATH",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "semver_matches",
@@ -625,6 +687,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Check if version matches requirement",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "sha256",
@@ -632,6 +695,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Calculate SHA-256 hash of string",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "sha256_file",
@@ -639,6 +703,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Calculate SHA-256 hash of file",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "shell",
@@ -646,6 +711,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Execute shell command",
     required_args: 1,
     accepts_variadic: true,
+    deprecated: None,
   },
   Builtin::Function {
     name: "shoutykebabcase",
@@ -653,6 +719,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to SHOUTY-KEBAB-CASE",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "shoutysnakecase",
@@ -660,6 +727,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to SHOUTY_SNAKE_CASE",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "snakecase",
@@ -667,6 +735,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to snake_case",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "source_directory",
@@ -674,6 +743,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Directory of current source file",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "source_file",
@@ -681,6 +751,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Path of current source file",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "style",
@@ -688,6 +759,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get terminal style escape sequence",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "titlecase",
@@ -695,6 +767,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to Title Case",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim",
@@ -702,6 +775,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Remove leading and trailing whitespace",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_end",
@@ -709,6 +783,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Remove trailing whitespace",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_end_match",
@@ -716,6 +791,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Remove suffix",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_end_matches",
@@ -723,6 +799,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Repeatedly remove suffix",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_start",
@@ -730,6 +807,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Remove leading whitespace",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_start_match",
@@ -737,6 +815,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Remove prefix",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "trim_start_matches",
@@ -744,6 +823,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Repeatedly remove prefix",
     required_args: 2,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "uppercamelcase",
@@ -751,6 +831,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to UpperCamelCase",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "uppercase",
@@ -758,6 +839,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Convert to uppercase",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "uuid",
@@ -765,6 +847,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Generate random UUID",
     required_args: 0,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "which",
@@ -772,6 +855,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Find executable in PATH or return empty string",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Function {
     name: "without_extension",
@@ -779,6 +863,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 138] = [
     description: "Get path without extension",
     required_args: 1,
     accepts_variadic: false,
+    deprecated: None,
   },
   Builtin::Setting {
     name: "allow-duplicate-recipes",

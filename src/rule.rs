@@ -37,6 +37,7 @@ mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;
 mod dependency_arguments;
+mod deprecated_function;
 mod duplicate_alias;
 mod duplicate_attribute;
 mod duplicate_dependencies;
