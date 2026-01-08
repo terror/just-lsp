@@ -42,7 +42,7 @@ impl<'a> Analyzer<'a> {
   pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
-    RULES
+    let mut diagnostics: Vec<Diagnostic> = RULES
       .iter()
       .flat_map(|rule| {
         rule
@@ -54,7 +54,18 @@ impl<'a> Analyzer<'a> {
             ..diagnostic
           })
       })
-      .collect()
+      .collect();
+
+    diagnostics.sort_by(|a, b| {
+      a.range
+        .start
+        .line
+        .cmp(&b.range.start.line)
+        .then_with(|| a.range.start.character.cmp(&b.range.start.character))
+        .then_with(|| a.message.cmp(&b.message))
+    });
+
+    diagnostics
   }
 
   /// Creates a new analyzer for the given document.
@@ -312,8 +323,8 @@ mod tests {
       alias baz := nonexistent
       "
     })
-    .error(Message::Text("Recipe `nonexistent` not found"))
     .error(Message::Text("Recipe `missing` not found"))
+    .error(Message::Text("Recipe `nonexistent` not found"))
     .run();
   }
 
@@ -1678,7 +1689,7 @@ mod tests {
   }
 
   #[test]
-  fn unexported_variables_still_warned() {
+  fn unexported_variables_warned() {
     Test::new(indoc! {
       "
       foo := \"unused value\"
