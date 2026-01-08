@@ -20,6 +20,7 @@ pub(crate) enum Builtin<'a> {
     description: &'a str,
     required_args: usize,
     accepts_variadic: bool,
+    deprecated: Option<&'a str>,
   },
   Setting {
     name: &'a str,
@@ -110,6 +111,10 @@ impl Builtin<'_> {
           }
           "env" => {
             format!("{name}(${{1:key:string}}${{2:, default:string}})")
+          }
+          "env_var" => format!("{name}(${{1:key:string}})"),
+          "env_var_or_default" => {
+            format!("{name}(${{1:key:string}}, ${{2:default:string}})")
           }
           "error" => format!("{name}(${{1:message:string}})"),
           "join" => format!(
@@ -207,6 +212,7 @@ impl Builtin<'_> {
         name,
         signature,
         description,
+        deprecated,
         ..
       } => {
         let example = match *name {
@@ -224,6 +230,10 @@ impl Builtin<'_> {
           }
           "env" => {
             "env(\"HOME\") => \"/home/user\"\nenv(\"MISSING\", \"default\") => \"default\""
+          }
+          "env_var" => "env_var(\"HOME\") => \"/home/user\"",
+          "env_var_or_default" => {
+            "env_var_or_default(\"MISSING\", \"default\") => \"default\""
           }
           "error" => "error(\"Something went wrong\") => *aborts execution*",
           "extension" => "extension(\"foo.txt\") => \"txt\"",
@@ -283,6 +293,13 @@ impl Builtin<'_> {
         };
 
         let mut documentation = String::new();
+
+        if let Some(replacement) = deprecated {
+          let _ = write!(
+            documentation,
+            "**Deprecated**: Use `{replacement}` instead.\n\n"
+          );
+        }
 
         documentation.push_str(description);
 
