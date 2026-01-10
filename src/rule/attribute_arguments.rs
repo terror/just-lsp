@@ -21,6 +21,19 @@ define_rule! {
         let argument_count = attribute.arguments.len();
         let has_arguments = argument_count > 0;
 
+        // Special case for 'arg' attribute which accepts variadic named parameters
+        // arg('NAME', help='...', long='...', short='...', value='...', pattern='...')
+        // Minimum 1 argument (the parameter name), no maximum
+        if attribute_name == "arg" {
+          if argument_count == 0 {
+            diagnostics.push(Diagnostic::error(
+              "Attribute `arg` requires at least 1 argument (parameter name)".to_string(),
+              attribute.range,
+            ));
+          }
+          continue;
+        }
+
         let parameter_mismatch = matching.iter().copied().all(|attr| {
           if let Builtin::Attribute { parameters, .. } = attr {
             (parameters.is_some() && !has_arguments)

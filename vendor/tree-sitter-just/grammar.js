@@ -245,7 +245,10 @@ module.exports = grammar({
             seq(
               $.identifier,
               "(",
-              field("argument", comma_sep1($.string)),
+              field("argument", comma_sep1(choice(
+                $.string,
+                $.attribute_named_param,
+              ))),
               ")",
             ),
             seq($.identifier, ":", field("argument", $.string)),
@@ -253,6 +256,13 @@ module.exports = grammar({
         ),
         "]",
         $._newline,
+      ),
+
+    // Named parameter in attribute: key='value' or just key (flag)
+    attribute_named_param: ($) =>
+      seq(
+        field("name", $.identifier),
+        optional(seq("=", field("value", $.string))),
       ),
 
     // A complete recipe

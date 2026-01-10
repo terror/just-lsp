@@ -88,6 +88,10 @@
             "named": false
           },
           {
+            "type": "attribute_named_param",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           }
@@ -103,6 +107,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "attribute_named_param",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {

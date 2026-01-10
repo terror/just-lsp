@@ -119,10 +119,12 @@ impl Document {
             .parent()
             .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
 
+          // Only get direct child identifiers, not ones inside attribute_named_param
           attribute_node
-            .find_all("identifier")
+            .find_all("^identifier")
             .into_iter()
             .map(move |identifier_node| {
+              // Collect arguments: strings and attribute_named_param nodes
               let arguments = identifier_node
                 .find_siblings_until("string", "identifier")
                 .into_iter()
