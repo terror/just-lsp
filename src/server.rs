@@ -2087,7 +2087,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "Lowercase hexadecimal digit string\n\"0123456789abcdef\"",
+        content: "Lowercase hexadecimal digit string  \n\"0123456789abcdef\"",
         kind: "markdown",
         start_line: 1,
         start_char: 10,
@@ -2172,7 +2172,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Attribute**: [no-cd]\nDon't change directory before executing recipe.\n**Introduced in**: 1.9.0\n**Target(s)**: recipe",
+        content: "**Attribute**: `[no-cd]`  \nDon't change directory before executing recipe.\n\n**Introduced in**: 1.9.0  \n**Target(s)**: recipe",
         kind: "markdown",
         start_line: 0,
         start_char: 1,
@@ -2207,7 +2207,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Setting**: export\nExport all variables as environment variables.\n**Type**: boolean\n**Default**: false",
+        content: "**Setting**: export  \nExport all variables as environment variables.  \n**Type**: boolean  \n**Default**: false",
         kind: "markdown",
         start_line: 0,
         start_char: 4,
