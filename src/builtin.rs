@@ -1,5 +1,8 @@
 use super::*;
 
+/// Markdown hard line break (two trailing spaces + newline)
+pub(crate) const BR: &str = "  \n";
+
 #[derive(Debug)]
 pub(crate) enum Builtin<'a> {
   Attribute {
@@ -182,21 +185,25 @@ impl Builtin<'_> {
         parameters,
       } => {
         let mut documentation =
-          format!("**Attribute**: [{name}]\n{description}");
+          format!("**Attribute**: `[{name}]`{BR}{description}");
 
         if let Some(params) = parameters {
-          let _ = write!(documentation, "\n**Syntax**: [{name}({params})]");
+          let _ =
+            write!(documentation, "\n\n**Syntax**: `[{name}({params})]`{BR}");
         }
 
-        let _ = write!(documentation, "\n**Introduced in**: {version}");
+        // Blank line before metadata if no Syntax was added
+        if parameters.is_none() {
+          documentation.push('\n');
+        }
+        let _ = write!(documentation, "\n**Introduced in**: {version}{BR}");
 
         let targets = targets
           .iter()
           .map(ToString::to_string)
           .collect::<Vec<String>>();
 
-        let _ =
-          write!(documentation, "\n**Target(s)**: {}", targets.join(", "));
+        let _ = write!(documentation, "**Target(s)**: {}", targets.join(", "));
 
         lsp::MarkupContent {
           kind: lsp::MarkupKind::Markdown,
@@ -207,7 +214,7 @@ impl Builtin<'_> {
         description, value, ..
       } => lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: format!("{description}\n{value}"),
+        value: format!("{description}{BR}{value}"),
       },
       Self::Function {
         name,
@@ -327,16 +334,16 @@ impl Builtin<'_> {
         let mut documentation = String::new();
 
         if let Some(replacement) = deprecated {
-          let _ = write!(
+          let _ = writeln!(
             documentation,
-            "**Deprecated**: Use `{replacement}` instead.\n\n"
+            "**Deprecated**: Use `{replacement}` instead.{BR}"
           );
         }
 
-        let _ = write!(documentation, "**Setting**: {name}\n{description}");
+        let _ = write!(documentation, "**Setting**: {name}{BR}{description}");
 
-        let _ = write!(documentation, "\n**Type**: {kind}");
-        let _ = write!(documentation, "\n**Default**: {default}");
+        let _ = write!(documentation, "{BR}**Type**: {kind}");
+        let _ = write!(documentation, "{BR}**Default**: {default}");
 
         lsp::MarkupContent {
           kind: lsp::MarkupKind::Markdown,
