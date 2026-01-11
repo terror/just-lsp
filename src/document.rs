@@ -124,7 +124,7 @@ impl Document {
             .find_all("^identifier")
             .into_iter()
             .map(move |identifier_node| {
-              // Collect arguments: strings and attribute_named_param nodes
+              // Collect string arguments (named params handled separately in validation)
               let arguments = identifier_node
                 .find_siblings_until("string", "identifier")
                 .into_iter()
@@ -263,10 +263,12 @@ impl Document {
             .find_all("attribute")
             .into_iter()
             .flat_map(|attribute_node| {
+              // Only get direct child identifiers, not ones inside `attribute_named_param`
               attribute_node
-                .find_all("identifier")
+                .find_all("^identifier")
                 .into_iter()
                 .map(|identifier_node| {
+                  // Collect string arguments (named params handled separately in validation)
                   let arguments = identifier_node
                     .find_siblings_until("string", "identifier")
                     .into_iter()

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 146] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 148] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string HELP for ARG in usage messages.",
@@ -24,10 +24,24 @@ pub(crate) const BUILTINS: [Builtin<'_>; 146] = [
   },
   Builtin::Attribute {
     name: "arg",
-    description: "Makes option ARG a flag which does not take a value.",
+    description: "Makes a long option a flag which does not take a value, instead using VALUE when the flag is passed.",
     version: "1.46.0",
     targets: &[AttributeTarget::Recipe],
-    parameters: Some("ARG, value=\"VALUE\""),
+    parameters: Some("ARG, long=\"LONG\", value=\"VALUE\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Makes a short option a flag which does not take a value, instead using VALUE when the flag is passed.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, short=\"S\", value=\"VALUE\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Makes an option with both long and short forms a flag which does not take a value, instead using VALUE when the flag is passed.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, long=\"LONG\", short=\"S\", value=\"VALUE\""),
   },
   Builtin::Attribute {
     name: "arg",
