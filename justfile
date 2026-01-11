@@ -62,6 +62,7 @@ publish:
   ./bin/publish
 
 [group: 'dev']
+[arg('args', help="Arguments passed to cargo run")]
 run *args:
   cargo run {{ args }}
 
@@ -88,5 +89,6 @@ update-parser:
   cargo test
 
 [group: 'dev']
+[arg('COMMAND', help="Cargo command to watch (default: test)")]
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
