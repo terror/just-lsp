@@ -10,7 +10,7 @@ impl<'a> Analyzer<'a> {
   pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
-    let mut diagnostics: Vec<Diagnostic> = inventory::iter::<&dyn Rule>
+    let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
       .flat_map(|rule| {
         rule
@@ -22,7 +22,7 @@ impl<'a> Analyzer<'a> {
             ..diagnostic
           })
       })
-      .collect();
+      .collect::<Vec<_>>();
 
     diagnostics.sort_by(|a, b| {
       a.range

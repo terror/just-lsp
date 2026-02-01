@@ -40,20 +40,11 @@ impl Analyze {
 
     let analyzer = Analyzer::new(&document);
 
-    let mut diagnostics = analyzer.analyze();
+    let diagnostics = analyzer.analyze();
 
     if diagnostics.is_empty() {
       return Ok(());
     }
-
-    diagnostics.sort_by_key(|diagnostic| {
-      (
-        diagnostic.range.start.line,
-        diagnostic.range.start.character,
-        diagnostic.range.end.line,
-        diagnostic.range.end.character,
-      )
-    });
 
     let any_error = diagnostics.iter().any(|diagnostic| {
       matches!(diagnostic.severity, lsp::DiagnosticSeverity::ERROR)
