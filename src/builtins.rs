@@ -1,6 +1,62 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 140] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 148] = [
+  Builtin::Attribute {
+    name: "arg",
+    description: "Print help string `HELP` for `ARG` in usage messages.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, help=\"HELP\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Require values of argument `ARG` to be passed as `--LONG` option.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, long=\"LONG\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Require values of argument `ARG` to be passed as short `-S` option.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, short=\"S\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Makes a long option a flag which does not take a value, instead using `VALUE` when the flag is passed.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, long=\"LONG\", value=\"VALUE\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Makes a short option a flag which does not take a value, instead using `VALUE` when the flag is passed.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, short=\"S\", value=\"VALUE\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Makes an option with both long and short forms a flag which does not take a value, instead using `VALUE` when the flag is passed.",
+    version: "1.46.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, long=\"LONG\", short=\"S\", value=\"VALUE\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Require values of argument `ARG` to match regular expression `PATTERN`.",
+    version: "1.45.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, pattern=\"PATTERN\""),
+  },
+  Builtin::Attribute {
+    name: "arg",
+    description: "Configure recipe parameter with multiple options.",
+    version: "1.45.0",
+    targets: &[AttributeTarget::Recipe],
+    parameters: Some("ARG, ..."),
+  },
   Builtin::Attribute {
     name: "confirm",
     description: "Require confirmation prior to executing recipe.",
