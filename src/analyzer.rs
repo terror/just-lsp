@@ -2117,7 +2117,7 @@ mod tests {
       "
     })
     .error(Message::Text(
-      "Attribute `arg` requires at least 1 argument (parameter name)",
+      "Attribute `arg` got 0 arguments but takes at least 1 arguments",
     ))
     .run();
   }
@@ -2132,7 +2132,7 @@ mod tests {
       "
     })
     .error(Message::Text(
-      "Attribute `arg` requires at least 1 argument (parameter name)",
+      "Attribute `arg` got 0 arguments but takes at least 1 arguments",
     ))
     .error(Message::Text("Missing identifier in attribute named param"))
     .run();

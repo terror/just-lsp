@@ -7,7 +7,9 @@ pub(crate) enum Builtin<'a> {
     description: &'a str,
     version: &'a str,
     targets: &'a [AttributeTarget],
-    parameters: Option<&'a str>,
+    syntax: Option<&'a str>,
+    min_args: usize,
+    max_args: Option<usize>,
   },
   Constant {
     name: &'a str,
@@ -179,12 +181,13 @@ impl Builtin<'_> {
         description,
         version,
         targets,
-        parameters,
+        syntax,
+        ..
       } => {
         let mut documentation =
           format!("**Attribute**: [{name}]\n{description}");
 
-        if let Some(params) = parameters {
+        if let Some(params) = syntax {
           let _ = write!(documentation, "\n**Syntax**: [{name}({params})]");
         }
 
