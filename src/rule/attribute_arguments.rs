@@ -60,7 +60,7 @@ define_rule! {
             format!(
               "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
               Count("argument", argument_count),
-              if max == Some(1) && min == 1 { "argument" } else { "arguments" },
+              if min == 1 && max.is_none_or(|m| m == 1) { "argument" } else { "arguments" },
             ),
             attribute.range,
           ));
