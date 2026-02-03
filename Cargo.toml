@@ -57,7 +57,7 @@ wildcard_imports = "allow"
 anyhow = "1.0.100"
 inventory = "0.3"
 ariadne = "0.6.0"
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.57", features = ["derive"] }
 env_logger = "0.11.8"
 log = "0.4.29"
 ropey = "1.6.1"
