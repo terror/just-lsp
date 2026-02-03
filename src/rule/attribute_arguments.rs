@@ -1,6 +1,8 @@
 use super::*;
 
 define_rule! {
+  /// Reports attribute invocations whose argument counts don't match their
+  /// builtin definitions.
   AttributeArgumentsRule {
     id: "attribute-arguments",
     message: "invalid attribute arguments",
