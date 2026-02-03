@@ -57,7 +57,7 @@ wildcard_imports = "allow"
 anyhow = "1.0.100"
 inventory = "0.3"
 ariadne = "0.6.0"
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.57", features = ["derive"] }
 env_logger = "0.11.8"
 log = "0.4.29"
 ropey = "1.6.1"
@@ -68,7 +68,7 @@ tempfile = "3.24.0"
 tokio = { version = "1.49.0", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.18", features = ["io-util"] }
 tower-lsp = "0.20.0"
-tree-sitter = "0.26.3"
+tree-sitter = "0.26.5"
 tree-sitter-highlight = "0.26.3"
 
 [dev-dependencies]
