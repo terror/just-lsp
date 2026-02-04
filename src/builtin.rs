@@ -39,11 +39,11 @@ impl Builtin<'_> {
     match self {
       Self::Attribute { name, .. } => lsp::CompletionItem {
         label: (*name).to_string(),
-        kind: Some(lsp::CompletionItemKind::CONSTANT),
+        kind: Some(lsp::CompletionItemKind::KEYWORD),
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
-        insert_text: Some(format!("[{name}]")),
+        insert_text: Some((*name).to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{name}")),
         ..Default::default()
@@ -166,7 +166,7 @@ impl Builtin<'_> {
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
-        insert_text: Some(format!("set {name} := ")),
+        insert_text: Some((*name).to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
         sort_text: Some(format!("z{name}")),
         ..Default::default()
