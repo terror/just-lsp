@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.3](https://github.com/terror/just-lsp/releases/tag/0.3.3) - 2026-02-03
+
+### Added
+
+- Add support for format strings ([#225](https://github.com/terror/just-lsp/pull/225) by [terror](https://github.com/terror))
+- Add support for `arg` attribute ([#218](https://github.com/terror/just-lsp/pull/218) by [terror](https://github.com/terror))
+
+### Misc
+
+- Insert raw names for setting and attribute completions ([#226](https://github.com/terror/just-lsp/pull/226) by [terror](https://github.com/terror))
+- Bump bytes from 1.10.1 to 1.11.1 ([#224](https://github.com/terror/just-lsp/pull/224) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.54 to 1.2.55 ([#223](https://github.com/terror/just-lsp/pull/223) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.3 to 0.26.5 ([#222](https://github.com/terror/just-lsp/pull/222) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.5.54 to 4.5.57 ([#221](https://github.com/terror/just-lsp/pull/221) by [app/dependabot](https://github.com/app/dependabot))
+- Bump regex from 1.12.2 to 1.12.3 ([#220](https://github.com/terror/just-lsp/pull/220) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.52 to 1.2.54 ([#216](https://github.com/terror/just-lsp/pull/216) by [app/dependabot](https://github.com/app/dependabot))
+- Remove redundant diagnostic sort in analyze subcommand ([#217](https://github.com/terror/just-lsp/pull/217) by [terror](https://github.com/terror))
+- Bump cc from 1.2.51 to 1.2.52 ([#214](https://github.com/terror/just-lsp/pull/214) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.3.2](https://github.com/terror/just-lsp/releases/tag/0.3.2) - 2026-01-08
 
 ### Added
