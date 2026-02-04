@@ -191,6 +191,161 @@ bar:= '''b
         (string)))))
 
 ================================================================================
+format strings
+================================================================================
+
+foo := f'hello {{name}}'
+bar := f"goodbye {{name}}"
+baz := f'no interpolation'
+qux := f"escape \t sequence {{var}}"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier)))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier)))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (escape_sequence)
+            (interpolation
+              (expression
+                (value
+                  (identifier))))))))))
+
+================================================================================
+indented format strings
+================================================================================
+
+foo := f'''
+hello {{name}}
+'''
+bar := f"""
+goodbye {{name}}
+"""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier)))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier))))))))))
+
+================================================================================
+format strings with function calls
+================================================================================
+
+foo := f'arch is {{arch()}}'
+bar := f"joined {{join("a", "b")}}"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (function_call
+                    (identifier))))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (function_call
+                    (identifier)
+                    (sequence
+                      (expression
+                        (value
+                          (string)))
+                      (expression
+                        (value
+                          (string))))))))))))))
+
+================================================================================
+format strings with single braces
+================================================================================
+
+foo := f'single { brace'
+bar := f'single } brace'
+baz := f'{start and }end'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string))))))
+
+================================================================================
 backticks
 ================================================================================
 
