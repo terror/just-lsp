@@ -39,7 +39,7 @@ impl Builtin<'_> {
     match self {
       Self::Attribute { name, .. } => lsp::CompletionItem {
         label: (*name).to_string(),
-        kind: Some(lsp::CompletionItemKind::CONSTANT),
+        kind: Some(lsp::CompletionItemKind::KEYWORD),
         documentation: Some(lsp::Documentation::MarkupContent(
           self.documentation(),
         )),
