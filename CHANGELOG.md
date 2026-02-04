@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.3](https://github.com/terror/just-lsp/releases/tag/0.3.3) - 2026-02-03
+
+### Added
+
+- Add support for format strings (#225)
+- Add support for `arg` attribute (#218)
+
+### Misc
+
+- Insert raw names for setting and attribute completions (#226)
+- Bump bytes from 1.10.1 to 1.11.1 (#224)
+- Bump cc from 1.2.54 to 1.2.55 (#223)
+- Bump tree-sitter from 0.26.3 to 0.26.5 (#222)
+- Bump clap from 4.5.54 to 4.5.57 (#221)
+- Bump regex from 1.12.2 to 1.12.3 (#220)
+- Bump cc from 1.2.52 to 1.2.54 (#216)
+- Remove redundant diagnostic sort in analyze subcommand (#217)
+- Bump cc from 1.2.51 to 1.2.52 (#214)
+
 ## [0.3.2](https://github.com/terror/just-lsp/releases/tag/0.3.2) - 2026-01-08
 
 ### Added
