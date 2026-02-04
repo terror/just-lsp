@@ -1694,6 +1694,171 @@
         {
           "type": "PATTERN",
           "value": "'[^']*'"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "format_string"
+        }
+      ]
+    },
+    "format_string": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_format_string"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_format_string_indented"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_format_raw_string"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_format_raw_string_indented"
+        }
+      ]
+    },
+    "_format_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "f\""
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "interpolation"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "escape_sequence"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^\\\\\"{]+"
+              },
+              {
+                "type": "PATTERN",
+                "value": "\\{"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "\""
+        }
+      ]
+    },
+    "_format_string_indented": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "f\"\"\""
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "interpolation"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "escape_sequence"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^\\\\\"{]+"
+              },
+              {
+                "type": "PATTERN",
+                "value": "\\{"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "\"\"\""
+        }
+      ]
+    },
+    "_format_raw_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "f'"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "interpolation"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^'{]+"
+              },
+              {
+                "type": "PATTERN",
+                "value": "\\{"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "'"
+        }
+      ]
+    },
+    "_format_raw_string_indented": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "f'''"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "interpolation"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^'{]+"
+              },
+              {
+                "type": "PATTERN",
+                "value": "\\{"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "'''"
         }
       ]
     },
@@ -1927,6 +2092,10 @@
     "_string",
     "_string_indented",
     "_raw_string_indented",
+    "_format_string",
+    "_format_string_indented",
+    "_format_raw_string",
+    "_format_raw_string_indented",
     "_expression_recurse"
   ],
   "supertypes": [],

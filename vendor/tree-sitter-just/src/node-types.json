@@ -345,6 +345,25 @@
     }
   },
   {
+    "type": "format_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "escape_sequence",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "function_call",
     "named": true,
     "fields": {
@@ -839,6 +858,10 @@
         {
           "type": "escape_sequence",
           "named": true
+        },
+        {
+          "type": "format_string",
+          "named": true
         }
       ]
     }
@@ -945,6 +968,10 @@
   },
   {
     "type": "&&",
+    "named": false
+  },
+  {
+    "type": "'",
     "named": false
   },
   {
@@ -1058,6 +1085,22 @@
   },
   {
     "type": "export",
+    "named": false
+  },
+  {
+    "type": "f\"",
+    "named": false
+  },
+  {
+    "type": "f\"\"\"",
+    "named": false
+  },
+  {
+    "type": "f'",
+    "named": false
+  },
+  {
+    "type": "f'''",
     "named": false
   },
   {

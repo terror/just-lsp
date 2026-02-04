@@ -62,6 +62,10 @@ module.exports = grammar({
     $._string,
     $._string_indented,
     $._raw_string_indented,
+    $._format_string,
+    $._format_string_indented,
+    $._format_raw_string,
+    $._format_raw_string_indented,
     $._expression_recurse,
   ],
   word: ($) => $.identifier,
@@ -360,6 +364,10 @@ module.exports = grammar({
     //               | INDENTED_STRING
     //               | RAW_STRING
     //               | INDENTED_RAW_STRING
+    //               | FORMAT_STRING
+    //               | FORMAT_INDENTED_STRING
+    //               | FORMAT_RAW_STRING
+    //               | FORMAT_INDENTED_RAW_STRING
     string: ($) =>
       choice(
         $._string_indented,
@@ -367,7 +375,36 @@ module.exports = grammar({
         $._string,
         // _raw_string, can't be written as a separate inline for osm reason
         /'[^']*'/,
+        $.format_string,
       ),
+
+    format_string: ($) =>
+      choice(
+        $._format_string,
+        $._format_string_indented,
+        $._format_raw_string,
+        $._format_raw_string_indented,
+      ),
+
+    _format_string: ($) =>
+      seq(
+        'f"',
+        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        '"',
+      ),
+
+    _format_string_indented: ($) =>
+      seq(
+        'f"""',
+        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        '"""',
+      ),
+
+    _format_raw_string: ($) =>
+      seq("f'", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'"),
+
+    _format_raw_string_indented: ($) =>
+      seq("f'''", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'''"),
 
     _raw_string_indented: (_) => seq("'''", repeat(/./), "'''"),
     _string: ($) => seq('"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),

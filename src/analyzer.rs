@@ -2175,4 +2175,55 @@ mod tests {
     ))
     .run();
   }
+
+  #[test]
+  fn format_strings_with_valid_variables() {
+    Test::new(indoc! {
+      r#"
+      name := "world"
+      greeting := f'Hello, {{name}}!'
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn format_strings_with_undefined_variables() {
+    Test::new(indoc! {
+      r"
+      greeting := f'Hello, {{undefined_var}}!'
+      foo:
+        echo {{greeting}}
+      "
+    })
+    .error(Message::Text("Variable `undefined_var` not found"))
+    .run();
+  }
+
+  #[test]
+  fn format_strings_with_function_calls() {
+    Test::new(indoc! {
+      r"
+      info := f'arch: {{arch()}}'
+      foo:
+        echo {{info}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn format_strings_mark_variables_as_used() {
+    Test::new(indoc! {
+      r#"
+      name := "world"
+      greeting := f'Hello, {{name}}!'
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
 }
