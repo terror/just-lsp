@@ -19,40 +19,45 @@ define_rule! {
         }
 
         let argument_count = attribute.arguments.len();
-        let has_arguments = argument_count > 0;
 
-        let parameter_mismatch = matching.iter().copied().all(|attr| {
-          if let Builtin::Attribute { parameters, .. } = attr {
-            (parameters.is_some() && !has_arguments)
-              || (parameters.is_none() && has_arguments)
-              || (parameters.map_or(0, |_| 1) < argument_count)
-          } else {
-            false
-          }
-        });
+        let bounds = matching
+          .iter()
+          .copied()
+          .filter_map(|attr| match attr {
+            Builtin::Attribute { min_args, max_args, .. } => Some((*min_args, *max_args)),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
 
-        if parameter_mismatch {
-          let required_argument_count = matching
-            .iter()
-            .copied()
-            .find_map(|attr| {
-              if let Builtin::Attribute { parameters, .. } = attr {
-                parameters.map(|_| 1)
-              } else {
-                None
-              }
-            })
-            .unwrap_or(0);
+        let is_valid = bounds
+          .iter()
+          .any(|(min, max)| argument_count >= *min && max.is_none_or(|m| argument_count <= m));
 
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Attribute `{attribute_name}` got {argument_count} {} but takes {required_argument_count} {}",
-              Count("argument", argument_count),
-              Count("argument", required_argument_count),
-            ),
-            attribute.range,
-          ));
+        if is_valid {
+          continue;
         }
+
+        let min = bounds.iter().map(|(min, _)| *min).min().unwrap_or(0);
+
+        let max = bounds
+          .iter()
+          .map(|(_, max)| *max)
+          .try_fold(0, |acc, max| max.map(|value| acc.max(value)));
+
+        let expected = match max {
+          Some(max) if min == max => format!("{min}"),
+          Some(max) => format!("{min}-{max}"),
+          None => format!("at least {min}"),
+        };
+
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
+            Count("argument", argument_count),
+            if min == 1 && max.is_none_or(|m| m == 1) { "argument" } else { "arguments" },
+          ),
+          attribute.range,
+        ));
       }
 
       diagnostics

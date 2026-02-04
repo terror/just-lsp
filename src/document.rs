@@ -120,7 +120,7 @@ impl Document {
             .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
 
           attribute_node
-            .find_all("identifier")
+            .find_all("^identifier")
             .into_iter()
             .map(move |identifier_node| {
               let arguments = identifier_node
@@ -262,7 +262,7 @@ impl Document {
             .into_iter()
             .flat_map(|attribute_node| {
               attribute_node
-                .find_all("identifier")
+                .find_all("^identifier")
                 .into_iter()
                 .map(|identifier_node| {
                   let arguments = identifier_node

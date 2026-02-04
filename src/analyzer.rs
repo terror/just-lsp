@@ -2048,6 +2048,97 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_valid() {
+    Test::new(indoc! {
+      "
+      [arg('foo', help=\"Help text\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_long_option() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_short_option() {
+    Test::new(indoc! {
+      "
+      [arg('foo', short=\"f\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_pattern() {
+    Test::new(indoc! {
+      "
+      [arg('version', pattern=\"[0-9]+\\\\.[0-9]+\\\\.[0-9]+\")]
+      release version:
+        echo {{version}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_multiple_options() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\", short=\"f\", value=\"default\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_missing_parameter_name() {
+    Test::new(indoc! {
+      "
+      [arg]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(Message::Text(
+      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_empty_parens() {
+    Test::new(indoc! {
+      "
+      [arg()]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(Message::Text(
+      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+    ))
+    .error(Message::Text("Missing identifier in attribute named param"))
+    .run();
+  }
+
+  #[test]
   fn circular_dependencies_multiple_cycles() {
     Test::new(indoc! {
       "
