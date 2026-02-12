@@ -55,9 +55,8 @@ impl Document {
         .find_all("alias")
         .iter()
         .filter_map(|alias_node| {
-          let left_node = alias_node.find("^identifier[0]")?;
-
-          let right_node = alias_node.find("^identifier[1]")?;
+          let left_node = alias_node.child_by_field_name("left")?;
+          let right_node = alias_node.child_by_field_name("right")?;
 
           Some(Alias {
             name: TextNode {
@@ -295,8 +294,14 @@ impl Document {
                 .find_all("dependency")
                 .into_iter()
                 .filter_map(|dependency_node| {
-                  let dependency_name =
-                    self.get_node_text(&dependency_node.find("identifier")?);
+                  let dependency_name = dependency_node
+                    .child_by_field_name("name")
+                    .or_else(|| {
+                      dependency_node
+                        .find("dependency_expression")
+                        .and_then(|node| node.child_by_field_name("name"))
+                    })
+                    .map(|node| self.get_node_text(&node))?;
 
                   let arguments = dependency_node
                     .find("dependency_expression")
@@ -572,6 +577,34 @@ mod tests {
           range: range((0, 12, 0, 15))
         },
         range: range((0, 0, 0, 15))
+      }]
+    );
+  }
+
+  #[test]
+  fn get_alias_with_module_path() {
+    let document = Document::from(indoc! {
+      "
+      alias a1 := tools::build
+      "
+    });
+
+    let aliases = document.aliases();
+
+    assert_eq!(aliases.len(), 1);
+
+    assert_eq!(
+      aliases,
+      vec![Alias {
+        name: TextNode {
+          value: "a1".into(),
+          range: range((0, 6, 0, 8))
+        },
+        value: TextNode {
+          value: "tools::build".into(),
+          range: range((0, 12, 0, 24))
+        },
+        range: range((0, 0, 0, 24))
       }]
     );
   }
@@ -1063,6 +1096,42 @@ mod tests {
         parameters: vec![],
         content: "bar: foo\n  echo \"bar\"".into(),
         range: range((3, 0, 5, 0)),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_module_path_dependency() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: tools::foo
+        echo \"baz\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("baz"),
+      Some(Recipe {
+        name: TextNode {
+          value: "baz".into(),
+          range: range((6, 0, 6, 3))
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: "tools::foo".into(),
+          arguments: vec![],
+          range: range((6, 5, 6, 15)),
+        }],
+        parameters: vec![],
+        content: "baz: tools::foo\n  echo \"baz\"".into(),
+        range: range((6, 0, 8, 0)),
         shebang: None,
       })
     );
