@@ -1681,6 +1681,22 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "_shell_expanded_string_indented"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_shell_expanded_raw_string_indented"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_shell_expanded_string"
+        },
+        {
+          "type": "PATTERN",
+          "value": "x'[^']*'"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_string_indented"
         },
         {
@@ -1911,6 +1927,84 @@
         }
       ]
     },
+    "_shell_expanded_string": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "x\""
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "escape_sequence"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^\\\\\"]+"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "\""
+        }
+      ]
+    },
+    "_shell_expanded_string_indented": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "x\"\"\""
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "escape_sequence"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^\\\\]?[^\\\\\"]+"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "\"\"\""
+        }
+      ]
+    },
+    "_shell_expanded_raw_string_indented": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "x'''"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "PATTERN",
+            "value": "."
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "'''"
+        }
+      ]
+    },
     "_string_indented": {
       "type": "SEQ",
       "members": [
@@ -2092,6 +2186,9 @@
     "_string",
     "_string_indented",
     "_raw_string_indented",
+    "_shell_expanded_string",
+    "_shell_expanded_string_indented",
+    "_shell_expanded_raw_string_indented",
     "_format_string",
     "_format_string_indented",
     "_format_raw_string",

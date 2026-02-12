@@ -1152,6 +1152,18 @@
     "named": false
   },
   {
+    "type": "x\"",
+    "named": false
+  },
+  {
+    "type": "x\"\"\"",
+    "named": false
+  },
+  {
+    "type": "x'''",
+    "named": false
+  },
+  {
     "type": "{",
     "named": false
   },

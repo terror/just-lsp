@@ -62,6 +62,9 @@ module.exports = grammar({
     $._string,
     $._string_indented,
     $._raw_string_indented,
+    $._shell_expanded_string,
+    $._shell_expanded_string_indented,
+    $._shell_expanded_raw_string_indented,
     $._format_string,
     $._format_string_indented,
     $._format_raw_string,
@@ -368,8 +371,17 @@ module.exports = grammar({
     //               | FORMAT_INDENTED_STRING
     //               | FORMAT_RAW_STRING
     //               | FORMAT_INDENTED_RAW_STRING
+    //               | SHELL_EXPANDED_STRING
+    //               | SHELL_EXPANDED_INDENTED_STRING
+    //               | SHELL_EXPANDED_RAW_STRING
+    //               | SHELL_EXPANDED_INDENTED_RAW_STRING
     string: ($) =>
       choice(
+        $._shell_expanded_string_indented,
+        $._shell_expanded_raw_string_indented,
+        $._shell_expanded_string,
+        // _shell_expanded_raw_string, can't be written as a separate inline
+        /x'[^']*'/,
         $._string_indented,
         $._raw_string_indented,
         $._string,
@@ -408,6 +420,12 @@ module.exports = grammar({
 
     _raw_string_indented: (_) => seq("'''", repeat(/./), "'''"),
     _string: ($) => seq('"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
+    _shell_expanded_string: ($) =>
+      seq('x"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
+    _shell_expanded_string_indented: ($) =>
+      seq('x"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+    _shell_expanded_raw_string_indented: (_) =>
+      seq("x'''", repeat(/./), "'''"),
     // We need try two separate munches so neither escape sequences nor
     // potential closing quotes get eaten.
     _string_indented: ($) =>
