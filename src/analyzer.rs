@@ -822,6 +822,21 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_shell_expanded_strings() {
+    Test::new(indoc! {
+      r#"
+      import x'~/.config/just/common.just'
+
+      greeting := x"~/$USER/${GREETING:-hello}"
+
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_dependencies_correct() {
     Test::new(indoc! {
       "
@@ -1195,6 +1210,32 @@ mod tests {
       foo:
         echo \"foo\"
       "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_string_type_correct_with_shell_expanded_string() {
+    Test::new(indoc! {
+      r#"
+      set dotenv-path := x"~/.env.${JUST_ENV:-development}"
+
+      foo:
+        echo "foo"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_shell_array_accepts_shell_expanded_strings() {
+    Test::new(indoc! {
+      r#"
+      set shell := [x"${SHELL_BIN:-bash}", x"-c"]
+
+      foo:
+        echo "foo"
+      "#
     })
     .run();
   }

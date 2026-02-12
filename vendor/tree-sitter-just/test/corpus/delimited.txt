@@ -136,6 +136,39 @@ baz := 'a\"\t'
         (string)))))
 
 ================================================================================
+shell-expanded strings
+================================================================================
+
+foo := x"a"
+bar := x'b'
+baz := x"""c"""
+qux := x'''d'''
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
 indented raw strings
 ================================================================================
 
