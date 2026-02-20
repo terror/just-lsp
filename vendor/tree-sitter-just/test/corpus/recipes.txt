@@ -711,3 +711,28 @@ bar:
     (recipe_body
       (recipe_line
         (text)))))
+
+================================================================================
+recipe_named_import
+================================================================================
+
+run: import
+
+import:
+	body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier)))))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
