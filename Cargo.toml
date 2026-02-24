@@ -54,7 +54,7 @@ unnecessary_wraps = "allow"
 wildcard_imports = "allow"
 
 [dependencies]
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 inventory = "0.3"
 ariadne = "0.6.0"
 clap = { version = "4.5.59", features = ["derive"] }
