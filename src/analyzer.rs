@@ -633,6 +633,18 @@ mod tests {
   }
 
   #[test]
+  fn attributes_metadata_multiple_arguments() {
+    Test::new(indoc! {
+      "
+      [metadata('foo', 'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_on_assignments() {
     Test::new(indoc! {
       "
