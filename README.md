@@ -127,9 +127,16 @@ folding ranges, etc.). The helper from `cmp-nvim-lsp` augments the defaults so
 completion-related capabilities line up with `nvim-cmp`. If you do not use
 `nvim-cmp`, you can omit the field or build your own table.
 
+### Visual Studio Code
+
+A third-party [**Visual Studio Code**](https://code.visualstudio.com/) extension is maintained over at
+https://github.com/nefrob/vscode-just, written by
+[@nefrob](https://github.com/nefrob). Follow the instructions in that
+repository to get it setup on your system.
+
 ### Zed
 
-A third-party [**zed**](https://zed.dev/) extension is maintained over at
+A third-party [**Zed**](https://zed.dev/) extension is maintained over at
 https://github.com/sectore/zed-just-ls, written by
 [@sectore](https://github.com/sectore). Follow the instructions in that
 repository to get it setup on your system.
