@@ -57,8 +57,8 @@ wildcard_imports = "allow"
 anyhow = "1.0.101"
 inventory = "0.3"
 ariadne = "0.6.0"
-clap = { version = "4.5.57", features = ["derive"] }
-env_logger = "0.11.8"
+clap = { version = "4.5.59", features = ["derive"] }
+env_logger = "0.11.9"
 log = "0.4.29"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -78,4 +78,4 @@ serde_json = "1.0.149"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.55"
+cc = "1.2.56"
