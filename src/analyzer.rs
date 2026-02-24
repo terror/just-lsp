@@ -2267,4 +2267,17 @@ mod tests {
     })
     .run();
   }
+
+  #[test]
+  fn recipe_named_import() {
+    Test::new(indoc! {
+      r"
+      run: import
+
+      import:
+        body
+      "
+    })
+    .run();
+  }
 }
