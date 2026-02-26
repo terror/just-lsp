@@ -1263,8 +1263,22 @@
           "type": "FIELD",
           "name": "name",
           "content": {
-            "type": "SYMBOL",
-            "name": "identifier"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "import"
+                },
+                "named": true,
+                "value": "identifier"
+              }
+            ]
           }
         },
         {
@@ -2195,6 +2209,5 @@
     "_format_raw_string_indented",
     "_expression_recurse"
   ],
-  "supertypes": [],
-  "reserved": {}
+  "supertypes": []
 }
