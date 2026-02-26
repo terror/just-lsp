@@ -134,7 +134,7 @@ pub(crate) const BUILTINS: [Builtin<'_>; 148] = [
     targets: &[AttributeTarget::Recipe],
     syntax: Some("METADATA"),
     min_args: 1,
-    max_args: Some(1),
+    max_args: None,
   },
   Builtin::Attribute {
     name: "linux",
