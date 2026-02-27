@@ -469,11 +469,13 @@ mod tests {
       import 'foo.just'
     "});
 
-    let imports = document.imports();
-
-    assert_eq!(imports.len(), 1);
-    assert_eq!(imports[0].path, "foo.just");
-    assert!(!imports[0].optional);
+    assert_eq!(
+      document.imports(),
+      vec![Import {
+        optional: false,
+        path: "foo.just".into(),
+      }]
+    );
   }
 
   #[test]
@@ -482,11 +484,13 @@ mod tests {
       import? 'bar.just'
     "});
 
-    let imports = document.imports();
-
-    assert_eq!(imports.len(), 1);
-    assert_eq!(imports[0].path, "bar.just");
-    assert!(imports[0].optional);
+    assert_eq!(
+      document.imports(),
+      vec![Import {
+        optional: true,
+        path: "bar.just".into(),
+      }]
+    );
   }
 
   #[test]
