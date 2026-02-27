@@ -11,12 +11,16 @@ define_rule! {
       let recipe_names = context.recipe_names();
 
       for alias in context.aliases() {
-        if !recipe_names.contains(&alias.value.value) {
-          diagnostics.push(Diagnostic::error(
-            format!("Recipe `{}` not found", alias.value.value),
-            alias.value.range,
-          ));
+        if alias.value.value.contains("::")
+          || recipe_names.contains(&alias.value.value)
+        {
+          continue;
         }
+
+        diagnostics.push(Diagnostic::error(
+          format!("Recipe `{}` not found", alias.value.value),
+          alias.value.range,
+        ));
       }
 
       diagnostics

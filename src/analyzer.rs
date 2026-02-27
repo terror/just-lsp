@@ -2281,6 +2281,23 @@ mod tests {
   }
 
   #[test]
+  fn module_path_dependency_not_flagged() {
+    Test::new(indoc! {"
+      foo: tools::build
+        echo foo
+    "})
+    .run();
+  }
+
+  #[test]
+  fn module_path_alias_not_flagged() {
+    Test::new(indoc! {"
+      alias b := tools::build
+    "})
+    .run();
+  }
+
+  #[test]
   fn recipe_named_import() {
     Test::new(indoc! {
       r"

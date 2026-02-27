@@ -211,6 +211,38 @@ impl Document {
       .to_string()
   }
 
+  #[must_use]
+  pub(crate) fn imports(&self) -> Vec<Import> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("import")
+        .iter()
+        .filter_map(|import_node| {
+          let string_node = import_node.find("string")?;
+
+          let optional = (0..import_node.child_count()).any(|index| {
+            u32::try_from(index)
+              .ok()
+              .and_then(|i| import_node.child(i))
+              .is_some_and(|child| child.kind() == "?")
+          });
+
+          let raw = self.get_node_text(&string_node);
+
+          let path = raw
+            .strip_prefix(['\'', '"'])
+            .unwrap_or(&raw)
+            .strip_suffix(['\'', '"'])
+            .unwrap_or(&raw)
+            .to_string();
+
+          Some(Import { optional, path })
+        })
+        .collect()
+    })
+  }
+
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
   pub(crate) fn node_at_position(
@@ -429,6 +461,32 @@ mod tests {
         character: end_character,
       },
     }
+  }
+
+  #[test]
+  fn basic_import() {
+    let document = Document::from(indoc! {"
+      import 'foo.just'
+    "});
+
+    let imports = document.imports();
+
+    assert_eq!(imports.len(), 1);
+    assert_eq!(imports[0].path, "foo.just");
+    assert!(!imports[0].optional);
+  }
+
+  #[test]
+  fn optional_import() {
+    let document = Document::from(indoc! {"
+      import? 'bar.just'
+    "});
+
+    let imports = document.imports();
+
+    assert_eq!(imports.len(), 1);
+    assert_eq!(imports[0].path, "bar.just");
+    assert!(imports[0].optional);
   }
 
   #[test]

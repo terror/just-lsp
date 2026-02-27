@@ -295,6 +295,42 @@ impl Inner {
         });
       }
 
+      let import_resolver = ImportResolver::new(document);
+
+      for imported in import_resolver.imported_documents() {
+        for recipe in imported.document.recipes() {
+          completion_items.push(lsp::CompletionItem {
+            label: recipe.name.value.clone(),
+            kind: Some(lsp::CompletionItemKind::FUNCTION),
+            documentation: Some(lsp::Documentation::MarkupContent(
+              lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: recipe.content,
+              },
+            )),
+            insert_text: Some(recipe.name.value),
+            insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+          });
+        }
+
+        for variable in imported.document.variables() {
+          completion_items.push(lsp::CompletionItem {
+            label: variable.name.value.clone(),
+            kind: Some(lsp::CompletionItemKind::VARIABLE),
+            documentation: Some(lsp::Documentation::MarkupContent(
+              lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: variable.content,
+              },
+            )),
+            insert_text: Some(variable.name.value),
+            insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+          });
+        }
+      }
+
       for builtin in BUILTINS {
         completion_items.push(builtin.completion_item());
       }
@@ -574,7 +610,9 @@ impl Inner {
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .and_then(|identifier| {
-          let resolver = Resolver::new(document);
+          let import_resolver = ImportResolver::new(document);
+          let resolver =
+            Resolver::new(document).with_import_resolver(&import_resolver);
 
           resolver
             .resolve_identifier_definition(&identifier)
@@ -594,7 +632,9 @@ impl Inner {
     let documents = self.documents.read().await;
 
     Ok(documents.get(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+      let import_resolver = ImportResolver::new(document);
+      let resolver =
+        Resolver::new(document).with_import_resolver(&import_resolver);
 
       document
         .node_at_position(position)

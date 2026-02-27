@@ -1,14 +1,17 @@
 use super::*;
 
-#[derive(Debug)]
 pub(crate) struct Resolver<'a> {
   document: &'a Document,
+  import_resolver: Option<&'a ImportResolver>,
 }
 
 impl<'a> Resolver<'a> {
   #[must_use]
   pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
+    Self {
+      document,
+      import_resolver: None,
+    }
   }
 
   /// Returns the [`lsp::Location`] that defines the symbol represented by
@@ -35,13 +38,23 @@ impl<'a> Resolver<'a> {
 
     let identifier_parent_kind = identifier.parent()?.kind();
 
-    if ["dependency", "alias"].contains(&identifier_parent_kind)
-      && let Some(recipe) = self.document.find_recipe(&identifier_name)
-    {
-      return Some(lsp::Location {
-        uri: self.document.uri.clone(),
-        range: recipe.range,
-      });
+    if ["dependency", "alias"].contains(&identifier_parent_kind) {
+      if let Some(recipe) = self.document.find_recipe(&identifier_name) {
+        return Some(lsp::Location {
+          uri: self.document.uri.clone(),
+          range: recipe.range,
+        });
+      }
+
+      if let Some((uri, recipe)) = self
+        .import_resolver
+        .and_then(|r| r.find_recipe(&identifier_name))
+      {
+        return Some(lsp::Location {
+          uri,
+          range: recipe.range,
+        });
+      }
     }
 
     if identifier_parent_kind == "value" {
@@ -73,6 +86,16 @@ impl<'a> Resolver<'a> {
             range: variable.range,
           });
         }
+      }
+
+      if let Some((uri, variable)) = self
+        .import_resolver
+        .and_then(|r| r.find_variable(&identifier_name))
+      {
+        return Some(lsp::Location {
+          uri,
+          range: variable.range,
+        });
       }
 
       for builtin in BUILTINS {
@@ -163,18 +186,30 @@ impl<'a> Resolver<'a> {
 
     let parent_kind = identifier.parent().map(|p| p.kind());
 
-    if let Some(recipe) = self.document.find_recipe(&text)
-      && parent_kind.is_some_and(|kind| {
-        ["alias", "dependency", "recipe_header"].contains(&kind)
-      })
-    {
-      return Some(lsp::Hover {
-        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-          kind: lsp::MarkupKind::PlainText,
-          value: recipe.content,
-        }),
-        range: Some(identifier.get_range(self.document)),
-      });
+    if parent_kind.is_some_and(|kind| {
+      ["alias", "dependency", "recipe_header"].contains(&kind)
+    }) {
+      if let Some(recipe) = self.document.find_recipe(&text) {
+        return Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: recipe.content,
+          }),
+          range: Some(identifier.get_range(self.document)),
+        });
+      }
+
+      if let Some((_uri, recipe)) =
+        self.import_resolver.and_then(|r| r.find_recipe(&text))
+      {
+        return Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: recipe.content,
+          }),
+          range: Some(identifier.get_range(self.document)),
+        });
+      }
     }
 
     if parent_kind.is_some_and(|kind| kind == "value") {
@@ -212,6 +247,18 @@ impl<'a> Resolver<'a> {
             range: Some(identifier.get_range(self.document)),
           });
         }
+      }
+
+      if let Some((_uri, variable)) =
+        self.import_resolver.and_then(|r| r.find_variable(&text))
+      {
+        return Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: variable.content,
+          }),
+          range: Some(identifier.get_range(self.document)),
+        });
       }
 
       for builtin in BUILTINS {
@@ -399,6 +446,15 @@ impl<'a> Resolver<'a> {
         range: found.get_range(self.document),
       })
       .collect()
+  }
+
+  #[must_use]
+  pub(crate) fn with_import_resolver(
+    mut self,
+    import_resolver: &'a ImportResolver,
+  ) -> Self {
+    self.import_resolver = Some(import_resolver);
+    self
   }
 }
 
