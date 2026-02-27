@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 148] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 149] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -1039,6 +1039,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 148] = [
     name: "fallback",
     kind: SettingKind::Boolean(false),
     description: "Search `justfile` in parent directory if the first recipe on the command line is not found.",
+    default: "false",
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "no-exit-message",
+    kind: SettingKind::Boolean(false),
+    description: "Suppress exit messages for failed recipes by default.",
     default: "false",
     deprecated: None,
   },
