@@ -38,6 +38,11 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     key: DuplicateKey::Name,
   },
   DuplicateConstraint {
+    name: "exit-message",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
     name: "extension",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Name,
