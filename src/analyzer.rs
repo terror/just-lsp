@@ -471,13 +471,13 @@ mod tests {
   fn attributes_missing_arguments() {
     Test::new(indoc! {
       "
-      [doc]
+      [extension]
       foo:
         echo \"foo\"
       "
     })
     .error(Message::Text(
-      "Attribute `doc` got 0 arguments but takes 1 argument",
+      "Attribute `extension` got 0 arguments but takes 1 argument",
     ))
     .run();
   }
