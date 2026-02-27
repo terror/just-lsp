@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 149] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 150] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -158,6 +158,15 @@ pub(crate) const BUILTINS: [Builtin<'_>; 149] = [
     name: "no-cd",
     description: "Don't change directory before executing recipe.",
     version: "1.9.0",
+    targets: &[AttributeTarget::Recipe],
+    syntax: None,
+    min_args: 0,
+    max_args: Some(0),
+  },
+  Builtin::Attribute {
+    name: "exit-message",
+    description: "Print an error message if recipe fails.",
+    version: "1.47.0",
     targets: &[AttributeTarget::Recipe],
     syntax: None,
     min_args: 0,
