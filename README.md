@@ -90,6 +90,25 @@ Pre-built binaries for Linux, MacOS, and Windows can be found on
 
 ## Usage
 
+### CLI
+
+Running `just-lsp` with no arguments starts the language server over stdin/stdout.
+
+#### `analyze`
+
+The `analyze` subcommand runs the diagnostic engine on a justfile and prints any
+warnings or errors to stderr, without starting the language server:
+
+```bash
+just-lsp analyze [PATH]
+```
+
+When `PATH` is omitted it searches the current directory and its ancestors for a
+file named `justfile`. The exit code is non-zero if any error-severity
+diagnostic is found.
+
+### Editor Integration
+
 `just-lsp` can be used with any LSP client, this section documents integration
 with some of the more popular ones.
 
