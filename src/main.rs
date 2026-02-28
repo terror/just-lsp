@@ -43,7 +43,7 @@ use {
   },
   str_ext::StrExt,
   subcommand::Subcommand,
-  tempfile::tempdir,
+  tempfile::Builder,
   text_node::TextNode,
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
