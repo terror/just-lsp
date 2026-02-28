@@ -13,12 +13,16 @@ define_rule! {
 
       for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
-          if !recipe_names.contains(&dependency.name) {
-            diagnostics.push(Diagnostic::error(
-              format!("Recipe `{}` not found", dependency.name),
-              dependency.range,
-            ));
+          if dependency.name.contains("::")
+            || recipe_names.contains(&dependency.name)
+          {
+            continue;
           }
+
+          diagnostics.push(Diagnostic::error(
+            format!("Recipe `{}` not found", dependency.name),
+            dependency.range,
+          ));
         }
       }
 

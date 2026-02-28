@@ -124,6 +124,7 @@ pub(crate) struct RuleContext<'a> {
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   identifier_analysis: OnceLock<IdentifierAnalysis>,
+  import_resolver: OnceLock<ImportResolver>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
@@ -246,6 +247,12 @@ impl<'a> RuleContext<'a> {
       .get_or_init(|| IdentifierAnalysis::new(self))
   }
 
+  pub(crate) fn import_resolver(&self) -> &ImportResolver {
+    self
+      .import_resolver
+      .get_or_init(|| ImportResolver::new(self.document))
+  }
+
   pub(crate) fn new(document: &'a Document) -> Self {
     Self {
       aliases: OnceLock::new(),
@@ -257,6 +264,7 @@ impl<'a> RuleContext<'a> {
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       identifier_analysis: OnceLock::new(),
+      import_resolver: OnceLock::new(),
       recipe_names: OnceLock::new(),
       recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
@@ -281,11 +289,15 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn recipe_names(&self) -> &HashSet<String> {
     self.recipe_names.get_or_init(|| {
-      self
+      let mut names: HashSet<String> = self
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.clone())
-        .collect()
+        .collect();
+
+      names.extend(self.import_resolver().imported_recipe_names());
+
+      names
     })
   }
 
@@ -335,6 +347,8 @@ impl<'a> RuleContext<'a> {
         Builtin::Constant { name, .. } => Some(name.to_owned()),
         _ => None,
       }));
+
+      names.extend(self.import_resolver().imported_variable_names());
 
       names
     })
