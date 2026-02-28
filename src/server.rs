@@ -484,18 +484,28 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(&self, content: &str) -> Result<String> {
-    let tempdir = tempdir()?;
-
-    let file = tempdir.path().join("justfile");
+  async fn format_document(
+    &self,
+    uri: &lsp::Url,
+    content: &str,
+  ) -> Result<String> {
+    let file = if let Ok(path) = uri.to_file_path() {
+      let dir = path.parent().expect("file path has no parent");
+      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
+    } else {
+      Builder::new().prefix(".justfile-fmt-").tempfile()?
+    };
 
     fs::write(&file, content.as_bytes())?;
 
     let mut command = tokio::process::Command::new("just");
 
-    command.arg("--fmt").arg("--unstable").arg("--quiet");
-
-    command.current_dir(tempdir.path());
+    command
+      .arg("--fmt")
+      .arg("--unstable")
+      .arg("--quiet")
+      .arg("--justfile")
+      .arg(file.path());
 
     let output = command.output().await?;
 
@@ -530,7 +540,7 @@ impl Inner {
     };
 
     if let Some((content, document_end)) = snapshot {
-      match self.format_document(&content).await {
+      match self.format_document(uri, &content).await {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
