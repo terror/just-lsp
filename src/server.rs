@@ -29,7 +29,10 @@ impl Server {
       ),
       hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
       references_provider: Some(lsp::OneOf::Left(true)),
-      rename_provider: Some(lsp::OneOf::Left(true)),
+      rename_provider: Some(lsp::OneOf::Right(lsp::RenameOptions {
+        prepare_provider: Some(true),
+        work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+      })),
       semantic_tokens_provider: Some(
         lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
           lsp::SemanticTokensOptions {
@@ -167,6 +170,13 @@ impl LanguageServer for Server {
 
   async fn initialized(&self, params: lsp::InitializedParams) {
     self.0.initialized(params).await;
+  }
+
+  async fn prepare_rename(
+    &self,
+    params: lsp::TextDocumentPositionParams,
+  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
+    self.0.prepare_rename(params).await
   }
 
   async fn references(
@@ -649,6 +659,27 @@ impl Inner {
       documents: RwLock::new(BTreeMap::new()),
       initialized: AtomicBool::new(false),
     }
+  }
+
+  async fn prepare_rename(
+    &self,
+    params: lsp::TextDocumentPositionParams,
+  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(uri).and_then(|document| {
+      document
+        .node_at_position(params.position)
+        .filter(|node| node.kind() == "identifier")
+        .map(
+          |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
+            range: identifier.get_range(document),
+            placeholder: document.get_node_text(&identifier),
+          },
+        )
+    }))
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
@@ -1363,6 +1394,65 @@ mod tests {
           "changes": {
             self.uri: self.edits.into_value()
           }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct PrepareRenameRequest<'a> {
+    character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
+  }
+
+  impl IntoValue for PrepareRenameRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/prepareRename",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          },
+          "position": {
+            "line": self.line,
+            "character": self.character
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct PrepareRenameResponse<'a> {
+    end_char: u32,
+    end_line: u32,
+    id: i64,
+    placeholder: &'a str,
+    start_char: u32,
+    start_line: u32,
+  }
+
+  impl IntoValue for PrepareRenameResponse<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "range": {
+            "start": {
+              "line": self.start_line,
+              "character": self.start_char
+            },
+            "end": {
+              "line": self.end_line,
+              "character": self.end_char
+            }
+          },
+          "placeholder": self.placeholder
         }
       })
     }
@@ -2582,6 +2672,67 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_identifier() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+      })
+      .response(PrepareRenameResponse {
+        id: 2,
+        start_line: 0,
+        start_char: 0,
+        end_line: 0,
+        end_char: 3,
+        placeholder: "foo",
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_non_identifier() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 3,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
       .run()
       .await
   }
