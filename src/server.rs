@@ -673,12 +673,12 @@ impl Inner {
       document
         .node_at_position(params.position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          lsp::PrepareRenameResponse::RangeWithPlaceholder {
+        .map(
+          |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
             range: identifier.get_range(document),
             placeholder: document.get_node_text(&identifier),
-          }
-        })
+          },
+        )
     }))
   }
 
