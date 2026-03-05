@@ -19,6 +19,7 @@ use {
   group::Group,
   import::Import,
   import_resolver::ImportResolver,
+  module::Module,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
@@ -73,6 +74,7 @@ mod function_call;
 mod group;
 mod import;
 mod import_resolver;
+mod module;
 mod node_ext;
 mod parameter;
 mod point_ext;

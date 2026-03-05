@@ -243,6 +243,44 @@ impl Document {
     })
   }
 
+  #[must_use]
+  pub(crate) fn modules(&self) -> Vec<Module> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("module")
+        .iter()
+        .filter_map(|import_node| {
+          let optional = (0..import_node.child_count()).any(|index| {
+            u32::try_from(index)
+              .ok()
+              .and_then(|i| import_node.child(i))
+              .is_some_and(|child| child.kind() == "?")
+          });
+
+          let name_node = import_node.child_by_field_name("name")?;
+
+          let path = import_node.find("string").map(|path_node| {
+            let raw = self.get_node_text(&path_node);
+
+            raw
+              .strip_prefix(['\'', '"'])
+              .unwrap_or(&raw)
+              .strip_suffix(['\'', '"'])
+              .unwrap_or(&raw)
+              .to_string()
+          });
+
+          Some(Module {
+            name: self.get_node_text(&name_node),
+            optional,
+            path,
+          })
+        })
+        .collect()
+    })
+  }
+
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
   pub(crate) fn node_at_position(
@@ -489,6 +527,54 @@ mod tests {
       vec![Import {
         optional: true,
         path: "bar.just".into(),
+      }]
+    );
+  }
+
+  #[test]
+  fn basic_module() {
+    let document = Document::from(indoc! {"
+      mod bar
+    "});
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        optional: false,
+        name: "bar".into(),
+        path: None,
+      }]
+    );
+  }
+
+  #[test]
+  fn optional_module() {
+    let document = Document::from(indoc! {"
+      mod? bar
+    "});
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        optional: true,
+        name: "bar".into(),
+        path: None,
+      }]
+    );
+  }
+
+  #[test]
+  fn optional_module_with_path() {
+    let document = Document::from(indoc! {"
+      mod? folder \"./folder/justfile\"
+    "});
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        optional: true,
+        name: "folder".into(),
+        path: Some("./folder/justfile".into()),
       }]
     );
   }

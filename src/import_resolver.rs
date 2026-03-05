@@ -9,6 +9,7 @@ pub(crate) struct ImportedDocument {
 
 pub(crate) struct ImportResolver {
   imported_documents: Vec<ImportedDocument>,
+  imported_modules: HashMap<Vec<String>, ImportedDocument>,
 }
 
 impl ImportResolver {
@@ -19,12 +20,23 @@ impl ImportResolver {
   }
 
   pub(crate) fn find_recipe(&self, name: &str) -> Option<(lsp::Url, Recipe)> {
-    self.imported_documents.iter().find_map(|imported| {
+    let mut split_name: Vec<_> = name.split("::").map(String::from).collect();
+    let recipe_name = split_name.pop()?;
+
+    if split_name.is_empty() {
+      self.imported_documents.iter().find_map(|imported| {
+        imported
+          .document
+          .find_recipe(&recipe_name)
+          .map(|r| (imported.uri.clone(), r))
+      })
+    } else {
+      let imported = self.imported_modules.get(&split_name)?;
       imported
         .document
-        .find_recipe(name)
+        .find_recipe(&recipe_name)
         .map(|r| (imported.uri.clone(), r))
-    })
+    }
   }
 
   pub(crate) fn find_variable(
@@ -74,6 +86,7 @@ impl ImportResolver {
   pub(crate) fn new(document: &Document) -> Self {
     let mut visited = HashSet::new();
     let mut imported_documents = Vec::new();
+    let mut imported_modules = HashMap::new();
 
     let base_path = Self::document_dir(document);
 
@@ -87,19 +100,26 @@ impl ImportResolver {
       Self::resolve_imports(
         document,
         base,
+        &Vec::new(),
         &mut visited,
         &mut imported_documents,
+        &mut imported_modules,
       );
     }
 
-    Self { imported_documents }
+    Self {
+      imported_documents,
+      imported_modules,
+    }
   }
 
   fn resolve_imports(
     document: &Document,
     base_dir: &Path,
+    module_path: &Vec<String>,
     visited: &mut HashSet<PathBuf>,
     imported_documents: &mut Vec<ImportedDocument>,
+    imported_modules: &mut HashMap<Vec<String>, ImportedDocument>,
   ) {
     for import in document.imports() {
       let path = base_dir.join(&import.path);
@@ -138,9 +158,77 @@ impl ImportResolver {
         .parent()
         .map_or_else(|| base_dir.to_path_buf(), Path::to_path_buf);
 
-      Self::resolve_imports(&doc, &import_dir, visited, imported_documents);
+      Self::resolve_imports(
+        &doc,
+        &import_dir,
+        module_path,
+        visited,
+        imported_documents,
+        imported_modules,
+      );
 
       imported_documents.push(ImportedDocument { document: doc, uri });
+    }
+
+    for module in document.modules() {
+      let mut inner_module_path = module_path.clone();
+      inner_module_path.push(module.name.clone());
+
+      if imported_modules.contains_key(&inner_module_path) {
+        continue;
+      }
+
+      let path = module
+        .path
+        .clone()
+        .unwrap_or_else(|| format!("{}.just", module.name));
+      let path = base_dir.join(&path);
+
+      let Ok(canonical) = fs::canonicalize(&path) else {
+        if !module.optional {
+          log::warn!("module not found: {}", path.display());
+        }
+        continue;
+      };
+
+      if !visited.insert(canonical.clone()) {
+        continue;
+      }
+
+      let Ok(content) = fs::read_to_string(&canonical) else {
+        continue;
+      };
+
+      let Ok(uri) = lsp::Url::from_file_path(&canonical) else {
+        continue;
+      };
+
+      let mut doc = Document {
+        content: Rope::from_str(&content),
+        tree: None,
+        uri: uri.clone(),
+        version: 0,
+      };
+
+      if doc.parse().is_err() {
+        continue;
+      }
+
+      let import_dir = canonical
+        .parent()
+        .map_or_else(|| base_dir.to_path_buf(), Path::to_path_buf);
+
+      Self::resolve_imports(
+        &doc,
+        &import_dir,
+        &inner_module_path,
+        visited,
+        imported_documents,
+        imported_modules,
+      );
+
+      imported_modules
+        .insert(inner_module_path, ImportedDocument { document: doc, uri });
     }
   }
 
@@ -317,6 +405,55 @@ mod tests {
 
     let (uri, variable) = resolver.find_variable("bar").unwrap();
     assert_eq!(variable.name.value, "bar");
+    assert!(uri.path().ends_with("bar.just"));
+  }
+
+  #[test]
+  fn find_module_recipe() {
+    let dir = tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "baz:\n  echo baz\n").unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str("mod bar\n"),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let resolver = ImportResolver::new(&document);
+
+    let (uri, recipe) = resolver.find_recipe("bar::baz").unwrap();
+    assert_eq!(recipe.name.value, "baz");
+    assert!(uri.path().ends_with("bar.just"));
+  }
+
+  #[test]
+  fn find_imported_module_recipe() {
+    let dir = tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar:\n  echo baz\n").unwrap();
+    fs::write(dir.path().join("foo.just"), "mod bar").unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str("import \"foo.just\""),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let resolver = ImportResolver::new(&document);
+
+    let (uri, recipe) = resolver.find_recipe("bar::bar").unwrap();
+    assert_eq!(recipe.name.value, "bar");
     assert!(uri.path().ends_with("bar.just"));
   }
 }
