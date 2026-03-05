@@ -31,7 +31,7 @@ impl Server {
       references_provider: Some(lsp::OneOf::Left(true)),
       rename_provider: Some(lsp::OneOf::Right(lsp::RenameOptions {
         prepare_provider: Some(true),
-        work_done_progress_options: Default::default(),
+        work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
       })),
       semantic_tokens_provider: Some(
         lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
@@ -172,18 +172,18 @@ impl LanguageServer for Server {
     self.0.initialized(params).await;
   }
 
-  async fn references(
-    &self,
-    params: lsp::ReferenceParams,
-  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    self.0.references(params).await
-  }
-
   async fn prepare_rename(
     &self,
     params: lsp::TextDocumentPositionParams,
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
     self.0.prepare_rename(params).await
+  }
+
+  async fn references(
+    &self,
+    params: lsp::ReferenceParams,
+  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
+    self.0.references(params).await
   }
 
   async fn rename(
@@ -661,6 +661,27 @@ impl Inner {
     }
   }
 
+  async fn prepare_rename(
+    &self,
+    params: lsp::TextDocumentPositionParams,
+  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(uri).and_then(|document| {
+      document
+        .node_at_position(params.position)
+        .filter(|node| node.kind() == "identifier")
+        .map(|identifier| {
+          lsp::PrepareRenameResponse::RangeWithPlaceholder {
+            range: identifier.get_range(document),
+            placeholder: document.get_node_text(&identifier),
+          }
+        })
+    }))
+  }
+
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
     if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
       return;
@@ -709,27 +730,6 @@ impl Inner {
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| resolver.resolve_identifier_references(&identifier))
-    }))
-  }
-
-  async fn prepare_rename(
-    &self,
-    params: lsp::TextDocumentPositionParams,
-  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
-
-    let documents = self.documents.read().await;
-
-    Ok(documents.get(uri).and_then(|document| {
-      document
-        .node_at_position(params.position)
-        .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          lsp::PrepareRenameResponse::RangeWithPlaceholder {
-            range: identifier.get_range(document),
-            placeholder: document.get_node_text(&identifier),
-          }
-        })
     }))
   }
 
@@ -1401,10 +1401,10 @@ mod tests {
 
   #[derive(Debug)]
   struct PrepareRenameRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for PrepareRenameRequest<'_> {
@@ -1428,12 +1428,12 @@ mod tests {
 
   #[derive(Debug)]
   struct PrepareRenameResponse<'a> {
-    id: i64,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    id: i64,
     placeholder: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for PrepareRenameResponse<'_> {
