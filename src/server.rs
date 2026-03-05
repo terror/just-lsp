@@ -21,6 +21,7 @@ impl Server {
         resolve_provider: Some(false),
       }),
       definition_provider: Some(lsp::OneOf::Left(true)),
+      document_symbol_provider: Some(lsp::OneOf::Left(true)),
       document_formatting_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
       execute_command_provider: Some(lsp::ExecuteCommandOptions {
@@ -133,6 +134,13 @@ impl LanguageServer for Server {
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
     self.0.document_highlight(params).await
+  }
+
+  async fn document_symbol(
+    &self,
+    params: lsp::DocumentSymbolParams,
+  ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
+    self.0.document_symbol(params).await
   }
 
   async fn execute_command(
@@ -448,6 +456,81 @@ impl Inner {
             .collect()
         })
     }))
+  }
+
+  async fn document_symbol(
+    &self,
+    params: lsp::DocumentSymbolParams,
+  ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
+      let mut symbols = Vec::new();
+
+      for recipe in document.recipes() {
+        #[allow(deprecated)]
+        symbols.push(lsp::DocumentSymbol {
+          name: recipe.name.value,
+          detail: None,
+          kind: lsp::SymbolKind::FUNCTION,
+          tags: None,
+          deprecated: None,
+          range: recipe.range,
+          selection_range: recipe.name.range,
+          children: None,
+        });
+      }
+
+      for alias in document.aliases() {
+        #[allow(deprecated)]
+        symbols.push(lsp::DocumentSymbol {
+          name: alias.name.value,
+          detail: Some(format!("alias for {}", alias.value.value)),
+          kind: lsp::SymbolKind::FUNCTION,
+          tags: None,
+          deprecated: None,
+          range: alias.range,
+          selection_range: alias.name.range,
+          children: None,
+        });
+      }
+
+      for variable in document.variables() {
+        #[allow(deprecated)]
+        symbols.push(lsp::DocumentSymbol {
+          name: variable.name.value,
+          detail: None,
+          kind: lsp::SymbolKind::VARIABLE,
+          tags: None,
+          deprecated: None,
+          range: variable.range,
+          selection_range: variable.name.range,
+          children: None,
+        });
+      }
+
+      for setting in document.settings() {
+        #[allow(deprecated)]
+        symbols.push(lsp::DocumentSymbol {
+          name: setting.name,
+          detail: Some(setting.kind.to_string()),
+          kind: lsp::SymbolKind::PROPERTY,
+          tags: None,
+          deprecated: None,
+          range: setting.range,
+          selection_range: setting.range,
+          children: None,
+        });
+      }
+
+      symbols.sort_by_key(|s| s.range.start);
+
+      return Ok(Some(lsp::DocumentSymbolResponse::Nested(symbols)));
+    }
+
+    Ok(None)
   }
 
   async fn execute_command(
@@ -2654,6 +2737,213 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[derive(Debug)]
+  struct DocumentSymbolRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for DocumentSymbolRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/documentSymbol",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn document_symbol_empty_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///empty.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_symbol_with_recipes_and_variables() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          bar := 'baz'
+
+          foo:
+            echo foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "bar",
+            "kind": 13,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            }
+          },
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 4, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 2, "character": 3 }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_symbol_with_alias() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          alias bar := foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 3, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            }
+          },
+          {
+            "name": "bar",
+            "detail": "alias for foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 3, "character": 0 },
+              "end": { "line": 3, "character": 16 }
+            },
+            "selectionRange": {
+              "start": { "line": 3, "character": 6 },
+              "end": { "line": 3, "character": 9 }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_symbol_with_setting() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          set export := true
+
+          foo:
+            echo foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "export",
+            "detail": "boolean",
+            "kind": 7,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            }
+          },
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 4, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 2, "character": 3 }
+            }
+          }
+        ]
+      }))
       .run()
       .await
   }
