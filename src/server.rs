@@ -17,6 +17,9 @@ impl Server {
       code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(
         true,
       )),
+      code_lens_provider: Some(lsp::CodeLensOptions {
+        resolve_provider: Some(false),
+      }),
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_formatting_provider: Some(lsp::OneOf::Left(true)),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
@@ -85,6 +88,13 @@ impl LanguageServer for Server {
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     self.0.code_action(params).await
+  }
+
+  async fn code_lens(
+    &self,
+    params: lsp::CodeLensParams,
+  ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
+    self.0.code_lens(params).await
   }
 
   async fn completion(
@@ -253,6 +263,50 @@ impl Inner {
       }
 
       return Ok(Some(actions));
+    }
+
+    Ok(None)
+  }
+
+  async fn code_lens(
+    &self,
+    params: lsp::CodeLensParams,
+  ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
+      let mut lenses = Vec::new();
+
+      for recipe in document.recipes() {
+        let parameters = recipe
+          .parameters
+          .into_iter()
+          .map(ParameterJson::from)
+          .collect::<Vec<ParameterJson>>();
+
+        let recipe_name = serde_json::to_value(&recipe.name.value)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let uri = serde_json::to_value(uri)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        let parameters = serde_json::to_value(parameters)
+          .map_err(|_| jsonrpc::Error::parse_error())?;
+
+        lenses.push(lsp::CodeLens {
+          range: recipe.name.range,
+          command: Some(lsp::Command {
+            title: "Run".into(),
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(vec![recipe_name, uri, parameters]),
+          }),
+          data: None,
+        });
+      }
+
+      return Ok(Some(lenses));
     }
 
     Ok(None)
@@ -1794,6 +1848,27 @@ mod tests {
     }
   }
 
+  #[derive(Debug)]
+  struct CodeLensRequest {
+    id: i64,
+    uri: &'static str,
+  }
+
+  impl IntoValue for CodeLensRequest {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/codeLens",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
   #[tokio::test]
   async fn initialize() -> Result {
     Test::new()?
@@ -2732,6 +2807,88 @@ mod tests {
         "jsonrpc": "2.0",
         "id": 2,
         "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_empty_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(CodeLensRequest {
+        id: 2,
+        uri: "file:///empty.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_with_recipes() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          bar arg1 arg2='default':
+            echo bar
+          "
+        },
+      })
+      .request(CodeLensRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            },
+            "command": {
+              "title": "Run",
+              "command": "just-lsp.run_recipe",
+              "arguments": ["foo", "file:///test.just", []]
+            }
+          },
+          {
+            "range": {
+              "start": { "line": 3, "character": 0 },
+              "end": { "line": 3, "character": 3 }
+            },
+            "command": {
+              "title": "Run",
+              "command": "just-lsp.run_recipe",
+              "arguments": [
+                "bar",
+                "file:///test.just",
+                [
+                  { "name": "arg1", "default_value": null },
+                  { "name": "arg2", "default_value": "'default'" }
+                ]
+              ]
+            }
+          }
+        ]
       }))
       .run()
       .await
