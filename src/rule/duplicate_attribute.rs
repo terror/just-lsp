@@ -48,11 +48,6 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     key: DuplicateKey::Name,
   },
   DuplicateConstraint {
-    name: "metadata",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
     name: "group",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Argument,
