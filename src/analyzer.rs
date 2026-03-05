@@ -657,7 +657,6 @@ mod tests {
     .run();
   }
 
-
   #[test]
   fn attributes_on_assignments() {
     Test::new(indoc! {
