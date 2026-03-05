@@ -645,6 +645,19 @@ mod tests {
   }
 
   #[test]
+  fn attributes_multiple_metadata_allowed() {
+    Test::new(indoc! {
+      "
+      [metadata('foo', 'bar')]
+      [metadata('baz', 'qux')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_on_assignments() {
     Test::new(indoc! {
       "
