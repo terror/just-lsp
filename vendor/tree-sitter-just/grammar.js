@@ -62,6 +62,13 @@ module.exports = grammar({
     $._string,
     $._string_indented,
     $._raw_string_indented,
+    $._shell_expanded_string,
+    $._shell_expanded_string_indented,
+    $._shell_expanded_raw_string_indented,
+    $._format_string,
+    $._format_string_indented,
+    $._format_raw_string,
+    $._format_raw_string_indented,
     $._expression_recurse,
   ],
   word: ($) => $.identifier,
@@ -75,6 +82,7 @@ module.exports = grammar({
     //               | alias
     //               | assignment
     //               | export
+    //               | unexport
     //               | import
     //               | module
     //               | setting
@@ -84,38 +92,49 @@ module.exports = grammar({
         $.alias,
         $.assignment,
         $.export,
+        $.unexport,
         $.import,
         $.module,
         $.setting,
       ),
 
     // alias         : 'alias' NAME ':=' NAME
+    //               | 'alias' NAME ':=' module_path
     alias: ($) =>
       seq(
         repeat($.attribute),
         "alias",
         field("left", $.identifier),
         ":=",
-        field("right", $.identifier),
+        field("right", choice($.module_path, $.identifier)),
       ),
-    // assignment    : NAME ':=' expression _eol
+
+    // module_path   : NAME '::' NAME ('::' NAME)*
+    module_path: ($) =>
+      seq($.identifier, repeat1(seq("::", $.identifier))),
+    // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) =>
       seq(
+        repeat($.attribute),
         field("left", $.identifier),
         ":=",
         field("right", $.expression),
         $._newline,
       ),
 
-    // export        : 'export' assignment
-    export: ($) => seq("export", $.assignment),
+    // export        : attribute* 'export' assignment
+    export: ($) => seq(repeat($.attribute), "export", $.assignment),
+
+    // unexport      : attribute* 'unexport' assignment
+    unexport: ($) => seq(repeat($.attribute), "unexport", $.assignment),
 
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
 
-    // module        : 'mod' '?'? string?
+    // module        : attribute* 'mod' '?'? string?
     module: ($) =>
       seq(
+        repeat($.attribute),
         "mod",
         optional("?"),
         field("name", $.identifier),
@@ -233,7 +252,10 @@ module.exports = grammar({
             seq(
               $.identifier,
               "(",
-              field("argument", comma_sep1($.string)),
+              field("argument", comma_sep1(choice(
+                $.string,
+                $.attribute_named_param,
+              ))),
               ")",
             ),
             seq($.identifier, ":", field("argument", $.string)),
@@ -241,6 +263,12 @@ module.exports = grammar({
         ),
         "]",
         $._newline,
+      ),
+
+    attribute_named_param: ($) =>
+      seq(
+        field("name", $.identifier),
+        optional(seq("=", field("value", $.string))),
       ),
 
     // A complete recipe
@@ -256,7 +284,7 @@ module.exports = grammar({
     recipe_header: ($) =>
       seq(
         optional("@"),
-        field("name", $.identifier),
+        field("name", choice($.identifier, alias("import", $.identifier))),
         optional($.parameters),
         ":",
         optional($.dependencies),
@@ -283,13 +311,24 @@ module.exports = grammar({
     dependencies: ($) => repeat1(seq(optional("&&"), $.dependency)),
 
     // dependency    : NAME
+    //               | module_path
     //               | '(' NAME expression* ')'
+    //               | '(' module_path expression* ')'
     dependency: ($) =>
-      choice(field("name", $.identifier), $.dependency_expression),
+      choice(
+        field("name", $.module_path),
+        field("name", $.identifier),
+        $.dependency_expression,
+      ),
 
     // contents of `(recipe expression)`
     dependency_expression: ($) =>
-      seq("(", field("name", $.identifier), repeat($.expression), ")"),
+      seq(
+        "(",
+        field("name", choice($.module_path, $.identifier)),
+        repeat($.expression),
+        ")",
+      ),
 
     // body          : INDENT line+ DEDENT
     recipe_body: ($) =>
@@ -328,17 +367,65 @@ module.exports = grammar({
     //               | INDENTED_STRING
     //               | RAW_STRING
     //               | INDENTED_RAW_STRING
+    //               | FORMAT_STRING
+    //               | FORMAT_INDENTED_STRING
+    //               | FORMAT_RAW_STRING
+    //               | FORMAT_INDENTED_RAW_STRING
+    //               | SHELL_EXPANDED_STRING
+    //               | SHELL_EXPANDED_INDENTED_STRING
+    //               | SHELL_EXPANDED_RAW_STRING
+    //               | SHELL_EXPANDED_INDENTED_RAW_STRING
     string: ($) =>
       choice(
+        $._shell_expanded_string_indented,
+        $._shell_expanded_raw_string_indented,
+        $._shell_expanded_string,
+        // _shell_expanded_raw_string, can't be written as a separate inline
+        /x'[^']*'/,
         $._string_indented,
         $._raw_string_indented,
         $._string,
         // _raw_string, can't be written as a separate inline for osm reason
         /'[^']*'/,
+        $.format_string,
       ),
+
+    format_string: ($) =>
+      choice(
+        $._format_string,
+        $._format_string_indented,
+        $._format_raw_string,
+        $._format_raw_string_indented,
+      ),
+
+    _format_string: ($) =>
+      seq(
+        'f"',
+        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        '"',
+      ),
+
+    _format_string_indented: ($) =>
+      seq(
+        'f"""',
+        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        '"""',
+      ),
+
+    _format_raw_string: ($) =>
+      seq("f'", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'"),
+
+    _format_raw_string_indented: ($) =>
+      seq("f'''", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'''"),
 
     _raw_string_indented: (_) => seq("'''", repeat(/./), "'''"),
     _string: ($) => seq('"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
+    _shell_expanded_string: ($) =>
+      seq('x"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
+    _shell_expanded_string_indented: ($) =>
+      seq('x"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+    _shell_expanded_raw_string_indented: (_) =>
+      seq("x'''", repeat(/./), "'''"),
     // We need try two separate munches so neither escape sequences nor
     // potential closing quotes get eaten.
     _string_indented: ($) =>

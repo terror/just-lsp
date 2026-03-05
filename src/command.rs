@@ -29,7 +29,7 @@ impl TryFrom<&str> for Command {
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
       "just-lsp.run_recipe" => Ok(Command::RunRecipe),
-      _ => Err(anyhow!("Unknown command: {}", value)),
+      _ => Err(anyhow!("Unknown command: {value}")),
     }
   }
 }

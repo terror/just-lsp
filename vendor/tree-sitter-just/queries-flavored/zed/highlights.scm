@@ -4,6 +4,7 @@
 
 [
   "export"
+  "unexport"
   "import"
 ] @keyword.control.import
 

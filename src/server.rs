@@ -1,25 +1,14 @@
 use super::*;
 
-#[derive(Debug)]
-pub(crate) struct Server(Arc<tokio::sync::Mutex<Inner>>);
+pub(crate) struct Server(Arc<Inner>);
+
+impl Debug for Server {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Server").finish()
+  }
+}
 
 impl Server {
-  pub fn new(client: Client) -> Self {
-    Self(Arc::new(tokio::sync::Mutex::new(Inner::new(client))))
-  }
-
-  pub async fn run() -> Result {
-    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
-
-    let (service, socket) = LspService::new(Server::new);
-
-    tower_lsp::Server::new(stdin, stdout, socket)
-      .serve(service)
-      .await;
-
-    Ok(())
-  }
-
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
@@ -44,6 +33,16 @@ impl Server {
         prepare_provider: Some(true),
         work_done_progress_options: Default::default(),
       })),
+      semantic_tokens_provider: Some(
+        lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
+          lsp::SemanticTokensOptions {
+            legend: tokenizer::Tokenizer::legend().clone(),
+            full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+            range: None,
+            ..Default::default()
+          },
+        ),
+      ),
       text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
         lsp::TextDocumentSyncOptions {
           open_close: Some(true),
@@ -61,6 +60,22 @@ impl Server {
       ..Default::default()
     }
   }
+
+  pub(crate) fn new(client: Client) -> Self {
+    Self(Arc::new(Inner::new(client)))
+  }
+
+  pub(crate) async fn run() -> Result {
+    let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
+
+    let (service, socket) = LspService::new(Server::new);
+
+    tower_lsp::Server::new(stdin, stdout, socket)
+      .serve(service)
+      .await;
+
+    Ok(())
+  }
 }
 
 #[tower_lsp::async_trait]
@@ -69,21 +84,20 @@ impl LanguageServer for Server {
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    self.0.lock().await.code_action(params).await
+    self.0.code_action(params).await
   }
 
   async fn completion(
     &self,
     params: lsp::CompletionParams,
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
-    self.0.lock().await.completion(params).await
+    self.0.completion(params).await
   }
 
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    let mut inner = self.0.lock().await;
-
-    if let Err(error) = inner.did_change(params).await {
-      inner
+    if let Err(error) = self.0.did_change(params).await {
+      self
+        .0
         .client
         .log_message(lsp::MessageType::ERROR, error)
         .await;
@@ -91,14 +105,13 @@ impl LanguageServer for Server {
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.lock().await.did_close(params).await
+    self.0.did_close(params).await;
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    let mut inner = self.0.lock().await;
-
-    if let Err(error) = inner.did_open(params).await {
-      inner
+    if let Err(error) = self.0.did_open(params).await {
+      self
+        .0
         .client
         .log_message(lsp::MessageType::ERROR, error)
         .await;
@@ -109,114 +122,116 @@ impl LanguageServer for Server {
     &self,
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
-    self.0.lock().await.document_highlight(params).await
+    self.0.document_highlight(params).await
   }
 
   async fn execute_command(
     &self,
     params: lsp::ExecuteCommandParams,
   ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    self.0.lock().await.execute_command(params).await
+    self.0.execute_command(params).await
   }
 
   async fn folding_range(
     &self,
     params: lsp::FoldingRangeParams,
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
-    self.0.lock().await.folding_range(params).await
+    self.0.folding_range(params).await
   }
 
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    self.0.lock().await.formatting(params).await
+    self.0.formatting(params).await
   }
 
   async fn goto_definition(
     &self,
     params: lsp::GotoDefinitionParams,
   ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    self.0.lock().await.goto_definition(params).await
+    self.0.goto_definition(params).await
   }
 
   async fn hover(
     &self,
     params: lsp::HoverParams,
   ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
-    self.0.lock().await.hover(params).await
+    self.0.hover(params).await
   }
 
+  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
   ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    self.0.lock().await.initialize(params).await
+    self.0.initialize(params).await
   }
 
   async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.lock().await.initialized(params).await
+    self.0.initialized(params).await;
   }
 
   async fn references(
     &self,
     params: lsp::ReferenceParams,
   ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    self.0.lock().await.references(params).await
+    self.0.references(params).await
   }
 
   async fn prepare_rename(
     &self,
     params: lsp::TextDocumentPositionParams,
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
-    self.0.lock().await.prepare_rename(params).await
+    self.0.prepare_rename(params).await
   }
 
   async fn rename(
     &self,
     params: lsp::RenameParams,
   ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
-    self.0.lock().await.rename(params).await
+    self.0.rename(params).await
   }
 
+  async fn semantic_tokens_full(
+    &self,
+    params: lsp::SemanticTokensParams,
+  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
+    self.0.semantic_tokens_full(params).await
+  }
+
+  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.lock().await.shutdown().await
+    self.0.shutdown().await
   }
 }
 
-#[derive(Debug)]
 pub(crate) struct Inner {
   client: Client,
-  documents: BTreeMap<lsp::Url, Document>,
-  initialized: bool,
+  documents: RwLock<BTreeMap<lsp::Url, Document>>,
+  initialized: AtomicBool,
 }
 
 impl Inner {
-  fn new(client: Client) -> Self {
-    Self {
-      client,
-      documents: BTreeMap::new(),
-      initialized: false,
-    }
-  }
-
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
       let mut actions = Vec::new();
 
-      for recipe in document.get_recipes() {
+      for recipe in document.recipes() {
         let parameters = recipe
           .parameters
           .into_iter()
           .map(ParameterJson::from)
           .collect::<Vec<ParameterJson>>();
 
-        let recipe_name = serde_json::to_value(&recipe.name)
+        let recipe_name = serde_json::to_value(&recipe.name.value)
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
         let uri = serde_json::to_value(uri)
@@ -226,10 +241,10 @@ impl Inner {
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
         actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-          title: recipe.name.clone(),
+          title: recipe.name.value.clone(),
           kind: Some(lsp::CodeActionKind::SOURCE),
           command: Some(lsp::Command {
-            title: recipe.name.clone(),
+            title: recipe.name.value.clone(),
             command: Command::RunRecipe.to_string(),
             arguments: Some(vec![recipe_name, uri, parameters]),
           }),
@@ -249,14 +264,16 @@ impl Inner {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri;
 
-    if let Some(document) = self.documents.get(&uri) {
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(&uri) {
       let mut completion_items = Vec::new();
 
-      let recipes = document.get_recipes();
+      let recipes = document.recipes();
 
       for recipe in recipes {
         completion_items.push(lsp::CompletionItem {
-          label: recipe.name.clone(),
+          label: recipe.name.value.clone(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
@@ -264,13 +281,13 @@ impl Inner {
               value: recipe.content,
             },
           )),
-          insert_text: Some(recipe.name),
+          insert_text: Some(recipe.name.value),
           insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
           ..Default::default()
         });
       }
 
-      let variables = document.get_variables();
+      let variables = document.variables();
 
       for variable in variables {
         completion_items.push(lsp::CompletionItem {
@@ -288,7 +305,7 @@ impl Inner {
         });
       }
 
-      for builtin in builtins::BUILTINS {
+      for builtin in BUILTINS {
         completion_items.push(builtin.completion_item());
       }
 
@@ -299,42 +316,51 @@ impl Inner {
   }
 
   async fn did_change(
-    &mut self,
+    &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    if let Some(document) = self.documents.get_mut(&params.text_document.uri) {
-      document.apply_change(params)?;
+    let mut should_publish = false;
+
+    {
+      let mut documents = self.documents.write().await;
+
+      if let Some(document) = documents.get_mut(&uri) {
+        document.apply_change(params)?;
+        should_publish = true;
+      }
+    }
+
+    if should_publish {
       self.publish_diagnostics(&uri).await;
     }
 
     Ok(())
   }
 
-  async fn did_close(&mut self, params: lsp::DidCloseTextDocumentParams) {
-    let uri = &params.text_document.uri;
+  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
 
-    if self.documents.contains_key(uri) {
-      self.documents.remove(uri);
+    let removed = {
+      let mut documents = self.documents.write().await;
+      documents.remove(&uri).is_some()
+    };
 
-      self
-        .client
-        .publish_diagnostics(uri.clone(), vec![], None)
-        .await;
+    if removed {
+      self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
 
-  async fn did_open(
-    &mut self,
-    params: lsp::DidOpenTextDocumentParams,
-  ) -> Result {
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    self.documents.insert(
-      params.text_document.uri.to_owned(),
-      Document::try_from(params)?,
-    );
+    let document = Document::try_from(params)?;
+
+    {
+      let mut documents = self.documents.write().await;
+      documents.insert(uri.clone(), document);
+    }
 
     self.publish_diagnostics(&uri).await;
 
@@ -349,7 +375,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -395,7 +423,7 @@ impl Inner {
           let path = uri
             .to_file_path()
             .ok()
-            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+            .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
             .unwrap_or(PathBuf::new());
 
           let recipe_arguments = Vec::new();
@@ -430,8 +458,10 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
-      let recipes = document.get_recipes();
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(uri) {
+      let recipes = document.recipes();
 
       let folding_ranges = recipes
         .into_iter()
@@ -464,24 +494,69 @@ impl Inner {
     Ok(None)
   }
 
+  async fn format_document(
+    &self,
+    uri: &lsp::Url,
+    content: &str,
+  ) -> Result<String> {
+    let file = if let Ok(path) = uri.to_file_path() {
+      let dir = path.parent().expect("file path has no parent");
+      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
+    } else {
+      Builder::new().prefix(".justfile-fmt-").tempfile()?
+    };
+
+    fs::write(&file, content.as_bytes())?;
+
+    let mut command = tokio::process::Command::new("just");
+
+    command
+      .arg("--fmt")
+      .arg("--unstable")
+      .arg("--quiet")
+      .arg("--justfile")
+      .arg(file.path());
+
+    let output = command.output().await?;
+
+    if !output.status.success() {
+      bail!(
+        "just formatting failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+    }
+
+    Ok(fs::read_to_string(&file)?)
+  }
+
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    if let Some(document) = self.documents.get(uri) {
-      let content = document.content.to_string();
+    let snapshot = {
+      let documents = self.documents.read().await;
 
-      match self.format_document(&content).await {
+      documents.get(uri).map(|document| {
+        let content = document.content.to_string();
+
+        let end = document
+          .content
+          .byte_to_lsp_position(document.content.len_bytes());
+
+        (content, end)
+      })
+    };
+
+    if let Some((content, document_end)) = snapshot {
+      match self.format_document(uri, &content).await {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
               range: lsp::Range {
                 start: lsp::Position::new(0, 0),
-                end: document
-                  .content
-                  .byte_to_lsp_position(document.content.len_bytes()),
+                end: document_end,
               },
               new_text: formatted,
             }]));
@@ -504,31 +579,6 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(&self, content: &str) -> Result<String> {
-    let tempdir = tempdir()?;
-
-    let file = tempdir.path().join("justfile");
-
-    fs::write(&file, content.as_bytes())?;
-
-    let mut command = tokio::process::Command::new("just");
-
-    command.arg("--fmt").arg("--unstable").arg("--quiet");
-
-    command.current_dir(tempdir.path());
-
-    let output = command.output().await?;
-
-    if !output.status.success() {
-      bail!(
-        "just formatting failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-      );
-    }
-
-    Ok(fs::read_to_string(&file)?)
-  }
-
   async fn goto_definition(
     &self,
     params: lsp::GotoDefinitionParams,
@@ -537,7 +587,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -559,7 +611,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -569,6 +623,7 @@ impl Inner {
     }))
   }
 
+  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     _params: lsp::InitializeParams,
@@ -584,7 +639,7 @@ impl Inner {
     })
   }
 
-  async fn initialized(&mut self, _: lsp::InitializedParams) {
+  async fn initialized(&self, _: lsp::InitializedParams) {
     self
       .client
       .log_message(
@@ -593,26 +648,48 @@ impl Inner {
       )
       .await;
 
-    self.initialized = true;
+    self
+      .initialized
+      .store(true, std::sync::atomic::Ordering::Relaxed);
+  }
+
+  fn new(client: Client) -> Self {
+    Self {
+      client,
+      documents: RwLock::new(BTreeMap::new()),
+      initialized: AtomicBool::new(false),
+    }
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized {
+    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
       return;
     }
 
-    if let Some(document) = self.documents.get(uri) {
-      let analyzer = Analyzer::new(document);
+    let (diagnostics, version) = {
+      let documents = self.documents.read().await;
 
-      self
-        .client
-        .publish_diagnostics(
-          uri.clone(),
-          analyzer.analyze(),
-          Some(document.version),
-        )
-        .await;
-    }
+      match documents.get(uri) {
+        Some(document) => {
+          let analyzer = Analyzer::new(document);
+
+          (
+            analyzer
+              .analyze()
+              .into_iter()
+              .map(lsp::Diagnostic::from)
+              .collect(),
+            document.version,
+          )
+        }
+        None => return,
+      }
+    };
+
+    self
+      .client
+      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .await;
   }
 
   async fn references(
@@ -623,7 +700,9 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -639,13 +718,15 @@ impl Inner {
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    Ok(self.documents.get(uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(uri).and_then(|document| {
       document
         .node_at_position(params.position)
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
           lsp::PrepareRenameResponse::RangeWithPlaceholder {
-            range: identifier.get_range(),
+            range: identifier.get_range(document),
             placeholder: document.get_node_text(&identifier),
           }
         })
@@ -662,7 +743,9 @@ impl Inner {
 
     let new_name = params.new_name;
 
-    Ok(self.documents.get(&uri).and_then(|document| {
+    let documents = self.documents.read().await;
+
+    Ok(documents.get(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -710,8 +793,8 @@ impl Inner {
 
     command
       .current_dir(directory.clone())
-      .stdout(std::process::Stdio::piped())
-      .stderr(std::process::Stdio::piped());
+      .stdout(process::Stdio::piped())
+      .stderr(process::Stdio::piped());
 
     let client = self.client.clone();
 
@@ -773,7 +856,7 @@ impl Inner {
 
           let mut buffer = String::new();
           let mut current_line = 0;
-          let mut last_update = std::time::Instant::now();
+          let mut last_update = Instant::now();
 
           while let Some(line_result) = merged_stream.next().await {
             match line_result {
@@ -782,7 +865,7 @@ impl Inner {
 
                 buffer.push('\n');
 
-                let now = std::time::Instant::now();
+                let now = Instant::now();
 
                 if (now.duration_since(last_update).as_millis() > 50
                   || buffer.len() > 1024)
@@ -813,7 +896,8 @@ impl Inner {
                     .await
                     .ok();
 
-                  let newlines = buffer.matches('\n').count() as u32;
+                  let newlines = u32::try_from(buffer.matches('\n').count())
+                    .expect("line count exceeds u32::MAX");
 
                   current_line += newlines;
                   buffer.clear();
@@ -821,7 +905,9 @@ impl Inner {
                 }
               }
               Err(error) => {
-                buffer.push_str(&format!("Error reading output: {error}\n"));
+                buffer.push_str("Error reading output: ");
+                buffer.push_str(&error.to_string());
+                buffer.push('\n');
               }
             }
           }
@@ -886,6 +972,42 @@ impl Inner {
     });
   }
 
+  async fn semantic_tokens_full(
+    &self,
+    params: lsp::SemanticTokensParams,
+  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
+    let uri = params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    if let Some(document) = documents.get(&uri) {
+      let tokenizer = tokenizer::Tokenizer::new(document);
+
+      match tokenizer.tokenize() {
+        Ok(data) => {
+          return Ok(Some(lsp::SemanticTokensResult::Tokens(
+            lsp::SemanticTokens {
+              result_id: None,
+              data,
+            },
+          )));
+        }
+        Err(error) => {
+          self
+            .client
+            .log_message(
+              lsp::MessageType::ERROR,
+              format!("Failed to compute semantic tokens: {error}"),
+            )
+            .await;
+        }
+      }
+    }
+
+    Ok(None)
+  }
+
+  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
@@ -897,7 +1019,7 @@ mod tests {
     super::*,
     indoc::indoc,
     pretty_assertions::assert_eq,
-    serde_json::{json, Value},
+    serde_json::{Value, json},
     std::env,
     tower_lsp::LspService,
     tower_test::mock::Spawn,
@@ -921,6 +1043,12 @@ mod tests {
       })
     }
 
+    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
+      self.requests.push(notification.into_value());
+      self.responses.push(None);
+      self
+    }
+
     fn request<T: IntoValue>(mut self, request: T) -> Self {
       self.requests.push(request.into_value());
       self
@@ -928,12 +1056,6 @@ mod tests {
 
     fn response<T: IntoValue>(mut self, response: T) -> Self {
       self.responses.push(Some(response.into_value()));
-      self
-    }
-
-    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
-      self.requests.push(notification.into_value());
-      self.responses.push(None);
       self
     }
 
@@ -1011,8 +1133,8 @@ mod tests {
 
   #[derive(Debug)]
   struct DidOpenNotification<'a> {
-    uri: &'a str,
     text: &'a str,
+    uri: &'a str,
   }
 
   impl IntoValue for DidOpenNotification<'_> {
@@ -1034,9 +1156,9 @@ mod tests {
 
   #[derive(Debug)]
   struct DidChangeNotification<'a> {
+    changes: Vec<lsp::TextDocumentContentChangeEvent>,
     uri: &'a str,
     version: i32,
-    changes: Vec<lsp::TextDocumentContentChangeEvent>,
   }
 
   impl IntoValue for DidChangeNotification<'_> {
@@ -1057,10 +1179,10 @@ mod tests {
 
   #[derive(Debug)]
   struct GotoDefinitionRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for GotoDefinitionRequest<'_> {
@@ -1084,12 +1206,12 @@ mod tests {
 
   #[derive(Debug)]
   struct GotoDefinitionResponse<'a> {
-    id: i64,
-    uri: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    id: i64,
+    start_char: u32,
+    start_line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for GotoDefinitionResponse<'_> {
@@ -1116,11 +1238,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Location<'a> {
-    uri: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    start_char: u32,
+    start_line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for Location<'_> {
@@ -1143,11 +1265,11 @@ mod tests {
 
   #[derive(Debug)]
   struct ReferencesRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
     include_declaration: bool,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for ReferencesRequest<'_> {
@@ -1180,10 +1302,7 @@ mod tests {
 
   impl IntoValue for Vec<Location<'_>> {
     fn into_value(self) -> Value {
-      self
-        .into_iter()
-        .map(|location| location.into_value())
-        .collect()
+      self.into_iter().map(Location::into_value).collect()
     }
   }
 
@@ -1199,11 +1318,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Rename<'a> {
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
     new_text: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for Rename<'_> {
@@ -1226,11 +1345,11 @@ mod tests {
 
   #[derive(Debug)]
   struct RenameRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
     new_name: &'a str,
+    uri: &'a str,
   }
 
   impl IntoValue for RenameRequest<'_> {
@@ -1255,14 +1374,14 @@ mod tests {
 
   #[derive(Debug)]
   struct RenameResponse<'a> {
+    edits: Vec<Rename<'a>>,
     id: i64,
     uri: &'a str,
-    edits: Vec<Rename<'a>>,
   }
 
   impl IntoValue for Vec<Rename<'_>> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|edit| edit.into_value()).collect()
+      self.into_iter().map(Rename::into_value).collect()
     }
   }
 
@@ -1341,10 +1460,10 @@ mod tests {
 
   #[derive(Debug)]
   struct HoverRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for HoverRequest<'_> {
@@ -1368,13 +1487,13 @@ mod tests {
 
   #[derive(Debug)]
   struct HoverResponse<'a> {
-    id: i64,
     content: &'a str,
-    kind: &'a str,
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
+    id: i64,
+    kind: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for HoverResponse<'_> {
@@ -1404,10 +1523,10 @@ mod tests {
 
   #[derive(Debug)]
   struct DocumentHighlightRequest<'a> {
-    id: i64,
-    uri: &'a str,
-    line: u32,
     character: u32,
+    id: i64,
+    line: u32,
+    uri: &'a str,
   }
 
   impl IntoValue for DocumentHighlightRequest<'_> {
@@ -1431,8 +1550,8 @@ mod tests {
 
   #[derive(Debug)]
   struct DocumentHighlightResponse<'a> {
-    id: i64,
     highlights: Vec<Highlight<'a>>,
+    id: i64,
   }
 
   impl IntoValue for DocumentHighlightResponse<'_> {
@@ -1447,11 +1566,11 @@ mod tests {
 
   #[derive(Debug)]
   struct Highlight<'a> {
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
     end_char: u32,
+    end_line: u32,
     kind: &'a str,
+    start_char: u32,
+    start_line: u32,
   }
 
   impl IntoValue for Highlight<'_> {
@@ -1468,7 +1587,6 @@ mod tests {
           }
         },
         "kind": match self.kind {
-          "text" => 1,
           "read" => 2,
           "write" => 3,
           _ => 1
@@ -1479,18 +1597,54 @@ mod tests {
 
   impl IntoValue for Vec<Highlight<'_>> {
     fn into_value(self) -> Value {
-      self
-        .into_iter()
-        .map(|highlight| highlight.into_value())
-        .collect()
+      self.into_iter().map(Highlight::into_value).collect()
+    }
+  }
+
+  #[derive(Debug)]
+  struct SemanticTokensRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for SemanticTokensRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/semanticTokens/full",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
+  struct SemanticTokensResponse {
+    data: Vec<u32>,
+    id: i64,
+  }
+
+  impl IntoValue for SemanticTokensResponse {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "result": {
+          "data": self.data,
+        }
+      })
     }
   }
 
   #[derive(Debug)]
   struct FoldingRange<'a> {
-    start_line: u32,
     end_line: u32,
     kind: &'a str,
+    start_line: u32,
   }
 
   impl IntoValue for FoldingRange<'_> {
@@ -1505,7 +1659,7 @@ mod tests {
 
   impl IntoValue for Vec<FoldingRange<'_>> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|range| range.into_value()).collect()
+      self.into_iter().map(FoldingRange::into_value).collect()
     }
   }
 
@@ -1549,8 +1703,8 @@ mod tests {
   #[derive(Debug)]
   struct CodeActionRequest {
     id: i64,
-    uri: &'static str,
     range: lsp::Range,
+    uri: &'static str,
   }
 
   impl IntoValue for CodeActionRequest {
@@ -1583,8 +1737,8 @@ mod tests {
 
   #[derive(Debug)]
   struct CodeActionResponse {
-    id: i64,
     actions: Vec<CodeAction>,
+    id: i64,
   }
 
   impl IntoValue for CodeActionResponse {
@@ -1599,10 +1753,10 @@ mod tests {
 
   #[derive(Debug)]
   struct CodeAction {
-    title: &'static str,
-    kind: &'static str,
-    command: Command,
     arguments: Vec<ParameterJson>,
+    command: Command,
+    kind: &'static str,
+    title: &'static str,
   }
 
   impl IntoValue for Vec<ParameterJson> {
@@ -1636,7 +1790,7 @@ mod tests {
 
   impl IntoValue for Vec<CodeAction> {
     fn into_value(self) -> Value {
-      self.into_iter().map(|a| a.into_value()).collect()
+      self.into_iter().map(CodeAction::into_value).collect()
     }
   }
 
@@ -1732,6 +1886,60 @@ mod tests {
         start_char: 0,
         end_line: 0,
         end_char: 3,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_without_open_document_is_ignored() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidChangeNotification {
+        uri: "file:///missing.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range {
+            start: lsp::Position {
+              line: 0,
+              character: 0,
+            },
+            end: lsp::Position {
+              line: 0,
+              character: 0,
+            },
+          }),
+          range_length: None,
+          text: "\"updated\"".into(),
+        }],
+      })
+      .notification(DidOpenNotification {
+        uri: "file:///missing.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///missing.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
       })
       .run()
       .await
@@ -2179,8 +2387,8 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation(
-  ) -> Result {
+  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
+  -> Result {
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
@@ -2299,6 +2507,35 @@ mod tests {
             end_char: 16,
             kind: "text",
           },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn semantic_tokens_basic() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"bar\"
+          "
+        },
+      })
+      .request(SemanticTokensRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(SemanticTokensResponse {
+        id: 2,
+        data: vec![
+          0, 0, 3, 6, 1, //
+          0, 3, 1, 3, 0,
         ],
       })
       .run()

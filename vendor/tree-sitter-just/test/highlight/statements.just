@@ -108,6 +108,16 @@ baz3 := '''
 '''
 # <- string
 
+x1 := x"~/$FOO/${BAR}"
+# <- variable
+#  ^^ operator
+#     ^^^^^^^^^^^^^^^^ string
+
+x2 := x'~/foo'
+# <- variable
+#  ^^ operator
+#     ^^^^^^^^ string
+
 foo4 := `echo hi`
 bar4 := `echo hi
   echo bye

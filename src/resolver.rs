@@ -1,15 +1,32 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct Resolver<'a> {
+pub(crate) struct Resolver<'a> {
   document: &'a Document,
 }
 
 impl<'a> Resolver<'a> {
+  #[must_use]
   pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
   }
 
+  /// Returns the [`lsp::Location`] that defines the symbol represented by
+  /// `identifier`.
+  ///
+  /// The resolver inspects the identifier's parent node to infer what kind of
+  /// symbol is being referenced. Recipe invocations that appear in aliases or
+  /// dependency lists resolve to the recipe header, identifiers inside a
+  /// recipe body (`value`) prefer matching parameters, then global variables,
+  /// and finally builtin constants. It also surfaces builtin
+  /// attribute/function/setting identifiers by returning the range of
+  /// the identifier itself so editors can jump to inline documentation.
+  ///
+  /// When the identifier belongs to a header construct (assignments,
+  /// parameters, variadic parameters, or the recipe header identifier) the
+  /// range of that construct is returned. `None` indicates that the resolver
+  /// could not find a definition in the current document.
+  #[must_use]
   pub(crate) fn resolve_identifier_definition(
     &self,
     identifier: &Node,
@@ -18,13 +35,13 @@ impl<'a> Resolver<'a> {
 
     let identifier_parent_kind = identifier.parent()?.kind();
 
-    if ["dependency", "alias"].contains(&identifier_parent_kind) {
-      if let Some(recipe) = self.document.find_recipe(&identifier_name) {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: recipe.range,
-        });
-      }
+    if ["dependency", "alias"].contains(&identifier_parent_kind)
+      && let Some(recipe) = self.document.find_recipe(&identifier_name)
+    {
+      return Some(lsp::Location {
+        uri: self.document.uri.clone(),
+        range: recipe.range,
+      });
     }
 
     if identifier_parent_kind == "value" {
@@ -47,7 +64,7 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == identifier_name {
@@ -58,20 +75,20 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      for builtin in builtins::BUILTINS {
+      for builtin in BUILTINS {
         match builtin {
           Builtin::Constant { name, .. } if identifier_name == name => {
             return Some(lsp::Location {
               uri: self.document.uri.clone(),
-              range: identifier.get_range(),
-            })
+              range: identifier.get_range(self.document),
+            });
           }
           _ => {}
         }
       }
     }
 
-    for builtin in builtins::BUILTINS {
+    for builtin in BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
           if identifier_name == name
@@ -79,7 +96,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         Builtin::Function { name, .. }
@@ -88,7 +105,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         Builtin::Setting { name, .. }
@@ -96,7 +113,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: identifier.get_range(),
+            range: identifier.get_range(self.document),
           });
         }
         _ => {}
@@ -110,20 +127,14 @@ impl<'a> Resolver<'a> {
         if recipe_node.kind() == "recipe" {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
-            range: recipe_node.get_range(),
+            range: recipe_node.get_range(self.document),
           });
         }
       }
-      "assignment" => {
+      "assignment" | "parameter" | "variadic_parameter" => {
         return Some(lsp::Location {
           uri: self.document.uri.clone(),
-          range: identifier.parent()?.get_range(),
-        });
-      }
-      "parameter" | "variadic_parameter" => {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: identifier.parent()?.get_range(),
+          range: identifier.parent()?.get_range(self.document),
         });
       }
       _ => {}
@@ -132,6 +143,18 @@ impl<'a> Resolver<'a> {
     None
   }
 
+  /// Builds an [`lsp::Hover`] for the symbol at `identifier`.
+  ///
+  /// When the identifier names a recipe (inside aliases, dependencies, or the
+  /// recipe header) the hover shows the rendered recipe body. Within a recipe
+  /// body the resolver prefers parameter documentation, then global variable
+  /// documentation, and finally the associated builtin constant description.
+  /// Builtin attributes, functions, and settings also map to their builtin
+  /// documentation as long as the identifier appears in the appropriate
+  /// syntactic context.
+  ///
+  /// If no contextual information exists the function returns `None`.
+  #[must_use]
   pub(crate) fn resolve_identifier_hover(
     &self,
     identifier: &Node,
@@ -140,18 +163,18 @@ impl<'a> Resolver<'a> {
 
     let parent_kind = identifier.parent().map(|p| p.kind());
 
-    if let Some(recipe) = self.document.find_recipe(&text) {
-      if parent_kind.is_some_and(|kind| {
+    if let Some(recipe) = self.document.find_recipe(&text)
+      && parent_kind.is_some_and(|kind| {
         ["alias", "dependency", "recipe_header"].contains(&kind)
-      }) {
-        return Some(lsp::Hover {
-          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
-          }),
-          range: Some(identifier.get_range()),
-        });
-      }
+      })
+    {
+      return Some(lsp::Hover {
+        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+          kind: lsp::MarkupKind::PlainText,
+          value: recipe.content,
+        }),
+        range: Some(identifier.get_range(self.document)),
+      });
     }
 
     if parent_kind.is_some_and(|kind| kind == "value") {
@@ -171,13 +194,13 @@ impl<'a> Resolver<'a> {
                 kind: lsp::MarkupKind::PlainText,
                 value: parameter.content,
               }),
-              range: Some(identifier.get_range()),
+              range: Some(identifier.get_range(self.document)),
             });
           }
         }
       }
 
-      let variables = self.document.get_variables();
+      let variables = self.document.variables();
 
       for variable in variables {
         if variable.name.value == text {
@@ -186,17 +209,17 @@ impl<'a> Resolver<'a> {
               kind: lsp::MarkupKind::PlainText,
               value: variable.content,
             }),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
       }
 
-      for builtin in builtins::BUILTINS {
+      for builtin in BUILTINS {
         match builtin {
           Builtin::Constant { name, .. } if text == name => {
             return Some(lsp::Hover {
               contents: lsp::HoverContents::Markup(builtin.documentation()),
-              range: Some(identifier.get_range()),
+              range: Some(identifier.get_range(self.document)),
             });
           }
           _ => {}
@@ -204,7 +227,7 @@ impl<'a> Resolver<'a> {
       }
     }
 
-    for builtin in builtins::BUILTINS {
+    for builtin in BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
           if text == name
@@ -212,7 +235,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         Builtin::Function { name, .. }
@@ -221,7 +244,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         Builtin::Setting { name, .. }
@@ -230,7 +253,7 @@ impl<'a> Resolver<'a> {
         {
           return Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range()),
+            range: Some(identifier.get_range(self.document)),
           });
         }
         _ => {}
@@ -240,6 +263,22 @@ impl<'a> Resolver<'a> {
     None
   }
 
+  /// Collects every [`lsp::Location`] that references the same logical symbol
+  /// as `identifier`.
+  ///
+  /// The resolver walks the entire syntax tree, filters identifier nodes with
+  /// matching text, and then applies parent-kind specific rules so that
+  /// references stay within the correct scope. Recipe names only match other
+  /// aliases/dependencies/headers, assignment targets only match body usages
+  /// that are not shadowed by parameters, and parameters (including variadic
+  /// ones) only match within the same recipe. Identifiers inside the
+  /// recipe body (`value`) will match local parameters first and fall back to
+  /// global assignments when no shadowing parameters exist. The identifier
+  /// node itself is always included.
+  ///
+  /// An empty vector is returned when the document tree or necessary parent
+  /// context is missing.
+  #[must_use]
   pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
@@ -268,9 +307,8 @@ impl<'a> Resolver<'a> {
           return false;
         }
 
-        let candidate_parent = match candidate.parent() {
-          Some(p) => p,
-          None => return false,
+        let Some(candidate_parent) = candidate.parent() else {
+          return false;
         };
 
         let candidate_parent_kind = candidate_parent.kind();
@@ -292,10 +330,9 @@ impl<'a> Resolver<'a> {
                 .and_then(|recipe_node| {
                   recipe_node.find("recipe_header > identifier")
                 })
-                .map(|identifier_node| {
+                .map_or_else(String::new, |identifier_node| {
                   self.document.get_node_text(&identifier_node)
-                })
-                .unwrap_or_else(String::new),
+                }),
             );
 
             candidate_recipe.is_some_and(|recipe| {
@@ -359,7 +396,7 @@ impl<'a> Resolver<'a> {
       })
       .map(|found| lsp::Location {
         uri: self.document.uri.clone(),
-        range: found.get_range(),
+        range: found.get_range(self.document),
       })
       .collect()
   }
@@ -369,21 +406,9 @@ impl<'a> Resolver<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn document(content: &str) -> Document {
-    Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-        language_id: "just".to_string(),
-        version: 1,
-        text: content.to_string(),
-      },
-    })
-    .unwrap()
-  }
-
   #[test]
   fn resolve_recipe_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -395,9 +420,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("recipe_header > identifier").unwrap();
 
@@ -449,7 +474,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_parameter_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := 'bar'
 
@@ -464,9 +489,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("parameter > identifier").unwrap();
 
@@ -518,7 +543,7 @@ mod tests {
 
   #[test]
   fn resolve_value_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := \"foo\"
 
@@ -527,9 +552,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("value > identifier").unwrap();
 
@@ -568,7 +593,7 @@ mod tests {
       ]
     );
 
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := \"foo\"
 
@@ -577,9 +602,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("value > identifier").unwrap();
 
@@ -631,7 +656,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo := 'bar'
 
@@ -650,9 +675,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("assignment > identifier").unwrap();
 
@@ -714,7 +739,7 @@ mod tests {
 
   #[test]
   fn resolve_dependency_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       all: foo
 
@@ -723,9 +748,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root.find("dependency > identifier").unwrap();
 
@@ -767,7 +792,7 @@ mod tests {
 
   #[test]
   fn resolve_dependency_argument_references() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       a := 'foo'
 
@@ -779,9 +804,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let identifier = root
       .find("dependency_expression > expression > value > identifier")
@@ -825,7 +850,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -835,9 +860,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let foo_dependency = root.find("dependency > identifier").unwrap();
 
@@ -862,7 +887,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       var := \"value\"
 
@@ -871,9 +896,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let var_usage = root.find("value > identifier").unwrap();
 
@@ -897,16 +922,16 @@ mod tests {
 
   #[test]
   fn resolve_parameter_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo param=\"default\":
         echo {{ param }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let param_usage = root.find("value > identifier").unwrap();
 
@@ -931,16 +956,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_identifier_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ arch() }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let builtin_usage = root.find("function_call > identifier").unwrap();
 
@@ -948,21 +973,21 @@ mod tests {
       .resolve_identifier_definition(&builtin_usage)
       .unwrap();
 
-    assert_eq!(definition.range, builtin_usage.get_range());
+    assert_eq!(definition.range, builtin_usage.get_range(&document));
   }
 
   #[test]
   fn resolve_self_definition() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let recipe_name = root.find("recipe_header > identifier").unwrap();
 
@@ -987,7 +1012,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -997,9 +1022,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(
@@ -1030,7 +1055,7 @@ mod tests {
 
   #[test]
   fn resolve_recipe_hover_in_alias() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -1039,9 +1064,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("alias > identifier[1]").unwrap())
@@ -1058,16 +1083,16 @@ mod tests {
 
   #[test]
   fn resolve_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo param=\"default\":
         echo {{ param }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1084,16 +1109,16 @@ mod tests {
 
   #[test]
   fn resolve_variadic_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo +args:
         echo {{ args }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1110,16 +1135,16 @@ mod tests {
 
   #[test]
   fn resolve_export_parameter_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo $env_var:
         echo {{ env_var }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1136,7 +1161,7 @@ mod tests {
 
   #[test]
   fn resolve_variable_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       var := \"value\"
 
@@ -1145,9 +1170,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1164,7 +1189,7 @@ mod tests {
 
   #[test]
   fn resolve_export_variable_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       export VERSION := \"1.0.0\"
 
@@ -1173,9 +1198,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1192,16 +1217,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_function_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ arch() }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(
@@ -1220,16 +1245,16 @@ mod tests {
 
   #[test]
   fn resolve_builtin_constant_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
-    foo:
-      echo {{ RED }}
-    "
+      foo:
+        echo {{ RED }}
+      "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1245,7 +1270,7 @@ mod tests {
 
   #[test]
   fn resolve_builtin_attribute_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       [no-cd]
       foo:
@@ -1253,9 +1278,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("attribute > identifier").unwrap())
@@ -1272,7 +1297,7 @@ mod tests {
 
   #[test]
   fn resolve_builtin_setting_hover() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       set export
 
@@ -1281,9 +1306,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("setting > identifier").unwrap())
@@ -1299,7 +1324,7 @@ mod tests {
 
   #[test]
   fn resolve_same_name_confusion() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       arch := \"custom_arch\"
 
@@ -1309,9 +1334,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1341,7 +1366,7 @@ mod tests {
 
   #[test]
   fn resolve_parameter_over_variable() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       param := \"global value\"
 
@@ -1350,9 +1375,9 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1369,34 +1394,36 @@ mod tests {
 
   #[test]
   fn resolve_hover_non_identifier() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
-    assert!(resolver
-      .resolve_identifier_hover(&root.find("text").unwrap())
-      .is_none());
+    assert!(
+      resolver
+        .resolve_identifier_hover(&root.find("text").unwrap())
+        .is_none()
+    );
   }
 
   #[test]
   fn resolve_hover_nonexistent_variable() {
-    let doc = document(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo {{ nonexistent }}
       "
     });
 
-    let resolver = Resolver::new(&doc);
+    let resolver = Resolver::new(&document);
 
-    let root = doc.tree.as_ref().unwrap().root_node();
+    let root = document.tree.as_ref().unwrap().root_node();
 
     let nonexistent = root.find("value > identifier").unwrap();
 

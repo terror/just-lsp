@@ -20,6 +20,10 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "module_path",
+            "named": true
           }
         ]
       }
@@ -59,6 +63,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "attribute",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -72,6 +86,10 @@
           {
             "type": ",",
             "named": false
+          },
+          {
+            "type": "attribute_named_param",
+            "named": true
           },
           {
             "type": "string",
@@ -89,6 +107,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "attribute_named_param",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -156,6 +200,10 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "module_path",
+            "named": true
           }
         ]
       }
@@ -181,6 +229,10 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "module_path",
             "named": true
           }
         ]
@@ -244,11 +296,15 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
           "type": "assignment",
+          "named": true
+        },
+        {
+          "type": "attribute",
           "named": true
         }
       ]
@@ -283,6 +339,25 @@
       "types": [
         {
           "type": "command_body",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "format_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "escape_sequence",
+          "named": true
+        },
+        {
+          "type": "interpolation",
           "named": true
         }
       ]
@@ -418,11 +493,30 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
         {
+          "type": "attribute",
+          "named": true
+        },
+        {
           "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_path",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
           "named": true
         }
       ]
@@ -745,6 +839,10 @@
         {
           "type": "shebang",
           "named": true
+        },
+        {
+          "type": "unexport",
+          "named": true
         }
       ]
     }
@@ -759,6 +857,29 @@
       "types": [
         {
           "type": "escape_sequence",
+          "named": true
+        },
+        {
+          "type": "format_string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unexport",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment",
+          "named": true
+        },
+        {
+          "type": "attribute",
           "named": true
         }
       ]
@@ -850,6 +971,10 @@
     "named": false
   },
   {
+    "type": "'",
+    "named": false
+  },
+  {
     "type": "'''",
     "named": false
   },
@@ -887,6 +1012,10 @@
   },
   {
     "type": ":",
+    "named": false
+  },
+  {
+    "type": "::",
     "named": false
   },
   {
@@ -939,7 +1068,8 @@
   },
   {
     "type": "comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "else",
@@ -955,6 +1085,22 @@
   },
   {
     "type": "export",
+    "named": false
+  },
+  {
+    "type": "f\"",
+    "named": false
+  },
+  {
+    "type": "f\"\"\"",
+    "named": false
+  },
+  {
+    "type": "f'",
+    "named": false
+  },
+  {
+    "type": "f'''",
     "named": false
   },
   {
@@ -999,6 +1145,22 @@
   },
   {
     "type": "true",
+    "named": false
+  },
+  {
+    "type": "unexport",
+    "named": false
+  },
+  {
+    "type": "x\"",
+    "named": false
+  },
+  {
+    "type": "x\"\"\"",
+    "named": false
+  },
+  {
+    "type": "x'''",
     "named": false
   },
   {

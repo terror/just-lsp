@@ -1,7 +1,6 @@
 use super::*;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(crate) enum SettingKind {
   Array,
   Boolean(bool),
@@ -31,12 +30,13 @@ impl PartialEq for SettingKind {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Setting {
-  pub(crate) name: String,
   pub(crate) kind: SettingKind,
+  pub(crate) name: String,
   pub(crate) range: lsp::Range,
 }
 
 impl Setting {
+  #[must_use]
   pub(crate) fn parse(text: &str, range: lsp::Range) -> Option<Self> {
     if !text.starts_with("set ") {
       return None;
@@ -58,7 +58,7 @@ impl Setting {
       });
     }
 
-    let parts: Vec<&str> = text.split(":=").collect();
+    let parts = text.split(":=").collect::<Vec<&str>>();
 
     if parts.len() != 2 {
       return None;
@@ -78,7 +78,7 @@ impl Setting {
 
     let kind = if value_part == "true" || value_part == "false" {
       SettingKind::Boolean(value_part == "true")
-    } else if value_part.starts_with("[") && value_part.ends_with("]") {
+    } else if value_part.starts_with('[') && value_part.ends_with(']') {
       SettingKind::Array
     } else {
       SettingKind::String

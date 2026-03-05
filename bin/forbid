@@ -9,4 +9,5 @@ which rg
   --ignore-case \
   --glob !bin/forbid \
   --glob !vendor \
+  --glob !www/bun.lock \
   'dbg!|fixme|todo|xxx'

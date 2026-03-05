@@ -257,6 +257,9 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
           if (lexer->lookahead == '!') {
             return false;
           }
+
+          advanced_once = true;
+          continue;
         }
 
         advance(lexer);
@@ -286,6 +289,18 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
 
         if (lexer->lookahead == '{') {
           advance(lexer);
+
+          if (lexer->lookahead == '{') {
+            advance(lexer);
+            if (lexer->lookahead == '{') {
+              advance(lexer);
+              advanced_once = true;
+              lexer->mark_end(lexer);
+              continue;
+            } else {
+              scanner->advance_brace_count++;
+            }
+          }
 
           while (lexer->lookahead == '{') { // more braces!
             scanner->advance_brace_count++;

@@ -11,9 +11,14 @@ alias t := test
 
 all: build test clippy fmt-check
 
-[group: 'misc']
+[group: 'dev']
 build:
   cargo build
+
+[group: 'dev']
+build-wasm:
+  just -f vendor/tree-sitter-just/justfile build-wasm
+  cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
 
 [group: 'check']
 check:
@@ -21,7 +26,7 @@ check:
 
 [group: 'check']
 ci: test clippy forbid
-  cargo +nightly fmt --all -- --check
+  cargo fmt --all -- --check
   cargo update --locked --package just-lsp
 
 [group: 'check']
@@ -30,47 +35,39 @@ clippy:
 
 [group: 'format']
 fmt:
-  cargo +nightly fmt
+  cargo fmt
+
+[group: 'format']
+fmt-web:
+  cd www && bun run format
 
 [group: 'format']
 fmt-check:
-  cargo +nightly fmt --all -- --check
+  cargo fmt --all -- --check
 
 [group: 'check']
 forbid:
   ./bin/forbid
 
-[group: 'misc']
+[group: 'dev']
 install:
   cargo install -f just-lsp
 
 [group: 'dev']
 install-dev-deps:
-  rustup install nightly
-  rustup update nightly
   cargo install cargo-watch
 
 [group: 'release']
 publish:
-  #!/usr/bin/env bash
-  set -euxo pipefail
-  rm -rf tmp/release
-  gh repo clone https://github.com/terror/just-lsp tmp/release
-  cd tmp/release
-  VERSION=`sed -En 's/version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' Cargo.toml | head -1`
-  git tag -a $VERSION -m "Release $VERSION"
-  git push origin $VERSION
-  cargo publish
-  cd ../..
-  rm -rf tmp/release
+  ./bin/publish
 
 [group: 'dev']
 run *args:
-  cargo run -- --{{args}}
+  cargo run {{ args }}
 
 [group: 'test']
 test:
-  cargo test
+  cargo test --all --all-targets
 
 [group: 'test']
 test-release-workflow:
@@ -83,6 +80,12 @@ test-release-workflow:
 update-changelog:
   echo >> CHANGELOG.md
   git log --pretty='format:- %s' >> CHANGELOG.md
+
+[group: 'dev']
+update-parser:
+  cd vendor/tree-sitter-just && npx tree-sitter generate
+  cd vendor/tree-sitter-just && npx tree-sitter test
+  cargo test
 
 [group: 'dev']
 watch +COMMAND='test':
