@@ -1565,14 +1565,12 @@ mod tests {
 
   #[test]
   fn imports() {
-    let document = Document::from(indoc! {
-      "
+    let document = Document::from(indoc! {"
       import 'foo/bar.just'
 
       a: b
         @echo A
-      "
-    });
+    "});
 
     assert_eq!(
       document.imports(),
@@ -1589,11 +1587,9 @@ mod tests {
 
   #[test]
   fn optional_import() {
-    let document = Document::from(indoc! {
-      "
+    let document = Document::from(indoc! {"
       import? 'foo/bar.just'
-      "
-    });
+    "});
 
     assert_eq!(
       document.imports(),
