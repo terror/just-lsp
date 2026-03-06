@@ -211,6 +211,32 @@ impl Document {
       .to_string()
   }
 
+  #[must_use]
+  #[allow(dead_code)]
+  pub(crate) fn imports(&self) -> Vec<Import> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("import")
+        .iter()
+        .filter_map(|import_node| {
+          let path_node = import_node.find("string")?;
+
+          let content = self.get_node_text(import_node);
+
+          Some(Import {
+            optional: content.contains('?'),
+            path: TextNode {
+              value: self.get_node_text(&path_node),
+              range: path_node.get_range(self),
+            },
+            range: import_node.get_range(self),
+          })
+        })
+        .collect()
+    })
+  }
+
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
   pub(crate) fn node_at_position(
@@ -1503,6 +1529,77 @@ mod tests {
           target: Some(AttributeTarget::Module),
         },
       ],
+    );
+  }
+
+  #[test]
+  fn imports() {
+    let document = Document::from(indoc! {"
+      import 'foo/bar.just'
+
+      a: b
+        @echo A
+    "});
+
+    assert_eq!(
+      document.imports(),
+      vec![Import {
+        optional: false,
+        path: TextNode {
+          value: "'foo/bar.just'".into(),
+          range: range((0, 7, 0, 21)),
+        },
+        range: range((0, 0, 0, 21)),
+      }]
+    );
+  }
+
+  #[test]
+  fn optional_import() {
+    let document = Document::from(indoc! {"
+      import? 'foo/bar.just'
+    "});
+
+    assert_eq!(
+      document.imports(),
+      vec![Import {
+        optional: true,
+        path: TextNode {
+          value: "'foo/bar.just'".into(),
+          range: range((0, 8, 0, 22)),
+        },
+        range: range((0, 0, 0, 22)),
+      }]
+    );
+  }
+
+  #[test]
+  fn multiple_imports() {
+    let document = Document::from(indoc! {"
+      import 'foo.just'
+      import? 'bar.just'
+    "});
+
+    assert_eq!(
+      document.imports(),
+      vec![
+        Import {
+          optional: false,
+          path: TextNode {
+            value: "'foo.just'".into(),
+            range: range((0, 7, 0, 17)),
+          },
+          range: range((0, 0, 0, 17)),
+        },
+        Import {
+          optional: true,
+          path: TextNode {
+            value: "'bar.just'".into(),
+            range: range((1, 8, 1, 18)),
+          },
+          range: range((1, 0, 1, 18)),
+        },
+      ]
     );
   }
 

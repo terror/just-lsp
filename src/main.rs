@@ -17,6 +17,7 @@ use {
   env_logger::Env,
   function_call::FunctionCall,
   group::Group,
+  import::Import,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
@@ -69,6 +70,7 @@ mod diagnostic;
 mod document;
 mod function_call;
 mod group;
+mod import;
 mod node_ext;
 mod parameter;
 mod point_ext;
