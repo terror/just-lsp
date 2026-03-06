@@ -1,5 +1,4 @@
 use super::*;
-use crate::position_ext::PositionExt;
 
 #[derive(Debug)]
 pub(crate) struct Document {
@@ -231,6 +230,38 @@ impl Document {
               range: path_node.get_range(self),
             },
             range: import_node.get_range(self),
+          })
+        })
+        .collect()
+    })
+  }
+
+  #[must_use]
+  #[allow(dead_code)]
+  pub(crate) fn modules(&self) -> Vec<Module> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("module")
+        .iter()
+        .filter_map(|module_node| {
+          let name_node = module_node.child_by_field_name("name")?;
+
+          let content = self.get_node_text(module_node);
+
+          let path = module_node.find("string").map(|path_node| TextNode {
+            value: self.get_node_text(&path_node),
+            range: path_node.get_range(self),
+          });
+
+          Some(Module {
+            name: TextNode {
+              value: self.get_node_text(&name_node),
+              range: name_node.get_range(self),
+            },
+            optional: content.contains('?'),
+            path,
+            range: module_node.get_range(self),
           })
         })
         .collect()
@@ -514,13 +545,15 @@ mod tests {
 
   #[test]
   fn find_recipe() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"foo\"
 
       bar:
         echo \"bar\"
-    "});
+      "
+    });
 
     assert_eq!(
       document.find_recipe("foo").unwrap(),
@@ -1035,10 +1068,12 @@ mod tests {
 
   #[test]
   fn node_at_position_handles_utf16_columns() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"a🧪b\"
-    "});
+      "
+    });
 
     let node = document
       .node_at_position(lsp::Position {
@@ -1534,12 +1569,14 @@ mod tests {
 
   #[test]
   fn imports() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import 'foo/bar.just'
 
       a: b
         @echo A
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1556,9 +1593,11 @@ mod tests {
 
   #[test]
   fn optional_import() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import? 'foo/bar.just'
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1575,10 +1614,12 @@ mod tests {
 
   #[test]
   fn multiple_imports() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import 'foo.just'
       import? 'bar.just'
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1604,12 +1645,120 @@ mod tests {
   }
 
   #[test]
+  fn module_without_path() {
+    let document = Document::from(indoc! {
+      "
+      mod foo
+      "
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 4, 0, 7)),
+        },
+        optional: false,
+        path: None,
+        range: range((0, 0, 0, 7)),
+      }]
+    );
+  }
+
+  #[test]
+  fn module_with_path() {
+    let document = Document::from(indoc! {
+      r#"
+      mod foo "./utils.just"
+      "#
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 4, 0, 7)),
+        },
+        optional: false,
+        path: Some(TextNode {
+          value: "\"./utils.just\"".into(),
+          range: range((0, 8, 0, 22)),
+        }),
+        range: range((0, 0, 0, 22)),
+      }]
+    );
+  }
+
+  #[test]
+  fn optional_module() {
+    let document = Document::from(indoc! {
+      "
+      mod? foo
+      "
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 5, 0, 8)),
+        },
+        optional: true,
+        path: None,
+        range: range((0, 0, 0, 8)),
+      }]
+    );
+  }
+
+  #[test]
+  fn multiple_modules() {
+    let document = Document::from(indoc! {
+      r#"
+      mod foo
+      mod? bar "bar.just"
+      "#
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![
+        Module {
+          name: TextNode {
+            value: "foo".into(),
+            range: range((0, 4, 0, 7)),
+          },
+          optional: false,
+          path: None,
+          range: range((0, 0, 0, 7)),
+        },
+        Module {
+          name: TextNode {
+            value: "bar".into(),
+            range: range((1, 5, 1, 8)),
+          },
+          optional: true,
+          path: Some(TextNode {
+            value: "\"bar.just\"".into(),
+            range: range((1, 9, 1, 19)),
+          }),
+          range: range((1, 0, 1, 19)),
+        },
+      ]
+    );
+  }
+
+  #[test]
   fn list_function_calls() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
-    "});
+      "
+    });
 
     let calls = document.function_calls();
 
