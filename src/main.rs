@@ -18,6 +18,7 @@ use {
   function_call::FunctionCall,
   group::Group,
   import::Import,
+  module::Module,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
@@ -71,6 +72,7 @@ mod document;
 mod function_call;
 mod group;
 mod import;
+mod module;
 mod node_ext;
 mod parameter;
 mod point_ext;
