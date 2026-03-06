@@ -22,6 +22,7 @@ use {
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind},
   point_ext::PointExt,
+  position_ext::PositionExt,
   recipe::Recipe,
   resolver::Resolver,
   rope_ext::RopeExt,

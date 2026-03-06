@@ -1,5 +1,4 @@
 use super::*;
-use crate::position_ext::PositionExt;
 
 #[derive(Debug)]
 pub(crate) struct Document {
