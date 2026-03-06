@@ -13,8 +13,7 @@ define_rule! {
 
       for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
-          if dependency.name.contains("::")
-            || recipe_names.contains(&dependency.name)
+          if recipe_names.contains(&dependency.name)
           {
             continue;
           }
