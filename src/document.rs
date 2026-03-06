@@ -250,17 +250,17 @@ impl Document {
         .root_node()
         .find_all("module")
         .iter()
-        .filter_map(|import_node| {
-          let optional = (0..import_node.child_count()).any(|index| {
+        .filter_map(|module_node| {
+          let optional = (0..module_node.child_count()).any(|index| {
             u32::try_from(index)
               .ok()
-              .and_then(|i| import_node.child(i))
+              .and_then(|i| module_node.child(i))
               .is_some_and(|child| child.kind() == "?")
           });
 
-          let name_node = import_node.child_by_field_name("name")?;
+          let name_node = module_node.child_by_field_name("name")?;
 
-          let path = import_node.find("string").map(|path_node| {
+          let path = module_node.find("string").map(|path_node| {
             let raw = self.get_node_text(&path_node);
 
             raw
@@ -273,6 +273,7 @@ impl Document {
 
           Some(Module {
             name: self.get_node_text(&name_node),
+            name_range: name_node.get_range(self),
             optional,
             path,
           })
@@ -533,9 +534,11 @@ mod tests {
 
   #[test]
   fn basic_module() {
-    let document = Document::from(indoc! {"
-      mod bar
-    "});
+    let document = Document::from(indoc! {
+        "
+        mod bar
+        "
+    });
 
     assert_eq!(
       document.modules(),
@@ -543,6 +546,16 @@ mod tests {
         optional: false,
         name: "bar".into(),
         path: None,
+        name_range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 4
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 7
+          }
+        }
       }]
     );
   }
@@ -559,6 +572,16 @@ mod tests {
         optional: true,
         name: "bar".into(),
         path: None,
+        name_range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 5
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 8
+          }
+        }
       }]
     );
   }
@@ -575,6 +598,16 @@ mod tests {
         optional: true,
         name: "folder".into(),
         path: Some("./folder/justfile".into()),
+        name_range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 5
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 11
+          }
+        }
       }]
     );
   }

@@ -2281,19 +2281,21 @@ mod tests {
   }
 
   #[test]
-  fn module_path_dependency_not_flagged() {
+  fn module_path_dependency_flagged() {
     Test::new(indoc! {"
       foo: tools::build
         echo foo
     "})
+    .error(Message::Text("Recipe `tools::build` not found"))
     .run();
   }
 
   #[test]
-  fn module_path_alias_not_flagged() {
+  fn module_path_alias_flagged() {
     Test::new(indoc! {"
       alias b := tools::build
     "})
+    .error(Message::Text("Recipe `tools::build` not found"))
     .run();
   }
 
@@ -2307,6 +2309,18 @@ mod tests {
         body
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn duplicate_module() {
+    Test::new(indoc! {
+      r"
+      mod foo
+      mod foo
+      "
+    })
+    .error(Message::Text("Duplicate module `foo`"))
     .run();
   }
 }

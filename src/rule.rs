@@ -42,6 +42,7 @@ mod deprecated_setting;
 mod duplicate_alias;
 mod duplicate_attribute;
 mod duplicate_dependencies;
+mod duplicate_module;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;

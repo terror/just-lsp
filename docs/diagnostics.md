@@ -35,3 +35,4 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `undefined-identifiers`           | Undefined Identifiers           | Identifier cannot be resolved to a parameter, variable, or builtin.                                                           |
 | `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read (unless exported).                                                                    |
+| `duplicate-module`                | Duplicate Module                | Module name is defined more than once in this file.                                                                           |
