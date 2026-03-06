@@ -247,6 +247,7 @@ impl Document {
         .iter()
         .filter_map(|module_node| {
           let name_node = module_node.child_by_field_name("name")?;
+
           let content = self.get_node_text(module_node);
 
           let path = module_node.find("string").map(|path_node| TextNode {
@@ -1565,12 +1566,14 @@ mod tests {
 
   #[test]
   fn imports() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import 'foo/bar.just'
 
       a: b
         @echo A
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1587,9 +1590,11 @@ mod tests {
 
   #[test]
   fn optional_import() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import? 'foo/bar.just'
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1606,10 +1611,12 @@ mod tests {
 
   #[test]
   fn multiple_imports() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       import 'foo.just'
       import? 'bar.just'
-    "});
+      "
+    });
 
     assert_eq!(
       document.imports(),
@@ -1636,9 +1643,11 @@ mod tests {
 
   #[test]
   fn module_without_path() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       mod foo
-    "});
+      "
+    });
 
     assert_eq!(
       document.modules(),
@@ -1656,9 +1665,11 @@ mod tests {
 
   #[test]
   fn module_with_path() {
-    let document = Document::from(indoc! {r#"
+    let document = Document::from(indoc! {
+      r#"
       mod foo "./utils.just"
-    "#});
+      "#
+    });
 
     assert_eq!(
       document.modules(),
@@ -1679,9 +1690,11 @@ mod tests {
 
   #[test]
   fn optional_module() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       mod? foo
-    "});
+      "
+    });
 
     assert_eq!(
       document.modules(),
@@ -1699,10 +1712,12 @@ mod tests {
 
   #[test]
   fn multiple_modules() {
-    let document = Document::from(indoc! {r#"
+    let document = Document::from(indoc! {
+      r#"
       mod foo
       mod? bar "bar.just"
-    "#});
+      "#
+    });
 
     assert_eq!(
       document.modules(),
@@ -1734,11 +1749,13 @@ mod tests {
 
   #[test]
   fn list_function_calls() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
-    "});
+      "
+    });
 
     let calls = document.function_calls();
 
