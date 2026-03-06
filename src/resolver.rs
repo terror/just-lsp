@@ -36,7 +36,8 @@ impl<'a> Resolver<'a> {
   ) -> Option<lsp::Location> {
     let identifier_name = self.document.get_node_text(identifier);
 
-    let identifier_parent_kind = identifier.parent()?.kind();
+    let identifier_parent = identifier.parent()?;
+    let identifier_parent_kind = identifier_parent.kind();
 
     if ["dependency", "alias"].contains(&identifier_parent_kind) {
       if let Some(recipe) = self.document.find_recipe(&identifier_name) {
@@ -49,6 +50,20 @@ impl<'a> Resolver<'a> {
       if let Some((uri, recipe)) = self
         .import_resolver
         .and_then(|r| r.find_recipe(&identifier_name))
+      {
+        return Some(lsp::Location {
+          uri,
+          range: recipe.range,
+        });
+      }
+    }
+
+    if identifier_parent_kind == "module_path" {
+      let module_name = self.document.get_node_text(&identifier_parent);
+
+      if let Some((uri, recipe)) = self
+        .import_resolver
+        .and_then(|r| r.find_recipe(&module_name))
       {
         return Some(lsp::Location {
           uri,
@@ -184,7 +199,8 @@ impl<'a> Resolver<'a> {
   ) -> Option<lsp::Hover> {
     let text = self.document.get_node_text(identifier);
 
-    let parent_kind = identifier.parent().map(|p| p.kind());
+    let parent = identifier.parent();
+    let parent_kind = parent.map(|p| p.kind());
 
     if parent_kind.is_some_and(|kind| {
       ["alias", "dependency", "recipe_header"].contains(&kind)
@@ -208,6 +224,23 @@ impl<'a> Resolver<'a> {
             value: recipe.content,
           }),
           range: Some(identifier.get_range(self.document)),
+        });
+      }
+    }
+
+    if let Some(parent) = parent
+      && parent_kind.is_some_and(|kind| kind == "module_path")
+    {
+      let text = self.document.get_node_text(&parent);
+      if let Some((_uri, recipe)) =
+        self.import_resolver.and_then(|r| r.find_recipe(&text))
+      {
+        return Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: recipe.content,
+          }),
+          range: Some(parent.get_range(self.document)),
         });
       }
     }
@@ -1067,6 +1100,63 @@ mod tests {
   }
 
   #[test]
+  fn resolve_module_definition() {
+    let dir = tempdir().unwrap();
+
+    let bar_justfile = dir.path().join("bar.just");
+    fs::write(&bar_justfile, "baz:\n   echo baz").unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(indoc! {
+        "
+        mod bar
+
+        foo: bar::baz
+          echo foo
+        "
+      }),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let import_resolver = ImportResolver::new(&document);
+    let resolver =
+      Resolver::new(&document).with_import_resolver(&import_resolver);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let foo_dependency =
+      root.find("dependency > module_path > identifier").unwrap();
+
+    let definition = resolver
+      .resolve_identifier_definition(&foo_dependency)
+      .unwrap();
+
+    assert_eq!(
+      definition.uri,
+      lsp::Url::from_file_path(bar_justfile).unwrap()
+    );
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 1,
+          character: 11
+        },
+      }
+    );
+  }
+
+  #[test]
   fn resolve_recipe_hover() {
     let document = Document::from(indoc! {
       "
@@ -1484,5 +1574,63 @@ mod tests {
     let nonexistent = root.find("value > identifier").unwrap();
 
     assert!(resolver.resolve_identifier_hover(&nonexistent).is_none());
+  }
+
+  #[test]
+  fn resolve_hover_module_recipe() {
+    let dir = tempdir().unwrap();
+
+    let bar_justfile = dir.path().join("bar.just");
+    fs::write(&bar_justfile, "baz:\n   echo baz\n").unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(indoc! {
+        "
+        mod bar
+
+        foo: bar::baz
+          echo foo
+        "
+      }),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let import_resolver = ImportResolver::new(&document);
+    let resolver =
+      Resolver::new(&document).with_import_resolver(&import_resolver);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let dependency =
+      root.find("dependency > module_path > identifier").unwrap();
+
+    let hover = resolver.resolve_identifier_hover(&dependency).unwrap();
+
+    assert_eq!(
+      hover.range.unwrap(),
+      lsp::Range {
+        start: lsp::Position {
+          line: 2,
+          character: 5
+        },
+        end: lsp::Position {
+          line: 2,
+          character: 13
+        }
+      }
+    );
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "baz:\n   echo baz".to_string(),
+      })
+    );
   }
 }

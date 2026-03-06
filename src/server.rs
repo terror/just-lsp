@@ -331,6 +331,26 @@ impl Inner {
         }
       }
 
+      for imported in import_resolver.imported_modules() {
+        for recipe in imported.1.document.recipes() {
+          let label =
+            format!("{}::{}", imported.0.join("::"), recipe.name.value);
+          completion_items.push(lsp::CompletionItem {
+            label: label.clone(),
+            kind: Some(lsp::CompletionItemKind::FUNCTION),
+            documentation: Some(lsp::Documentation::MarkupContent(
+              lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: recipe.content,
+              },
+            )),
+            insert_text: Some(label),
+            insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+          });
+        }
+      }
+
       for builtin in BUILTINS {
         completion_items.push(builtin.completion_item());
       }

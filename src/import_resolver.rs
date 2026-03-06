@@ -55,18 +55,28 @@ impl ImportResolver {
     &self.imported_documents
   }
 
+  pub(crate) fn imported_modules(&self) -> &HashMap<Vec<String>, ImportedDocument> {
+    &self.imported_modules
+  }
+
   pub(crate) fn imported_recipe_names(&self) -> HashSet<String> {
-    self
-      .imported_documents
-      .iter()
-      .flat_map(|imported| {
-        imported
-          .document
-          .recipes()
-          .into_iter()
-          .map(|r| r.name.value)
-      })
-      .collect()
+    let documents = self.imported_documents.iter().flat_map(|imported| {
+      imported
+        .document
+        .recipes()
+        .into_iter()
+        .map(|r| r.name.value)
+    });
+    let modules = self.imported_modules.iter().flat_map(|imported| {
+      let path = imported.0.join("::");
+      imported
+        .1
+        .document
+        .recipes()
+        .into_iter()
+        .map(move |r| format!("{}::{}", path, r.name.value))
+    });
+    documents.chain(modules).collect()
   }
 
   pub(crate) fn imported_variable_names(&self) -> HashSet<String> {
@@ -297,11 +307,12 @@ mod tests {
     let dir = tempdir().unwrap();
 
     fs::write(dir.path().join("bar.just"), "bar:\n  echo bar\n").unwrap();
+    fs::write(dir.path().join("baz.just"), "baz:\n  echo baz\n").unwrap();
 
     let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
 
     let mut document = Document {
-      content: Rope::from_str("import 'bar.just'\n"),
+      content: Rope::from_str("import \'bar.just\'\nmod baz"),
       tree: None,
       uri,
       version: 1,
@@ -311,7 +322,10 @@ mod tests {
 
     let resolver = ImportResolver::new(&document);
 
-    assert!(resolver.imported_recipe_names().contains("bar"));
+    let resolved_recipes = resolver.imported_recipe_names();
+    assert_eq!(resolved_recipes.len(), 2);
+    assert!(resolved_recipes.contains("bar"));
+    assert!(resolved_recipes.contains("baz::baz"));
   }
 
   #[test]
