@@ -546,13 +546,15 @@ mod tests {
 
   #[test]
   fn find_recipe() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"foo\"
 
       bar:
         echo \"bar\"
-    "});
+      "
+    });
 
     assert_eq!(
       document.find_recipe("foo").unwrap(),
@@ -1067,10 +1069,12 @@ mod tests {
 
   #[test]
   fn node_at_position_handles_utf16_columns() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"a🧪b\"
-    "});
+      "
+    });
 
     let node = document
       .node_at_position(lsp::Position {
