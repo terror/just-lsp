@@ -55,10 +55,11 @@ wildcard_imports = "allow"
 
 [dependencies]
 anyhow = "1.0.102"
-inventory = "0.3"
 ariadne = "0.6.0"
 clap = { version = "4.5.60", features = ["derive"] }
+dirs = "6.0.0"
 env_logger = "0.11.9"
+inventory = "0.3"
 log = "0.4.29"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
