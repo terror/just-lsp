@@ -253,8 +253,6 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn new(document: &'a Document) -> Self {
-    let imported_documents = Self::resolve_imports(document);
-
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
@@ -265,7 +263,7 @@ impl<'a> RuleContext<'a> {
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       identifier_analysis: OnceLock::new(),
-      imported_documents,
+      imported_documents: Self::resolve_imports(document),
       recipe_names: OnceLock::new(),
       recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
