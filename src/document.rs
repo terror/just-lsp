@@ -162,6 +162,36 @@ impl Document {
       .find(|var| var.name.value == name)
   }
 
+  pub(crate) fn format(&self) -> Result<String> {
+    let file = if let Ok(path) = self.uri.to_file_path() {
+      let dir = path.parent().expect("file path has no parent");
+      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
+    } else {
+      Builder::new().prefix(".justfile-fmt-").tempfile()?
+    };
+
+    let content = self.content.to_string();
+
+    fs::write(&file, content.as_bytes())?;
+
+    let output = process::Command::new("just")
+      .arg("--fmt")
+      .arg("--unstable")
+      .arg("--quiet")
+      .arg("--justfile")
+      .arg(file.path())
+      .output()?;
+
+    if !output.status.success() {
+      bail!(
+        "just formatting failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+    }
+
+    Ok(fs::read_to_string(&file)?)
+  }
+
   #[must_use]
   pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {

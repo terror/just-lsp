@@ -631,89 +631,45 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(
-    &self,
-    uri: &lsp::Url,
-    content: &str,
-  ) -> Result<String> {
-    let file = if let Ok(path) = uri.to_file_path() {
-      let dir = path.parent().expect("file path has no parent");
-      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
-    } else {
-      Builder::new().prefix(".justfile-fmt-").tempfile()?
-    };
-
-    fs::write(&file, content.as_bytes())?;
-
-    let mut command = tokio::process::Command::new("just");
-
-    command
-      .arg("--fmt")
-      .arg("--unstable")
-      .arg("--quiet")
-      .arg("--justfile")
-      .arg(file.path());
-
-    let output = command.output().await?;
-
-    if !output.status.success() {
-      bail!(
-        "just formatting failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-      );
-    }
-
-    Ok(fs::read_to_string(&file)?)
-  }
-
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let documents = self.documents.read().await;
 
-    let snapshot = {
-      let documents = self.documents.read().await;
+    let Some(document) = documents.get(&params.text_document.uri) else {
+      return Ok(None);
+    };
 
-      documents.get(uri).map(|document| {
-        let content = document.content.to_string();
+    let content = document.content.to_string();
 
+    match document.format() {
+      Ok(formatted) if formatted == content => Ok(Some(vec![])),
+      Ok(formatted) => {
         let end = document
           .content
           .byte_to_lsp_position(document.content.len_bytes());
 
-        (content, end)
-      })
-    };
+        Ok(Some(vec![lsp::TextEdit {
+          range: lsp::Range {
+            start: lsp::Position::new(0, 0),
+            end,
+          },
+          new_text: formatted,
+        }]))
+      }
+      Err(error) => {
+        self
+          .client
+          .show_message(
+            lsp::MessageType::ERROR,
+            format!("Failed to format document: {error}"),
+          )
+          .await;
 
-    if let Some((content, document_end)) = snapshot {
-      match self.format_document(uri, &content).await {
-        Ok(formatted) => {
-          if formatted != content {
-            return Ok(Some(vec![lsp::TextEdit {
-              range: lsp::Range {
-                start: lsp::Position::new(0, 0),
-                end: document_end,
-              },
-              new_text: formatted,
-            }]));
-          }
-
-          return Ok(Some(vec![]));
-        }
-        Err(error) => {
-          self
-            .client
-            .show_message(
-              lsp::MessageType::ERROR,
-              format!("Failed to format document: {error}"),
-            )
-            .await;
-        }
+        Ok(None)
       }
     }
-
-    Ok(None)
   }
 
   async fn goto_definition(
