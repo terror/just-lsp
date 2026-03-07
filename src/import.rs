@@ -42,7 +42,10 @@ mod tests {
 
   #[test]
   fn empty_path_returns_none() {
-    let base = lsp::Url::from_file_path("/foo/justfile").unwrap();
+    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    let base =
+      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(import("''").resolve(&base), None);
     assert_eq!(import("\"\"").resolve(&base), None);
@@ -51,7 +54,10 @@ mod tests {
 
   #[test]
   fn home_directory() {
-    let base = lsp::Url::from_file_path("/foo/justfile").unwrap();
+    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    let base =
+      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
       import("'~/bar.just'").resolve(&base).unwrap(),
@@ -61,26 +67,29 @@ mod tests {
 
   #[test]
   fn resolve() {
-    #[track_caller]
-    fn case(path: &str, expected: &str) {
-      let base = lsp::Url::from_file_path("/foo/justfile").unwrap();
+    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-      let import = Import {
-        optional: false,
-        path: TextNode {
-          value: path.to_owned(),
-          range: lsp::Range::default(),
-        },
-        range: lsp::Range::default(),
-      };
+    let base =
+      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-      assert_eq!(import.resolve(&base).unwrap(), PathBuf::from(expected),);
-    }
+    assert_eq!(
+      import("'bar.just'").resolve(&base).unwrap(),
+      directory.path().join("bar.just")
+    );
 
-    case("'bar.just'", "/foo/bar.just");
-    case("\"bar.just\"", "/foo/bar.just");
-    case("bar.just", "/foo/bar.just");
-    case("'sub/bar.just'", "/foo/sub/bar.just");
-    case("'/absolute/bar.just'", "/absolute/bar.just");
+    assert_eq!(
+      import("\"bar.just\"").resolve(&base).unwrap(),
+      directory.path().join("bar.just")
+    );
+
+    assert_eq!(
+      import("bar.just").resolve(&base).unwrap(),
+      directory.path().join("bar.just")
+    );
+
+    assert_eq!(
+      import("'sub/bar.just'").resolve(&base).unwrap(),
+      directory.path().join("sub/bar.just")
+    );
   }
 }
