@@ -631,41 +631,6 @@ impl Inner {
     Ok(None)
   }
 
-  async fn format_document(
-    &self,
-    uri: &lsp::Url,
-    content: &str,
-  ) -> Result<String> {
-    let file = if let Ok(path) = uri.to_file_path() {
-      let dir = path.parent().expect("file path has no parent");
-      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
-    } else {
-      Builder::new().prefix(".justfile-fmt-").tempfile()?
-    };
-
-    fs::write(&file, content.as_bytes())?;
-
-    let mut command = tokio::process::Command::new("just");
-
-    command
-      .arg("--fmt")
-      .arg("--unstable")
-      .arg("--quiet")
-      .arg("--justfile")
-      .arg(file.path());
-
-    let output = command.output().await?;
-
-    if !output.status.success() {
-      bail!(
-        "just formatting failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-      );
-    }
-
-    Ok(fs::read_to_string(&file)?)
-  }
-
   async fn formatting(
     &self,
     params: lsp::DocumentFormattingParams,
@@ -682,12 +647,12 @@ impl Inner {
           .content
           .byte_to_lsp_position(document.content.len_bytes());
 
-        (content, end)
+        (content, end, document.format())
       })
     };
 
-    if let Some((content, document_end)) = snapshot {
-      match self.format_document(uri, &content).await {
+    if let Some((content, document_end, result)) = snapshot {
+      match result {
         Ok(formatted) => {
           if formatted != content {
             return Ok(Some(vec![lsp::TextEdit {
