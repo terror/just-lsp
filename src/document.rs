@@ -164,8 +164,9 @@ impl Document {
 
   pub(crate) fn format(&self) -> Result<String> {
     let file = if let Ok(path) = self.uri.to_file_path() {
-      let dir = path.parent().expect("file path has no parent");
-      Builder::new().prefix(".justfile-fmt-").tempfile_in(dir)?
+      Builder::new()
+        .prefix(".justfile-fmt-")
+        .tempfile_in(path.parent().context("file path has no parent")?)?
     } else {
       Builder::new().prefix(".justfile-fmt-").tempfile()?
     };

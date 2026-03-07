@@ -1,7 +1,7 @@
 use {
   alias::Alias,
   analyzer::Analyzer,
-  anyhow::{Error, anyhow, bail},
+  anyhow::{Context, Error, anyhow, bail},
   arguments::Arguments,
   ariadne::{Color, Label, Report, ReportKind, sources},
   attribute::Attribute,
