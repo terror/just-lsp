@@ -479,14 +479,13 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(
-      context
-        .recipes()
-        .iter()
-        .map(|r| r.name.value.as_str())
-        .collect::<HashSet<_>>(),
-      HashSet::from(["foo", "bar"]),
-    );
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo", "bar"]);
   }
 
   #[test]
@@ -522,14 +521,13 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(
-      context
-        .variables()
-        .iter()
-        .map(|v| v.name.value.as_str())
-        .collect::<HashSet<_>>(),
-      HashSet::from(["foo", "bar"]),
-    );
+    let variable_names = context
+      .variables()
+      .iter()
+      .map(|variable| variable.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(variable_names, ["foo", "bar"]);
   }
 
   #[test]
@@ -565,14 +563,13 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(
-      context
-        .settings()
-        .iter()
-        .map(|s| s.name.as_str())
-        .collect::<HashSet<_>>(),
-      HashSet::from(["export", "dotenv-load"]),
-    );
+    let setting_names = context
+      .settings()
+      .iter()
+      .map(|s| s.name.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(setting_names, ["dotenv-load", "export"]);
   }
 
   #[test]
@@ -607,8 +604,13 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(context.recipes().len(), 1);
-    assert_eq!(context.recipes()[0].name.value, "foo");
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo"]);
   }
 
   #[test]
@@ -667,14 +669,13 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(
-      context
-        .recipes()
-        .iter()
-        .map(|r| r.name.value.as_str())
-        .collect::<HashSet<_>>(),
-      HashSet::from(["foo", "bar", "baz"]),
-    );
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo", "baz", "bar"]);
   }
 
   #[test]
@@ -722,13 +723,12 @@ mod tests {
 
     let context = RuleContext::new(&document);
 
-    assert_eq!(
-      context
-        .recipes()
-        .iter()
-        .map(|recipe| recipe.name.value.as_str())
-        .collect::<HashSet<_>>(),
-      HashSet::from(["foo", "bar"]),
-    );
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo", "bar"]);
   }
 }
