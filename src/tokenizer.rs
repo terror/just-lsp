@@ -210,9 +210,14 @@ impl<'doc> Tokenizer<'doc> {
       return None;
     }
 
-    let end = (byte_idx + 4).min(rope.len_bytes());
+    let char_idx = rope.byte_to_char(byte_idx);
 
-    rope.byte_slice(byte_idx..end).chars().next()
+    // Verify byte_idx actually falls on a character boundary.
+    if rope.char_to_byte(char_idx) != byte_idx {
+      return None;
+    }
+
+    Some(rope.char(char_idx))
   }
 
   /// Sorts collected semantic token data and converts it into the LSP wire format,
@@ -427,34 +432,18 @@ impl<'doc> Tokenizer<'doc> {
   /// Returns the number of bytes that make up the trailing line break for the given
   /// line, handling `\n` and `\r\n` endings.
   fn trailing_line_break_len(rope: &Rope, line_idx: usize) -> usize {
-    let (line_start_byte, line_end_byte) = (
-      rope.line_to_byte(line_idx),
-      rope.line_to_byte((line_idx + 1).min(rope.len_lines())),
-    );
+    let line = rope.line(line_idx);
+    let len_chars = line.len_chars();
 
-    if line_end_byte <= line_start_byte || line_end_byte == 0 {
+    if len_chars == 0 {
       return 0;
     }
 
-    let last_byte = line_end_byte - 1;
-
-    let Some(last_char) = Self::char_at_byte(rope, last_byte) else {
-      return 0;
-    };
-
-    if last_char != '\n' {
+    if line.char(len_chars - 1) != '\n' {
       return 0;
     }
 
-    if last_byte == 0 {
-      return 1;
-    }
-
-    if last_byte <= line_start_byte {
-      return 1;
-    }
-
-    if matches!(Self::char_at_byte(rope, last_byte - 1), Some('\r')) {
+    if len_chars >= 2 && line.char(len_chars - 2) == '\r' {
       2
     } else {
       1
@@ -604,5 +593,34 @@ mod tests {
     let rope = Rope::from_str("foo\r\nbar");
     assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 2);
     assert_eq!(Tokenizer::trailing_line_break_len(&rope, 1), 0);
+  }
+
+  #[test]
+  fn trailing_line_break_len_with_multibyte_chars() {
+    // U+2500 BOX DRAWINGS LIGHT HORIZONTAL is 3 bytes in UTF-8.
+    // This previously panicked because byte arithmetic (last_byte - 1)
+    // landed in the middle of the multi-byte character.
+    let rope = Rope::from_str("# ─── Helpers ─\n");
+    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 1);
+  }
+
+  #[test]
+  fn char_at_byte_returns_none_for_non_boundary() {
+    // U+2500 '─' is 3 bytes (0xE2 0x94 0x80).
+    let rope = Rope::from_str("─");
+    // Byte 0 is the start of the character.
+    assert_eq!(Tokenizer::char_at_byte(&rope, 0), Some('─'));
+    // Bytes 1 and 2 are continuation bytes, not character boundaries.
+    assert_eq!(Tokenizer::char_at_byte(&rope, 1), None);
+    assert_eq!(Tokenizer::char_at_byte(&rope, 2), None);
+  }
+
+  #[test]
+  fn tokenizer_handles_multibyte_comment_lines() {
+    // Reproduces the crash from justfiles with box-drawing section headers.
+    let source = "# ─── Helpers ──────────────────\nfoo:\n  echo bar\n";
+    let document = Document::from(source);
+    // Must not panic.
+    let _tokens = Tokenizer::new(&document).tokenize().unwrap();
   }
 }
