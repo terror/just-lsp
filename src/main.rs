@@ -38,6 +38,7 @@ use {
     env,
     fmt::{self, Debug, Display, Formatter, Write},
     fs,
+    iter::once,
     ops::ControlFlow,
     path::PathBuf,
     process,

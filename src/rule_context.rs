@@ -124,6 +124,7 @@ pub(crate) struct RuleContext<'a> {
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   identifier_analysis: OnceLock<IdentifierAnalysis>,
+  imported_documents: Vec<Document>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
@@ -136,7 +137,12 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn aliases(&self) -> &[Alias] {
     self
       .aliases
-      .get_or_init(|| self.document.aliases())
+      .get_or_init(|| {
+        once(self.document)
+          .chain(&self.imported_documents)
+          .flat_map(Document::aliases)
+          .collect()
+      })
       .as_slice()
   }
 
@@ -247,6 +253,8 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn new(document: &'a Document) -> Self {
+    let imported_documents = Self::resolve_imports(document);
+
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
@@ -257,6 +265,7 @@ impl<'a> RuleContext<'a> {
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       identifier_analysis: OnceLock::new(),
+      imported_documents,
       recipe_names: OnceLock::new(),
       recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
@@ -302,8 +311,69 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn recipes(&self) -> &[Recipe] {
     self
       .recipes
-      .get_or_init(|| self.document.recipes())
+      .get_or_init(|| {
+        once(self.document)
+          .chain(&self.imported_documents)
+          .flat_map(Document::recipes)
+          .collect()
+      })
       .as_slice()
+  }
+
+  fn resolve_imports(document: &Document) -> Vec<Document> {
+    let mut documents = Vec::new();
+    let mut seen = HashSet::new();
+
+    if let Ok(path) = document.uri.to_file_path() {
+      seen.insert(path);
+    }
+
+    Self::resolve_imports_recursive(document, &mut documents, &mut seen);
+
+    documents
+  }
+
+  fn resolve_imports_recursive(
+    document: &Document,
+    documents: &mut Vec<Document>,
+    seen: &mut HashSet<PathBuf>,
+  ) {
+    for import in document.imports() {
+      let Some(path) = import.resolve(&document.uri) else {
+        continue;
+      };
+
+      if !seen.insert(path.clone()) {
+        continue;
+      }
+
+      let Ok(content) = fs::read_to_string(&path) else {
+        if !import.optional {
+          log::warn!("failed to read import: {}", path.display());
+        }
+
+        continue;
+      };
+
+      let Ok(uri) = lsp::Url::from_file_path(&path) else {
+        continue;
+      };
+
+      let mut imported = Document {
+        content: Rope::from_str(&content),
+        tree: None,
+        uri,
+        version: 0,
+      };
+
+      if imported.parse().is_err() {
+        continue;
+      }
+
+      Self::resolve_imports_recursive(&imported, documents, seen);
+
+      documents.push(imported);
+    }
   }
 
   pub(crate) fn setting_enabled(&self, name: &str) -> bool {
@@ -315,7 +385,12 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn settings(&self) -> &[Setting] {
     self
       .settings
-      .get_or_init(|| self.document.settings())
+      .get_or_init(|| {
+        once(self.document)
+          .chain(&self.imported_documents)
+          .flat_map(Document::settings)
+          .collect()
+      })
       .as_slice()
   }
 
@@ -347,7 +422,313 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn variables(&self) -> &[Variable] {
     self
       .variables
-      .get_or_init(|| self.document.variables())
+      .get_or_init(|| {
+        once(self.document)
+          .chain(&self.imported_documents)
+          .flat_map(Document::variables)
+          .collect()
+      })
       .as_slice()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[test]
+  fn imported_recipes_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        bar:
+          echo bar
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo:
+          echo foo
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context
+        .recipes()
+        .iter()
+        .map(|r| r.name.value.as_str())
+        .collect::<HashSet<_>>(),
+      HashSet::from(["foo", "bar"]),
+    );
+  }
+
+  #[test]
+  fn imported_variables_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar := 'baz'\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo := 'qux'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context
+        .variables()
+        .iter()
+        .map(|v| v.name.value.as_str())
+        .collect::<HashSet<_>>(),
+      HashSet::from(["foo", "bar"]),
+    );
+  }
+
+  #[test]
+  fn imported_settings_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "set export\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        set dotenv-load
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context
+        .settings()
+        .iter()
+        .map(|s| s.name.as_str())
+        .collect::<HashSet<_>>(),
+      HashSet::from(["export", "dotenv-load"]),
+    );
+  }
+
+  #[test]
+  fn optional_missing_import_is_skipped() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import? 'nonexistent.just'
+
+        foo:
+          echo foo
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(context.recipes().len(), 1);
+    assert_eq!(context.recipes()[0].name.value, "foo");
+  }
+
+  #[test]
+  fn recursive_imports_are_resolved() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(
+      dir.path().join("baz.just"),
+      indoc! {
+        "
+        baz:
+          echo baz
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        import 'baz.just'
+
+        bar:
+          echo bar
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo:
+          echo foo
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context
+        .recipes()
+        .iter()
+        .map(|r| r.name.value.as_str())
+        .collect::<HashSet<_>>(),
+      HashSet::from(["foo", "bar", "baz"]),
+    );
+  }
+
+  #[test]
+  fn circular_imports_are_handled() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        import 'justfile'
+
+        bar:
+          echo bar
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo:
+          echo foo
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context
+        .recipes()
+        .iter()
+        .map(|recipe| recipe.name.value.as_str())
+        .collect::<HashSet<_>>(),
+      HashSet::from(["foo", "bar"]),
+    );
   }
 }

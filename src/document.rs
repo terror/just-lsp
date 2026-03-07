@@ -211,7 +211,6 @@ impl Document {
   }
 
   #[must_use]
-  #[allow(dead_code)]
   pub(crate) fn imports(&self) -> Vec<Import> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
