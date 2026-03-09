@@ -13,6 +13,33 @@ for [just](https://github.com/casey/just), the command runner.
 
 <img width="1667" alt="demo" src="screenshot.png" />
 
+**just-lsp** brings rich editor support to your justfiles, including:
+
+- Completions for recipe names, variables, and all builtins — attributes,
+  constants, functions, and settings.
+
+- Hover docs for whatever's under your cursor: recipe definitions, parameter
+  declarations, variable assignments, and the full builtin reference.
+
+- Jump to definition for recipes, aliases, parameters, assignments, and builtin
+  constants.
+
+- Diagnostics on every change, catching syntax errors, unknown recipes, bad
+  dependencies, indentation issues, and more. See
+  [`docs/diagnostics.md`](docs/diagnostics.md) for the full list of rules.
+
+- Rename and find references for recipes, aliases, variables, and parameters —
+  scope-aware, so refactors don't accidentally rewrite unrelated identifiers.
+
+- Run any recipe directly from your editor via a code action, with optional
+  argument prompting before `just` is invoked.
+
+- Semantic highlighting, folding, and formatting via `just --fmt --unstable`.
+
+If you need help with `just-lsp` please feel free to open an issue or ping me on
+[Discord](https://discord.gg/ezYScXR). Feature requests and bug reports are
+always welcome!
+
 ## Installation
 
 `just-lsp` should run on any system, including Linux, MacOS, and the BSDs.
@@ -92,7 +119,8 @@ Pre-built binaries for Linux, MacOS, and Windows can be found on
 
 ### CLI
 
-Running `just-lsp` with no arguments starts the language server over stdin/stdout.
+Running `just-lsp` with no arguments starts the language server over
+stdin/stdout.
 
 #### `analyze`
 
@@ -139,7 +167,7 @@ vim.lsp.enable('just')
 ```
 
 `vim.lsp.config` automatically merges your overrides with the upstream config
-shipped inside nvim-lspconfig’s `lsp/just.lua`.
+shipped inside nvim-lspconfig's `lsp/just.lua`.
 
 `capabilities` describe what features your client supports (completion snippets,
 folding ranges, etc.). The helper from `cmp-nvim-lsp` augments the defaults so
@@ -148,10 +176,10 @@ completion-related capabilities line up with `nvim-cmp`. If you do not use
 
 ### Visual Studio Code
 
-A third-party [**Visual Studio Code**](https://code.visualstudio.com/) extension is maintained over at
-https://github.com/nefrob/vscode-just, written by
-[@nefrob](https://github.com/nefrob). Follow the instructions in that
-repository to get it setup on your system.
+A third-party [**Visual Studio Code**](https://code.visualstudio.com/) extension
+is maintained over at https://github.com/nefrob/vscode-just, written by
+[@nefrob](https://github.com/nefrob). Follow the instructions in that repository
+to get it setup on your system.
 
 ### Zed
 
@@ -201,98 +229,6 @@ vim.lsp.config('just', {
 
 vim.lsp.enable('just')
 ```
-
-## Features
-
-The server implements a decent amount of the language server protocol
-[specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
-This section aims to document some of them.
-
-### `textDocument/codeAction`
-
-Every recipe exposes a `Run recipe` source action. Invoking it calls back into
-`workspace/executeCommand` with the recipe metadata (name, parameter list,
-default values) so a client can optionally prompt for arguments before the
-server spawns `just` in the justfile's directory.
-
-### `textDocument/completion`
-
-Completions are available anywhere in the buffer and include recipe names,
-variables/assignments, and every builtin attribute, constant, function, and
-setting.
-
-### `textDocument/definition`
-
-Definitions are resolved through the parsed syntax tree: aliases and dependency
-lists jump back to the referenced recipe header, identifiers in a recipe body
-prefer a matching parameter, then global assignments, and finally builtin
-constants.
-
-### `textDocument/documentHighlight`
-
-Highlights reuse the same resolver that powers references/rename, so every
-occurrence that refers to the same logical symbol (recipe name, alias,
-parameter, variable, etc.) is marked in-place.
-
-### `textDocument/foldingRange`
-
-Each recipe header produces a folding region that spans from the header line to
-the last line of the body (exclusive of the trailing blank line). Because the
-ranges are derived from the parsed tree rather than indentation, they work even
-when recipes mix tabs/spaces or contain raw string blocks.
-
-### `textDocument/formatting`
-
-You're able to format your justfile. This calls `just --fmt --unstable` and
-writes the result to your buffer.
-
-Formatting is implemented by writing the current buffer to a temporary file,
-running `just --fmt --unstable --quiet`, and applying a full-document edit with
-the formatter's output. You get the exact formatting that the `just` CLI
-produces (so make sure a new-enough `just` binary is on PATH), and any formatter
-errors surface as LSP errors.
-
-### `textDocument/hover`
-
-Hover text comes directly from the semantic element under the cursor: for
-recipes we show the rendered definition, parameters show their declaration
-(including default values), variables show their assignment, and builtin
-attributes/functions/settings/constants return the curated Markdown docs that
-ship with the server.
-
-### `textDocument/publishDiagnostics`
-
-Diagnostics run every time a document is opened or changes and are generated by
-a rule engine (`src/analyzer.rs`) that enforces syntax correctness, validates
-recipe/alias/dependency wiring, checks indentation and formatter-related
-constraints, and more. For a rule-by-rule breakdown, see
-[`docs/diagnostics.md`](docs/diagnostics.md).
-
-### `textDocument/references`
-
-References share the same scope-aware logic as highlights/rename. Looking up a
-recipe name will list all aliases and dependency entries, parameter references
-stay within the recipe body/header, and variable references exclude sites where
-the name is shadowed by a parameter. Builtin symbols are also emitted so you can
-see every place a builtin is used.
-
-### `textDocument/rename`
-
-Renames compute the same reference set described above and return a single-file
-`WorkspaceEdit`, so the editor can apply the change atomically. Recipes,
-aliases, variables, and parameters are all safe to rename; the resolver avoids
-touching out-of-scope symbols so refactors do not accidentally rewrite other
-identifiers with the same text.
-
-### `textDocument/semanticTokens`
-
-The server exposes semantic tokens for recipes, parameters, assignments,
-built-in symbols, and comments. Clients that support semantic highlighting
-(Neovim, VS Code, Helix, etc.) will automatically colorize justfiles when this
-capability is enabled, offering more granular syntax highlighting than
-regex-based schemes. We currently support full-document requests and use the
-same tokenizer legend as the core `just` tree-sitter grammar, so colors stay
-consistent with the language's syntax tree.
 
 ## Development
 
