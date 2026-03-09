@@ -226,6 +226,7 @@ impl LanguageServer for Server {
 
 pub(crate) struct Inner {
   client: Client,
+  config: RwLock<Config>,
   documents: RwLock<BTreeMap<lsp::Url, Document>>,
   initialized: AtomicBool,
 }
@@ -719,9 +720,18 @@ impl Inner {
   #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
-    _params: lsp::InitializeParams,
+    params: lsp::InitializeParams,
   ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
     log::info!("Starting just language server...");
+
+    if let Some(options) = params.initialization_options {
+      match serde_json::from_value::<Config>(options) {
+        Ok(config) => *self.config.write().await = config,
+        Err(error) => {
+          log::warn!("failed to parse initialization options: {error}");
+        }
+      }
+    }
 
     Ok(lsp::InitializeResult {
       capabilities: Server::capabilities(),
@@ -749,6 +759,7 @@ impl Inner {
   fn new(client: Client) -> Self {
     Self {
       client,
+      config: RwLock::new(Config::default()),
       documents: RwLock::new(BTreeMap::new()),
       initialized: AtomicBool::new(false),
     }
@@ -782,10 +793,11 @@ impl Inner {
 
     let (diagnostics, version) = {
       let documents = self.documents.read().await;
+      let config = self.config.read().await;
 
       match documents.get(uri) {
         Some(document) => {
-          let analyzer = Analyzer::new(document);
+          let analyzer = Analyzer::from(document).config(&config);
 
           (
             analyzer

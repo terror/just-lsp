@@ -2,7 +2,17 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Analyzer<'a> {
+  config: Option<&'a Config>,
   document: &'a Document,
+}
+
+impl<'a> From<&'a Document> for Analyzer<'a> {
+  fn from(document: &'a Document) -> Self {
+    Self {
+      config: None,
+      document,
+    }
+  }
 }
 
 impl<'a> Analyzer<'a> {
@@ -10,16 +20,25 @@ impl<'a> Analyzer<'a> {
   pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
+    let default = Config::default();
+
+    let config = self.config.unwrap_or(&default);
+
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
       .flat_map(|rule| {
         rule
           .run(&context)
           .into_iter()
-          .map(move |diagnostic| Diagnostic {
-            id: rule.id().to_string(),
-            display: rule.message().to_string(),
-            ..diagnostic
+          .filter_map(move |diagnostic| {
+            let rule_config = config.rule_config(rule.id());
+
+            Some(Diagnostic {
+              id: rule.id().to_string(),
+              display: rule.message().to_string(),
+              severity: rule_config.severity(diagnostic.severity)?,
+              ..diagnostic
+            })
           })
       })
       .collect::<Vec<_>>();
@@ -36,16 +55,19 @@ impl<'a> Analyzer<'a> {
     diagnostics
   }
 
-  /// Creates a new analyzer for the given document.
+  /// Sets the config for the analyzer.
   #[must_use]
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
+  pub(crate) fn config(self, config: &'a Config) -> Self {
+    Self {
+      config: Some(config),
+      ..self
+    }
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use {super::*, Message::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   type RangeSpec = (u32, u32, u32, u32);
 
@@ -72,11 +94,16 @@ mod tests {
 
   #[derive(Debug)]
   struct Test {
+    config: Config,
     document: Document,
     messages: Vec<(Message<'static>, Option<lsp::DiagnosticSeverity>)>,
   }
 
   impl Test {
+    fn config(self, config: Config) -> Self {
+      Self { config, ..self }
+    }
+
     fn error(self, message: Message<'static>) -> Self {
       Self {
         messages: self
@@ -90,6 +117,7 @@ mod tests {
 
     fn new(content: &str) -> Self {
       Self {
+        config: Config::default(),
         document: Document::try_from(lsp::DidOpenTextDocumentParams {
           text_document: lsp::TextDocumentItem {
             uri: lsp::Url::parse("file:///test.just").unwrap(),
@@ -104,9 +132,13 @@ mod tests {
     }
 
     fn run(self) {
-      let Test { document, messages } = self;
+      let Test {
+        config,
+        document,
+        messages,
+      } = self;
 
-      let analyzer = Analyzer::new(&document);
+      let analyzer = Analyzer::from(&document).config(&config);
 
       let diagnostics = analyzer
         .analyze()
@@ -128,8 +160,8 @@ mod tests {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
 
         match expected_message {
-          Text(expected) => assert_eq!(diagnostic.message, *expected),
-          Scoped { text, range } => {
+          Message::Text(expected) => assert_eq!(diagnostic.message, *expected),
+          Message::Scoped { text, range } => {
             assert_eq!(diagnostic.message, *text);
             assert_eq!(diagnostic.range, to_lsp_range(range));
           }
@@ -2303,6 +2335,72 @@ mod tests {
         body
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn rule_config_off_suppresses_diagnostic() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "unused-variables": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+
+      recipe:
+        echo foo
+      "
+    })
+    .config(config)
+    .run();
+  }
+
+  #[test]
+  fn rule_config_overrides_severity_to_error() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "unused-variables": "error"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+
+      recipe:
+        echo foo
+      "
+    })
+    .config(config)
+    .error(Message::Text("Variable `foo` appears unused"))
+    .run();
+  }
+
+  #[test]
+  fn rule_config_overrides_severity_to_warning() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "missing-dependencies": "warning"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+      "
+    })
+    .config(config)
+    .warning(Message::Text("Recipe `baz` not found"))
     .run();
   }
 }

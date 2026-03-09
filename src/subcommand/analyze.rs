@@ -38,7 +38,7 @@ impl Analyze {
       },
     })?;
 
-    let analyzer = Analyzer::new(&document);
+    let analyzer = Analyzer::from(&document);
 
     let diagnostics = analyzer.analyze();
 

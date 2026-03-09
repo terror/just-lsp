@@ -10,6 +10,7 @@ use {
   builtins::BUILTINS,
   clap::Parser as Clap,
   command::Command,
+  config::Config,
   count::Count,
   dependency::Dependency,
   diagnostic::Diagnostic,
@@ -67,6 +68,7 @@ mod attribute_target;
 mod builtin;
 mod builtins;
 mod command;
+mod config;
 mod count;
 mod dependency;
 mod diagnostic;
