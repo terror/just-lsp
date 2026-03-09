@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Analyzer<'a> {
+  config: &'a Config,
   document: &'a Document,
 }
 
@@ -16,10 +17,17 @@ impl<'a> Analyzer<'a> {
         rule
           .run(&context)
           .into_iter()
-          .map(move |diagnostic| Diagnostic {
-            id: rule.id().to_string(),
-            display: rule.message().to_string(),
-            ..diagnostic
+          .filter_map(move |diagnostic| {
+            let rule_config = self.config.rule_config(rule.id());
+
+            let severity = rule_config.severity(diagnostic.severity)?;
+
+            Some(Diagnostic {
+              id: rule.id().to_string(),
+              display: rule.message().to_string(),
+              severity,
+              ..diagnostic
+            })
           })
       })
       .collect::<Vec<_>>();
@@ -38,8 +46,8 @@ impl<'a> Analyzer<'a> {
 
   /// Creates a new analyzer for the given document.
   #[must_use]
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
+  pub(crate) fn new(document: &'a Document, config: &'a Config) -> Self {
+    Self { config, document }
   }
 }
 
@@ -72,11 +80,16 @@ mod tests {
 
   #[derive(Debug)]
   struct Test {
+    config: Config,
     document: Document,
     messages: Vec<(Message<'static>, Option<lsp::DiagnosticSeverity>)>,
   }
 
   impl Test {
+    fn config(self, config: Config) -> Self {
+      Self { config, ..self }
+    }
+
     fn error(self, message: Message<'static>) -> Self {
       Self {
         messages: self
@@ -90,6 +103,7 @@ mod tests {
 
     fn new(content: &str) -> Self {
       Self {
+        config: Config::default(),
         document: Document::try_from(lsp::DidOpenTextDocumentParams {
           text_document: lsp::TextDocumentItem {
             uri: lsp::Url::parse("file:///test.just").unwrap(),
@@ -104,9 +118,13 @@ mod tests {
     }
 
     fn run(self) {
-      let Test { document, messages } = self;
+      let Test {
+        config,
+        document,
+        messages,
+      } = self;
 
-      let analyzer = Analyzer::new(&document);
+      let analyzer = Analyzer::new(&document, &config);
 
       let diagnostics = analyzer
         .analyze()
@@ -2303,6 +2321,86 @@ mod tests {
         body
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn rule_config_off_suppresses_diagnostic() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "unused-variables": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+
+      recipe:
+        echo foo
+      "
+    })
+    .config(config)
+    .run();
+  }
+
+  #[test]
+  fn rule_config_overrides_severity_to_error() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "unused-variables": "error"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+
+      recipe:
+        echo foo
+      "
+    })
+    .config(config)
+    .error(Message::Text("Variable `foo` appears unused"))
+    .run();
+  }
+
+  #[test]
+  fn rule_config_overrides_severity_to_warning() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "missing-dependencies": "warning"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+      "
+    })
+    .config(config)
+    .warning(Message::Text("Recipe `baz` not found"))
+    .run();
+  }
+
+  #[test]
+  fn default_config_does_not_affect_diagnostics() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+
+      recipe:
+        echo foo
+      "
+    })
+    .warning(Message::Text("Variable `foo` appears unused"))
     .run();
   }
 }
