@@ -160,6 +160,48 @@ https://github.com/sectore/zed-just-ls, written by
 [@sectore](https://github.com/sectore). Follow the instructions in that
 repository to get it setup on your system.
 
+## Configuration
+
+`just-lsp` accepts configuration through the LSP `initializationOptions` object,
+sent from your editor when the server starts.
+
+### Rules
+
+Individual diagnostic rules can be configured under the `rules` key. Each rule
+is keyed by its code (see [`docs/diagnostics.md`](docs/diagnostics.md)) and
+accepts either a level string or a table with a `level` field:
+
+```json
+{
+  "rules": {
+    "unused-variables": "off",
+    "unused-parameters": { "level": "error" }
+  }
+}
+```
+
+Supported levels are `error`, `warning`, `information` (or `info`), `hint`, and
+`off`. Setting a rule to `off` suppresses it entirely; any other level overrides
+the rule's default severity. Rules that are not listed retain their default
+behavior.
+
+#### Neovim
+
+Pass the configuration table via the `init_options` field:
+
+```lua
+vim.lsp.config('just', {
+  init_options = {
+    rules = {
+      ['unused-variables'] = 'off',
+      ['unused-parameters'] = { level = 'warning' },
+    },
+  },
+})
+
+vim.lsp.enable('just')
+```
+
 ## Features
 
 The server implements a decent amount of the language server protocol
