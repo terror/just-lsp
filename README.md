@@ -15,7 +15,7 @@ for [just](https://github.com/casey/just), the command runner.
 
 **just-lsp** brings rich editor support to your justfiles, including:
 
-- Completions for recipe names, variables, and all builtins — attributes,
+- Completions for recipe names, variables, and all builtins: attributes,
   constants, functions, and settings.
 
 - Hover docs for whatever's under your cursor: recipe definitions, parameter
@@ -28,8 +28,8 @@ for [just](https://github.com/casey/just), the command runner.
   dependencies, indentation issues, and more. See
   [`docs/diagnostics.md`](docs/diagnostics.md) for the full list of rules.
 
-- Rename and find references for recipes, aliases, variables, and parameters —
-  scope-aware, so refactors don't accidentally rewrite unrelated identifiers.
+- Rename and find references for recipes, aliases, variables, and parameters,
+  scope-aware so refactors don't accidentally rewrite unrelated identifiers.
 
 - Run any recipe directly from your editor via a code action, with optional
   argument prompting before `just` is invoked.
