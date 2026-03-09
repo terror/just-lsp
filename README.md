@@ -7,13 +7,13 @@
 [![downloads](https://img.shields.io/github/downloads/terror/just-lsp/total.svg)](https://github.com/terror/just-lsp/releases)
 [![dependency status](https://deps.rs/repo/github/terror/just-lsp/status.svg)](https://deps.rs/repo/github/terror/just-lsp)
 
-**just-lsp** is a server implementation of the
+`just-lsp` is a server implementation of the
 [language server protocol](https://microsoft.github.io/language-server-protocol/)
 for [just](https://github.com/casey/just), the command runner.
 
 <img width="1667" alt="demo" src="screenshot.png" />
 
-**just-lsp** brings rich editor support to your justfiles, including:
+`just-lsp` brings rich editor support to your justfiles, including:
 
 - Completions for recipe names, variables, and all builtins: attributes,
   constants, functions, and settings.
