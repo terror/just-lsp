@@ -797,7 +797,7 @@ impl Inner {
 
       match documents.get(uri) {
         Some(document) => {
-          let analyzer = Analyzer::new(document, &config);
+          let analyzer = Analyzer::from(document).config(&config);
 
           (
             analyzer

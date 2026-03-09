@@ -2,14 +2,27 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Analyzer<'a> {
-  config: &'a Config,
+  config: Option<&'a Config>,
   document: &'a Document,
+}
+
+impl<'a> From<&'a Document> for Analyzer<'a> {
+  fn from(document: &'a Document) -> Self {
+    Self {
+      config: None,
+      document,
+    }
+  }
 }
 
 impl<'a> Analyzer<'a> {
   /// Analyzes the document and returns a list of diagnostics.
   pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
+
+    let default = Config::default();
+
+    let config = self.config.unwrap_or(&default);
 
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
@@ -18,14 +31,12 @@ impl<'a> Analyzer<'a> {
           .run(&context)
           .into_iter()
           .filter_map(move |diagnostic| {
-            let rule_config = self.config.rule_config(rule.id());
-
-            let severity = rule_config.severity(diagnostic.severity)?;
+            let rule_config = config.rule_config(rule.id());
 
             Some(Diagnostic {
               id: rule.id().to_string(),
               display: rule.message().to_string(),
-              severity,
+              severity: rule_config.severity(diagnostic.severity)?,
               ..diagnostic
             })
           })
@@ -44,10 +55,13 @@ impl<'a> Analyzer<'a> {
     diagnostics
   }
 
-  /// Creates a new analyzer for the given document.
+  /// Sets the config for the analyzer.
   #[must_use]
-  pub(crate) fn new(document: &'a Document, config: &'a Config) -> Self {
-    Self { config, document }
+  pub(crate) fn config(self, config: &'a Config) -> Self {
+    Self {
+      config: Some(config),
+      ..self
+    }
   }
 }
 
@@ -124,7 +138,7 @@ mod tests {
         messages,
       } = self;
 
-      let analyzer = Analyzer::new(&document, &config);
+      let analyzer = Analyzer::from(&document).config(&config);
 
       let diagnostics = analyzer
         .analyze()

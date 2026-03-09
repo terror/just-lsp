@@ -38,9 +38,7 @@ impl Analyze {
       },
     })?;
 
-    let config = Config::default();
-
-    let analyzer = Analyzer::new(&document, &config);
+    let analyzer = Analyzer::from(&document);
 
     let diagnostics = analyzer.analyze();
 
