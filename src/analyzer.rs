@@ -53,7 +53,7 @@ impl<'a> Analyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq, Message::*};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   type RangeSpec = (u32, u32, u32, u32);
 
@@ -146,8 +146,8 @@ mod tests {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
 
         match expected_message {
-          Text(expected) => assert_eq!(diagnostic.message, *expected),
-          Scoped { text, range } => {
+          Message::Text(expected) => assert_eq!(diagnostic.message, *expected),
+          Message::Scoped { text, range } => {
             assert_eq!(diagnostic.message, *text);
             assert_eq!(diagnostic.range, to_lsp_range(range));
           }
