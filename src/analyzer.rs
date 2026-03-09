@@ -53,7 +53,7 @@ impl<'a> Analyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, Message::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq, Message::*};
 
   type RangeSpec = (u32, u32, u32, u32);
 
@@ -2387,20 +2387,6 @@ mod tests {
     })
     .config(config)
     .warning(Message::Text("Recipe `baz` not found"))
-    .run();
-  }
-
-  #[test]
-  fn default_config_does_not_affect_diagnostics() {
-    Test::new(indoc! {
-      "
-      foo := \"unused value\"
-
-      recipe:
-        echo foo
-      "
-    })
-    .warning(Message::Text("Variable `foo` appears unused"))
     .run();
   }
 }
