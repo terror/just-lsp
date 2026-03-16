@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.4.0](https://github.com/terror/just-lsp/releases/tag/0.4.0) - 2026-03-16
+
+### Added
+
+- Add support for `_dir` abbreviations for `_directory` functions ([#284](https://github.com/terror/just-lsp/pull/284) by [terror](https://github.com/terror))
+- Add support for `guards` setting ([#283](https://github.com/terror/just-lsp/pull/283) by [terror](https://github.com/terror))
+- Add support for `lazy` setting ([#282](https://github.com/terror/just-lsp/pull/282) by [terror](https://github.com/terror))
+- Add support for `dragonfly`, `freebsd`, and `netbsd` attributes ([#281](https://github.com/terror/just-lsp/pull/281) by [terror](https://github.com/terror))
+- Add support for `env` attribute ([#280](https://github.com/terror/just-lsp/pull/280) by [terror](https://github.com/terror))
+- Allow analyzer rule configuration ([#276](https://github.com/terror/just-lsp/pull/276) by [terror](https://github.com/terror))
+- Add support for resolving imports in `RuleContext` ([#271](https://github.com/terror/just-lsp/pull/271) by [terror](https://github.com/terror))
+- Add support for `textDocument/documentSymbol` ([#266](https://github.com/terror/just-lsp/pull/266) by [terror](https://github.com/terror))
+- Add support for `textDocument/codeLens` ([#264](https://github.com/terror/just-lsp/pull/264) by [terror](https://github.com/terror))
+- Add support for `textDocument/prepareRename` ([#263](https://github.com/terror/just-lsp/pull/263) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix variable shadowing in parameter default values ([#285](https://github.com/terror/just-lsp/pull/285) by [terror](https://github.com/terror))
+- Allow multiple `metadata` attributes on recipes ([#265](https://github.com/terror/just-lsp/pull/265) by [terror](https://github.com/terror))
+- Fix formatting for justfiles with relative imports ([#258](https://github.com/terror/just-lsp/pull/258) by [terror](https://github.com/terror))
+
+### Misc
+
+- Bump tree-sitter-highlight from 0.26.5 to 0.26.6 ([#279](https://github.com/terror/just-lsp/pull/279) by [app/dependabot](https://github.com/app/dependabot))
+- Set `just-lsp` as web playground header ([#278](https://github.com/terror/just-lsp/pull/278) by [terror](https://github.com/terror))
+- Collapse features section in readme ([#277](https://github.com/terror/just-lsp/pull/277) by [terror](https://github.com/terror))
+- Replace panic with error in `Document::format` ([#273](https://github.com/terror/just-lsp/pull/273) by [terror](https://github.com/terror))
+- Move document formatting to `Document` ([#272](https://github.com/terror/just-lsp/pull/272) by [terror](https://github.com/terror))
+- Add support for parsing modules from `Document` ([#269](https://github.com/terror/just-lsp/pull/269) by [terror](https://github.com/terror))
+- Add support for parsing imports from `Document` ([#268](https://github.com/terror/just-lsp/pull/268) by [terror](https://github.com/terror))
+- Bump tokio from 1.49.0 to 1.50.0 ([#260](https://github.com/terror/just-lsp/pull/260) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.5 to 0.26.6 ([#259](https://github.com/terror/just-lsp/pull/259) by [app/dependabot](https://github.com/app/dependabot))
+- Document command-line interface usage ([#257](https://github.com/terror/just-lsp/pull/257) by [terror](https://github.com/terror))
+
 ## [0.3.4](https://github.com/terror/just-lsp/releases/tag/0.3.4) - 2026-02-26
 
 ### Added
