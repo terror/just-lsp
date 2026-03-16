@@ -690,6 +690,92 @@ mod tests {
   }
 
   #[test]
+  fn env_attribute_valid() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_multiple_vars_allowed() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      [env('BAZ', 'qux')]
+      foo:
+        echo \"$FOO $BAZ\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_duplicate_var_name() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      [env('FOO', 'baz')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `env` is duplicated"))
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_missing_value() {
+    Test::new(indoc! {
+      "
+      [env('FOO')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .error(Message::Text(
+      "Attribute `env` got 1 argument but takes 2 arguments",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_too_many_arguments() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar', 'extra')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .error(Message::Text(
+      "Attribute `env` got 3 arguments but takes 2 arguments",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_wrong_target() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      alias baz := foo
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(Message::Text(
+      "Attribute `env` cannot be applied to alias target",
+    ))
+    .run();
+  }
+
+  #[test]
   fn attributes_on_assignments() {
     Test::new(indoc! {
       "

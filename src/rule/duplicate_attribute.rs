@@ -43,6 +43,11 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     key: DuplicateKey::Name,
   },
   DuplicateConstraint {
+    name: "env",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Argument,
+  },
+  DuplicateConstraint {
     name: "extension",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Name,
