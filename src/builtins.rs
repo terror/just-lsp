@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 156] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 157] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -1100,6 +1100,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 156] = [
     name: "no-exit-message",
     kind: SettingKind::Boolean(false),
     description: "Suppress exit messages for failed recipes by default.",
+    default: "false",
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "guards",
+    kind: SettingKind::Boolean(false),
+    description: "Enable `?` sigils on recipe lines to conditionally stop recipe execution.",
     default: "false",
     deprecated: None,
   },
