@@ -86,13 +86,16 @@ impl IdentifierAnalysis {
         .or_default()
         .insert(identifier_name.clone());
 
-      if recipe_parameters
-        .get(&recipe.name.value)
-        .is_some_and(|parameters| {
-          parameters
-            .iter()
-            .any(|parameter| parameter.name == identifier_name)
-        })
+      let in_parameter_default = identifier.get_parent("parameter").is_some();
+
+      if !in_parameter_default
+        && recipe_parameters
+          .get(&recipe.name.value)
+          .is_some_and(|parameters| {
+            parameters
+              .iter()
+              .any(|parameter| parameter.name == identifier_name)
+          })
       {
         return;
       }

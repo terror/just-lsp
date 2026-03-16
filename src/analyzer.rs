@@ -1816,6 +1816,46 @@ mod tests {
   }
 
   #[test]
+  fn shadowed_parameter_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      a := 'default a'
+
+      b a=a:
+        echo {{ a }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cross_parameter_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      a := 'foo'
+
+      foo a b=a:
+        echo {{ a }} {{ b }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parenthesized_expression_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+      bar := 'bar'
+
+      recipe x=(foo + bar):
+        echo {{ x }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn variables_used_in_dependency_args() {
     Test::new(indoc! {
       "
