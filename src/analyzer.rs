@@ -2007,6 +2007,22 @@ mod tests {
       [windows]
       build:
         echo \"Building on Windows\"
+
+      [dragonfly]
+      build:
+        echo \"Building on DragonFly BSD\"
+
+      [freebsd]
+      build:
+        echo \"Building on FreeBSD\"
+
+      [netbsd]
+      build:
+        echo \"Building on NetBSD\"
+
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
       "
     })
     .run();
@@ -2060,6 +2076,9 @@ mod tests {
       [windows]
       [unix]
       [macos]
+      [dragonfly]
+      [freebsd]
+      [netbsd]
       [openbsd]
       build:
         echo \"Building everywhere\"
@@ -2118,6 +2137,123 @@ mod tests {
         @echo 'building on windows'
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn bsd_os_specific_no_conflict() {
+    Test::new(indoc! {
+      "
+      [dragonfly]
+      build:
+        echo \"Building on DragonFly BSD\"
+
+      [freebsd]
+      build:
+        echo \"Building on FreeBSD\"
+
+      [netbsd]
+      build:
+        echo \"Building on NetBSD\"
+
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unix_dragonfly_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [dragonfly]
+      build:
+        echo \"Building on DragonFly BSD\"
+      "
+    })
+    .error(Message::Text("Duplicate recipe name `build`"))
+    .run();
+  }
+
+  #[test]
+  fn unix_freebsd_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [freebsd]
+      build:
+        echo \"Building on FreeBSD\"
+      "
+    })
+    .error(Message::Text("Duplicate recipe name `build`"))
+    .run();
+  }
+
+  #[test]
+  fn unix_netbsd_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [netbsd]
+      build:
+        echo \"Building on NetBSD\"
+      "
+    })
+    .error(Message::Text("Duplicate recipe name `build`"))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_dragonfly_attribute() {
+    Test::new(indoc! {
+      "
+      [dragonfly]
+      [dragonfly]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `dragonfly` is duplicated"))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_freebsd_attribute() {
+    Test::new(indoc! {
+      "
+      [freebsd]
+      [freebsd]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `freebsd` is duplicated"))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_netbsd_attribute() {
+    Test::new(indoc! {
+      "
+      [netbsd]
+      [netbsd]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(Message::Text("Recipe attribute `netbsd` is duplicated"))
     .run();
   }
 

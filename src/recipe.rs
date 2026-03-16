@@ -159,7 +159,7 @@ mod tests {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(5, 0, 5, 4),
+        range: create_range(8, 0, 8, 4),
       },
       attributes: vec![
         Attribute {
@@ -200,30 +200,60 @@ mod tests {
         },
         Attribute {
           name: TextNode {
-            value: "openbsd".to_string(),
-            range: create_range(4, 1, 4, 8),
+            value: "dragonfly".to_string(),
+            range: create_range(4, 1, 4, 10),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
           range: create_range(4, 0, 5, 0),
+        },
+        Attribute {
+          name: TextNode {
+            value: "freebsd".to_string(),
+            range: create_range(5, 1, 5, 8),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: create_range(5, 0, 6, 0),
+        },
+        Attribute {
+          name: TextNode {
+            value: "netbsd".to_string(),
+            range: create_range(6, 1, 6, 7),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: create_range(6, 0, 7, 0),
+        },
+        Attribute {
+          name: TextNode {
+            value: "openbsd".to_string(),
+            range: create_range(7, 1, 7, 8),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: create_range(7, 0, 8, 0),
         },
       ],
       dependencies: vec![],
       shebang: None,
       parameters: vec![],
       content:
-        "[linux]\n[windows]\n[macos]\n[unix]\n[openbsd]\ntest:\n  echo test"
+        "[linux]\n[windows]\n[macos]\n[unix]\n[dragonfly]\n[freebsd]\n[netbsd]\n[openbsd]\ntest:\n  echo test"
           .to_string(),
-      range: create_range(0, 0, 7, 0),
+      range: create_range(0, 0, 10, 0),
     };
 
     assert_eq!(
       recipe.groups(),
       HashSet::from([
+        Group::Dragonfly,
+        Group::Freebsd,
         Group::Linux,
-        Group::Windows,
         Group::Macos,
-        Group::Openbsd
+        Group::Netbsd,
+        Group::Openbsd,
+        Group::Windows,
       ])
     );
   }
