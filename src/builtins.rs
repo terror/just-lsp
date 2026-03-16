@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 151] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 152] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -72,6 +72,15 @@ pub(crate) const BUILTINS: [Builtin<'_>; 151] = [
     syntax: Some("ARG, ..."),
     min_args: 1,
     max_args: None,
+  },
+  Builtin::Attribute {
+    name: "env",
+    description: "Set an environment variable for the recipe.",
+    version: "1.47.0",
+    targets: &[AttributeTarget::Recipe],
+    syntax: Some("ENV_VAR, VALUE"),
+    min_args: 2,
+    max_args: Some(2),
   },
   Builtin::Attribute {
     name: "confirm",
