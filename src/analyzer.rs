@@ -1414,6 +1414,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_lazy_recognized() {
+    Test::new(indoc! {
+      "
+      set lazy
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn should_recognize_recipe_parameters_in_dependency_arguments() {
     Test::new(indoc! {
       "

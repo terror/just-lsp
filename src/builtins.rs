@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 155] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 156] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -1107,6 +1107,13 @@ pub(crate) const BUILTINS: [Builtin<'_>; 155] = [
     name: "ignore-comments",
     kind: SettingKind::Boolean(false),
     description: "Ignore recipe lines beginning with `#`.",
+    default: "false",
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "lazy",
+    kind: SettingKind::Boolean(false),
+    description: "Don't evaluate unused variables.",
     default: "false",
     deprecated: None,
   },
