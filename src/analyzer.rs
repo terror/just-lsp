@@ -1414,6 +1414,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_guards_recognized() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_lazy_recognized() {
     Test::new(indoc! {
       "
