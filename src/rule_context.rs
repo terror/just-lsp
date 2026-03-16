@@ -86,13 +86,24 @@ impl IdentifierAnalysis {
         .or_default()
         .insert(identifier_name.clone());
 
-      if recipe_parameters
-        .get(&recipe.name.value)
-        .is_some_and(|parameters| {
-          parameters
-            .iter()
-            .any(|parameter| parameter.name == identifier_name)
-        })
+      let in_parameter_default = identifier
+        .get_parent("parameter")
+        .is_some_and(|param_node| {
+          param_node
+            .find("^identifier")
+            .is_some_and(|param_name_node| {
+              document.get_node_text(&param_name_node) == identifier_name
+            })
+        });
+
+      if !in_parameter_default
+        && recipe_parameters
+          .get(&recipe.name.value)
+          .is_some_and(|parameters| {
+            parameters
+              .iter()
+              .any(|parameter| parameter.name == identifier_name)
+          })
       {
         return;
       }

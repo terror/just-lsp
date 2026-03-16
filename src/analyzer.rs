@@ -1816,6 +1816,19 @@ mod tests {
   }
 
   #[test]
+  fn shadowed_parameter_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      a := 'default a'
+
+      b a=a:
+        echo {{ a }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn variables_used_in_dependency_args() {
     Test::new(indoc! {
       "

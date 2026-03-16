@@ -53,13 +53,25 @@ impl<'a> Resolver<'a> {
           .get_node_text(&recipe_node.find("recipe_header > identifier")?),
       );
 
+      let in_parameter_default = identifier
+        .get_parent("parameter")
+        .is_some_and(|param_node| {
+          param_node
+            .find("^identifier")
+            .is_some_and(|param_name_node| {
+              self.document.get_node_text(&param_name_node) == identifier_name
+            })
+        });
+
       if let Some(recipe) = recipe {
-        for param in &recipe.parameters {
-          if param.name == identifier_name {
-            return Some(lsp::Location {
-              uri: self.document.uri.clone(),
-              range: param.range,
-            });
+        if !in_parameter_default {
+          for param in &recipe.parameters {
+            if param.name == identifier_name {
+              return Some(lsp::Location {
+                uri: self.document.uri.clone(),
+                range: param.range,
+              });
+            }
           }
         }
       }
@@ -187,16 +199,28 @@ impl<'a> Resolver<'a> {
           .get_node_text(&recipe_node.find("recipe_header > identifier")?),
       );
 
-      if let Some(recipe) = recipe {
-        for parameter in recipe.parameters {
-          if parameter.name == text {
-            return Some(lsp::Hover {
-              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                kind: lsp::MarkupKind::PlainText,
-                value: parameter.content,
-              }),
-              range: Some(identifier.get_range(self.document)),
-            });
+      let in_parameter_default = identifier
+        .get_parent("parameter")
+        .is_some_and(|param_node| {
+          param_node
+            .find("^identifier")
+            .is_some_and(|param_name_node| {
+              self.document.get_node_text(&param_name_node) == text
+            })
+        });
+
+      if !in_parameter_default {
+        if let Some(recipe) = recipe {
+          for parameter in recipe.parameters {
+            if parameter.name == text {
+              return Some(lsp::Hover {
+                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                  kind: lsp::MarkupKind::PlainText,
+                  value: parameter.content,
+                }),
+                range: Some(identifier.get_range(self.document)),
+              });
+            }
           }
         }
       }
@@ -322,6 +346,20 @@ impl<'a> Resolver<'a> {
           "assignment" => {
             if candidate_parent_kind != "value" {
               return false;
+            }
+
+            let in_parameter_default =
+              candidate.get_parent("parameter").is_some_and(|param_node| {
+                param_node
+                  .find("^identifier")
+                  .is_some_and(|param_name_node| {
+                    self.document.get_node_text(&param_name_node)
+                      == identifier_name
+                  })
+              });
+
+            if in_parameter_default {
+              return true;
             }
 
             let candidate_recipe = self.document.find_recipe(
@@ -735,6 +773,94 @@ mod tests {
           },
         },
       ]
+    );
+  }
+
+  #[test]
+  fn resolve_shadowed_parameter_default_references() {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      b a=a:
+        echo {{ a }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("assignment > identifier").unwrap();
+
+    let references = resolver.resolve_identifier_references(&identifier);
+
+    assert_eq!(references.len(), 2);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 1,
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 2,
+            character: 4,
+          },
+          end: lsp::Position {
+            line: 2,
+            character: 5,
+          },
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_shadowed_parameter_default_definition() {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      b a=a:
+        echo {{ a }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("parameter > value > identifier").unwrap();
+
+    let definition =
+      resolver.resolve_identifier_definition(&identifier).unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0,
+        },
+        end: lsp::Position {
+          line: 1,
+          character: 0,
+        },
+      }
     );
   }
 
