@@ -53,15 +53,7 @@ impl<'a> Resolver<'a> {
           .get_node_text(&recipe_node.find("recipe_header > identifier")?),
       );
 
-      let in_parameter_default = identifier
-        .get_parent("parameter")
-        .is_some_and(|param_node| {
-          param_node
-            .find("^identifier")
-            .is_some_and(|param_name_node| {
-              self.document.get_node_text(&param_name_node) == identifier_name
-            })
-        });
+      let in_parameter_default = identifier.get_parent("parameter").is_some();
 
       if let Some(recipe) = recipe
         && !in_parameter_default
@@ -199,15 +191,7 @@ impl<'a> Resolver<'a> {
           .get_node_text(&recipe_node.find("recipe_header > identifier")?),
       );
 
-      let in_parameter_default = identifier
-        .get_parent("parameter")
-        .is_some_and(|param_node| {
-          param_node
-            .find("^identifier")
-            .is_some_and(|param_name_node| {
-              self.document.get_node_text(&param_name_node) == text
-            })
-        });
+      let in_parameter_default = identifier.get_parent("parameter").is_some();
 
       if !in_parameter_default && let Some(recipe) = recipe {
         for parameter in recipe.parameters {
@@ -346,17 +330,7 @@ impl<'a> Resolver<'a> {
               return false;
             }
 
-            let in_parameter_default =
-              candidate.get_parent("parameter").is_some_and(|param_node| {
-                param_node
-                  .find("^identifier")
-                  .is_some_and(|param_name_node| {
-                    self.document.get_node_text(&param_name_node)
-                      == identifier_name
-                  })
-              });
-
-            if in_parameter_default {
+            if candidate.get_parent("parameter").is_some() {
               return true;
             }
 
