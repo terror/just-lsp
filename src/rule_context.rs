@@ -404,8 +404,8 @@ impl<'a> RuleContext<'a> {
     self.variable_and_builtin_names.get_or_init(|| {
       let mut names = self.document_variable_names().clone();
 
-      names.extend(BUILTINS.into_iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some(name.to_owned()),
+      names.extend(BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Constant { name, .. } => Some((*name).to_owned()),
         _ => None,
       }));
 

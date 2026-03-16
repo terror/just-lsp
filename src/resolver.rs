@@ -75,9 +75,9 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      for builtin in BUILTINS {
+      for builtin in &BUILTINS {
         match builtin {
-          Builtin::Constant { name, .. } if identifier_name == name => {
+          Builtin::Constant { name, .. } if identifier_name == *name => {
             return Some(lsp::Location {
               uri: self.document.uri.clone(),
               range: identifier.get_range(self.document),
@@ -88,10 +88,10 @@ impl<'a> Resolver<'a> {
       }
     }
 
-    for builtin in BUILTINS {
+    for builtin in &BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
-          if identifier_name == name
+          if identifier_name == *name
             && identifier_parent_kind == "attribute" =>
         {
           return Some(lsp::Location {
@@ -100,7 +100,7 @@ impl<'a> Resolver<'a> {
           });
         }
         Builtin::Function { name, .. }
-          if identifier_name == name
+          if identifier_name == *name
             && identifier_parent_kind == "function_call" =>
         {
           return Some(lsp::Location {
@@ -109,7 +109,8 @@ impl<'a> Resolver<'a> {
           });
         }
         Builtin::Setting { name, .. }
-          if identifier_name == name && identifier_parent_kind == "setting" =>
+          if identifier_name == *name
+            && identifier_parent_kind == "setting" =>
         {
           return Some(lsp::Location {
             uri: self.document.uri.clone(),
@@ -214,9 +215,9 @@ impl<'a> Resolver<'a> {
         }
       }
 
-      for builtin in BUILTINS {
+      for builtin in &BUILTINS {
         match builtin {
-          Builtin::Constant { name, .. } if text == name => {
+          Builtin::Constant { name, .. } if text == *name => {
             return Some(lsp::Hover {
               contents: lsp::HoverContents::Markup(builtin.documentation()),
               range: Some(identifier.get_range(self.document)),
@@ -227,10 +228,10 @@ impl<'a> Resolver<'a> {
       }
     }
 
-    for builtin in BUILTINS {
+    for builtin in &BUILTINS {
       match builtin {
         Builtin::Attribute { name, .. }
-          if text == name
+          if text == *name
             && parent_kind.is_some_and(|kind| kind == "attribute") =>
         {
           return Some(lsp::Hover {
@@ -239,7 +240,7 @@ impl<'a> Resolver<'a> {
           });
         }
         Builtin::Function { name, .. }
-          if text == name
+          if text == *name
             && parent_kind.is_some_and(|kind| kind == "function_call") =>
         {
           return Some(lsp::Hover {
@@ -248,7 +249,7 @@ impl<'a> Resolver<'a> {
           });
         }
         Builtin::Setting { name, .. }
-          if text == name
+          if text == *name
             && parent_kind.is_some_and(|kind| kind == "setting") =>
         {
           return Some(lsp::Hover {

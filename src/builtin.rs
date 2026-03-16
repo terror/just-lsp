@@ -62,8 +62,9 @@ impl Builtin<'_> {
       Self::Function { name, .. } => {
         let snippet = match *name {
           "absolute_path" | "blake3_file" | "canonicalize" | "clean"
-          | "extension" | "file_name" | "file_stem" | "parent_directory"
-          | "path_exists" | "read" | "sha256_file" | "without_extension" => {
+          | "extension" | "file_name" | "file_stem" | "parent_dir"
+          | "parent_directory" | "path_exists" | "read" | "sha256_file"
+          | "without_extension" => {
             format!("{name}(${{1:path:string}})")
           }
           "append" => {
@@ -76,20 +77,31 @@ impl Builtin<'_> {
           | "is_dependency"
           | "invocation_directory"
           | "invocation_directory_native"
+          | "invocation_dir"
+          | "invocation_dir_native"
           | "justfile"
           | "justfile_directory"
+          | "justfile_dir"
           | "source_file"
           | "source_directory"
+          | "source_dir"
           | "just_executable"
           | "just_pid"
           | "uuid"
           | "cache_directory"
+          | "cache_dir"
           | "config_directory"
+          | "config_dir"
           | "config_local_directory"
+          | "config_local_dir"
           | "data_directory"
+          | "data_dir"
           | "data_local_directory"
+          | "data_local_dir"
           | "executable_directory"
-          | "home_directory" => format!("{name}()"),
+          | "executable_dir"
+          | "home_directory"
+          | "home_dir" => format!("{name}()"),
           "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
           "capitalize"
           | "encode_uri_component"

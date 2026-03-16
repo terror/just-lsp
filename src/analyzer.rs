@@ -860,6 +860,28 @@ mod tests {
   }
 
   #[test]
+  fn dir_aliases_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ home_dir() }}
+        echo {{ cache_dir() }}
+        echo {{ config_dir() }}
+        echo {{ config_local_dir() }}
+        echo {{ data_dir() }}
+        echo {{ data_local_dir() }}
+        echo {{ executable_dir() }}
+        echo {{ invocation_dir() }}
+        echo {{ invocation_dir_native() }}
+        echo {{ justfile_dir() }}
+        echo {{ source_dir() }}
+        echo {{ parent_dir('~/.config') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn function_calls_nested() {
     Test::new(indoc! {
       "
