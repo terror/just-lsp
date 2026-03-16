@@ -63,15 +63,15 @@ impl<'a> Resolver<'a> {
             })
         });
 
-      if let Some(recipe) = recipe {
-        if !in_parameter_default {
-          for param in &recipe.parameters {
-            if param.name == identifier_name {
-              return Some(lsp::Location {
-                uri: self.document.uri.clone(),
-                range: param.range,
-              });
-            }
+      if let Some(recipe) = recipe
+        && !in_parameter_default
+      {
+        for param in &recipe.parameters {
+          if param.name == identifier_name {
+            return Some(lsp::Location {
+              uri: self.document.uri.clone(),
+              range: param.range,
+            });
           }
         }
       }
@@ -209,18 +209,16 @@ impl<'a> Resolver<'a> {
             })
         });
 
-      if !in_parameter_default {
-        if let Some(recipe) = recipe {
-          for parameter in recipe.parameters {
-            if parameter.name == text {
-              return Some(lsp::Hover {
-                contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                  kind: lsp::MarkupKind::PlainText,
-                  value: parameter.content,
-                }),
-                range: Some(identifier.get_range(self.document)),
-              });
-            }
+      if !in_parameter_default && let Some(recipe) = recipe {
+        for parameter in recipe.parameters {
+          if parameter.name == text {
+            return Some(lsp::Hover {
+              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+                kind: lsp::MarkupKind::PlainText,
+                value: parameter.content,
+              }),
+              range: Some(identifier.get_range(self.document)),
+            });
           }
         }
       }
