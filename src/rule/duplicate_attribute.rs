@@ -58,6 +58,16 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     key: DuplicateKey::Argument,
   },
   DuplicateConstraint {
+    name: "dragonfly",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
+    name: "freebsd",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
     name: "linux",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Name,
@@ -79,6 +89,11 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
   },
   DuplicateConstraint {
     name: "no-quiet",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
+    name: "netbsd",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Name,
   },

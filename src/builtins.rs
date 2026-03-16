@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) const BUILTINS: [Builtin<'_>; 152] = [
+pub(crate) const BUILTINS: [Builtin<'_>; 155] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -155,6 +155,24 @@ pub(crate) const BUILTINS: [Builtin<'_>; 152] = [
     max_args: None,
   },
   Builtin::Attribute {
+    name: "dragonfly",
+    description: "Enable recipe on DragonFly BSD.",
+    version: "1.47.0",
+    targets: &[AttributeTarget::Recipe],
+    syntax: None,
+    min_args: 0,
+    max_args: Some(0),
+  },
+  Builtin::Attribute {
+    name: "freebsd",
+    description: "Enable recipe on FreeBSD.",
+    version: "1.47.0",
+    targets: &[AttributeTarget::Recipe],
+    syntax: None,
+    min_args: 0,
+    max_args: Some(0),
+  },
+  Builtin::Attribute {
     name: "linux",
     description: "Enable recipe on Linux.",
     version: "1.8.0",
@@ -203,6 +221,15 @@ pub(crate) const BUILTINS: [Builtin<'_>; 152] = [
     name: "no-quiet",
     description: "Override globally quiet recipes and always echo out the recipe.",
     version: "1.23.0",
+    targets: &[AttributeTarget::Recipe],
+    syntax: None,
+    min_args: 0,
+    max_args: Some(0),
+  },
+  Builtin::Attribute {
+    name: "netbsd",
+    description: "Enable recipe on NetBSD.",
+    version: "1.47.0",
     targets: &[AttributeTarget::Recipe],
     syntax: None,
     min_args: 0,
