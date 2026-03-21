@@ -3253,16 +3253,30 @@ mod tests {
 
   #[tokio::test]
   async fn document_link_import() -> Result {
+    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
+      (
+        "file:///C:/foo/justfile",
+        "file:///C:/foo/bar.just",
+        "C:\\foo\\bar.just",
+      )
+    } else {
+      (
+        "file:///foo/justfile",
+        "file:///foo/bar.just",
+        "/foo/bar.just",
+      )
+    };
+
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
-        uri: "file:///foo/justfile",
+        uri: justfile_uri,
         text: "import 'bar.just'\n",
       })
       .request(DocumentLinkRequest {
         id: 2,
-        uri: "file:///foo/justfile",
+        uri: justfile_uri,
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3273,8 +3287,8 @@ mod tests {
               "start": { "line": 0, "character": 7 },
               "end": { "line": 0, "character": 17 }
             },
-            "target": "file:///foo/bar.just",
-            "tooltip": "/foo/bar.just"
+            "target": target_uri,
+            "tooltip": tooltip
           }
         ]
       }))
@@ -3284,16 +3298,30 @@ mod tests {
 
   #[tokio::test]
   async fn document_link_module_with_path() -> Result {
+    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
+      (
+        "file:///C:/foo/justfile",
+        "file:///C:/foo/baz.just",
+        "C:\\foo\\baz.just",
+      )
+    } else {
+      (
+        "file:///foo/justfile",
+        "file:///foo/baz.just",
+        "/foo/baz.just",
+      )
+    };
+
     Test::new()?
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
-        uri: "file:///foo/justfile",
+        uri: justfile_uri,
         text: "mod bar 'baz.just'\n",
       })
       .request(DocumentLinkRequest {
         id: 2,
-        uri: "file:///foo/justfile",
+        uri: justfile_uri,
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3304,8 +3332,8 @@ mod tests {
               "start": { "line": 0, "character": 8 },
               "end": { "line": 0, "character": 18 }
             },
-            "target": "file:///foo/baz.just",
-            "tooltip": "/foo/baz.just"
+            "target": target_uri,
+            "tooltip": tooltip
           }
         ]
       }))
