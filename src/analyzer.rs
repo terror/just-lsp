@@ -116,11 +116,17 @@ mod tests {
     }
 
     fn new(content: &str) -> Self {
+      let uri = if cfg!(windows) {
+        "file:///C:/test.just"
+      } else {
+        "file:///test.just"
+      };
+
       Self {
         config: Config::default(),
         document: Document::try_from(lsp::DidOpenTextDocumentParams {
           text_document: lsp::TextDocumentItem {
-            uri: lsp::Url::parse("file:///test.just").unwrap(),
+            uri: lsp::Url::parse(uri).unwrap(),
             language_id: "just".to_string(),
             version: 1,
             text: content.to_string(),
@@ -997,6 +1003,53 @@ mod tests {
       foo:
         echo {{greeting}}
       "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn import_invalid_path() {
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\nonexistent.just`"
+    } else {
+      "Import path does not exist: `/nonexistent.just`"
+    };
+
+    Test::new(indoc! {
+      "
+      import 'nonexistent.just'
+      "
+    })
+    .error(Message::Text(expected))
+    .run();
+  }
+
+  #[test]
+  fn import_optional_invalid_path() {
+    Test::new(indoc! {
+      "
+      import? 'nonexistent.just'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn import_format_string_skipped() {
+    Test::new(indoc! {
+      r#"
+      import f"{'nonexistent.just'}"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn import_shell_expanded_string_skipped() {
+    Test::new(indoc! {
+      "
+      import x'nonexistent.just'
+      "
     })
     .run();
   }
