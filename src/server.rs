@@ -23,6 +23,10 @@ impl Server {
       definition_provider: Some(lsp::OneOf::Left(true)),
       document_symbol_provider: Some(lsp::OneOf::Left(true)),
       document_formatting_provider: Some(lsp::OneOf::Left(true)),
+      document_link_provider: Some(lsp::DocumentLinkOptions {
+        resolve_provider: Some(false),
+        work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+      }),
       document_highlight_provider: Some(lsp::OneOf::Left(true)),
       execute_command_provider: Some(lsp::ExecuteCommandOptions {
         commands: Command::all(),
@@ -134,6 +138,13 @@ impl LanguageServer for Server {
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
     self.0.document_highlight(params).await
+  }
+
+  async fn document_link(
+    &self,
+    params: lsp::DocumentLinkParams,
+  ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
+    self.0.document_link(params).await
   }
 
   async fn document_symbol(
@@ -457,6 +468,51 @@ impl Inner {
             .collect()
         })
     }))
+  }
+
+  async fn document_link(
+    &self,
+    params: lsp::DocumentLinkParams,
+  ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
+    let uri = &params.text_document.uri;
+
+    let documents = self.documents.read().await;
+
+    let Some(document) = documents.get(uri) else {
+      return Ok(None);
+    };
+
+    let mut links = Vec::new();
+
+    for import in document.imports() {
+      if let Some(path) = import.resolve(uri)
+        && let Ok(target) = lsp::Url::from_file_path(&path)
+      {
+        links.push(lsp::DocumentLink {
+          range: import.path.range,
+          target: Some(target),
+          tooltip: Some(path.display().to_string()),
+          data: None,
+        });
+      }
+    }
+
+    for module in document.modules() {
+      let range = module.path.as_ref().map_or(module.name.range, |p| p.range);
+
+      if let Some(path) = module.resolve(uri)
+        && let Ok(target) = lsp::Url::from_file_path(&path)
+      {
+        links.push(lsp::DocumentLink {
+          range,
+          target: Some(target),
+          tooltip: Some(path.display().to_string()),
+          data: None,
+        });
+      }
+    }
+
+    Ok(Some(links))
   }
 
   async fn document_symbol(
@@ -3145,6 +3201,139 @@ mod tests {
                 ]
               ]
             }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[derive(Debug)]
+  struct DocumentLinkRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for DocumentLinkRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/documentLink",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn document_link_empty_document() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_link_import() -> Result {
+    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
+      (
+        "file:///C:/foo/justfile",
+        "file:///C:/foo/bar.just",
+        "C:\\foo\\bar.just",
+      )
+    } else {
+      (
+        "file:///foo/justfile",
+        "file:///foo/bar.just",
+        "/foo/bar.just",
+      )
+    };
+
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: justfile_uri,
+        text: "import 'bar.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: justfile_uri,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 7 },
+              "end": { "line": 0, "character": 17 }
+            },
+            "target": target_uri,
+            "tooltip": tooltip
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_link_module_with_path() -> Result {
+    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
+      (
+        "file:///C:/foo/justfile",
+        "file:///C:/foo/baz.just",
+        "C:\\foo\\baz.just",
+      )
+    } else {
+      (
+        "file:///foo/justfile",
+        "file:///foo/baz.just",
+        "/foo/baz.just",
+      )
+    };
+
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: justfile_uri,
+        text: "mod bar 'baz.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: justfile_uri,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 8 },
+              "end": { "line": 0, "character": 18 }
+            },
+            "target": target_uri,
+            "tooltip": tooltip
           }
         ]
       }))
