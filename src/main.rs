@@ -48,6 +48,7 @@ use {
   },
   str_ext::StrExt,
   subcommand::Subcommand,
+  symbol::Symbol,
   tempfile::Builder,
   text_node::TextNode,
   tokio::{io::AsyncBufReadExt, sync::RwLock},
@@ -90,6 +91,7 @@ mod server;
 mod setting;
 mod str_ext;
 mod subcommand;
+mod symbol;
 mod text_node;
 mod tokenizer;
 mod variable;
