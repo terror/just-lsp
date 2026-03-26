@@ -91,6 +91,7 @@ module.exports = grammar({
         $.recipe,
         $.alias,
         $.assignment,
+        $.eager,
         $.export,
         $.unexport,
         $.import,
@@ -121,6 +122,9 @@ module.exports = grammar({
         field("right", $.expression),
         $._newline,
       ),
+
+    // eager         : attribute* 'eager' assignment
+    eager: ($) => seq(repeat($.attribute), "eager", $.assignment),
 
     // export        : attribute* 'export' assignment
     export: ($) => seq(repeat($.attribute), "export", $.assignment),

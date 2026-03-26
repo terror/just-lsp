@@ -1,6 +1,7 @@
 ; This file specifies how matched syntax patterns should be highlighted
 
 [
+  "eager"
   "export"
   "unexport"
   "import"

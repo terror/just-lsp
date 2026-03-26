@@ -1021,6 +1021,17 @@ mod tests {
   }
 
   #[test]
+  fn eager_variable_is_parsed() {
+    let document = Document::from(indoc! {
+      "
+      eager foo := 'bar'
+      "
+    });
+
+    assert_eq!(document.variables().len(), 1);
+  }
+
+  #[test]
   fn multiple_recipes() {
     let document = Document::from(indoc! {
       "
