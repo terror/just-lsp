@@ -53,6 +53,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "eager"
+        },
+        {
+          "type": "SYMBOL",
           "name": "export"
         },
         {
@@ -176,6 +180,26 @@
         {
           "type": "SYMBOL",
           "name": "_newline"
+        }
+      ]
+    },
+    "eager": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "eager"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "assignment"
         }
       ]
     },

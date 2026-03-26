@@ -250,6 +250,25 @@
     }
   },
   {
+    "type": "eager",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment",
+          "named": true
+        },
+        {
+          "type": "attribute",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "else_clause",
     "named": true,
     "fields": {
@@ -817,6 +836,10 @@
           "named": true
         },
         {
+          "type": "eager",
+          "named": true
+        },
+        {
           "type": "export",
           "named": true
         },
@@ -1070,6 +1093,10 @@
     "type": "comment",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "eager",
+    "named": false
   },
   {
     "type": "else",
