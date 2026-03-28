@@ -116,8 +116,13 @@ impl<'a> Resolver<'a> {
               && ["value", "parameter", "variadic_parameter"]
                 .contains(&candidate_parent_kind)
           }
-          Symbol::Recipe(_) => ["alias", "dependency", "recipe_header"]
-            .contains(&candidate_parent_kind),
+          Symbol::Recipe(_) => [
+            "alias",
+            "dependency",
+            "dependency_expression",
+            "recipe_header",
+          ]
+          .contains(&candidate_parent_kind),
 
           Symbol::Variable(_) => {
             if candidate_parent_kind == "assignment" {
@@ -173,7 +178,7 @@ impl<'a> Resolver<'a> {
     };
 
     match parent_kind {
-      "alias" | "dependency" | "recipe_header" => {
+      "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "parameter" | "variadic_parameter" => {
@@ -756,6 +761,125 @@ mod tests {
           },
         },
       ]
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_expression_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo foo
+
+      bar: (foo)
+        echo bar
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("dependency_expression > identifier").unwrap();
+
+    let definition =
+      resolver.resolve_identifier_definition(&identifier).unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 3,
+          character: 0
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_expression_references() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo foo
+
+      bar: (foo)
+        echo bar
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("dependency_expression > identifier").unwrap();
+
+    let references = resolver.resolve_identifier_references(&identifier);
+
+    assert_eq!(references.len(), 2);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![
+        lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 3
+          },
+        },
+        lsp::Range {
+          start: lsp::Position {
+            line: 3,
+            character: 6
+          },
+          end: lsp::Position {
+            line: 3,
+            character: 9
+          },
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_expression_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo foo
+
+      bar: (foo)
+        echo bar
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("dependency_expression > identifier").unwrap();
+
+    let hover = resolver.resolve_identifier_hover(&identifier).unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "foo:\n  echo foo".to_string(),
+      })
     );
   }
 
