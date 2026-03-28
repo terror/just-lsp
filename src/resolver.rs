@@ -6,21 +6,10 @@ pub(crate) struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
+  /// Creates a new `Resolver` bound to the given `Document`.
   #[must_use]
   pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
-  }
-
-  /// Walks up from `node` to the nearest `recipe` ancestor and looks
-  /// it up by name through the document.
-  fn enclosing_recipe(&self, node: &Node) -> Option<Recipe> {
-    let recipe_node = node.get_parent("recipe")?;
-
-    self.document.find_recipe(
-      &self
-        .document
-        .get_node_text(&recipe_node.find("recipe_header > identifier")?),
-    )
   }
 
   /// Returns the definition site of the symbol that `identifier` refers
@@ -33,13 +22,13 @@ impl<'a> Resolver<'a> {
     identifier: &Node,
   ) -> Option<lsp::Location> {
     Some(lsp::Location {
-      uri: self.document.uri.clone(),
       range: match self.resolve_symbol(identifier)? {
         Symbol::Builtin(_) => identifier.get_range(self.document),
         Symbol::Parameter(parameter) => parameter.range,
         Symbol::Recipe(recipe) => recipe.range,
         Symbol::Variable(variable) => variable.range,
       },
+      uri: self.document.uri.clone(),
     })
   }
 
@@ -88,9 +77,8 @@ impl<'a> Resolver<'a> {
   ) -> Vec<lsp::Location> {
     let name = self.document.get_node_text(identifier);
 
-    let symbol = match self.resolve_symbol(identifier) {
-      Some(symbol) => symbol,
-      None => return Vec::new(),
+    let Some(symbol) = self.resolve_symbol(identifier) else {
+      return Vec::new();
     };
 
     let root = match &self.document.tree {
@@ -120,10 +108,7 @@ impl<'a> Resolver<'a> {
           Symbol::Builtin(_) => false,
           Symbol::Parameter(_) => {
             let in_same_recipe = matches!(
-              (
-                identifier.get_parent("recipe"),
-                candidate.get_parent("recipe"),
-              ),
+              (identifier.get_parent("recipe"), candidate.get_parent("recipe")),
               (Some(r1), Some(r2)) if r1.id() == r2.id()
             );
 
@@ -147,7 +132,7 @@ impl<'a> Resolver<'a> {
               return true;
             }
 
-            self.enclosing_recipe(candidate).is_some_and(|recipe| {
+            candidate.get_recipe(self.document).is_some_and(|recipe| {
               !recipe
                 .parameters
                 .iter()
@@ -177,83 +162,66 @@ impl<'a> Resolver<'a> {
 
     let parent_kind = identifier.parent()?.kind();
 
-    if ["dependency", "alias", "recipe_header"].contains(&parent_kind) {
-      if let Some(recipe) = self.document.find_recipe(&name) {
-        return Some(Symbol::Recipe(recipe));
+    let builtin_constant = |name: &str| {
+      BUILTINS
+        .iter()
+        .find(|builtin| matches!(
+          builtin,
+          Builtin::Constant { name: builtin_name, .. } if name == *builtin_name
+        ))
+        .map(Symbol::Builtin)
+    };
+
+    match parent_kind {
+      "alias" | "dependency" | "recipe_header" => {
+        self.document.find_recipe(&name).map(Symbol::Recipe)
       }
+      "parameter" | "variadic_parameter" => {
+        identifier.get_recipe(self.document).and_then(|recipe| {
+          recipe
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == name)
+            .cloned()
+            .map(Symbol::Parameter)
+        })
+      }
+      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "value" if identifier.get_parent("parameter").is_none() => identifier
+        .get_recipe(self.document)
+        .and_then(|recipe| {
+          recipe
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == name)
+            .cloned()
+            .map(Symbol::Parameter)
+        })
+        .or_else(|| self.document.find_variable(&name).map(Symbol::Variable))
+        .or_else(|| builtin_constant(&name)),
+      "value" => self
+        .document
+        .find_variable(&name)
+        .map(Symbol::Variable)
+        .or_else(|| builtin_constant(&name)),
+      _ => BUILTINS
+        .iter()
+        .find(|builtin| match builtin {
+          Builtin::Attribute {
+            name: attribute_name,
+            ..
+          } => parent_kind == "attribute" && name == *attribute_name,
+          Builtin::Constant { .. } => false,
+          Builtin::Function {
+            name: function_name,
+            ..
+          } => parent_kind == "function_call" && name == *function_name,
+          Builtin::Setting {
+            name: setting_name, ..
+          } => parent_kind == "setting" && name == *setting_name,
+        })
+        .map(Symbol::Builtin),
     }
-
-    if parent_kind == "value" {
-      let recipe_node = identifier.get_parent("recipe")?;
-
-      let recipe = self.document.find_recipe(
-        &self
-          .document
-          .get_node_text(&recipe_node.find("recipe_header > identifier")?),
-      );
-
-      let in_parameter_default = identifier.get_parent("parameter").is_some();
-
-      if let Some(recipe) = recipe
-        && !in_parameter_default
-      {
-        for parameter in &recipe.parameters {
-          if parameter.name == name {
-            return Some(Symbol::Parameter(parameter.clone()));
-          }
-        }
-      }
-
-      if let Some(variable) = self.document.find_variable(&name) {
-        return Some(Symbol::Variable(variable));
-      }
-
-      for builtin in &BUILTINS {
-        if let Builtin::Constant {
-          name: constant_name,
-          ..
-        } = builtin
-          && name == *constant_name
-        {
-          return Some(Symbol::Builtin(builtin));
-        }
-      }
-    }
-
-    for builtin in &BUILTINS {
-      if match builtin {
-        Builtin::Attribute { name: n, .. } => {
-          parent_kind == "attribute" && name == *n
-        }
-        Builtin::Function { name: n, .. } => {
-          parent_kind == "function_call" && name == *n
-        }
-        Builtin::Setting { name: n, .. } => {
-          parent_kind == "setting" && name == *n
-        }
-        _ => false,
-      } {
-        return Some(Symbol::Builtin(builtin));
-      }
-    }
-
-    if parent_kind == "assignment" {
-      if let Some(variable) = self.document.find_variable(&name) {
-        return Some(Symbol::Variable(variable));
-      }
-    }
-
-    if parent_kind == "parameter" || parent_kind == "variadic_parameter" {
-      if let Some(recipe) = self.enclosing_recipe(identifier) {
-        for parameter in &recipe.parameters {
-          if parameter.name == name {
-            return Some(Symbol::Parameter(parameter.clone()));
-          }
-        }
-      }
-    }
-
-    None
   }
 }
 
