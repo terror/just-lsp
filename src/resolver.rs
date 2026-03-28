@@ -6,295 +6,79 @@ pub(crate) struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
+  /// Creates a new `Resolver` bound to the given `Document`.
   #[must_use]
   pub(crate) fn new(document: &'a Document) -> Self {
     Self { document }
   }
 
-  /// Returns the [`lsp::Location`] that defines the symbol represented by
-  /// `identifier`.
-  ///
-  /// The resolver inspects the identifier's parent node to infer what kind of
-  /// symbol is being referenced. Recipe invocations that appear in aliases or
-  /// dependency lists resolve to the recipe header, identifiers inside a
-  /// recipe body (`value`) prefer matching parameters, then global variables,
-  /// and finally builtin constants. It also surfaces builtin
-  /// attribute/function/setting identifiers by returning the range of
-  /// the identifier itself so editors can jump to inline documentation.
-  ///
-  /// When the identifier belongs to a header construct (assignments,
-  /// parameters, variadic parameters, or the recipe header identifier) the
-  /// range of that construct is returned. `None` indicates that the resolver
-  /// could not find a definition in the current document.
+  /// Returns the definition site of the symbol that `identifier` refers
+  /// to. Builtins have no in-document declaration, so the identifier's
+  /// own range is returned instead, letting editors anchor inline
+  /// documentation at the cursor.
   #[must_use]
   pub(crate) fn resolve_identifier_definition(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
-    let identifier_name = self.document.get_node_text(identifier);
-
-    let identifier_parent_kind = identifier.parent()?.kind();
-
-    if ["dependency", "alias"].contains(&identifier_parent_kind)
-      && let Some(recipe) = self.document.find_recipe(&identifier_name)
-    {
-      return Some(lsp::Location {
-        uri: self.document.uri.clone(),
-        range: recipe.range,
-      });
-    }
-
-    if identifier_parent_kind == "value" {
-      let recipe_node = identifier.get_parent("recipe")?;
-
-      let recipe = self.document.find_recipe(
-        &self
-          .document
-          .get_node_text(&recipe_node.find("recipe_header > identifier")?),
-      );
-
-      let in_parameter_default = identifier.get_parent("parameter").is_some();
-
-      if let Some(recipe) = recipe
-        && !in_parameter_default
-      {
-        for param in &recipe.parameters {
-          if param.name == identifier_name {
-            return Some(lsp::Location {
-              uri: self.document.uri.clone(),
-              range: param.range,
-            });
-          }
-        }
-      }
-
-      let variables = self.document.variables();
-
-      for variable in variables {
-        if variable.name.value == identifier_name {
-          return Some(lsp::Location {
-            uri: self.document.uri.clone(),
-            range: variable.range,
-          });
-        }
-      }
-
-      for builtin in &BUILTINS {
-        match builtin {
-          Builtin::Constant { name, .. } if identifier_name == *name => {
-            return Some(lsp::Location {
-              uri: self.document.uri.clone(),
-              range: identifier.get_range(self.document),
-            });
-          }
-          _ => {}
-        }
-      }
-    }
-
-    for builtin in &BUILTINS {
-      match builtin {
-        Builtin::Attribute { name, .. }
-          if identifier_name == *name
-            && identifier_parent_kind == "attribute" =>
-        {
-          return Some(lsp::Location {
-            uri: self.document.uri.clone(),
-            range: identifier.get_range(self.document),
-          });
-        }
-        Builtin::Function { name, .. }
-          if identifier_name == *name
-            && identifier_parent_kind == "function_call" =>
-        {
-          return Some(lsp::Location {
-            uri: self.document.uri.clone(),
-            range: identifier.get_range(self.document),
-          });
-        }
-        Builtin::Setting { name, .. }
-          if identifier_name == *name
-            && identifier_parent_kind == "setting" =>
-        {
-          return Some(lsp::Location {
-            uri: self.document.uri.clone(),
-            range: identifier.get_range(self.document),
-          });
-        }
-        _ => {}
-      }
-    }
-
-    match identifier_parent_kind {
-      "recipe_header" => {
-        let recipe_node = identifier.parent()?.parent()?;
-
-        if recipe_node.kind() == "recipe" {
-          return Some(lsp::Location {
-            uri: self.document.uri.clone(),
-            range: recipe_node.get_range(self.document),
-          });
-        }
-      }
-      "assignment" | "parameter" | "variadic_parameter" => {
-        return Some(lsp::Location {
-          uri: self.document.uri.clone(),
-          range: identifier.parent()?.get_range(self.document),
-        });
-      }
-      _ => {}
-    }
-
-    None
+    Some(lsp::Location {
+      range: match self.resolve_symbol(identifier)? {
+        Symbol::Builtin(_) => identifier.get_range(self.document),
+        Symbol::Parameter(parameter) => parameter.range,
+        Symbol::Recipe(recipe) => recipe.range,
+        Symbol::Variable(variable) => variable.range,
+      },
+      uri: self.document.uri.clone(),
+    })
   }
 
-  /// Builds an [`lsp::Hover`] for the symbol at `identifier`.
-  ///
-  /// When the identifier names a recipe (inside aliases, dependencies, or the
-  /// recipe header) the hover shows the rendered recipe body. Within a recipe
-  /// body the resolver prefers parameter documentation, then global variable
-  /// documentation, and finally the associated builtin constant description.
-  /// Builtin attributes, functions, and settings also map to their builtin
-  /// documentation as long as the identifier appears in the appropriate
-  /// syntactic context.
-  ///
-  /// If no contextual information exists the function returns `None`.
+  /// Builds hover content for the symbol at `identifier`. User-defined
+  /// symbols show their source text; builtins show their Markdown
+  /// documentation from the static [`BUILTINS`] table.
   #[must_use]
   pub(crate) fn resolve_identifier_hover(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Hover> {
-    let text = self.document.get_node_text(identifier);
-
-    let parent_kind = identifier.parent().map(|p| p.kind());
-
-    if let Some(recipe) = self.document.find_recipe(&text)
-      && parent_kind.is_some_and(|kind| {
-        ["alias", "dependency", "recipe_header"].contains(&kind)
-      })
-    {
-      return Some(lsp::Hover {
-        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-          kind: lsp::MarkupKind::PlainText,
-          value: recipe.content,
-        }),
-        range: Some(identifier.get_range(self.document)),
-      });
-    }
-
-    if parent_kind.is_some_and(|kind| kind == "value") {
-      let recipe_node = identifier.get_parent("recipe")?;
-
-      let recipe = self.document.find_recipe(
-        &self
-          .document
-          .get_node_text(&recipe_node.find("recipe_header > identifier")?),
-      );
-
-      let in_parameter_default = identifier.get_parent("parameter").is_some();
-
-      if !in_parameter_default && let Some(recipe) = recipe {
-        for parameter in recipe.parameters {
-          if parameter.name == text {
-            return Some(lsp::Hover {
-              contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-                kind: lsp::MarkupKind::PlainText,
-                value: parameter.content,
-              }),
-              range: Some(identifier.get_range(self.document)),
-            });
-          }
-        }
-      }
-
-      let variables = self.document.variables();
-
-      for variable in variables {
-        if variable.name.value == text {
-          return Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(lsp::MarkupContent {
-              kind: lsp::MarkupKind::PlainText,
-              value: variable.content,
-            }),
-            range: Some(identifier.get_range(self.document)),
-          });
-        }
-      }
-
-      for builtin in &BUILTINS {
-        match builtin {
-          Builtin::Constant { name, .. } if text == *name => {
-            return Some(lsp::Hover {
-              contents: lsp::HoverContents::Markup(builtin.documentation()),
-              range: Some(identifier.get_range(self.document)),
-            });
-          }
-          _ => {}
-        }
-      }
-    }
-
-    for builtin in &BUILTINS {
-      match builtin {
-        Builtin::Attribute { name, .. }
-          if text == *name
-            && parent_kind.is_some_and(|kind| kind == "attribute") =>
-        {
-          return Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range(self.document)),
-          });
-        }
-        Builtin::Function { name, .. }
-          if text == *name
-            && parent_kind.is_some_and(|kind| kind == "function_call") =>
-        {
-          return Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range(self.document)),
-          });
-        }
-        Builtin::Setting { name, .. }
-          if text == *name
-            && parent_kind.is_some_and(|kind| kind == "setting") =>
-        {
-          return Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(builtin.documentation()),
-            range: Some(identifier.get_range(self.document)),
-          });
-        }
-        _ => {}
-      }
-    }
-
-    None
+    Some(lsp::Hover {
+      contents: lsp::HoverContents::Markup(
+        match self.resolve_symbol(identifier)? {
+          Symbol::Builtin(builtin) => builtin.documentation(),
+          Symbol::Parameter(parameter) => lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: parameter.content,
+          },
+          Symbol::Recipe(recipe) => lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: recipe.content,
+          },
+          Symbol::Variable(variable) => lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: variable.content,
+          },
+        },
+      ),
+      range: Some(identifier.get_range(self.document)),
+    })
   }
 
-  /// Collects every [`lsp::Location`] that references the same logical symbol
-  /// as `identifier`.
+  /// Collects every location in the document that references the same
+  /// symbol as `identifier`. The identifier itself is always included.
   ///
-  /// The resolver walks the entire syntax tree, filters identifier nodes with
-  /// matching text, and then applies parent-kind specific rules so that
-  /// references stay within the correct scope. Recipe names only match other
-  /// aliases/dependencies/headers, assignment targets only match body usages
-  /// that are not shadowed by parameters, and parameters (including variadic
-  /// ones) only match within the same recipe. Identifiers inside the
-  /// recipe body (`value`) will match local parameters first and fall back to
-  /// global assignments when no shadowing parameters exist. The identifier
-  /// node itself is always included.
-  ///
-  /// An empty vector is returned when the document tree or necessary parent
-  /// context is missing.
+  /// Scoping follows `just`'s semantics: parameters are local to their
+  /// recipe, while variables are global but can be shadowed by a
+  /// same-named parameter. Variable references inside parameter defaults
+  /// (e.g. `a=a`) are treated as belonging to the outer scope, not the
+  /// parameter being defined.
   #[must_use]
   pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
-    let identifier_name = self.document.get_node_text(identifier);
+    let name = self.document.get_node_text(identifier);
 
-    let identifier_parent_kind = match identifier.parent() {
-      Some(parent) => parent.kind(),
-      None => return Vec::new(),
+    let Some(symbol) = self.resolve_symbol(identifier) else {
+      return Vec::new();
     };
 
     let root = match &self.document.tree {
@@ -310,7 +94,7 @@ impl<'a> Resolver<'a> {
           return true;
         }
 
-        if self.document.get_node_text(candidate) != identifier_name {
+        if self.document.get_node_text(candidate) != name {
           return false;
         }
 
@@ -320,12 +104,26 @@ impl<'a> Resolver<'a> {
 
         let candidate_parent_kind = candidate_parent.kind();
 
-        match identifier_parent_kind {
-          "alias" | "dependency" | "recipe_header" => {
-            ["alias", "dependency", "recipe_header"]
-              .contains(&candidate_parent_kind)
+        match &symbol {
+          Symbol::Builtin(_) => false,
+          Symbol::Parameter(_) => {
+            let in_same_recipe = matches!(
+              (identifier.get_parent("recipe"), candidate.get_parent("recipe")),
+              (Some(r1), Some(r2)) if r1.id() == r2.id()
+            );
+
+            in_same_recipe
+              && ["value", "parameter", "variadic_parameter"]
+                .contains(&candidate_parent_kind)
           }
-          "assignment" => {
+          Symbol::Recipe(_) => ["alias", "dependency", "recipe_header"]
+            .contains(&candidate_parent_kind),
+
+          Symbol::Variable(_) => {
+            if candidate_parent_kind == "assignment" {
+              return true;
+            }
+
             if candidate_parent_kind != "value" {
               return false;
             }
@@ -334,75 +132,13 @@ impl<'a> Resolver<'a> {
               return true;
             }
 
-            let candidate_recipe = self.document.find_recipe(
-              &candidate_parent
-                .get_parent("recipe")
-                .as_ref()
-                .and_then(|recipe_node| {
-                  recipe_node.find("recipe_header > identifier")
-                })
-                .map_or_else(String::new, |identifier_node| {
-                  self.document.get_node_text(&identifier_node)
-                }),
-            );
-
-            candidate_recipe.is_some_and(|recipe| {
+            candidate.get_recipe(self.document).is_some_and(|recipe| {
               !recipe
                 .parameters
                 .iter()
-                .any(|param| param.name == identifier_name)
+                .any(|parameter| parameter.name == name)
             })
           }
-          "parameter" | "variadic_parameter" => {
-            let in_same_recipe = match (
-              identifier.get_parent("recipe"),
-              candidate.get_parent("recipe"),
-            ) {
-              (Some(r1), Some(r2)) => r1.id() == r2.id(),
-              _ => false,
-            };
-
-            in_same_recipe
-              && ["value", "parameter", "variadic_parameter"]
-                .contains(&candidate_parent_kind)
-          }
-          "value" => {
-            let in_same_recipe = match (
-              identifier.get_parent("recipe"),
-              candidate.get_parent("recipe"),
-            ) {
-              (Some(r1), Some(r2)) => r1.id() == r2.id(),
-              _ => false,
-            };
-
-            if in_same_recipe
-              && ["parameter", "value"].contains(&candidate_parent_kind)
-            {
-              return true;
-            }
-
-            let identifier_recipe = self.document.find_recipe(
-              &identifier
-                .get_parent("recipe")
-                .as_ref()
-                .and_then(|recipe_node| {
-                  recipe_node.find("recipe_header > identifier")
-                })
-                .map(|identifier_node| {
-                  self.document.get_node_text(&identifier_node)
-                })
-                .unwrap_or_default(),
-            );
-
-            identifier_recipe.is_some_and(|recipe| {
-              candidate_parent_kind == "assignment"
-                && !recipe
-                  .parameters
-                  .iter()
-                  .any(|param| param.name == identifier_name)
-            })
-          }
-          _ => false,
         }
       })
       .map(|found| lsp::Location {
@@ -410,6 +146,82 @@ impl<'a> Resolver<'a> {
         range: found.get_range(self.document),
       })
       .collect()
+  }
+
+  /// Classifies `identifier` into the [`Symbol`] it refers to, following
+  /// `just`'s name-resolution priority: recipe names, then parameters
+  /// (which shadow globals within their recipe), then variables, then
+  /// builtins.
+  ///
+  /// Identifiers at definition sites (the left-hand side of an
+  /// assignment, or a parameter name in a recipe header) are looked up
+  /// through the document so that callers receive a fully-populated
+  /// [`Symbol`] rather than a raw range.
+  fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+    let name = self.document.get_node_text(identifier);
+
+    let parent_kind = identifier.parent()?.kind();
+
+    let builtin_constant = |name: &str| {
+      BUILTINS
+        .iter()
+        .find(|builtin| matches!(
+          builtin,
+          Builtin::Constant { name: builtin_name, .. } if name == *builtin_name
+        ))
+        .map(Symbol::Builtin)
+    };
+
+    match parent_kind {
+      "alias" | "dependency" | "recipe_header" => {
+        self.document.find_recipe(&name).map(Symbol::Recipe)
+      }
+      "parameter" | "variadic_parameter" => {
+        identifier.get_recipe(self.document).and_then(|recipe| {
+          recipe
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == name)
+            .cloned()
+            .map(Symbol::Parameter)
+        })
+      }
+      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "value" if identifier.get_parent("parameter").is_none() => identifier
+        .get_recipe(self.document)
+        .and_then(|recipe| {
+          recipe
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == name)
+            .cloned()
+            .map(Symbol::Parameter)
+        })
+        .or_else(|| self.document.find_variable(&name).map(Symbol::Variable))
+        .or_else(|| builtin_constant(&name)),
+      "value" => self
+        .document
+        .find_variable(&name)
+        .map(Symbol::Variable)
+        .or_else(|| builtin_constant(&name)),
+      _ => BUILTINS
+        .iter()
+        .find(|builtin| match builtin {
+          Builtin::Attribute {
+            name: attribute_name,
+            ..
+          } => parent_kind == "attribute" && name == *attribute_name,
+          Builtin::Constant { .. } => false,
+          Builtin::Function {
+            name: function_name,
+            ..
+          } => parent_kind == "function_call" && name == *function_name,
+          Builtin::Setting {
+            name: setting_name, ..
+          } => parent_kind == "setting" && name == *setting_name,
+        })
+        .map(Symbol::Builtin),
+    }
   }
 }
 
