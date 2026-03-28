@@ -123,7 +123,6 @@ impl<'a> Resolver<'a> {
             "recipe_header",
           ]
           .contains(&candidate_parent_kind),
-
           Symbol::Variable(_) => {
             if candidate_parent_kind == "assignment" {
               return true;
