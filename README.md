@@ -184,9 +184,10 @@ to get it setup on your system.
 ### Zed
 
 A third-party [**Zed**](https://zed.dev/) extension is maintained over at
-https://github.com/sectore/zed-just-ls, written by
-[@sectore](https://github.com/sectore). Follow the instructions in that
-repository to get it setup on your system.
+https://github.com/jackTabsCode/zed-just, written by
+[@jackTabsCode](https://github.com/jackTabsCode) &
+[@mattrobenolt](https://github.com/mattrobenolt). Follow the instructions in
+that repository to get it setup on your system.
 
 ## Configuration
 
