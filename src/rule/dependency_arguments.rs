@@ -13,40 +13,39 @@ define_rule! {
 
       for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
-          if let Some(params) = recipe_parameters.get(&dependency.name) {
-            let required_params = params
+          if let Some(parameters) = recipe_parameters.get(&dependency.name) {
+            let required_parameters = parameters
               .iter()
-              .filter(|p| {
-                p.default_value.is_none()
+              .filter(|parameter| {
+                parameter.default_value.is_none()
                   && !matches!(
-                    p.kind,
+                    parameter.kind,
                     ParameterKind::Variadic(VariadicType::ZeroOrMore)
                   )
               })
               .count();
 
-            let has_variadic = params
+            let has_variadic = parameters
               .iter()
-              .any(|p| matches!(p.kind, ParameterKind::Variadic(_)));
+              .any(|parameter| matches!(parameter.kind, ParameterKind::Variadic(_)));
 
-            let total_params = params.len();
-            let arg_count = dependency.arguments.len();
+            let (argument_count, parameter_count) = (dependency.arguments.len(), parameters.len());
 
-            if arg_count < required_params {
+            if argument_count < required_parameters {
               diagnostics.push(Diagnostic::error(
                 format!(
-                  "Dependency `{}` requires {required_params} {}, but {arg_count} provided",
+                  "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
                   dependency.name,
-                  Count("argument", required_params)
+                  Count("argument", required_parameters)
                 ),
                 dependency.range,
               ));
-            } else if !has_variadic && arg_count > total_params {
+            } else if !has_variadic && argument_count > parameter_count {
               diagnostics.push(Diagnostic::error(
                 format!(
-                  "Dependency `{}` accepts {total_params} {}, but {arg_count} provided",
+                  "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
                   dependency.name,
-                  Count("argument", total_params)
+                  Count("argument", parameter_count)
                 ),
                 dependency.range,
               ));
