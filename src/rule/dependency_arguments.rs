@@ -18,7 +18,10 @@ define_rule! {
               .iter()
               .filter(|p| {
                 p.default_value.is_none()
-                  && !matches!(p.kind, ParameterKind::Variadic(_))
+                  && !matches!(
+                    p.kind,
+                    ParameterKind::Variadic(VariadicType::ZeroOrMore)
+                  )
               })
               .count();
 

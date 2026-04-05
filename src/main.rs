@@ -21,7 +21,7 @@ use {
   import::Import,
   module::Module,
   node_ext::NodeExt,
-  parameter::{Parameter, ParameterJson, ParameterKind},
+  parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
   recipe::Recipe,
