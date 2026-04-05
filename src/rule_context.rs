@@ -73,8 +73,10 @@ impl IdentifierAnalysis {
     let identifier_name = document.get_node_text(&identifier);
 
     if let Some(function_node) = identifier.get_parent("function_definition") {
-      let function_name_node =
-        function_node.child_by_field_name("name").unwrap();
+      let Some(function_name_node) = function_node.child_by_field_name("name")
+      else {
+        return;
+      };
 
       let function_name = document.get_node_text(&function_name_node);
 
