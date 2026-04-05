@@ -41,7 +41,9 @@ impl IdentifierAnalysis {
         );
       }
 
-      for identifier in root.find_all("parameter > value > identifier") {
+      for identifier in root.find_all(
+        "parameter > value > identifier, variadic_parameter > value > identifier",
+      ) {
         Self::record_identifier(
           context,
           &mut recipe_identifier_usage,
@@ -86,17 +88,34 @@ impl IdentifierAnalysis {
         .or_default()
         .insert(identifier_name.clone());
 
-      let in_parameter_default = identifier.get_parent("parameter").is_some();
+      let containing_parameter = identifier
+        .get_parent("parameter")
+        .or_else(|| identifier.get_parent("variadic_parameter"));
 
-      if !in_parameter_default
-        && recipe_parameters
+      if let Some(containing_parameter) = &containing_parameter {
+        let containing_parameter_name = document
+          .get_node_text(&containing_parameter.find("identifier").unwrap());
+
+        if recipe_parameters
           .get(&recipe.name.value)
           .is_some_and(|parameters| {
             parameters
               .iter()
+              .take_while(|parameter| {
+                parameter.name != containing_parameter_name
+              })
               .any(|parameter| parameter.name == identifier_name)
           })
-      {
+        {
+          return;
+        }
+      } else if recipe_parameters.get(&recipe.name.value).is_some_and(
+        |parameters| {
+          parameters
+            .iter()
+            .any(|parameter| parameter.name == identifier_name)
+        },
+      ) {
         return;
       }
     }
