@@ -2011,6 +2011,22 @@ mod tests {
   }
 
   #[test]
+  fn set_export_suppresses_unused_variable_warnings() {
+    Test::new(indoc! {
+      "
+      set export
+
+      foo := 'bar'
+      baz := 'qux'
+
+      recipe:
+        echo $foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn os_specific_duplicate_recipes() {
     Test::new(indoc! {
       "

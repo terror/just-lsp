@@ -13,6 +13,8 @@ define_rule! {
         return diagnostics;
       }
 
+      let exported = context.setting_enabled("export");
+
       for (variable_name, is_used) in context.variable_usage() {
         if *is_used {
           continue;
@@ -23,7 +25,7 @@ define_rule! {
           continue;
         };
 
-        if variable.export {
+        if variable.export || exported {
           continue;
         }
 
