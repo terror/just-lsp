@@ -380,15 +380,15 @@ impl Inner {
       }
 
       for function in document.functions() {
-        let params = function
+        let parameters = function
           .parameters
           .iter()
-          .map(|p| p.value.as_str())
+          .map(|parameter| parameter.value.as_str())
           .collect::<Vec<_>>()
           .join(", ");
 
         completion_items.push(lsp::CompletionItem {
-          label: format!("{}({})", function.name.value, params),
+          label: format!("{}({})", function.name.value, parameters),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
@@ -593,17 +593,17 @@ impl Inner {
       }
 
       for function in document.functions() {
-        let params = function
+        let parameters = function
           .parameters
           .iter()
-          .map(|p| p.value.as_str())
+          .map(|parameter| parameter.value.as_str())
           .collect::<Vec<_>>()
           .join(", ");
 
         #[allow(deprecated)]
         symbols.push(lsp::DocumentSymbol {
           name: function.name.value,
-          detail: Some(format!("({params})")),
+          detail: Some(format!("({parameters})")),
           kind: lsp::SymbolKind::FUNCTION,
           tags: None,
           deprecated: None,
