@@ -147,6 +147,14 @@ impl Document {
   }
 
   #[must_use]
+  pub(crate) fn find_function(&self, name: &str) -> Option<Function> {
+    self
+      .functions()
+      .into_iter()
+      .find(|function| function.name.value == name)
+  }
+
+  #[must_use]
   pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .recipes()
@@ -224,6 +232,50 @@ impl Document {
             },
             arguments,
             range: function_call_node.get_range(self),
+          })
+        })
+        .collect()
+    })
+  }
+
+  #[must_use]
+  pub(crate) fn functions(&self) -> Vec<Function> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("function_definition")
+        .iter()
+        .filter_map(|function_node| {
+          let name_node = function_node.child_by_field_name("name")?;
+
+          let parameters = function_node
+            .child_by_field_name("parameters")
+            .map(|params_node| {
+              params_node
+                .find_all("^identifier")
+                .iter()
+                .map(|param_node| TextNode {
+                  value: self.get_node_text(param_node),
+                  range: param_node.get_range(self),
+                })
+                .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+          let body = function_node
+            .child_by_field_name("body")
+            .map(|body_node| self.get_node_text(&body_node))
+            .unwrap_or_default();
+
+          Some(Function {
+            name: TextNode {
+              value: self.get_node_text(&name_node),
+              range: name_node.get_range(self),
+            },
+            parameters,
+            body,
+            content: self.get_node_text(function_node).trim().to_string(),
+            range: function_node.get_range(self),
           })
         })
         .collect()
@@ -1832,6 +1884,90 @@ mod tests {
           range: range((2, 9, 2, 36)),
         },
       ],
+    );
+  }
+
+  #[test]
+  fn list_functions() {
+    let document = Document::from(indoc! {
+      "
+      hello(name) := f\"Hello, \" + name
+
+      greet(a, b) := hello(a) + \" and \" + hello(b)
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![
+        Function {
+          name: TextNode {
+            value: "hello".into(),
+            range: range((0, 0, 0, 5)),
+          },
+          parameters: vec![TextNode {
+            value: "name".into(),
+            range: range((0, 6, 0, 10)),
+          }],
+          body: "f\"Hello, \" + name".into(),
+          content: "hello(name) := f\"Hello, \" + name".into(),
+          range: range((0, 0, 1, 0)),
+        },
+        Function {
+          name: TextNode {
+            value: "greet".into(),
+            range: range((2, 0, 2, 5)),
+          },
+          parameters: vec![
+            TextNode {
+              value: "a".into(),
+              range: range((2, 6, 2, 7)),
+            },
+            TextNode {
+              value: "b".into(),
+              range: range((2, 9, 2, 10)),
+            },
+          ],
+          body: "hello(a) + \" and \" + hello(b)".into(),
+          content: "greet(a, b) := hello(a) + \" and \" + hello(b)".into(),
+          range: range((2, 0, 3, 0)),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn find_function() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+      "
+    });
+
+    assert!(document.find_function("foo").is_some());
+    assert!(document.find_function("bar").is_none());
+  }
+
+  #[test]
+  fn function_no_parameters() {
+    let document = Document::from(indoc! {
+      "
+      foo() := \"bar\"
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![Function {
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 0, 0, 3)),
+        },
+        parameters: vec![],
+        body: "\"bar\"".into(),
+        content: "foo() := \"bar\"".into(),
+        range: range((0, 0, 1, 0)),
+      }],
     );
   }
 }

@@ -34,6 +34,12 @@
 
 ; Functions
 
+(function_definition
+  name: (identifier) @function)
+
+(function_parameters
+  (identifier) @variable.parameter)
+
 (recipe_header
   name: (identifier) @function)
 

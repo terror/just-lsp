@@ -94,9 +94,28 @@ module.exports = grammar({
         $.eager,
         $.export,
         $.unexport,
+        $.function_definition,
         $.import,
         $.module,
         $.setting,
+      ),
+
+    // function      : NAME '(' parameters? ')' ':=' expression
+    function_definition: ($) =>
+      seq(
+        field("name", $.identifier),
+        "(",
+        optional(field("parameters", $.function_parameters)),
+        ")",
+        ":=",
+        field("body", $.expression),
+        $._newline,
+      ),
+
+    function_parameters: ($) =>
+      seq(
+        comma_sep1(field("parameter", $.identifier)),
+        optional(","),
       ),
 
     // alias         : 'alias' NAME ':=' NAME

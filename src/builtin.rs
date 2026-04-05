@@ -20,7 +20,7 @@ pub(crate) enum Builtin<'a> {
     name: &'a str,
     signature: &'a str,
     description: &'a str,
-    required_args: usize,
+    required_arguments: usize,
     accepts_variadic: bool,
     deprecated: Option<&'a str>,
   },

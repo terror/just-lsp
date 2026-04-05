@@ -2825,4 +2825,95 @@ mod tests {
     .warning(Message::Text("Recipe `baz` not found"))
     .run();
   }
+
+  #[test]
+  fn user_defined_function_not_flagged_as_unknown() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_wrong_arity() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"a\", \"b\") }}
+      "
+    })
+    .error(Message::Text(
+      "Function `foo` accepts 1 argument, but 2 provided",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_too_few_args() {
+    Test::new(indoc! {
+      "
+      foo(a, b) := a + b
+
+      bar:
+        echo {{ foo(\"a\") }}
+      "
+    })
+    .error(Message::Text(
+      "Function `foo` accepts 2 arguments, but 1 provided",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_parameters_not_unresolved() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_body_references_variable() {
+    Test::new(indoc! {
+      "
+      base := \"hello\"
+
+      foo(x) := base + x
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_body_unknown_identifier() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + unknown
+      "
+    })
+    .error(Message::Text("Variable `unknown` not found"))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_no_params() {
+    Test::new(indoc! {
+      "
+      foo() := \"bar\"
+
+      baz:
+        echo {{ foo() }}
+      "
+    })
+    .run();
+  }
 }

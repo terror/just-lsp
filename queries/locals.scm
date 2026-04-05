@@ -6,6 +6,7 @@
 ; Scope
 
 (recipe) @local.scope
+(function_definition) @local.scope
 
 ; Definitions
 
@@ -14,6 +15,12 @@
 
 (assignment
   left: (identifier) @local.definition.var)
+
+(function_definition
+  name: (identifier) @local.definition.function)
+
+(function_parameters
+  (identifier) @local.definition.var)
 
 (module
   name: (identifier) @local.definition.namespace)
