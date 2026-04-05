@@ -77,16 +77,17 @@ impl IdentifierAnalysis {
     if let Some(function_node) = identifier.get_parent("function_definition") {
       let function_name_node =
         function_node.child_by_field_name("name").unwrap();
+
       let function_name = document.get_node_text(&function_name_node);
 
       if let Some(function) = context
         .functions()
         .iter()
-        .find(|f| f.name.value == function_name)
+        .find(|function| function.name.value == function_name)
         && function
           .parameters
           .iter()
-          .any(|p| p.value == identifier_name)
+          .any(|parameter| parameter.value == identifier_name)
       {
         return;
       }
