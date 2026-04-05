@@ -209,6 +209,19 @@ impl<'a> Resolver<'a> {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "function_call" => self
+        .document
+        .find_function(&name)
+        .map(Symbol::Function)
+        .or_else(|| {
+          BUILTINS
+            .iter()
+            .find(|builtin| matches!(
+              builtin,
+              Builtin::Function { name: builtin_name, .. } if name == *builtin_name
+            ))
+            .map(Symbol::Builtin)
+        }),
       "function_definition" => {
         self.document.find_function(&name).map(Symbol::Function)
       }
@@ -267,31 +280,19 @@ impl<'a> Resolver<'a> {
           }
         }
       }
-      _ => {
-        if parent_kind == "function_call"
-          && let Some(function) = self.document.find_function(&name)
-        {
-          return Some(Symbol::Function(function));
-        }
-
-        BUILTINS
-          .iter()
-          .find(|builtin| match builtin {
-            Builtin::Attribute {
-              name: attribute_name,
-              ..
-            } => parent_kind == "attribute" && name == *attribute_name,
-            Builtin::Constant { .. } => false,
-            Builtin::Function {
-              name: function_name,
-              ..
-            } => parent_kind == "function_call" && name == *function_name,
-            Builtin::Setting {
-              name: setting_name, ..
-            } => parent_kind == "setting" && name == *setting_name,
-          })
-          .map(Symbol::Builtin)
-      }
+      _ => BUILTINS
+        .iter()
+        .find(|builtin| match builtin {
+          Builtin::Attribute {
+            name: attribute_name,
+            ..
+          } => parent_kind == "attribute" && name == *attribute_name,
+          Builtin::Setting {
+            name: setting_name, ..
+          } => parent_kind == "setting" && name == *setting_name,
+          _ => false,
+        })
+        .map(Symbol::Builtin),
     }
   }
 }
