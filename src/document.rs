@@ -1897,28 +1897,42 @@ mod tests {
       "
     });
 
-    let functions = document.functions();
-
-    assert_eq!(functions.len(), 2);
-
-    assert_eq!(functions[0].name.value, "hello");
     assert_eq!(
-      functions[0]
-        .parameters
-        .iter()
-        .map(|p| p.value.as_str())
-        .collect::<Vec<_>>(),
-      vec!["name"],
-    );
-
-    assert_eq!(functions[1].name.value, "greet");
-    assert_eq!(
-      functions[1]
-        .parameters
-        .iter()
-        .map(|p| p.value.as_str())
-        .collect::<Vec<_>>(),
-      vec!["a", "b"],
+      document.functions(),
+      vec![
+        Function {
+          name: TextNode {
+            value: "hello".into(),
+            range: range((0, 0, 0, 5)),
+          },
+          parameters: vec![TextNode {
+            value: "name".into(),
+            range: range((0, 6, 0, 10)),
+          }],
+          body: "f\"Hello, \" + name".into(),
+          content: "hello(name) := f\"Hello, \" + name".into(),
+          range: range((0, 0, 1, 0)),
+        },
+        Function {
+          name: TextNode {
+            value: "greet".into(),
+            range: range((2, 0, 2, 5)),
+          },
+          parameters: vec![
+            TextNode {
+              value: "a".into(),
+              range: range((2, 6, 2, 7)),
+            },
+            TextNode {
+              value: "b".into(),
+              range: range((2, 9, 2, 10)),
+            },
+          ],
+          body: "hello(a) + \" and \" + hello(b)".into(),
+          content: "greet(a, b) := hello(a) + \" and \" + hello(b)".into(),
+          range: range((2, 0, 3, 0)),
+        },
+      ],
     );
   }
 
@@ -1942,10 +1956,18 @@ mod tests {
       "
     });
 
-    let functions = document.functions();
-
-    assert_eq!(functions.len(), 1);
-    assert_eq!(functions[0].name.value, "foo");
-    assert!(functions[0].parameters.is_empty());
+    assert_eq!(
+      document.functions(),
+      vec![Function {
+        name: TextNode {
+          value: "foo".into(),
+          range: range((0, 0, 0, 3)),
+        },
+        parameters: vec![],
+        body: "\"bar\"".into(),
+        content: "foo() := \"bar\"".into(),
+        range: range((0, 0, 1, 0)),
+      }],
+    );
   }
 }
