@@ -12,7 +12,9 @@ define_rule! {
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if context.builtin_function(function_name.as_str()).is_none() {
+        if context.builtin_function(function_name.as_str()).is_none()
+          && !context.user_function_names().contains(function_name)
+        {
           diagnostics.push(Diagnostic::error(
             format!("Unknown function `{function_name}`"),
             function_call.name.range,

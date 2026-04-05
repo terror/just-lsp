@@ -37,6 +37,23 @@ define_rule! {
               function_call.range,
             ));
           }
+        } else if let Some(function) = context
+          .functions()
+          .iter()
+          .find(|f| f.name.value == *function_name)
+        {
+          let arg_count = function_call.arguments.len();
+          let expected = function.parameters.len();
+
+          if arg_count != expected {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Function `{function_name}` accepts {expected} {}, but {arg_count} provided",
+                Count("argument", expected)
+              ),
+              function_call.range,
+            ));
+          }
         }
       }
 

@@ -24,6 +24,7 @@ impl<'a> Resolver<'a> {
     Some(lsp::Location {
       range: match self.resolve_symbol(identifier)? {
         Symbol::Builtin(_) => identifier.get_range(self.document),
+        Symbol::Function(function) => function.name.range,
         Symbol::Parameter(parameter) => parameter.range,
         Symbol::Recipe(recipe) => recipe.range,
         Symbol::Variable(variable) => variable.range,
@@ -44,6 +45,10 @@ impl<'a> Resolver<'a> {
       contents: lsp::HoverContents::Markup(
         match self.resolve_symbol(identifier)? {
           Symbol::Builtin(builtin) => builtin.documentation(),
+          Symbol::Function(function) => lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: function.content,
+          },
           Symbol::Parameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: parameter.content,
@@ -106,6 +111,10 @@ impl<'a> Resolver<'a> {
 
         match &symbol {
           Symbol::Builtin(_) => false,
+          Symbol::Function(_) => {
+            candidate_parent_kind == "function_call"
+              || candidate_parent_kind == "function_definition"
+          }
           Symbol::Parameter(_) => {
             let in_same_recipe = matches!(
               (identifier.get_parent("recipe"), candidate.get_parent("recipe")),
@@ -200,6 +209,9 @@ impl<'a> Resolver<'a> {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "function_definition" => {
+        self.document.find_function(&name).map(Symbol::Function)
+      }
       "parameter" | "variadic_parameter" => {
         identifier.get_recipe(self.document).and_then(|recipe| {
           recipe
@@ -255,23 +267,31 @@ impl<'a> Resolver<'a> {
           }
         }
       }
-      _ => BUILTINS
-        .iter()
-        .find(|builtin| match builtin {
-          Builtin::Attribute {
-            name: attribute_name,
-            ..
-          } => parent_kind == "attribute" && name == *attribute_name,
-          Builtin::Constant { .. } => false,
-          Builtin::Function {
-            name: function_name,
-            ..
-          } => parent_kind == "function_call" && name == *function_name,
-          Builtin::Setting {
-            name: setting_name, ..
-          } => parent_kind == "setting" && name == *setting_name,
-        })
-        .map(Symbol::Builtin),
+      _ => {
+        if parent_kind == "function_call"
+          && let Some(function) = self.document.find_function(&name)
+        {
+          return Some(Symbol::Function(function));
+        }
+
+        BUILTINS
+          .iter()
+          .find(|builtin| match builtin {
+            Builtin::Attribute {
+              name: attribute_name,
+              ..
+            } => parent_kind == "attribute" && name == *attribute_name,
+            Builtin::Constant { .. } => false,
+            Builtin::Function {
+              name: function_name,
+              ..
+            } => parent_kind == "function_call" && name == *function_name,
+            Builtin::Setting {
+              name: setting_name, ..
+            } => parent_kind == "setting" && name == *setting_name,
+          })
+          .map(Symbol::Builtin)
+      }
     }
   }
 }
@@ -1551,5 +1571,91 @@ mod tests {
     let nonexistent = root.find("value > identifier").unwrap();
 
     assert!(resolver.resolve_identifier_hover(&nonexistent).is_none());
+  }
+
+  #[test]
+  fn resolve_user_function_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let call_identifier = root.find("function_call > identifier").unwrap();
+
+    let definition = resolver
+      .resolve_identifier_definition(&call_identifier)
+      .unwrap();
+
+    assert_eq!(
+      definition.range,
+      lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0
+        },
+        end: lsp::Position {
+          line: 0,
+          character: 3
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_user_function_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let call_identifier = root.find("function_call > identifier").unwrap();
+
+    let hover = resolver.resolve_identifier_hover(&call_identifier).unwrap();
+
+    match hover.contents {
+      lsp::HoverContents::Markup(markup) => {
+        assert!(markup.value.contains("foo(x) :="));
+      }
+      _ => panic!("expected markup content"),
+    }
+  }
+
+  #[test]
+  fn resolve_user_function_references() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"a\") }}
+        echo {{ foo(\"b\") }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let def_identifier = root.find("function_definition > identifier").unwrap();
+
+    let references = resolver.resolve_identifier_references(&def_identifier);
+
+    assert_eq!(references.len(), 3);
   }
 }

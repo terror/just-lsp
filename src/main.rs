@@ -16,6 +16,7 @@ use {
   diagnostic::Diagnostic,
   document::Document,
   env_logger::Env,
+  function::Function,
   function_call::FunctionCall,
   group::Group,
   import::Import,
@@ -74,6 +75,7 @@ mod count;
 mod dependency;
 mod diagnostic;
 mod document;
+mod function;
 mod function_call;
 mod group;
 mod import;

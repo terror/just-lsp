@@ -379,6 +379,30 @@ impl Inner {
         });
       }
 
+      for function in document.functions() {
+        let params = function
+          .parameters
+          .iter()
+          .map(|p| p.value.as_str())
+          .collect::<Vec<_>>()
+          .join(", ");
+
+        completion_items.push(lsp::CompletionItem {
+          label: format!("{}({})", function.name.value, params),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::PlainText,
+              value: function.content.clone(),
+            },
+          )),
+          filter_text: Some(function.name.value.clone()),
+          insert_text: Some(function.name.value),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          ..Default::default()
+        });
+      }
+
       for builtin in &BUILTINS {
         completion_items.push(builtin.completion_item());
       }
@@ -564,6 +588,27 @@ impl Inner {
           deprecated: None,
           range: variable.range,
           selection_range: variable.name.range,
+          children: None,
+        });
+      }
+
+      for function in document.functions() {
+        let params = function
+          .parameters
+          .iter()
+          .map(|p| p.value.as_str())
+          .collect::<Vec<_>>()
+          .join(", ");
+
+        #[allow(deprecated)]
+        symbols.push(lsp::DocumentSymbol {
+          name: function.name.value,
+          detail: Some(format!("({params})")),
+          kind: lsp::SymbolKind::FUNCTION,
+          tags: None,
+          deprecated: None,
+          range: function.range,
+          selection_range: function.name.range,
           children: None,
         });
       }
