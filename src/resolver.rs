@@ -218,7 +218,7 @@ impl<'a> Resolver<'a> {
             .iter()
             .find(|builtin| matches!(
               builtin,
-              Builtin::Function { name: builtin_name, .. } if name == *builtin_name
+              Builtin::Function { name: function_name, .. } if name == *function_name
             ))
             .map(Symbol::Builtin)
         }),
