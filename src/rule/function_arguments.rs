@@ -13,26 +13,26 @@ define_rule! {
         let function_name = &function_call.name.value;
 
         if let Some(Builtin::Function {
-          required_args,
+          required_arguments,
           accepts_variadic,
           ..
         }) = context.builtin_function(function_name.as_str())
         {
-          let arg_count = function_call.arguments.len();
+          let argument_count = function_call.arguments.len();
 
-          if arg_count < *required_args {
+          if argument_count < *required_arguments {
             diagnostics.push(Diagnostic::error(
               format!(
-                "Function `{function_name}` requires at least {required_args} {}, but {arg_count} provided",
-                Count("argument", *required_args)
+                "Function `{function_name}` requires at least {required_arguments} {}, but {argument_count} provided",
+                Count("argument", *required_arguments)
               ),
               function_call.range,
             ));
-          } else if !accepts_variadic && arg_count > *required_args {
+          } else if !accepts_variadic && argument_count > *required_arguments {
             diagnostics.push(Diagnostic::error(
               format!(
-                "Function `{function_name}` accepts {required_args} {}, but {arg_count} provided",
-                Count("argument", *required_args)
+                "Function `{function_name}` accepts {required_arguments} {}, but {argument_count} provided",
+                Count("argument", *required_arguments)
               ),
               function_call.range,
             ));
@@ -40,16 +40,15 @@ define_rule! {
         } else if let Some(function) = context
           .functions()
           .iter()
-          .find(|f| f.name.value == *function_name)
+          .find(|function| function.name.value == *function_name)
         {
-          let arg_count = function_call.arguments.len();
-          let expected = function.parameters.len();
+          let (argument_count, parameter_count) = (function_call.arguments.len(), function.parameters.len());
 
-          if arg_count != expected {
+          if argument_count != parameter_count {
             diagnostics.push(Diagnostic::error(
               format!(
-                "Function `{function_name}` accepts {expected} {}, but {arg_count} provided",
-                Count("argument", expected)
+                "Function `{function_name}` accepts {parameter_count} {}, but {argument_count} provided",
+                Count("argument", parameter_count)
               ),
               function_call.range,
             ));
