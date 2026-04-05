@@ -132,10 +132,27 @@ impl<'a> Resolver<'a> {
               return false;
             }
 
-            if candidate.get_parent("parameter").is_some()
-              || candidate.get_parent("variadic_parameter").is_some()
-            {
-              return true;
+            let containing_parameter = candidate
+              .get_parent("parameter")
+              .or_else(|| candidate.get_parent("variadic_parameter"));
+
+            if let Some(containing_parameter) = containing_parameter {
+              let containing_parameter_name = self.document.get_node_text(
+                &containing_parameter.find("identifier").unwrap(),
+              );
+
+              let shadowed_by_preceding_parameter =
+                candidate.get_recipe(self.document).is_some_and(|recipe| {
+                  recipe
+                    .parameters
+                    .iter()
+                    .take_while(|parameter| {
+                      parameter.name != containing_parameter_name
+                    })
+                    .any(|parameter| parameter.name == name)
+                });
+
+              return !shadowed_by_preceding_parameter;
             }
 
             candidate.get_recipe(self.document).is_some_and(|recipe| {
@@ -679,6 +696,48 @@ mod tests {
           character: 0,
         },
       }
+    );
+  }
+
+  #[test]
+  fn resolve_variable_excludes_parameter_default_shadowed_by_preceding_parameter()
+   {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      bar a b=a:
+        echo {{ b }}
+      "
+    });
+
+    let resolver = Resolver::new(&document);
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("assignment > identifier").unwrap();
+
+    let references = resolver.resolve_identifier_references(&identifier);
+
+    assert_eq!(references.len(), 1);
+
+    let ranges = references
+      .iter()
+      .map(|reference| reference.range)
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      ranges,
+      vec![lsp::Range {
+        start: lsp::Position {
+          line: 0,
+          character: 0,
+        },
+        end: lsp::Position {
+          line: 0,
+          character: 1,
+        },
+      },]
     );
   }
 
