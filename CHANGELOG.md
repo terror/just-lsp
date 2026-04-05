@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.4.1](https://github.com/terror/just-lsp/releases/tag/0.4.1) - 2026-04-04
+
+### Added
+
+- Add resolver support for parenthesized dependency expressions ([#300](https://github.com/terror/just-lsp/pull/300) by [terror](https://github.com/terror))
+- Add support for `eager` keyword ([#297](https://github.com/terror/just-lsp/pull/297) by [terror](https://github.com/terror))
+- Add rule for detecting invalid import paths ([#292](https://github.com/terror/just-lsp/pull/292) by [terror](https://github.com/terror))
+- Add support for `textDocument/documentLink` ([#291](https://github.com/terror/just-lsp/pull/291) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Require arguments for `+` variadic parameters in dependency checks ([#308](https://github.com/terror/just-lsp/pull/308) by [terror](https://github.com/terror))
+- Respect `export` setting in unused variable diagnostics ([#307](https://github.com/terror/just-lsp/pull/307) by [terror](https://github.com/terror))
+- Exclude parameter-shadowed defaults from variable references ([#306](https://github.com/terror/just-lsp/pull/306) by [terror](https://github.com/terror))
+- Fix false positive for parameter defaults referencing preceding parameters ([#305](https://github.com/terror/just-lsp/pull/305) by [terror](https://github.com/terror))
+
+### Misc
+
+- Bump inventory from 0.3.22 to 0.3.24 ([#303](https://github.com/terror/just-lsp/pull/303) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.57 to 1.2.58 ([#302](https://github.com/terror/just-lsp/pull/302) by [app/dependabot](https://github.com/app/dependabot))
+- Update zed extension section in readme ([#301](https://github.com/terror/just-lsp/pull/301) by [redactedscribe](https://github.com/redactedscribe))
+- Refactor resolver to use symbol-based dispatch ([#299](https://github.com/terror/just-lsp/pull/299) by [terror](https://github.com/terror))
+- Bump env_logger from 0.11.9 to 0.11.10 ([#296](https://github.com/terror/just-lsp/pull/296) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.6 to 0.26.7 ([#295](https://github.com/terror/just-lsp/pull/295) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.5.60 to 4.6.0 ([#290](https://github.com/terror/just-lsp/pull/290) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tempfile from 3.26.0 to 3.27.0 ([#289](https://github.com/terror/just-lsp/pull/289) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.6 to 0.26.7 ([#288](https://github.com/terror/just-lsp/pull/288) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.56 to 1.2.57 ([#287](https://github.com/terror/just-lsp/pull/287) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.4.0](https://github.com/terror/just-lsp/releases/tag/0.4.0) - 2026-03-16
 
 ### Added
