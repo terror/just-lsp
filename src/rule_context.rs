@@ -69,8 +69,6 @@ impl IdentifierAnalysis {
     identifier: Node<'_>,
   ) {
     let document = context.document();
-    let recipe_parameters = context.recipe_parameters();
-    let value_names = context.variable_and_builtin_names();
 
     let identifier_name = document.get_node_text(&identifier);
 
@@ -96,7 +94,9 @@ impl IdentifierAnalysis {
         *usage = true;
       }
 
-      if !value_names.contains(&identifier_name)
+      if !context
+        .variable_and_builtin_names()
+        .contains(&identifier_name)
         && !context.user_function_names().contains(&identifier_name)
       {
         unresolved_identifiers.push(UnresolvedIdentifier {
@@ -130,7 +130,8 @@ impl IdentifierAnalysis {
         let containing_parameter_name = document
           .get_node_text(&containing_parameter.find("identifier").unwrap());
 
-        if recipe_parameters
+        if context
+          .recipe_parameters()
           .get(&recipe.name.value)
           .is_some_and(|parameters| {
             parameters
@@ -143,13 +144,15 @@ impl IdentifierAnalysis {
         {
           return;
         }
-      } else if recipe_parameters.get(&recipe.name.value).is_some_and(
-        |parameters| {
+      } else if context
+        .recipe_parameters()
+        .get(&recipe.name.value)
+        .is_some_and(|parameters| {
           parameters
             .iter()
             .any(|parameter| parameter.name == identifier_name)
-        },
-      ) {
+        })
+      {
         return;
       }
     }
@@ -158,7 +161,9 @@ impl IdentifierAnalysis {
       *usage = true;
     }
 
-    if !value_names.contains(&identifier_name)
+    if !context
+      .variable_and_builtin_names()
+      .contains(&identifier_name)
       && !context.user_function_names().contains(&identifier_name)
     {
       unresolved_identifiers.push(UnresolvedIdentifier {
