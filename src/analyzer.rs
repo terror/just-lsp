@@ -1258,6 +1258,37 @@ mod tests {
   }
 
   #[test]
+  fn recipe_invocation_one_or_more_variadic_requires_argument() {
+    Test::new(indoc! {
+      "
+      foo +args:
+        echo \"{{args}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    })
+    .error(Message::Text(
+      "Dependency `foo` requires 1 argument, but 0 provided",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_zero_or_more_variadic_accepts_no_arguments() {
+    Test::new(indoc! {
+      "
+      foo *args:
+        echo \"{{args}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_dependencies_with_expressions() {
     Test::new(indoc! {
       "
