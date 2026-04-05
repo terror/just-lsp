@@ -1882,13 +1882,25 @@ mod tests {
   }
 
   #[test]
-  fn cross_parameter_default_uses_global_variable() {
+  fn cross_parameter_default_references_preceding_parameter() {
     Test::new(indoc! {
       "
       a := 'foo'
 
       foo a b=a:
         echo {{ a }} {{ b }}
+      "
+    })
+    .warning(Message::Text("Variable `a` appears unused"))
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_references_preceding_parameter() {
+    Test::new(indoc! {
+      "
+      @binstall crate bin=crate:
+        which {{bin}} 2>&1 >/dev/null || cargo binstall -y {{crate}}
       "
     })
     .run();

@@ -132,7 +132,9 @@ impl<'a> Resolver<'a> {
               return false;
             }
 
-            if candidate.get_parent("parameter").is_some() {
+            if candidate.get_parent("parameter").is_some()
+              || candidate.get_parent("variadic_parameter").is_some()
+            {
               return true;
             }
 
@@ -180,6 +182,7 @@ impl<'a> Resolver<'a> {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
+      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
       "parameter" | "variadic_parameter" => {
         identifier.get_recipe(self.document).and_then(|recipe| {
           recipe
@@ -190,24 +193,51 @@ impl<'a> Resolver<'a> {
             .map(Symbol::Parameter)
         })
       }
-      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
-      "value" if identifier.get_parent("parameter").is_none() => identifier
-        .get_recipe(self.document)
-        .and_then(|recipe| {
-          recipe
-            .parameters
-            .iter()
-            .find(|parameter| parameter.name == name)
-            .cloned()
-            .map(Symbol::Parameter)
-        })
-        .or_else(|| self.document.find_variable(&name).map(Symbol::Variable))
-        .or_else(|| builtin_constant(&name)),
-      "value" => self
-        .document
-        .find_variable(&name)
-        .map(Symbol::Variable)
-        .or_else(|| builtin_constant(&name)),
+      "value" => {
+        let containing_parameter = identifier
+          .get_parent("parameter")
+          .or_else(|| identifier.get_parent("variadic_parameter"));
+
+        match containing_parameter {
+          None => identifier
+            .get_recipe(self.document)
+            .and_then(|recipe| {
+              recipe
+                .parameters
+                .iter()
+                .find(|parameter| parameter.name == name)
+                .cloned()
+                .map(Symbol::Parameter)
+            })
+            .or_else(|| {
+              self.document.find_variable(&name).map(Symbol::Variable)
+            })
+            .or_else(|| builtin_constant(&name)),
+          Some(containing_parameter) => {
+            let containing_parameter_name = self
+              .document
+              .get_node_text(&containing_parameter.find("identifier")?);
+
+            identifier
+              .get_recipe(self.document)
+              .and_then(|recipe| {
+                recipe
+                  .parameters
+                  .iter()
+                  .take_while(|parameter| {
+                    parameter.name != containing_parameter_name
+                  })
+                  .find(|parameter| parameter.name == name)
+                  .cloned()
+                  .map(Symbol::Parameter)
+              })
+              .or_else(|| {
+                self.document.find_variable(&name).map(Symbol::Variable)
+              })
+              .or_else(|| builtin_constant(&name))
+          }
+        }
+      }
       _ => BUILTINS
         .iter()
         .find(|builtin| match builtin {
