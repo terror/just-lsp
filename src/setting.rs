@@ -73,7 +73,7 @@ impl Setting {
       return None;
     };
 
-    Some(Setting { name, kind, range })
+    Some(Setting { kind, name, range })
   }
 }
 
