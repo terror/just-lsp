@@ -37,10 +37,7 @@ pub(crate) struct Setting {
 
 impl Setting {
   #[must_use]
-  pub(crate) fn from_node(
-    node: &Node,
-    document: &Document,
-  ) -> Option<Self> {
+  pub(crate) fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
     let name = document.get_node_text(&node.child(1)?);
@@ -57,9 +54,8 @@ impl Setting {
       .iter()
       .find(|child| child.kind() == "boolean");
 
-    let string_child = right_children
-      .iter()
-      .find(|child| child.kind() == "string");
+    let string_child =
+      right_children.iter().find(|child| child.kind() == "string");
 
     let kind = if has_bracket {
       SettingKind::Array
