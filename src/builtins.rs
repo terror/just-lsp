@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) static BUILTINS: [Builtin<'_>; 169] = [
+pub(crate) static BUILTINS: [Builtin<'_>; 172] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",
@@ -990,6 +990,30 @@ pub(crate) static BUILTINS: [Builtin<'_>; 169] = [
     signature: "snakecase(s: string) -> string",
     description: "Convert to snake_case",
     required_arguments: 1,
+    accepts_variadic: false,
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_directory",
+    signature: "module_directory() -> string",
+    description: "Directory of current module file",
+    required_arguments: 0,
+    accepts_variadic: false,
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_dir",
+    signature: "module_dir() -> string",
+    description: "Directory of current module file. Alias for `module_directory()`.",
+    required_arguments: 0,
+    accepts_variadic: false,
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_file",
+    signature: "module_file() -> string",
+    description: "Path of current module file",
+    required_arguments: 0,
     accepts_variadic: false,
     deprecated: None,
   },
