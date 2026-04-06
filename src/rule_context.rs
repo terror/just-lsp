@@ -16,7 +16,7 @@ pub(crate) struct RuleContext<'a> {
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
-  scope: OnceLock<Scope>,
+  scope: OnceLock<Scope<'a>>,
   settings: OnceLock<Vec<Setting>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
@@ -115,7 +115,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn document(&self) -> &Document {
+  pub(crate) fn document(&self) -> &'a Document {
     self.document
   }
 
