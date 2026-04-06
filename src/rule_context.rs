@@ -1,181 +1,5 @@
 use super::*;
 
-pub(crate) struct UnresolvedIdentifier {
-  pub(crate) name: String,
-  pub(crate) range: lsp::Range,
-}
-
-#[derive(Default)]
-pub(crate) struct IdentifierAnalysis {
-  recipe_identifier_usage: HashMap<String, HashSet<String>>,
-  unresolved_identifiers: Vec<UnresolvedIdentifier>,
-  variable_usage: HashMap<String, bool>,
-}
-
-impl IdentifierAnalysis {
-  fn new(context: &RuleContext<'_>) -> Self {
-    let mut variable_usage = context
-      .variables()
-      .iter()
-      .map(|variable| (variable.name.value.clone(), false))
-      .collect::<HashMap<_, _>>();
-
-    let mut recipe_identifier_usage = context
-      .recipes()
-      .iter()
-      .map(|recipe| (recipe.name.value.clone(), HashSet::new()))
-      .collect::<HashMap<_, _>>();
-
-    let mut unresolved_identifiers = Vec::new();
-
-    if let Some(tree) = context.tree() {
-      let root = tree.root_node();
-
-      for identifier in root.find_all("expression > value > identifier") {
-        Self::record_identifier(
-          context,
-          &mut recipe_identifier_usage,
-          &mut variable_usage,
-          &mut unresolved_identifiers,
-          identifier,
-        );
-      }
-
-      for identifier in root.find_all(
-        "parameter > value > identifier, variadic_parameter > value > identifier",
-      ) {
-        Self::record_identifier(
-          context,
-          &mut recipe_identifier_usage,
-          &mut variable_usage,
-          &mut unresolved_identifiers,
-          identifier,
-        );
-      }
-    }
-
-    Self {
-      recipe_identifier_usage,
-      unresolved_identifiers,
-      variable_usage,
-    }
-  }
-
-  fn record_identifier(
-    context: &RuleContext<'_>,
-    recipe_identifier_usage: &mut HashMap<String, HashSet<String>>,
-    variable_usage: &mut HashMap<String, bool>,
-    unresolved_identifiers: &mut Vec<UnresolvedIdentifier>,
-    identifier: Node<'_>,
-  ) {
-    let document = context.document();
-
-    let identifier_name = document.get_node_text(&identifier);
-
-    if let Some(function_node) = identifier.get_parent("function_definition") {
-      let Some(function_name_node) = function_node.child_by_field_name("name")
-      else {
-        return;
-      };
-
-      let function_name = document.get_node_text(&function_name_node);
-
-      if let Some(function) = context
-        .functions()
-        .iter()
-        .find(|function| function.name.value == function_name)
-        && function
-          .parameters
-          .iter()
-          .any(|parameter| parameter.value == identifier_name)
-      {
-        return;
-      }
-
-      if let Some(usage) = variable_usage.get_mut(&identifier_name) {
-        *usage = true;
-      }
-
-      if !context
-        .variable_and_builtin_names()
-        .contains(&identifier_name)
-        && !context.user_function_names().contains(&identifier_name)
-      {
-        unresolved_identifiers.push(UnresolvedIdentifier {
-          name: identifier_name,
-          range: identifier.get_range(document),
-        });
-      }
-
-      return;
-    }
-
-    let recipe_name = identifier
-      .get_parent("recipe")
-      .as_ref()
-      .and_then(|recipe_node| recipe_node.find("recipe_header > identifier"))
-      .map_or_else(String::new, |identifier_node| {
-        document.get_node_text(&identifier_node)
-      });
-
-    if let Some(recipe) = context.recipe(&recipe_name) {
-      recipe_identifier_usage
-        .entry(recipe.name.value.clone())
-        .or_default()
-        .insert(identifier_name.clone());
-
-      let containing_parameter = identifier
-        .get_parent("parameter")
-        .or_else(|| identifier.get_parent("variadic_parameter"));
-
-      if let Some(containing_parameter) = &containing_parameter {
-        let containing_parameter_name = document
-          .get_node_text(&containing_parameter.find("identifier").unwrap());
-
-        if context
-          .recipe_parameters()
-          .get(&recipe.name.value)
-          .is_some_and(|parameters| {
-            parameters
-              .iter()
-              .take_while(|parameter| {
-                parameter.name != containing_parameter_name
-              })
-              .any(|parameter| parameter.name == identifier_name)
-          })
-        {
-          return;
-        }
-      } else if context
-        .recipe_parameters()
-        .get(&recipe.name.value)
-        .is_some_and(|parameters| {
-          parameters
-            .iter()
-            .any(|parameter| parameter.name == identifier_name)
-        })
-      {
-        return;
-      }
-    }
-
-    if let Some(usage) = variable_usage.get_mut(&identifier_name) {
-      *usage = true;
-    }
-
-    if !context
-      .variable_and_builtin_names()
-      .contains(&identifier_name)
-      && !context.user_function_names().contains(&identifier_name)
-    {
-      unresolved_identifiers.push(UnresolvedIdentifier {
-        name: identifier_name,
-        range: identifier.get_range(document),
-      });
-    }
-  }
-}
-
 pub(crate) struct RuleContext<'a> {
   aliases: OnceLock<Vec<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
@@ -189,11 +13,11 @@ pub(crate) struct RuleContext<'a> {
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   functions: OnceLock<Vec<Function>>,
-  identifier_analysis: OnceLock<IdentifierAnalysis>,
   imported_documents: Vec<Document>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
+  scope: OnceLock<Scope>,
   settings: OnceLock<Vec<Setting>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
@@ -325,12 +149,6 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  fn identifier_analysis(&self) -> &IdentifierAnalysis {
-    self
-      .identifier_analysis
-      .get_or_init(|| IdentifierAnalysis::new(self))
-  }
-
   pub(crate) fn new(document: &'a Document) -> Self {
     Self {
       aliases: OnceLock::new(),
@@ -342,11 +160,11 @@ impl<'a> RuleContext<'a> {
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       functions: OnceLock::new(),
-      identifier_analysis: OnceLock::new(),
       imported_documents: Self::resolve_imports(document),
       recipe_names: OnceLock::new(),
       recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
+      scope: OnceLock::new(),
       settings: OnceLock::new(),
       user_function_names: OnceLock::new(),
       variable_and_builtin_names: OnceLock::new(),
@@ -359,12 +177,6 @@ impl<'a> RuleContext<'a> {
       .recipes()
       .iter()
       .find(|recipe| recipe.name.value == name)
-  }
-
-  pub(crate) fn recipe_identifier_usage(
-    &self,
-  ) -> &HashMap<String, HashSet<String>> {
-    &self.identifier_analysis().recipe_identifier_usage
   }
 
   pub(crate) fn recipe_names(&self) -> &HashSet<String> {
@@ -455,6 +267,10 @@ impl<'a> RuleContext<'a> {
     }
   }
 
+  pub(crate) fn scope(&self) -> &Scope {
+    self.scope.get_or_init(|| Scope::analyze(self))
+  }
+
   pub(crate) fn setting_enabled(&self, name: &str) -> bool {
     self.settings().iter().any(|setting| {
       setting.name == name && matches!(setting.kind, SettingKind::Boolean(true))
@@ -475,10 +291,6 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn tree(&self) -> Option<&Tree> {
     self.document.tree.as_ref()
-  }
-
-  pub(crate) fn unresolved_identifiers(&self) -> &[UnresolvedIdentifier] {
-    &self.identifier_analysis().unresolved_identifiers
   }
 
   pub(crate) fn user_function_names(&self) -> &HashSet<String> {
@@ -502,10 +314,6 @@ impl<'a> RuleContext<'a> {
 
       names
     })
-  }
-
-  pub(crate) fn variable_usage(&self) -> &HashMap<String, bool> {
-    &self.identifier_analysis().variable_usage
   }
 
   pub(crate) fn variables(&self) -> &[Variable] {

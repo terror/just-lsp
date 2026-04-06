@@ -9,10 +9,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for unresolved in context.unresolved_identifiers() {
+      for (name, range) in &context.scope().unresolved_identifiers {
         diagnostics.push(Diagnostic::error(
-          format!("Variable `{}` not found", unresolved.name),
-          unresolved.range,
+          format!("Variable `{name}` not found"),
+          *range,
         ));
       }
 

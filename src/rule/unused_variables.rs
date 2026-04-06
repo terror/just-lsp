@@ -15,7 +15,7 @@ define_rule! {
 
       let exported = context.setting_enabled("export");
 
-      for (variable_name, is_used) in context.variable_usage() {
+      for (variable_name, is_used) in &context.scope().variable_usage {
         if *is_used {
           continue;
         }
