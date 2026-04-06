@@ -1,14 +1,13 @@
 use super::*;
 
+type BuiltinRef = &'static Builtin<'static>;
+
 pub(crate) struct RuleContext<'a> {
   aliases: OnceLock<Vec<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
-  builtin_attributes_map:
-    OnceLock<HashMap<&'static str, Vec<&'static Builtin<'static>>>>,
-  builtin_function_map:
-    OnceLock<HashMap<&'static str, &'static Builtin<'static>>>,
-  builtin_setting_map:
-    OnceLock<HashMap<&'static str, &'static Builtin<'static>>>,
+  builtin_attributes_map: OnceLock<HashMap<&'static str, Vec<BuiltinRef>>>,
+  builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
+  builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document: &'a Document,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,

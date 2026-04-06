@@ -58,7 +58,7 @@ impl Scope {
         .variables()
         .iter()
         .map(|variable| (variable.name.value.clone(), false))
-        .collect::<HashMap<_, _>>(),
+        .collect(),
     }
   }
 
