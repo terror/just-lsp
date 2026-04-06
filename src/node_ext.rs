@@ -7,6 +7,7 @@ pub(crate) trait NodeExt {
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self, document: &Document) -> lsp::Range;
   fn get_recipe(&self, document: &Document) -> Option<Recipe>;
+  fn has_any_parent(&self, kinds: &[&str]) -> bool;
 }
 
 fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
@@ -198,6 +199,10 @@ impl NodeExt for Node<'_> {
     document.find_recipe(
       &document.get_node_text(&recipe_node.find("recipe_header > identifier")?),
     )
+  }
+
+  fn has_any_parent(&self, kinds: &[&str]) -> bool {
+    kinds.iter().any(|kind| self.get_parent(kind).is_some())
   }
 }
 

@@ -12,7 +12,8 @@ define_rule! {
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
       context
-        .recipe_identifier_usage()
+        .scope()
+        .recipe_identifier_usage
         .iter()
         .filter_map(|(recipe_name, identifiers)| {
           context.recipe(recipe_name).map(|recipe| (recipe, identifiers))

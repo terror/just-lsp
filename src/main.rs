@@ -31,6 +31,7 @@ use {
   ropey::Rope,
   rule::Rule,
   rule_context::RuleContext,
+  scope::Scope,
   serde::{Deserialize, Serialize},
   server::Server,
   setting::{Setting, SettingKind},
@@ -89,6 +90,7 @@ mod resolver;
 mod rope_ext;
 mod rule;
 mod rule_context;
+mod scope;
 mod server;
 mod setting;
 mod str_ext;
