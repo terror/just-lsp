@@ -3,6 +3,8 @@ name: Web
 on:
   push:
     branches: ['master']
+  pull_request:
+    branches: ['*']
   workflow_dispatch:
 
 permissions:
@@ -48,6 +50,7 @@ jobs:
           path: './www/dist'
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
