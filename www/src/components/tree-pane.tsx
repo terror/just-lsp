@@ -1,67 +1,38 @@
-import type {
-  Position,
-  SyntaxNode,
-  TreeNode as TreeNodeType,
-} from '@/lib/types';
-import { getVisibleNodes } from '@/lib/utils';
-import { useEffect, useMemo, useState } from 'react';
+import type { SyntaxNode } from '@/lib/types';
+import { Text } from '@codemirror/state';
+import { useMemo } from 'react';
 
 import { TreeNode } from './tree-node';
 
 interface TreePaneProps {
-  formattedTree: TreeNodeType[];
-  nodePositionMap: Map<SyntaxNode, Position>;
+  root: SyntaxNode | undefined;
+  code: string;
   expandedNodes: Set<SyntaxNode>;
-  expandNode: (node: SyntaxNode) => void;
+  toggleExpand: (node: SyntaxNode) => void;
   onHighlightChange: (range: { from: number; to: number } | undefined) => void;
 }
 
 export const TreePane = ({
-  formattedTree,
-  nodePositionMap,
+  root,
+  code,
   expandedNodes,
-  expandNode,
+  toggleExpand,
   onHighlightChange,
 }: TreePaneProps) => {
-  const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
-    undefined
-  );
-
-  useEffect(() => {
-    if (!hoveredNode) {
-      onHighlightChange(undefined);
-      return;
-    }
-
-    const position = nodePositionMap.get(hoveredNode);
-
-    if (!position) {
-      onHighlightChange(undefined);
-      return;
-    }
-
-    onHighlightChange({ from: position.start, to: position.end });
-  }, [hoveredNode, nodePositionMap, onHighlightChange]);
-
-  const visibleTree = useMemo(
-    () => getVisibleNodes(formattedTree, expandedNodes),
-    [formattedTree, expandedNodes]
-  );
+  const doc = useMemo(() => Text.of(code.split('\n')), [code]);
 
   return (
     <div className='h-full overflow-auto'>
-      {visibleTree.length > 0 ? (
+      {root ? (
         <div className='p-2'>
-          {visibleTree.map((item, index) => (
-            <TreeNode
-              key={index}
-              item={item}
-              hoveredNode={hoveredNode}
-              setHoveredNode={setHoveredNode}
-              expandedNodes={expandedNodes}
-              expandNode={expandNode}
-            />
-          ))}
+          <TreeNode
+            node={root}
+            level={0}
+            doc={doc}
+            expandedNodes={expandedNodes}
+            toggleExpand={toggleExpand}
+            onHighlightChange={onHighlightChange}
+          />
         </div>
       ) : (
         <p className='p-4 text-center text-gray-500'>
