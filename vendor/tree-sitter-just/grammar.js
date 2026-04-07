@@ -9,7 +9,7 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
-const ESCAPE_SEQUENCE = token(/\\([nrt"\\]|(\r?\n))/);
+const ESCAPE_SEQUENCE = token(/\\([nrt"\\]|(\r?\n)|u\{[0-9a-fA-F]{1,6}\})/);
 // Flags to `/usr/bin/env`, anything that starts with a dash
 const SHEBANG_ENV_FLAG = token(/-\S*/);
 
