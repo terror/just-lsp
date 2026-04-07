@@ -33,6 +33,7 @@ macro_rules! define_rule {
 inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
+mod arg_attribute;
 mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;

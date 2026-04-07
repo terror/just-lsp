@@ -486,6 +486,63 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_unknown_parameter() {
+    Test::new(indoc! {
+      "
+      [arg('missing', help='nope')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(Message::Text(
+      "`[arg]` references unknown parameter `missing`",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_unknown_kwarg() {
+    Test::new(indoc! {
+      "
+      [arg('name', bogus='x')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(Message::Text(
+      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_requires_long_or_short() {
+    Test::new(indoc! {
+      "
+      [arg('name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(Message::Text(
+      "`[arg]` `value=` requires `long=` or `short=`",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_with_long_ok() {
+    Test::new(indoc! {
+      "
+      [arg('name', long='name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_extra_arguments() {
     Test::new(indoc! {
       "

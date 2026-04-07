@@ -3,11 +3,11 @@ use super::*;
 pub(crate) trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
-  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self, document: &Document) -> lsp::Range;
   fn get_recipe(&self, document: &Document) -> Option<Recipe>;
   fn has_any_parent(&self, kinds: &[&str]) -> bool;
+  fn siblings(&self) -> impl Iterator<Item = Node<'_>>;
 }
 
 fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
@@ -152,26 +152,6 @@ impl NodeExt for Node<'_> {
     collect_nodes_by_kind(*self, selector)
   }
 
-  fn find_siblings_until(&self, kind: &str, until: &str) -> Vec<Node<'_>> {
-    let mut siblings = Vec::new();
-
-    let mut current = self.next_sibling();
-
-    while let Some(sibling) = current {
-      if sibling.kind() == until {
-        break;
-      }
-
-      if sibling.kind() == kind {
-        siblings.push(sibling);
-      }
-
-      current = sibling.next_sibling();
-    }
-
-    siblings
-  }
-
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
     let mut current = *self;
 
@@ -203,6 +183,10 @@ impl NodeExt for Node<'_> {
 
   fn has_any_parent(&self, kinds: &[&str]) -> bool {
     kinds.iter().any(|kind| self.get_parent(kind).is_some())
+  }
+
+  fn siblings(&self) -> impl Iterator<Item = Node<'_>> {
+    successors(self.next_sibling(), Node::next_sibling)
   }
 }
 

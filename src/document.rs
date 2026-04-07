@@ -122,8 +122,11 @@ impl Document {
             .into_iter()
             .map(move |identifier_node| {
               let arguments = identifier_node
-                .find_siblings_until("string", "identifier")
-                .into_iter()
+                .siblings()
+                .take_while(|sibling| sibling.kind() != "identifier")
+                .filter(|sibling| {
+                  matches!(sibling.kind(), "string" | "attribute_named_param")
+                })
                 .map(|argument_node| TextNode {
                   value: self.get_node_text(&argument_node),
                   range: argument_node.get_range(self),
@@ -404,8 +407,14 @@ impl Document {
                 .into_iter()
                 .map(|identifier_node| {
                   let arguments = identifier_node
-                    .find_siblings_until("string", "identifier")
-                    .into_iter()
+                    .siblings()
+                    .take_while(|sibling| sibling.kind() != "identifier")
+                    .filter(|sibling| {
+                      matches!(
+                        sibling.kind(),
+                        "string" | "attribute_named_param"
+                      )
+                    })
                     .map(|argument_node| TextNode {
                       value: self.get_node_text(&argument_node),
                       range: argument_node.get_range(self),
