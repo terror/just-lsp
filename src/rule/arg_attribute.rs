@@ -51,7 +51,10 @@ impl ArgAttributeRule {
       return false;
     };
 
-    !recipe.parameters.iter().any(|parameter| parameter.name == parameter_name)
+    !recipe
+      .parameters
+      .iter()
+      .any(|parameter| parameter.name == parameter_name)
   }
 
   fn validate(
