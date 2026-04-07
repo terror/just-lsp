@@ -12,6 +12,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `alias-recipe-conflict`           | Alias/Recipe Conflicts          | Alias and recipe share a name and would shadow each other.                                                                    |
 | `unknown-attribute`               | Unknown Attribute               | Attribute name is not part of the builtin catalog.                                                                            |
 | `attribute-arguments`             | Attribute Arguments             | Attribute invocation uses the wrong number of arguments.                                                                      |
+| `arg-attribute`                   | Arg Attribute                   | `[arg(NAME, ...)]` references an unknown parameter, uses an unknown keyword, or uses `value=` without `long=` or `short=`.    |
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                                                        |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind (recipe, alias, module, etc.).                                                |
 | `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique (e.g., `[default]`, `[script]`) appear more than once.                                         |
