@@ -575,6 +575,7 @@ mod tests {
       "
       [extension]
       foo:
+        #!/usr/bin/env bash
         echo \"foo\"
       "
     })
@@ -661,6 +662,47 @@ mod tests {
       [script]
       publish:
         echo \"publish\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_without_script_or_shebang() {
+    Test::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(Message::Text(
+      "Recipe `foo` uses `[extension]` without `[script]` or a shebang",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn extension_with_script_is_allowed() {
+    Test::new(indoc! {
+      "
+      [script]
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_with_shebang_is_allowed() {
+    Test::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
       "
     })
     .run();
