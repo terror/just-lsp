@@ -13,9 +13,7 @@ interface TreePaneProps {
   nodePositionMap: Map<SyntaxNode, Position>;
   expandedNodes: Set<SyntaxNode>;
   expandNode: (node: SyntaxNode) => void;
-  onHighlightChange: (
-    range: { from: number; to: number } | undefined
-  ) => void;
+  onHighlightChange: (range: { from: number; to: number } | undefined) => void;
 }
 
 export const TreePane = ({

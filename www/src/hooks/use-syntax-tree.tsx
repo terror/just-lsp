@@ -1,7 +1,7 @@
 import type { Position, SyntaxNode, TreeNode } from '@/lib/types';
 import { parse, processTree } from '@/lib/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Language as TSLanguage, Parser } from 'web-tree-sitter';
+import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
   parser: Parser | undefined;

@@ -72,11 +72,7 @@ const App = () => {
           className='h-full rounded border'
         >
           <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
-            <EditorPane
-              value={doc}
-              onChange={setDoc}
-              extensions={extensions}
-            />
+            <EditorPane value={doc} onChange={setDoc} extensions={extensions} />
           </ResizablePanel>
 
           <ResizableHandle withHandle />
