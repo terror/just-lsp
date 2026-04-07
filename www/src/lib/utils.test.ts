@@ -268,9 +268,8 @@ describe('processTree', () => {
   it('processes a tree into required data structures', () => {
     const rootNode = mockTreeSitterNode('program', 0, 0, 1, 0, []);
     const mockTree = { rootNode } as unknown as Tree;
-    const doc = EditorState.create({ doc: 'test' }).doc;
 
-    const result = processTree(mockTree, doc);
+    const result = processTree(mockTree, 'test');
 
     expect(result).toHaveProperty('formattedTree');
     expect(result).toHaveProperty('nodePositionMap');

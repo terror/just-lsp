@@ -1,5 +1,5 @@
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { ReactNode, createContext, useContext } from 'react';
+import { ReactNode, createContext, useContext, useEffect } from 'react';
 
 export interface EditorSettings {
   fontSize: number;
@@ -51,6 +51,13 @@ export const EditorSettingsProvider = ({
   const updateSettings = (newSettings: Partial<EditorSettings>) => {
     setSettings((prevSettings) => ({ ...prevSettings, ...newSettings }));
   };
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--editor-font-size',
+      `${settings.fontSize}px`
+    );
+  }, [settings.fontSize]);
 
   return (
     <EditorSettingsContext.Provider value={{ settings, updateSettings }}>

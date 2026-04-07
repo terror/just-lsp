@@ -9,57 +9,26 @@ import type {
   TreeNode as TreeNodeType,
 } from '@/lib/types';
 import { getVisibleNodes, parse, processTree } from '@/lib/utils';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import {
-  bracketMatching,
-  defaultHighlightStyle,
-  indentOnInput,
-  syntaxHighlighting,
-} from '@codemirror/language';
-import { EditorState, Extension } from '@codemirror/state';
-import {
-  EditorView,
-  ViewUpdate,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  keymap,
-  lineNumbers,
-} from '@codemirror/view';
-import { vim } from '@replit/codemirror-vim';
 import { Bot, Loader2 } from 'lucide-react';
-import {
-  type CSSProperties,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import defaultJustfile from '../../justfile?raw';
-import { EditorSettingsDialog } from './components/editor-settings-dialog';
+import { EditorPane } from './components/editor-pane';
 import { TreeNode } from './components/tree-node';
+import { useEditorExtensions } from './hooks/use-editor-extensions';
+import { usePersistedDoc } from './hooks/use-persisted-doc';
 import { useTreeSitter } from './hooks/use-tree-sitter';
-import {
-  addHighlightEffect,
-  highlightExtension,
-  removeHighlightEffect,
-} from './lib/cm-highlight-extension';
-import { createJustSyntaxHighlightingExtension } from './lib/just-syntax-highlighting';
-import { useEditorSettings } from './providers/editor-settings-provider';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 
 const App = () => {
-  const {
-    parser,
-    language: justLanguage,
-    loading,
-    error,
-  } = useTreeSitter();
+  const { parser, language: justLanguage, loading, error } = useTreeSitter();
 
-  const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
+  const [doc, setDoc] = usePersistedDoc(
+    EDITOR_STORAGE_KEY,
+    defaultJustfile.trim()
+  );
 
   const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
     undefined
@@ -69,195 +38,44 @@ const App = () => {
     new Set()
   );
 
-  const [nodePositionMap, setNodePositionMap] = useState<
-    Map<SyntaxNode, Position>
-  >(new Map());
-
-  const editorRef = useRef<HTMLDivElement>(null);
-  const editorViewRef = useRef<EditorView | undefined>(undefined);
-
-  const { settings: editorSettings } = useEditorSettings();
-
-  const initialEditorDoc = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const storedDoc = window.localStorage.getItem(EDITOR_STORAGE_KEY);
-
-      if (storedDoc && storedDoc.length > 0) {
-        return storedDoc;
-      }
+  const { formattedTree, nodePositionMap } = useMemo<{
+    formattedTree: TreeNodeType[];
+    nodePositionMap: Map<SyntaxNode, Position>;
+  }>(() => {
+    if (!parser || !justLanguage) {
+      return { formattedTree: [], nodePositionMap: new Map() };
     }
 
-    return defaultJustfile.trim();
-  }, [defaultJustfile]);
+    const tree = parse({ parser, language: justLanguage, code: doc });
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    if (!tree) {
+      return { formattedTree: [], nodePositionMap: new Map() };
     }
 
-    const existingDoc = window.localStorage.getItem(EDITOR_STORAGE_KEY);
+    const result = processTree(tree, doc);
 
-    if (!existingDoc) {
-      window.localStorage.setItem(EDITOR_STORAGE_KEY, initialEditorDoc);
-    }
-  }, [initialEditorDoc]);
+    setExpandedNodes(result.allNodes);
 
-  useEffect(() => {
-    return () => {
-      if (editorViewRef.current) {
-        editorViewRef.current.destroy();
-      }
+    return {
+      formattedTree: result.formattedTree,
+      nodePositionMap: result.nodePositionMap,
     };
-  }, []);
+  }, [parser, justLanguage, doc]);
 
-  const handleHighlightNode = useCallback(() => {
-    if (hoveredNode && editorViewRef.current) {
-      const position = nodePositionMap.get(hoveredNode);
+  const highlight = useMemo(() => {
+    if (!hoveredNode) return undefined;
 
-      if (position) {
-        const { start: from, end: to } = position;
+    const position = nodePositionMap.get(hoveredNode);
 
-        editorViewRef.current.dispatch({
-          effects: [
-            removeHighlightEffect.of(null),
-            addHighlightEffect.of({ from, to }),
-            EditorView.scrollIntoView(from, { y: 'center' }),
-          ],
-        });
-      }
-    } else if (editorViewRef.current) {
-      editorViewRef.current.dispatch({
-        effects: [removeHighlightEffect.of(null)],
-      });
-    }
+    if (!position) return undefined;
+
+    return { from: position.start, to: position.end };
   }, [hoveredNode, nodePositionMap]);
 
-  useEffect(() => {
-    handleHighlightNode();
-  }, [handleHighlightNode]);
-
-  const onEditorUpdate = useCallback(
-    (update: ViewUpdate) => {
-      if (update.docChanged && parser && justLanguage) {
-        const newCode = update.state.doc.toString();
-
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(EDITOR_STORAGE_KEY, newCode);
-        }
-
-        const newTree = parse({
-          parser,
-          language: justLanguage,
-          code: newCode,
-        });
-
-        if (newTree) {
-          const { formattedTree, nodePositionMap, allNodes } = processTree(
-            newTree,
-            update.state.doc
-          );
-
-          setFormattedTree(formattedTree);
-          setNodePositionMap(nodePositionMap);
-          setExpandedNodes(allNodes);
-        }
-      }
-    },
-    [
-      parser,
-      justLanguage,
-      setFormattedTree,
-      setNodePositionMap,
-      setExpandedNodes,
-    ]
-  );
-
-  const editorContainerStyle = useMemo(
-    () =>
-      ({
-        fontSize: `${editorSettings.fontSize}px`,
-        '--editor-font-size': `${editorSettings.fontSize}px`,
-      }) as CSSProperties,
-    [editorSettings.fontSize]
-  );
-
-  const editorExtensions = useMemo(() => {
-    const extensions: Extension[] = [
-      EditorState.tabSize.of(editorSettings.tabSize),
-      EditorView.updateListener.of(onEditorUpdate),
-      bracketMatching(),
-      highlightActiveLine(),
-      highlightActiveLineGutter(),
-      highlightExtension,
-      history(),
-      indentOnInput(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
-      syntaxHighlighting(defaultHighlightStyle),
-    ];
-
-    extensions.push(...createJustSyntaxHighlightingExtension(justLanguage));
-
-    if (editorSettings.keybindings === 'vim') {
-      extensions.push(vim());
-    }
-
-    if (editorSettings.lineNumbers) {
-      extensions.push(lineNumbers());
-    }
-
-    if (editorSettings.lineWrapping) {
-      extensions.push(EditorView.lineWrapping);
-    }
-
-    return extensions;
-  }, [
-    editorSettings.tabSize,
-    editorSettings.keybindings,
-    editorSettings.lineNumbers,
-    editorSettings.lineWrapping,
-    onEditorUpdate,
-    justLanguage,
-  ]);
-
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const state = EditorState.create({
-      doc: initialEditorDoc,
-      extensions: editorExtensions,
-    });
-
-    const view = new EditorView({
-      state: state,
-      parent: editorRef.current,
-    });
-
-    editorViewRef.current = view;
-
-    return () => {
-      view.destroy();
-    };
-  }, [parser, editorExtensions, initialEditorDoc]);
-
-  useEffect(() => {
-    if (!parser || !justLanguage || !editorViewRef.current) {
-      return;
-    }
-
-    const code = editorViewRef.current.state.doc.toString();
-    const newTree = parse({ parser, language: justLanguage, code });
-
-    if (newTree) {
-      const { formattedTree, nodePositionMap, allNodes } = processTree(
-        newTree,
-        editorViewRef.current.state.doc
-      );
-
-      setFormattedTree(formattedTree);
-      setNodePositionMap(nodePositionMap);
-      setExpandedNodes(allNodes);
-    }
-  }, [parser, justLanguage]);
+  const extensions = useEditorExtensions({
+    language: justLanguage,
+    highlight,
+  });
 
   const expandNode = useCallback((node: SyntaxNode) => {
     setExpandedNodes((prevExpandedNodes) => {
@@ -306,27 +124,14 @@ const App = () => {
           className='h-full rounded border'
         >
           <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
-            <div className='flex h-full min-h-0 flex-col overflow-hidden'>
-              <div className='flex items-center justify-between border-b bg-gray-50 px-2 py-1'>
-                <EditorSettingsDialog />
-              </div>
-              <div
-                ref={editorRef}
-                className='editor-host w-full flex-1 overflow-hidden'
-                style={editorContainerStyle}
-              />
-            </div>
+            <EditorPane value={doc} onChange={setDoc} extensions={extensions} />
           </ResizablePanel>
 
           <ResizableHandle withHandle />
 
           <ResizablePanel id='tree-panel' defaultSize={50} minSize={30}>
             <div className='h-full overflow-auto'>
-              {loading ? (
-                <div className='flex h-full items-center justify-center'>
-                  <Loader2 className='text-muted-foreground h-8 w-8 animate-spin' />
-                </div>
-              ) : visibleTree.length > 0 ? (
+              {visibleTree.length > 0 ? (
                 <div className='p-2'>
                   {visibleTree.map((item, index) => (
                     <TreeNode

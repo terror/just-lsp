@@ -1,4 +1,4 @@
-import { EditorState } from '@codemirror/state';
+import { EditorState, Text } from '@codemirror/state';
 import { type ClassValue, clsx } from 'clsx';
 import _ from 'lodash';
 import { twMerge } from 'tailwind-merge';
@@ -138,7 +138,7 @@ export const positionToOffset = (
 
 export const processTree = (
   tree: Tree,
-  doc: EditorState['doc']
+  code: string
 ): {
   formattedTree: TreeNode[];
   nodePositionMap: Map<SyntaxNode, Position>;
@@ -152,7 +152,10 @@ export const processTree = (
 
   return {
     formattedTree,
-    nodePositionMap: createNodePositionMap(formattedTree, doc),
+    nodePositionMap: createNodePositionMap(
+      formattedTree,
+      Text.of(code.split('\n'))
+    ),
     allNodes,
   };
 };
