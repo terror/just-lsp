@@ -37,180 +37,162 @@ pub(crate) struct Setting {
 
 impl Setting {
   #[must_use]
-  pub(crate) fn parse(text: &str, range: lsp::Range) -> Option<Self> {
-    if !text.starts_with("set ") {
-      return None;
-    }
+  pub(crate) fn from_node(node: &Node, document: &Document) -> Option<Self> {
+    let range = node.get_range(document);
 
-    let text = &text[4..];
+    let name = document.get_node_text(&node.child(1)?);
 
-    if !text.contains(":=") {
-      let name = text.trim();
+    let mut cursor = node.walk();
 
-      if name.is_empty() {
-        return None;
-      }
+    let right_children = node
+      .children_by_field_name("right", &mut cursor)
+      .collect::<Vec<_>>();
 
-      return Some(Setting {
-        name: name.to_string(),
-        kind: SettingKind::Boolean(true),
-        range,
-      });
-    }
+    let has_bracket = right_children.iter().any(|child| child.kind() == "[");
 
-    let parts = text.split(":=").collect::<Vec<&str>>();
+    let boolean_child = right_children
+      .iter()
+      .find(|child| child.kind() == "boolean");
 
-    if parts.len() != 2 {
-      return None;
-    }
+    let string_child =
+      right_children.iter().find(|child| child.kind() == "string");
 
-    let name_part = parts[0].trim();
-
-    if name_part.is_empty() {
-      return None;
-    }
-
-    let value_part = parts[1].trim();
-
-    if value_part.is_empty() {
-      return None;
-    }
-
-    let kind = if value_part == "true" || value_part == "false" {
-      SettingKind::Boolean(value_part == "true")
-    } else if value_part.starts_with('[') && value_part.ends_with(']') {
+    let kind = if has_bracket {
       SettingKind::Array
-    } else {
+    } else if let Some(boolean) = boolean_child {
+      SettingKind::Boolean(document.get_node_text(boolean) == "true")
+    } else if string_child.is_some() {
       SettingKind::String
+    } else if right_children.is_empty() {
+      SettingKind::Boolean(true)
+    } else {
+      return None;
     };
 
-    Some(Setting {
-      name: name_part.to_string(),
-      kind,
-      range,
-    })
+    Some(Setting { kind, name, range })
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn create_range(
+  fn range(
     start_line: u32,
-    start_char: u32,
+    start_character: u32,
     end_line: u32,
-    end_char: u32,
+    end_character: u32,
   ) -> lsp::Range {
     lsp::Range {
       start: lsp::Position {
         line: start_line,
-        character: start_char,
+        character: start_character,
       },
       end: lsp::Position {
         line: end_line,
-        character: end_char,
+        character: end_character,
       },
     }
   }
 
   #[test]
   fn parse_boolean_with_value() {
-    let input = "set foo := true";
-
-    let range = create_range(0, 0, 0, 14);
-
-    let setting = Setting::parse(input, range).unwrap();
-
     assert_eq!(
-      setting,
-      Setting {
+      Document::from("set foo := true\n").settings(),
+      vec![Setting {
         name: "foo".to_string(),
         kind: SettingKind::Boolean(true),
-        range,
-      }
+        range: range(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_boolean_false() {
+    assert_eq!(
+      Document::from("set foo := false\n").settings(),
+      vec![Setting {
+        name: "foo".to_string(),
+        kind: SettingKind::Boolean(false),
+        range: range(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
   fn parse_boolean_without_value() {
-    let input = "set export";
-
-    let range = create_range(0, 0, 0, 10);
-
-    let setting = Setting::parse(input, range).unwrap();
-
     assert_eq!(
-      setting,
-      Setting {
+      Document::from("set export\n").settings(),
+      vec![Setting {
         name: "export".to_string(),
         kind: SettingKind::Boolean(true),
-        range,
-      }
+        range: range(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
   fn parse_array() {
-    let input = "set shell := [\"zsh\", \"-cu\"]";
-
-    let range = create_range(0, 0, 0, 27);
-
-    let setting = Setting::parse(input, range).unwrap();
-
     assert_eq!(
-      setting,
-      Setting {
+      Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
+      vec![Setting {
         name: "shell".to_string(),
         kind: SettingKind::Array,
-        range,
-      }
+        range: range(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
   fn parse_string() {
-    let input = "set name := \"value\"";
-
-    let range = create_range(0, 0, 0, 18);
-
-    let setting = Setting::parse(input, range).unwrap();
-
     assert_eq!(
-      setting,
-      Setting {
-        name: "name".to_string(),
+      Document::from("set foo := \"bar\"\n").settings(),
+      vec![Setting {
+        name: "foo".to_string(),
         kind: SettingKind::String,
-        range,
-      }
+        range: range(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
-  fn parse_number_as_string() {
-    let input = "set bar := 42";
-
-    let range = create_range(0, 0, 0, 13);
-
-    let setting = Setting::parse(input, range).unwrap();
-
+  fn parse_string_containing_walrus() {
     assert_eq!(
-      setting,
-      Setting {
-        name: "bar".to_string(),
+      Document::from("set foo := \"bar := baz\"\n").settings(),
+      vec![Setting {
+        name: "foo".to_string(),
         kind: SettingKind::String,
-        range,
-      }
+        range: range(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
-  fn invalid_input() {
-    let range = create_range(0, 0, 0, 7);
-
-    assert_eq!(Setting::parse("invalid", range), None);
-    assert_eq!(Setting::parse("set :=", range), None);
-    assert_eq!(Setting::parse("set name :=", range), None);
-    assert_eq!(Setting::parse("set name := := value", range), None);
+  fn parse_multiple_settings() {
+    assert_eq!(
+      Document::from(indoc! {"
+        set foo := true
+        set bar := \"baz\"
+        set shell := [\"zsh\", \"-cu\"]
+      "})
+      .settings(),
+      vec![
+        Setting {
+          name: "foo".to_string(),
+          kind: SettingKind::Boolean(true),
+          range: range(0, 0, 1, 0),
+        },
+        Setting {
+          name: "bar".to_string(),
+          kind: SettingKind::String,
+          range: range(1, 0, 2, 0),
+        },
+        Setting {
+          name: "shell".to_string(),
+          kind: SettingKind::Array,
+          range: range(2, 0, 3, 0),
+        },
+      ],
+    );
   }
 }

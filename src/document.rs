@@ -519,12 +519,7 @@ impl Document {
         .root_node()
         .find_all("setting")
         .iter()
-        .filter_map(|setting_node| {
-          Setting::parse(
-            &self.get_node_text(setting_node),
-            setting_node.get_range(self),
-          )
-        })
+        .filter_map(|setting_node| Setting::from_node(setting_node, self))
         .collect()
     })
   }
