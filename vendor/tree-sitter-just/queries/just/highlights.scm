@@ -102,7 +102,6 @@
 [
   (string)
   (external_command)
-  (format_string)
 ] @string
 
 (escape_sequence) @string.escape
