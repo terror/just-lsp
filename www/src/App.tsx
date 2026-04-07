@@ -3,20 +3,15 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import type {
-  Position,
-  SyntaxNode,
-  TreeNode as TreeNodeType,
-} from '@/lib/types';
-import { getVisibleNodes, parse, processTree } from '@/lib/utils';
 import { Bot, Loader2 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import defaultJustfile from '../../justfile?raw';
 import { EditorPane } from './components/editor-pane';
-import { TreeNode } from './components/tree-node';
+import { TreePane } from './components/tree-pane';
 import { useEditorExtensions } from './hooks/use-editor-extensions';
 import { usePersistedDoc } from './hooks/use-persisted-doc';
+import { useSyntaxTree } from './hooks/use-syntax-tree';
 import { useTreeSitter } from './hooks/use-tree-sitter';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
@@ -30,71 +25,24 @@ const App = () => {
     defaultJustfile.trim()
   );
 
-  const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
-    undefined
+  const { formattedTree, nodePositionMap, expandedNodes, expandNode } =
+    useSyntaxTree({ parser, language: justLanguage, code: doc });
+
+  const [highlight, setHighlight] = useState<
+    { from: number; to: number } | undefined
+  >(undefined);
+
+  const handleHighlightChange = useCallback(
+    (range: { from: number; to: number } | undefined) => {
+      setHighlight(range);
+    },
+    []
   );
-
-  const [expandedNodes, setExpandedNodes] = useState<Set<SyntaxNode>>(
-    new Set()
-  );
-
-  const { formattedTree, nodePositionMap } = useMemo<{
-    formattedTree: TreeNodeType[];
-    nodePositionMap: Map<SyntaxNode, Position>;
-  }>(() => {
-    if (!parser || !justLanguage) {
-      return { formattedTree: [], nodePositionMap: new Map() };
-    }
-
-    const tree = parse({ parser, language: justLanguage, code: doc });
-
-    if (!tree) {
-      return { formattedTree: [], nodePositionMap: new Map() };
-    }
-
-    const result = processTree(tree, doc);
-
-    setExpandedNodes(result.allNodes);
-
-    return {
-      formattedTree: result.formattedTree,
-      nodePositionMap: result.nodePositionMap,
-    };
-  }, [parser, justLanguage, doc]);
-
-  const highlight = useMemo(() => {
-    if (!hoveredNode) return undefined;
-
-    const position = nodePositionMap.get(hoveredNode);
-
-    if (!position) return undefined;
-
-    return { from: position.start, to: position.end };
-  }, [hoveredNode, nodePositionMap]);
 
   const extensions = useEditorExtensions({
     language: justLanguage,
     highlight,
   });
-
-  const expandNode = useCallback((node: SyntaxNode) => {
-    setExpandedNodes((prevExpandedNodes) => {
-      const newExpandedNodes = new Set(prevExpandedNodes);
-
-      if (newExpandedNodes.has(node)) {
-        newExpandedNodes.delete(node);
-      } else {
-        newExpandedNodes.add(node);
-      }
-
-      return newExpandedNodes;
-    });
-  }, []);
-
-  const visibleTree = useMemo(
-    () => getVisibleNodes(formattedTree, expandedNodes),
-    [formattedTree, expandedNodes]
-  );
 
   if (error) {
     return <div className='p-4'>error: {error}</div>;
@@ -130,26 +78,13 @@ const App = () => {
           <ResizableHandle withHandle />
 
           <ResizablePanel id='tree-panel' defaultSize={50} minSize={30}>
-            <div className='h-full overflow-auto'>
-              {visibleTree.length > 0 ? (
-                <div className='p-2'>
-                  {visibleTree.map((item, index) => (
-                    <TreeNode
-                      key={index}
-                      item={item}
-                      hoveredNode={hoveredNode}
-                      setHoveredNode={setHoveredNode}
-                      expandedNodes={expandedNodes}
-                      expandNode={expandNode}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className='p-4 text-center text-gray-500'>
-                  No parsed tree available
-                </p>
-              )}
-            </div>
+            <TreePane
+              formattedTree={formattedTree}
+              nodePositionMap={nodePositionMap}
+              expandedNodes={expandedNodes}
+              expandNode={expandNode}
+              onHighlightChange={handleHighlightChange}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
