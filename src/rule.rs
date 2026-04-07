@@ -46,6 +46,7 @@ mod duplicate_dependencies;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;
+mod extension_without_script;
 mod function_arguments;
 mod inconsistent_indentation;
 mod invalid_import_path;

@@ -17,6 +17,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind (recipe, alias, module, etc.).                                                |
 | `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique (e.g., `[default]`, `[script]`) appear more than once.                                         |
 | `script-shebang-conflict`         | Script Shebang Conflict         | Recipe combines a shebang line with the `[script]` attribute.                                                                 |
+| `extension-without-script`        | Extension Without Script        | Recipe uses `[extension]` without `[script]` or a shebang, so the attribute has no effect.                                    |
 | `duplicate-recipes`               | Duplicate Recipes               | Recipe name collides with another recipe for overlapping targets (unless duplicates allowed).                                 |
 | `recipe-parameters`               | Recipe Parameters               | Parameter list has duplicates, required-after-default parameters, or misplaced variadic parameters.                           |
 | `recipe-dependency-cycles`        | Recipe Dependency Cycles        | Recipe participates in a circular dependency chain.                                                                           |
