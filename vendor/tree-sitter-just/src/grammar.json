@@ -2183,7 +2183,7 @@
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\\\\([nrt\"\\\\]|(\\r?\\n))"
+        "value": "\\\\([nrt\"\\\\]|(\\r?\\n)|u\\{[0-9a-fA-F]{1,6}\\})"
       }
     },
     "_backticked": {
