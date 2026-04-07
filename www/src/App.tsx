@@ -35,11 +35,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
 import defaultJustfile from '../../justfile?raw';
 import { EditorSettingsDialog } from './components/editor-settings-dialog';
 import { TreeNode } from './components/tree-node';
+import { useTreeSitter } from './hooks/use-tree-sitter';
 import {
   addHighlightEffect,
   highlightExtension,
@@ -52,14 +52,14 @@ const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 
 const App = () => {
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [parser, setParser] = useState<Parser | undefined>(undefined);
-  const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
+  const {
+    parser,
+    language: justLanguage,
+    loading,
+    error,
+  } = useTreeSitter();
 
-  const [justLanguage, setJustLanguage] = useState<TSLanguage | undefined>(
-    undefined
-  );
+  const [formattedTree, setFormattedTree] = useState<TreeNodeType[]>([]);
 
   const [hoveredNode, setHoveredNode] = useState<SyntaxNode | undefined>(
     undefined
@@ -103,40 +103,7 @@ const App = () => {
   }, [initialEditorDoc]);
 
   useEffect(() => {
-    let parserInstance: Parser | undefined;
-
-    const initialize = async () => {
-      try {
-        setLoading(true);
-
-        await Parser.init({
-          locateFile(scriptName: string, _scriptDirectory: string) {
-            return scriptName;
-          },
-        });
-
-        parserInstance = new Parser();
-
-        const language = await TSLanguage.load('tree-sitter-just.wasm');
-
-        setParser(parserInstance);
-        setJustLanguage(language);
-      } catch (err) {
-        setError(
-          `Failed to initialize parser: ${err instanceof Error ? err.message : String(err)}`
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initialize();
-
     return () => {
-      if (parserInstance) {
-        parserInstance.delete();
-      }
-
       if (editorViewRef.current) {
         editorViewRef.current.destroy();
       }
