@@ -1,5 +1,5 @@
-import type { Position, SyntaxNode, TreeNode } from '@/lib/types';
-import { parse, processTree } from '@/lib/utils';
+import type { SyntaxNode } from '@/lib/types';
+import { parse } from '@/lib/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
 
@@ -10,10 +10,9 @@ interface UseSyntaxTreeOptions {
 }
 
 interface UseSyntaxTree {
-  formattedTree: TreeNode[];
-  nodePositionMap: Map<SyntaxNode, Position>;
+  root: SyntaxNode | undefined;
   expandedNodes: Set<SyntaxNode>;
-  expandNode: (node: SyntaxNode) => void;
+  toggleExpand: (node: SyntaxNode) => void;
 }
 
 export function useSyntaxTree({
@@ -21,26 +20,14 @@ export function useSyntaxTree({
   language,
   code,
 }: UseSyntaxTreeOptions): UseSyntaxTree {
-  const { formattedTree, nodePositionMap, allNodes } = useMemo(() => {
+  const root = useMemo(() => {
     if (!parser || !language) {
-      return {
-        formattedTree: [] as TreeNode[],
-        nodePositionMap: new Map<SyntaxNode, Position>(),
-        allNodes: new Set<SyntaxNode>(),
-      };
+      return undefined;
     }
 
     const tree = parse({ parser, language, code });
 
-    if (!tree) {
-      return {
-        formattedTree: [] as TreeNode[],
-        nodePositionMap: new Map<SyntaxNode, Position>(),
-        allNodes: new Set<SyntaxNode>(),
-      };
-    }
-
-    return processTree(tree, code);
+    return (tree?.rootNode as unknown as SyntaxNode) ?? undefined;
   }, [parser, language, code]);
 
   const [expandedNodes, setExpandedNodes] = useState<Set<SyntaxNode>>(
@@ -48,10 +35,24 @@ export function useSyntaxTree({
   );
 
   useEffect(() => {
-    setExpandedNodes(allNodes);
-  }, [allNodes]);
+    if (!root) {
+      setExpandedNodes(new Set());
+      return;
+    }
 
-  const expandNode = useCallback((node: SyntaxNode) => {
+    const all = new Set<SyntaxNode>();
+
+    const walk = (node: SyntaxNode) => {
+      all.add(node);
+      node.children.forEach(walk);
+    };
+
+    walk(root);
+
+    setExpandedNodes(all);
+  }, [root]);
+
+  const toggleExpand = useCallback((node: SyntaxNode) => {
     setExpandedNodes((prev) => {
       const next = new Set(prev);
 
@@ -65,5 +66,5 @@ export function useSyntaxTree({
     });
   }, []);
 
-  return { formattedTree, nodePositionMap, expandedNodes, expandNode };
+  return { root, expandedNodes, toggleExpand };
 }
