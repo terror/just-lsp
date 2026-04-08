@@ -40,6 +40,42 @@
     }
   },
   {
+    "type": "assert_expression",
+    "named": true,
+    "fields": {
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "condition",
+            "named": true
+          }
+        ]
+      },
+      "message": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "assignment",
     "named": true,
     "fields": {
@@ -972,6 +1008,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "assert_expression",
+          "named": true
+        },
         {
           "type": "expression",
           "named": true
