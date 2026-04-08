@@ -195,6 +195,19 @@ mod tests {
   }
 
   #[test]
+  fn assert_accepts_condition_operators() {
+    Test::new(indoc! {
+      "
+      foo name:
+        {{ assert(name == \"bar\", \"msg\") }}
+        {{ assert(name != \"bar\", \"msg\") }}
+        {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn aliases_basic() {
     Test::new(indoc! {
       "

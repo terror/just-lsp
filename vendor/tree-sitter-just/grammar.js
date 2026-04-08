@@ -242,12 +242,27 @@ module.exports = grammar({
     value: ($) =>
       prec.left(
         choice(
+          $.assert_expression,
           $.function_call,
           $.external_command,
           $.identifier,
           $.string,
           $.numeric_error,
           seq("(", $.expression, ")"),
+        ),
+      ),
+
+    assert_expression: ($) =>
+      prec(
+        1,
+        seq(
+          field("name", alias("assert", $.identifier)),
+          "(",
+          field("condition", $.condition),
+          ",",
+          field("message", $.expression),
+          optional(","),
+          ")",
         ),
       ),
 
