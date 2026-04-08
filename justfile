@@ -2,6 +2,12 @@ set dotenv-load
 
 export CARGO_MSG_LIMIT := '1'
 
+export AR := if os() == 'macos' {
+  shell('rustc --print sysroot') / 'lib/rustlib' / arch() + '-apple-darwin/bin/llvm-ar'
+} else {
+  env('AR', '')
+}
+
 default:
 	just --list
 
