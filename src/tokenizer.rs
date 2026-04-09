@@ -454,7 +454,7 @@ impl<'doc> Tokenizer<'doc> {
       return 1;
     }
 
-    if matches!(Self::char_at_byte(rope, last_byte - 1), Some('\r')) {
+    if rope.byte(last_byte - 1) == b'\r' {
       2
     } else {
       1
@@ -604,5 +604,31 @@ mod tests {
     let rope = Rope::from_str("foo\r\nbar");
     assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 2);
     assert_eq!(Tokenizer::trailing_line_break_len(&rope, 1), 0);
+  }
+
+  #[test]
+  fn trailing_line_break_len_multibyte_before_newline() {
+    #[track_caller]
+    fn case(s: &str) {
+      assert_eq!(Tokenizer::trailing_line_break_len(&Rope::from_str(s), 0), 1);
+    }
+
+    case("# カ\n");
+    case("# 😀\n");
+    case("# å\n");
+  }
+
+  #[test]
+  fn tokenize_cjk_comment() {
+    Tokenizer::new(&Document::from("# カ\n\nbuild:\n    echo \"foo\"\n"))
+      .tokenize()
+      .unwrap();
+  }
+
+  #[test]
+  fn tokenize_emoji_comment() {
+    Tokenizer::new(&Document::from("# 😀\n\nbuild:\n    echo \"foo\"\n"))
+      .tokenize()
+      .unwrap();
   }
 }
