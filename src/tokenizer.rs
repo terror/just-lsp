@@ -20,26 +20,26 @@ const TOKEN_TYPES: &[&str] = &[
 const TOKEN_MODIFIERS: &[&str] = &["declaration", "deprecated"];
 
 const HIGHLIGHTS: &[(&str, Option<&str>, &[&str])] = &[
-  ("keyword.import", Some("keyword"), &[]),
+  ("attribute", Some("decorator"), &[]),
+  ("boolean", Some("boolean"), &[]),
+  ("comment", Some("comment"), &[]),
+  ("error", Some("keyword"), &["deprecated"]),
+  ("function", Some("function"), &["declaration"]),
+  ("function.call", Some("function"), &[]),
+  ("keyword", Some("keyword"), &[]),
   ("keyword.conditional", Some("keyword"), &[]),
   ("keyword.directive", Some("keyword"), &[]),
-  ("keyword", Some("keyword"), &[]),
+  ("keyword.import", Some("keyword"), &[]),
   ("module", Some("namespace"), &[]),
-  ("variable.parameter", Some("parameter"), &[]),
-  ("variable", Some("variable"), &[]),
-  ("function.call", Some("function"), &[]),
-  ("function", Some("function"), &["declaration"]),
-  ("attribute", Some("decorator"), &[]),
   ("operator", Some("operator"), &[]),
-  ("punctuation.delimiter", Some("operator"), &[]),
   ("punctuation.bracket", Some("operator"), &[]),
+  ("punctuation.delimiter", Some("operator"), &[]),
   ("punctuation.special", Some("operator"), &[]),
-  ("boolean", Some("boolean"), &[]),
-  ("string.escape", Some("string"), &[]),
-  ("string", Some("string"), &[]),
-  ("comment", Some("comment"), &[]),
   ("spell", None, &[]),
-  ("error", Some("keyword"), &["deprecated"]),
+  ("string", Some("string"), &[]),
+  ("string.escape", Some("string"), &[]),
+  ("variable", Some("variable"), &[]),
+  ("variable.parameter", Some("parameter"), &[]),
 ];
 
 pub(crate) static SEMANTIC_TOKENS_LEGEND: LazyLock<lsp::SemanticTokensLegend> =
@@ -367,59 +367,6 @@ mod tests {
   }
 
   #[test]
-  fn recipe() {
-    assert_eq!(
-      tokenize("foo:\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
-          token_type: "function",
-        },
-        Expected {
-          line: 0,
-          start: 3,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn assignment() {
-    assert_eq!(
-      tokenize("foo := \"bar\"\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: 0,
-          token_type: "variable",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 2,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 7,
-          length: 5,
-          modifiers: 0,
-          token_type: "string",
-        },
-      ]
-    );
-  }
-
-  #[test]
   fn alias() {
     assert_eq!(
       tokenize(indoc! {"
@@ -464,6 +411,134 @@ mod tests {
           token_type: "operator",
         },
       ]
+    );
+  }
+
+  #[test]
+  fn assignment() {
+    assert_eq!(
+      tokenize("foo := \"bar\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn attribute() {
+    assert_eq!(
+      tokenize(indoc! {"
+        [private]
+        foo:
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 1,
+          length: 7,
+          modifiers: 0,
+          token_type: "decorator",
+        },
+        Expected {
+          line: 0,
+          start: 8,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 1,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn boolean_setting() {
+    assert_eq!(
+      tokenize("set export := true\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 4,
+          modifiers: 0,
+          token_type: "boolean",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn comment() {
+    assert_eq!(
+      tokenize("# foo\n"),
+      [Expected {
+        line: 0,
+        start: 0,
+        length: 5,
+        modifiers: 0,
+        token_type: "comment",
+      }]
     );
   }
 
@@ -568,192 +643,6 @@ mod tests {
   }
 
   #[test]
-  fn function_call() {
-    assert_eq!(
-      tokenize("foo := env(\"bar\")\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: 0,
-          token_type: "variable",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 2,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 7,
-          length: 3,
-          modifiers: 0,
-          token_type: "function",
-        },
-        Expected {
-          line: 0,
-          start: 10,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 11,
-          length: 5,
-          modifiers: 0,
-          token_type: "string",
-        },
-        Expected {
-          line: 0,
-          start: 16,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn comment() {
-    assert_eq!(
-      tokenize("# foo\n"),
-      [Expected {
-        line: 0,
-        start: 0,
-        length: 5,
-        modifiers: 0,
-        token_type: "comment",
-      }]
-    );
-  }
-
-  #[test]
-  fn boolean_setting() {
-    assert_eq!(
-      tokenize("set export := true\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: 0,
-          token_type: "keyword",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 6,
-          modifiers: 0,
-          token_type: "keyword",
-        },
-        Expected {
-          line: 0,
-          start: 11,
-          length: 2,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 14,
-          length: 4,
-          modifiers: 0,
-          token_type: "boolean",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn attribute() {
-    assert_eq!(
-      tokenize(indoc! {"
-        [private]
-        foo:
-      "}),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 1,
-          length: 7,
-          modifiers: 0,
-          token_type: "decorator",
-        },
-        Expected {
-          line: 0,
-          start: 8,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 1,
-          start: 0,
-          length: 3,
-          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
-          token_type: "function",
-        },
-        Expected {
-          line: 1,
-          start: 3,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn parameters() {
-    assert_eq!(
-      tokenize("foo bar baz:\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
-          token_type: "function",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 3,
-          modifiers: 0,
-          token_type: "parameter",
-        },
-        Expected {
-          line: 0,
-          start: 8,
-          length: 3,
-          modifiers: 0,
-          token_type: "parameter",
-        },
-        Expected {
-          line: 0,
-          start: 11,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-      ]
-    );
-  }
-
-  #[test]
   fn dependencies() {
     assert_eq!(
       tokenize(indoc! {"
@@ -801,214 +690,8 @@ mod tests {
   }
 
   #[test]
-  fn import() {
-    assert_eq!(
-      tokenize("import \"foo.just\"\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 6,
-          modifiers: 0,
-          token_type: "keyword",
-        },
-        Expected {
-          line: 0,
-          start: 7,
-          length: 10,
-          modifiers: 0,
-          token_type: "string",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn module_declaration() {
-    assert_eq!(
-      tokenize("mod foo\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: 0,
-          token_type: "namespace",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 3,
-          modifiers: 0,
-          token_type: "namespace",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn shebang() {
-    assert_eq!(
-      tokenize(indoc! {"
-        foo:
-          #!/usr/bin/env bash
-      "}),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
-          token_type: "function",
-        },
-        Expected {
-          line: 0,
-          start: 3,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 1,
-          start: 2,
-          length: 19,
-          modifiers: 0,
-          token_type: "keyword",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn export_assignment() {
-    assert_eq!(
-      tokenize("export foo := \"bar\"\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 6,
-          modifiers: 0,
-          token_type: "keyword",
-        },
-        Expected {
-          line: 0,
-          start: 7,
-          length: 3,
-          modifiers: 0,
-          token_type: "variable",
-        },
-        Expected {
-          line: 0,
-          start: 11,
-          length: 2,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 14,
-          length: 5,
-          modifiers: 0,
-          token_type: "string",
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn escape_sequence() {
-    assert_eq!(
-      tokenize("foo := \"bar\\n\"\n"),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 3,
-          modifiers: 0,
-          token_type: "variable",
-        },
-        Expected {
-          line: 0,
-          start: 4,
-          length: 2,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 7,
-          length: 4,
-          modifiers: 0,
-          token_type: "string",
-        },
-        Expected {
-          line: 0,
-          start: 11,
-          length: 2,
-          modifiers: 0,
-          token_type: "string",
-        },
-        Expected {
-          line: 0,
-          start: 13,
-          length: 1,
-          modifiers: 0,
-          token_type: "string",
-        },
-      ]
-    );
-  }
-
-  #[test]
   fn empty_document() {
     assert_eq!(tokenize(""), []);
-  }
-
-  #[test]
-  fn multibyte_comment() {
-    #[track_caller]
-    fn case(source: &str) {
-      let tokens = tokenize(source);
-      assert_eq!(tokens.len(), 1);
-      assert_eq!(tokens[0].token_type, "comment");
-      assert_eq!(tokens[0].line, 0);
-      assert_eq!(tokens[0].start, 0);
-    }
-
-    case("# カ\n");
-    case("# 😀\n");
-    case("# å\n");
-  }
-
-  #[test]
-  fn multiline_span() {
-    let rope = Rope::from_str("foo\nbar\n");
-
-    assert_eq!(
-      Tokenizer::span_to_tokens(
-        &rope,
-        0,
-        rope.len_bytes() - 1,
-        TokenMap::new("keyword", &[]),
-      ),
-      [
-        Token {
-          length: 3,
-          line: 0,
-          modifiers_bitset: 0,
-          start_character: 0,
-          token_type_index: Tokenizer::token_type_index("keyword"),
-        },
-        Token {
-          length: 3,
-          line: 1,
-          modifiers_bitset: 0,
-          start_character: 0,
-          token_type_index: Tokenizer::token_type_index("keyword"),
-        },
-      ]
-    );
   }
 
   #[test]
@@ -1021,6 +704,51 @@ mod tests {
         TokenMap::new("keyword", &[]),
       ),
       []
+    );
+  }
+
+  #[test]
+  fn encode_empty() {
+    assert_eq!(Tokenizer::encode_tokens(Vec::new()), []);
+  }
+
+  #[test]
+  fn encode_same_line_deltas() {
+    let tokens = vec![
+      Token {
+        length: 3,
+        line: 0,
+        modifiers_bitset: 0,
+        start_character: 0,
+        token_type_index: 0,
+      },
+      Token {
+        length: 2,
+        line: 0,
+        modifiers_bitset: 0,
+        start_character: 5,
+        token_type_index: 1,
+      },
+    ];
+
+    assert_eq!(
+      Tokenizer::encode_tokens(tokens),
+      [
+        lsp::SemanticToken {
+          delta_line: 0,
+          delta_start: 0,
+          length: 3,
+          token_modifiers_bitset: 0,
+          token_type: 0,
+        },
+        lsp::SemanticToken {
+          delta_line: 0,
+          delta_start: 5,
+          length: 2,
+          token_modifiers_bitset: 0,
+          token_type: 1,
+        },
+      ]
     );
   }
 
@@ -1079,48 +807,333 @@ mod tests {
   }
 
   #[test]
-  fn encode_same_line_deltas() {
-    let tokens = vec![
-      Token {
-        length: 3,
-        line: 0,
-        modifiers_bitset: 0,
-        start_character: 0,
-        token_type_index: 0,
-      },
-      Token {
-        length: 2,
-        line: 0,
-        modifiers_bitset: 0,
-        start_character: 5,
-        token_type_index: 1,
-      },
-    ];
-
+  fn escape_sequence() {
     assert_eq!(
-      Tokenizer::encode_tokens(tokens),
+      tokenize("foo := \"bar\\n\"\n"),
       [
-        lsp::SemanticToken {
-          delta_line: 0,
-          delta_start: 0,
+        Expected {
+          line: 0,
+          start: 0,
           length: 3,
-          token_modifiers_bitset: 0,
-          token_type: 0,
+          modifiers: 0,
+          token_type: "variable",
         },
-        lsp::SemanticToken {
-          delta_line: 0,
-          delta_start: 5,
+        Expected {
+          line: 0,
+          start: 4,
           length: 2,
-          token_modifiers_bitset: 0,
-          token_type: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 4,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 13,
+          length: 1,
+          modifiers: 0,
+          token_type: "string",
         },
       ]
     );
   }
 
   #[test]
-  fn encode_empty() {
-    assert_eq!(Tokenizer::encode_tokens(Vec::new()), []);
+  fn export_assignment() {
+    assert_eq!(
+      tokenize("export foo := \"bar\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn function_call() {
+    assert_eq!(
+      tokenize("foo := env(\"bar\")\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 10,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 16,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn import() {
+    assert_eq!(
+      tokenize("import \"foo.just\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 10,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn modifier_bitsets() {
+    #[track_caller]
+    fn case(modifiers: &[&str], expected: u32) {
+      assert_eq!(Tokenizer::modifier_bitset(modifiers), expected);
+    }
+
+    case(&[], 0);
+    case(&["declaration"], 1);
+    case(&["deprecated"], 2);
+    case(&["declaration", "deprecated"], 3);
+  }
+
+  #[test]
+  fn module_declaration() {
+    assert_eq!(
+      tokenize("mod foo\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn multibyte_comment() {
+    #[track_caller]
+    fn case(source: &str) {
+      let tokens = tokenize(source);
+      assert_eq!(tokens.len(), 1);
+      assert_eq!(tokens[0].token_type, "comment");
+      assert_eq!(tokens[0].line, 0);
+      assert_eq!(tokens[0].start, 0);
+    }
+
+    case("# カ\n");
+    case("# 😀\n");
+    case("# å\n");
+  }
+
+  #[test]
+  fn multiline_span() {
+    let rope = Rope::from_str("foo\nbar\n");
+
+    assert_eq!(
+      Tokenizer::span_to_tokens(
+        &rope,
+        0,
+        rope.len_bytes() - 1,
+        TokenMap::new("keyword", &[]),
+      ),
+      [
+        Token {
+          length: 3,
+          line: 0,
+          modifiers_bitset: 0,
+          start_character: 0,
+          token_type_index: Tokenizer::token_type_index("keyword"),
+        },
+        Token {
+          length: 3,
+          line: 1,
+          modifiers_bitset: 0,
+          start_character: 0,
+          token_type_index: Tokenizer::token_type_index("keyword"),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn parameters() {
+    assert_eq!(
+      tokenize("foo bar baz:\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 3,
+          modifiers: 0,
+          token_type: "parameter",
+        },
+        Expected {
+          line: 0,
+          start: 8,
+          length: 3,
+          modifiers: 0,
+          token_type: "parameter",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn recipe() {
+    assert_eq!(
+      tokenize("foo:\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn shebang() {
+    assert_eq!(
+      tokenize(indoc! {"
+        foo:
+          #!/usr/bin/env bash
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 2,
+          length: 19,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+      ]
+    );
   }
 
   #[test]
@@ -1140,19 +1153,6 @@ mod tests {
     case("namespace", 7);
     case("decorator", 8);
     case("boolean", 9);
-  }
-
-  #[test]
-  fn modifier_bitsets() {
-    #[track_caller]
-    fn case(modifiers: &[&str], expected: u32) {
-      assert_eq!(Tokenizer::modifier_bitset(modifiers), expected);
-    }
-
-    case(&[], 0);
-    case(&["declaration"], 1);
-    case(&["deprecated"], 2);
-    case(&["declaration", "deprecated"], 3);
   }
 
   #[test]
