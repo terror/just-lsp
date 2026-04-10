@@ -369,11 +369,13 @@ mod tests {
   #[test]
   fn alias() {
     assert_eq!(
-      tokenize(indoc! {"
+      tokenize(indoc! {
+        "
         foo:
 
         alias bar := foo
-      "}),
+        "
+      }),
       [
         Expected {
           line: 0,
@@ -447,10 +449,12 @@ mod tests {
   #[test]
   fn attribute() {
     assert_eq!(
-      tokenize(indoc! {"
+      tokenize(indoc! {
+        "
         [private]
         foo:
-      "}),
+        "
+      }),
       [
         Expected {
           line: 0,
@@ -645,10 +649,12 @@ mod tests {
   #[test]
   fn dependencies() {
     assert_eq!(
-      tokenize(indoc! {"
+      tokenize(indoc! {
+        "
         foo:
         bar: foo
-      "}),
+        "
+      }),
       [
         Expected {
           line: 0,
@@ -1106,10 +1112,12 @@ mod tests {
   #[test]
   fn shebang() {
     assert_eq!(
-      tokenize(indoc! {"
+      tokenize(indoc! {
+        "
         foo:
           #!/usr/bin/env bash
-      "}),
+        "
+      }),
       [
         Expected {
           line: 0,
