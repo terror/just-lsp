@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.4.2](https://github.com/terror/just-lsp/releases/tag/0.4.2) - 2026-04-09
+
+### Added
+
+- Add support for `assert` keyword ([#328](https://github.com/terror/just-lsp/pull/328) by [terror](https://github.com/terror))
+- Add rule for `extension` attribute without `script` or shebang ([#316](https://github.com/terror/just-lsp/pull/316) by [terror](https://github.com/terror))
+- Add rule for validating `arg` attributes ([#315](https://github.com/terror/just-lsp/pull/315) by [terror](https://github.com/terror))
+- Add `module_file`, `module_directory`, and `module_dir` builtin functions ([#313](https://github.com/terror/just-lsp/pull/313) by [terror](https://github.com/terror))
+- Add support for user-defined functions ([#310](https://github.com/terror/just-lsp/pull/310) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix tokenizer crash on multi-byte UTF-8 characters in comments ([#330](https://github.com/terror/just-lsp/pull/330) by [terror](https://github.com/terror))
+- Support \u{...} unicode escape sequences in strings ([#317](https://github.com/terror/just-lsp/pull/317) by [terror](https://github.com/terror))
+
+### Misc
+
+- Simplify tokenizer and expand test coverage ([#331](https://github.com/terror/just-lsp/pull/331) by [terror](https://github.com/terror))
+- Bump tokio from 1.50.0 to 1.51.0 ([#326](https://github.com/terror/just-lsp/pull/326) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.7 to 0.26.8 ([#325](https://github.com/terror/just-lsp/pull/325) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.58 to 1.2.59 ([#324](https://github.com/terror/just-lsp/pull/324) by [app/dependabot](https://github.com/app/dependabot))
+- Set `just-lsp` as web playground page title ([#323](https://github.com/terror/just-lsp/pull/323) by [terror](https://github.com/terror))
+- Rebuild grammar wasm to fix web playground highlighting ([#322](https://github.com/terror/just-lsp/pull/322) by [terror](https://github.com/terror))
+- Simplify web playground tree pane by rendering tree-sitter nodes recursively ([#321](https://github.com/terror/just-lsp/pull/321) by [terror](https://github.com/terror))
+- Extract `useSyntaxTree` hook and `TreePane` component in web playground ([#320](https://github.com/terror/just-lsp/pull/320) by [terror](https://github.com/terror))
+- Refactor web playground editor into presentational component ([#319](https://github.com/terror/just-lsp/pull/319) by [terror](https://github.com/terror))
+- Extract `useTreeSitter` hook from `App` in web playground ([#318](https://github.com/terror/just-lsp/pull/318) by [terror](https://github.com/terror))
+- Parse settings from tree-sitter node instead of text ([#314](https://github.com/terror/just-lsp/pull/314) by [terror](https://github.com/terror))
+- Store document reference on `Scope` ([#312](https://github.com/terror/just-lsp/pull/312) by [terror](https://github.com/terror))
+- Centralize scope resolution for diagnostic rules ([#311](https://github.com/terror/just-lsp/pull/311) by [terror](https://github.com/terror))
+
 ## [0.4.1](https://github.com/terror/just-lsp/releases/tag/0.4.1) - 2026-04-04
 
 ### Added
