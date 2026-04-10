@@ -1187,12 +1187,14 @@ impl Inner {
     let documents = self.documents.read().await;
 
     if let Some(document) = documents.get(&uri) {
-      match tokenizer::Tokenizer::new(document).tokenize() {
+      let tokenizer = Tokenizer::new(document);
+
+      match tokenizer.tokenize() {
         Ok(data) => {
           return Ok(Some(lsp::SemanticTokensResult::Tokens(
             lsp::SemanticTokens {
-              result_id: None,
               data,
+              result_id: None,
             },
           )));
         }

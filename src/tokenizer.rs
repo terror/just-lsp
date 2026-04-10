@@ -274,7 +274,7 @@ impl<'doc> Tokenizer<'doc> {
 
     let tokens = highlight_iter
       .map(|event| {
-        event.map_err(|error| anyhow!("failed to highlight document: {error}"))
+        event.map_err(|error| anyhow!("Failed to highlight document: {error}"))
       })
       .filter_map(|event| match event {
         Err(error) => Some(Err(error)),

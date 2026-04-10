@@ -53,6 +53,7 @@ use {
   symbol::Symbol,
   tempfile::Builder,
   text_node::TextNode,
+  tokenizer::Tokenizer,
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
