@@ -19,113 +19,27 @@ const TOKEN_TYPES: &[&str] = &[
 
 const TOKEN_MODIFIERS: &[&str] = &["declaration", "deprecated"];
 
-struct HighlightConfig {
-  modifiers: &'static [&'static str],
-  name: &'static str,
-  token_type: Option<&'static str>,
-}
-
-const HIGHLIGHTS: &[HighlightConfig] = &[
-  HighlightConfig {
-    modifiers: &[],
-    name: "keyword.import",
-    token_type: Some("keyword"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "keyword.conditional",
-    token_type: Some("keyword"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "keyword.directive",
-    token_type: Some("keyword"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "keyword",
-    token_type: Some("keyword"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "module",
-    token_type: Some("namespace"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "variable.parameter",
-    token_type: Some("parameter"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "variable",
-    token_type: Some("variable"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "function.call",
-    token_type: Some("function"),
-  },
-  HighlightConfig {
-    modifiers: &["declaration"],
-    name: "function",
-    token_type: Some("function"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "attribute",
-    token_type: Some("decorator"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "operator",
-    token_type: Some("operator"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "punctuation.delimiter",
-    token_type: Some("operator"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "punctuation.bracket",
-    token_type: Some("operator"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "punctuation.special",
-    token_type: Some("operator"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "boolean",
-    token_type: Some("boolean"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "string.escape",
-    token_type: Some("string"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "string",
-    token_type: Some("string"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "comment",
-    token_type: Some("comment"),
-  },
-  HighlightConfig {
-    modifiers: &[],
-    name: "spell",
-    token_type: None,
-  },
-  HighlightConfig {
-    modifiers: &["deprecated"],
-    name: "error",
-    token_type: Some("keyword"),
-  },
+const HIGHLIGHTS: &[(&str, Option<&str>, &[&str])] = &[
+  ("keyword.import", Some("keyword"), &[]),
+  ("keyword.conditional", Some("keyword"), &[]),
+  ("keyword.directive", Some("keyword"), &[]),
+  ("keyword", Some("keyword"), &[]),
+  ("module", Some("namespace"), &[]),
+  ("variable.parameter", Some("parameter"), &[]),
+  ("variable", Some("variable"), &[]),
+  ("function.call", Some("function"), &[]),
+  ("function", Some("function"), &["declaration"]),
+  ("attribute", Some("decorator"), &[]),
+  ("operator", Some("operator"), &[]),
+  ("punctuation.delimiter", Some("operator"), &[]),
+  ("punctuation.bracket", Some("operator"), &[]),
+  ("punctuation.special", Some("operator"), &[]),
+  ("boolean", Some("boolean"), &[]),
+  ("string.escape", Some("string"), &[]),
+  ("string", Some("string"), &[]),
+  ("comment", Some("comment"), &[]),
+  ("spell", None, &[]),
+  ("error", Some("keyword"), &["deprecated"]),
 ];
 
 pub(crate) static SEMANTIC_TOKENS_LEGEND: LazyLock<lsp::SemanticTokensLegend> =
@@ -143,7 +57,7 @@ pub(crate) static SEMANTIC_TOKENS_LEGEND: LazyLock<lsp::SemanticTokensLegend> =
 static HIGHLIGHT_CONFIGURATION: LazyLock<HighlightConfiguration> =
   LazyLock::new(|| {
     let mut configuration = HighlightConfiguration::new(
-      // SAFETY: tree_sitter_just exposes a static tree-sitter language definition.
+      // SAFETY: tree_sitter_just returns a valid static tree-sitter language.
       unsafe { tree_sitter_just() },
       "just",
       HIGHLIGHTS_QUERY,
@@ -154,7 +68,7 @@ static HIGHLIGHT_CONFIGURATION: LazyLock<HighlightConfiguration> =
 
     let names = HIGHLIGHTS
       .iter()
-      .map(|config| config.name)
+      .map(|(name, _, _)| *name)
       .collect::<Vec<_>>();
 
     configuration.configure(&names);
@@ -166,15 +80,13 @@ static HIGHLIGHT_MAPPINGS: LazyLock<Vec<Option<TokenMap>>> =
   LazyLock::new(|| {
     HIGHLIGHTS
       .iter()
-      .map(|config| {
-        config
-          .token_type
-          .map(|token_type| TokenMap::new(token_type, config.modifiers))
+      .map(|(_, token_type, modifiers)| {
+        token_type.map(|token_type| TokenMap::new(token_type, modifiers))
       })
       .collect()
   });
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Token {
   length: u32,
   line: u32,
@@ -203,20 +115,6 @@ pub(crate) struct Tokenizer<'doc> {
 }
 
 impl<'doc> Tokenizer<'doc> {
-  /// Returns the UTF-8 scalar starting at `byte_idx`, if the index points to the
-  /// beginning of a code point inside the rope.
-  fn char_at_byte(rope: &Rope, byte_idx: usize) -> Option<char> {
-    if byte_idx >= rope.len_bytes() {
-      return None;
-    }
-
-    let end = (byte_idx + 4).min(rope.len_bytes());
-
-    rope.byte_slice(byte_idx..end).chars().next()
-  }
-
-  /// Sorts collected semantic token data and converts it into the LSP wire format,
-  /// computing delta-encoded positions as required by the protocol.
   fn encode_tokens(mut tokens: Vec<Token>) -> Vec<lsp::SemanticToken> {
     tokens.sort_by(|left, right| {
       left
@@ -225,48 +123,35 @@ impl<'doc> Tokenizer<'doc> {
         .then(left.start_character.cmp(&right.start_character))
     });
 
-    let mut data = Vec::with_capacity(tokens.len());
+    tokens
+      .iter()
+      .scan((0u32, 0u32), |(prev_line, prev_start), token| {
+        let delta_line = token.line.saturating_sub(*prev_line);
 
-    let (mut previous_line, mut previous_start) = (0, 0);
+        let delta_start = if delta_line > 0 {
+          token.start_character
+        } else {
+          token.start_character.saturating_sub(*prev_start)
+        };
 
-    let mut first = true;
+        (*prev_line, *prev_start) = (token.line, token.start_character);
 
-    for token in tokens {
-      let delta_line = if first {
-        token.line
-      } else {
-        token.line.saturating_sub(previous_line)
-      };
-
-      let delta_start = if first || delta_line > 0 {
-        token.start_character
-      } else {
-        token.start_character.saturating_sub(previous_start)
-      };
-
-      data.push(lsp::SemanticToken {
-        delta_line,
-        delta_start,
-        length: token.length,
-        token_type: token.token_type_index,
-        token_modifiers_bitset: token.modifiers_bitset,
-      });
-
-      (previous_line, previous_start) = (token.line, token.start_character);
-
-      first = false;
-    }
-
-    data
+        Some(lsp::SemanticToken {
+          delta_line,
+          delta_start,
+          length: token.length,
+          token_modifiers_bitset: token.modifiers_bitset,
+          token_type: token.token_type_index,
+        })
+      })
+      .collect()
   }
 
-  /// Provides the static semantic token legend shared by all tokenizer instances.
   #[must_use]
   pub(crate) fn legend() -> &'static lsp::SemanticTokensLegend {
     &SEMANTIC_TOKENS_LEGEND
   }
 
-  /// Converts a list of modifier names into a bitset understood by the LSP client.
   fn modifier_bitset(modifiers: &[&str]) -> u32 {
     modifiers
       .iter()
@@ -274,7 +159,6 @@ impl<'doc> Tokenizer<'doc> {
       .fold(0, |bitset, index| bitset | (1 << index))
   }
 
-  /// Finds the ordinal for a modifier inside the published legend.
   fn modifier_index(modifier: &str) -> Option<u32> {
     TOKEN_MODIFIERS
       .iter()
@@ -285,23 +169,27 @@ impl<'doc> Tokenizer<'doc> {
       })
   }
 
-  /// Creates a tokenizer that operates on the supplied document.
   #[must_use]
   pub(crate) fn new(document: &'doc Document) -> Self {
     Self { document }
   }
 
-  /// Breaks a highlighted span into per-line semantic token entries expressed in
-  /// UTF-16 coordinates, pushing them into `tokens`.
-  fn push_tokens_for_span(
+  fn resolve_mapping(highlight_stack: &[usize]) -> Option<TokenMap> {
+    highlight_stack.iter().rev().find_map(|index| {
+      HIGHLIGHT_MAPPINGS
+        .get(*index)
+        .and_then(|mapping| mapping.as_ref().copied())
+    })
+  }
+
+  fn span_to_tokens(
     rope: &Rope,
     start_byte: usize,
     end_byte: usize,
     mapping: TokenMap,
-    tokens: &mut Vec<Token>,
-  ) {
+  ) -> Vec<Token> {
     if start_byte >= end_byte {
-      return;
+      return Vec::new();
     }
 
     let (start_line, end_line) = (
@@ -309,52 +197,54 @@ impl<'doc> Tokenizer<'doc> {
       rope.byte_to_line(end_byte.saturating_sub(1)),
     );
 
-    for line_idx in start_line..=end_line {
-      let line_start_byte = rope.line_to_byte(line_idx);
+    (start_line..=end_line)
+      .filter_map(|line_idx| {
+        let line_start_byte = rope.line_to_byte(line_idx);
 
-      let line_end_byte =
-        rope.line_to_byte((line_idx + 1).min(rope.len_lines()));
+        let line_end_byte =
+          rope.line_to_byte((line_idx + 1).min(rope.len_lines()));
 
-      let segment_start = start_byte.max(line_start_byte);
+        let segment_start = start_byte.max(line_start_byte);
 
-      let segment_end = end_byte
-        .min(
-          line_end_byte
-            .saturating_sub(Self::trailing_line_break_len(rope, line_idx)),
-        )
-        .max(segment_start); // Ensure we don't go backwards if line is just a newline
+        let segment_end = end_byte
+          .min(
+            line_end_byte
+              .saturating_sub(Self::trailing_line_break_len(rope, line_idx)),
+          )
+          .max(segment_start);
 
-      if segment_end <= segment_start {
-        continue;
-      }
+        if segment_end <= segment_start {
+          return None;
+        }
 
-      let line_utf16 = rope.char_to_utf16_cu(rope.line_to_char(line_idx));
+        let line_utf16 = rope.char_to_utf16_cu(rope.line_to_char(line_idx));
 
-      let (start_utf16, end_utf16) = (
-        rope.char_to_utf16_cu(rope.byte_to_char(segment_start)),
-        rope.char_to_utf16_cu(rope.byte_to_char(segment_end)),
-      );
+        let start_utf16 =
+          rope.char_to_utf16_cu(rope.byte_to_char(segment_start));
 
-      let start_character =
-        u32::try_from(start_utf16.saturating_sub(line_utf16)).ok();
+        let end_utf16 = rope.char_to_utf16_cu(rope.byte_to_char(segment_end));
 
-      let length = u32::try_from(end_utf16.saturating_sub(start_utf16)).ok();
+        let start_character =
+          u32::try_from(start_utf16.saturating_sub(line_utf16)).ok()?;
 
-      if let (Some(start_character), Some(length)) = (start_character, length)
-        && length > 0
-      {
-        tokens.push(Token {
+        let length =
+          u32::try_from(end_utf16.saturating_sub(start_utf16)).ok()?;
+
+        if length == 0 {
+          return None;
+        }
+
+        Some(Token {
           length,
           line: u32::try_from(line_idx).unwrap_or(0),
           modifiers_bitset: mapping.modifiers_bitset,
           start_character,
           token_type_index: mapping.token_type_index,
-        });
-      }
-    }
+        })
+      })
+      .collect()
   }
 
-  /// Resolves the legend index for the provided token type name.
   fn token_type_index(token_type: &str) -> u32 {
     TOKEN_TYPES
       .iter()
@@ -365,17 +255,13 @@ impl<'doc> Tokenizer<'doc> {
       .expect("Token type missing from legend")
   }
 
-  /// Runs the tree-sitter highlighter over the document and emits the LSP semantic
-  /// token stream corresponding to the captured scopes.
   pub(crate) fn tokenize(&self) -> Result<Vec<lsp::SemanticToken>> {
     let mut highlighter = Highlighter::new();
 
     highlighter
       .parser()
-      .set_language(
-        // SAFETY: The generated parser exposes a valid static tree-sitter language.
-        &unsafe { tree_sitter_just() },
-      )
+      // SAFETY: tree_sitter_just returns a valid static tree-sitter language.
+      .set_language(&unsafe { tree_sitter_just() })
       .map_err(|error| anyhow!("Failed to configure highlighter: {error}"))?;
 
     let source = self.document.content.to_string();
@@ -385,76 +271,56 @@ impl<'doc> Tokenizer<'doc> {
       .map_err(|error| anyhow!("Failed to highlight document: {error}"))?;
 
     let mut highlight_stack = Vec::new();
-    let mut tokens = Vec::new();
 
-    for event in highlight_iter {
-      match event
-        .map_err(|error| anyhow!("Failed to highlight document: {error}"))?
-      {
-        HighlightEvent::HighlightStart(Highlight(index)) => {
+    let tokens = highlight_iter
+      .map(|event| {
+        event.map_err(|error| anyhow!("failed to highlight document: {error}"))
+      })
+      .filter_map(|event| match event {
+        Err(error) => Some(Err(error)),
+        Ok(HighlightEvent::HighlightStart(Highlight(index))) => {
           highlight_stack.push(index);
+          None
         }
-        HighlightEvent::HighlightEnd => {
+        Ok(HighlightEvent::HighlightEnd) => {
           highlight_stack.pop();
+          None
         }
-        HighlightEvent::Source { start, end } => {
-          if start >= end {
-            continue;
-          }
-
-          if let Some(mapping) =
-            highlight_stack.iter().rev().find_map(|index| {
-              HIGHLIGHT_MAPPINGS
-                .get(*index)
-                .and_then(|mapping| mapping.as_ref().copied())
-            })
-          {
-            Self::push_tokens_for_span(
+        Ok(HighlightEvent::Source { start, end }) => {
+          Self::resolve_mapping(&highlight_stack).map(|mapping| {
+            Ok(Self::span_to_tokens(
               &self.document.content,
               start,
               end,
               mapping,
-              &mut tokens,
-            );
-          }
+            ))
+          })
         }
-      }
-    }
+      })
+      .collect::<Result<Vec<_>>>()?
+      .into_iter()
+      .flatten()
+      .collect();
 
     Ok(Self::encode_tokens(tokens))
   }
 
-  /// Returns the number of bytes that make up the trailing line break for the given
-  /// line, handling `\n` and `\r\n` endings.
   fn trailing_line_break_len(rope: &Rope, line_idx: usize) -> usize {
-    let (line_start_byte, line_end_byte) = (
-      rope.line_to_byte(line_idx),
-      rope.line_to_byte((line_idx + 1).min(rope.len_lines())),
-    );
+    let line_start_byte = rope.line_to_byte(line_idx);
 
-    if line_end_byte <= line_start_byte || line_end_byte == 0 {
+    let line_end_byte = rope.line_to_byte((line_idx + 1).min(rope.len_lines()));
+
+    if line_end_byte <= line_start_byte {
       return 0;
     }
 
-    let last_byte = line_end_byte - 1;
-
-    let Some(last_char) = Self::char_at_byte(rope, last_byte) else {
-      return 0;
-    };
-
-    if last_char != '\n' {
+    if rope.byte(line_end_byte - 1) != b'\n' {
       return 0;
     }
 
-    if last_byte == 0 {
-      return 1;
-    }
-
-    if last_byte <= line_start_byte {
-      return 1;
-    }
-
-    if rope.byte(last_byte - 1) == b'\r' {
+    if line_end_byte - 1 > line_start_byte
+      && rope.byte(line_end_byte - 2) == b'\r'
+    {
       2
     } else {
       1
@@ -464,70 +330,708 @@ impl<'doc> Tokenizer<'doc> {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[derive(Debug, PartialEq, Eq)]
+  struct Expected {
+    length: u32,
+    line: u32,
+    modifiers: u32,
+    start: u32,
+    token_type: &'static str,
+  }
+
+  fn to_expected(tokens: &[lsp::SemanticToken]) -> Vec<Expected> {
+    let (mut line, mut start) = (0u32, 0u32);
+
+    tokens
+      .iter()
+      .map(|token| {
+        line += token.delta_line;
+
+        start = if token.delta_line > 0 {
+          token.delta_start
+        } else {
+          start + token.delta_start
+        };
+
+        Expected {
+          length: token.length,
+          line,
+          modifiers: token.token_modifiers_bitset,
+          start,
+          token_type: TOKEN_TYPES[token.token_type as usize],
+        }
+      })
+      .collect()
+  }
+
+  fn tokenize_to_expected(source: &str) -> Vec<Expected> {
+    to_expected(&Tokenizer::new(&Document::from(source)).tokenize().unwrap())
+  }
 
   #[test]
-  fn tokenizer_emits_expected_tokens() {
-    let document = Document::from("foo:\n  echo \"bar\"\n");
-
+  fn recipe() {
     assert_eq!(
-      Tokenizer::new(&document).tokenize().unwrap(),
-      vec![
-        lsp::SemanticToken {
-          delta_line: 0,
-          delta_start: 0,
+      tokenize_to_expected("foo:\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
           length: 3,
-          token_type: Tokenizer::token_type_index("function"),
-          token_modifiers_bitset: Tokenizer::modifier_bitset(&["declaration"]),
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
         },
-        lsp::SemanticToken {
-          delta_line: 0,
-          delta_start: 3,
+        Expected {
+          line: 0,
+          start: 3,
           length: 1,
-          token_type: Tokenizer::token_type_index("operator"),
-          token_modifiers_bitset: 0,
+          modifiers: 0,
+          token_type: "operator",
         },
-      ],
+      ]
     );
   }
 
   #[test]
-  fn push_tokens_for_span_handles_multiline_segments() {
-    let text = "alpha\nbeta\n";
-
-    let mut tokens = Vec::new();
-
-    Tokenizer::push_tokens_for_span(
-      &text.into(),
-      0,
-      text.len() - 1,
-      TokenMap::new("keyword", &[]),
-      &mut tokens,
+  fn assignment() {
+    assert_eq!(
+      tokenize_to_expected("foo := \"bar\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
     );
+  }
+
+  #[test]
+  fn alias() {
+    assert_eq!(
+      tokenize_to_expected(indoc! {"
+        foo:
+
+        alias bar := foo
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 2,
+          start: 0,
+          length: 5,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 2,
+          start: 6,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 2,
+          start: 10,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn conditional() {
+    assert_eq!(
+      tokenize_to_expected(
+        "foo := if \"a\" == \"b\" { \"c\" } else { \"d\" }\n"
+      ),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 2,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 10,
+          length: 3,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 17,
+          length: 3,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 21,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 23,
+          length: 3,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 27,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 29,
+          length: 4,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 34,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 36,
+          length: 3,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 40,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn function_call() {
+    assert_eq!(
+      tokenize_to_expected("foo := env(\"bar\")\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 10,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 16,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn comment() {
+    assert_eq!(
+      tokenize_to_expected("# foo\n"),
+      [Expected {
+        line: 0,
+        start: 0,
+        length: 5,
+        modifiers: 0,
+        token_type: "comment",
+      }]
+    );
+  }
+
+  #[test]
+  fn boolean_setting() {
+    assert_eq!(
+      tokenize_to_expected("set export := true\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 4,
+          modifiers: 0,
+          token_type: "boolean",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn attribute() {
+    assert_eq!(
+      tokenize_to_expected(indoc! {"
+        [private]
+        foo:
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 1,
+          length: 7,
+          modifiers: 0,
+          token_type: "decorator",
+        },
+        Expected {
+          line: 0,
+          start: 8,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 1,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn parameters() {
+    assert_eq!(
+      tokenize_to_expected("foo bar baz:\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 3,
+          modifiers: 0,
+          token_type: "parameter",
+        },
+        Expected {
+          line: 0,
+          start: 8,
+          length: 3,
+          modifiers: 0,
+          token_type: "parameter",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn dependencies() {
+    assert_eq!(
+      tokenize_to_expected(indoc! {"
+        foo:
+        bar: foo
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 1,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 5,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn import() {
+    assert_eq!(
+      tokenize_to_expected("import \"foo.just\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 10,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn module_declaration() {
+    assert_eq!(
+      tokenize_to_expected("mod foo\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn shebang() {
+    assert_eq!(
+      tokenize_to_expected(indoc! {"
+        foo:
+          #!/usr/bin/env bash
+      "}),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 1,
+          start: 2,
+          length: 19,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn export_assignment() {
+    assert_eq!(
+      tokenize_to_expected("export foo := \"bar\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 6,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn escape_sequence() {
+    assert_eq!(
+      tokenize_to_expected("foo := \"bar\\n\"\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 4,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 11,
+          length: 2,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 13,
+          length: 1,
+          modifiers: 0,
+          token_type: "string",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn empty_document() {
+    assert_eq!(tokenize_to_expected(""), []);
+  }
+
+  #[test]
+  fn multibyte_comment() {
+    #[track_caller]
+    fn case(source: &str) {
+      let tokens = tokenize_to_expected(source);
+      assert_eq!(tokens.len(), 1);
+      assert_eq!(tokens[0].token_type, "comment");
+      assert_eq!(tokens[0].line, 0);
+      assert_eq!(tokens[0].start, 0);
+    }
+
+    case("# カ\n");
+    case("# 😀\n");
+    case("# å\n");
+  }
+
+  #[test]
+  fn multiline_span() {
+    let rope = Rope::from_str("foo\nbar\n");
 
     assert_eq!(
-      tokens,
-      vec![
+      Tokenizer::span_to_tokens(
+        &rope,
+        0,
+        rope.len_bytes() - 1,
+        TokenMap::new("keyword", &[]),
+      ),
+      [
         Token {
-          length: 5,
+          length: 3,
           line: 0,
           modifiers_bitset: 0,
           start_character: 0,
           token_type_index: Tokenizer::token_type_index("keyword"),
         },
         Token {
-          length: 4,
+          length: 3,
           line: 1,
           modifiers_bitset: 0,
           start_character: 0,
           token_type_index: Tokenizer::token_type_index("keyword"),
-        }
+        },
       ]
     );
   }
 
   #[test]
-  fn encode_tokens_sorts_and_computes_deltas() {
+  fn empty_span() {
+    assert_eq!(
+      Tokenizer::span_to_tokens(
+        &Rope::from_str("foo"),
+        0,
+        0,
+        TokenMap::new("keyword", &[]),
+      ),
+      []
+    );
+  }
+
+  #[test]
+  fn encode_sorts_and_computes_deltas() {
     let tokens = vec![
       Token {
         length: 2,
@@ -552,11 +1056,9 @@ mod tests {
       },
     ];
 
-    let encoded = Tokenizer::encode_tokens(tokens);
-
     assert_eq!(
-      encoded,
-      vec![
+      Tokenizer::encode_tokens(tokens),
+      [
         lsp::SemanticToken {
           delta_line: 0,
           delta_start: 5,
@@ -583,52 +1085,98 @@ mod tests {
   }
 
   #[test]
-  fn token_type_index_matches_expected_order() {
-    assert_eq!(Tokenizer::token_type_index("comment"), 0);
-    assert_eq!(Tokenizer::token_type_index("keyword"), 1);
-    assert_eq!(Tokenizer::token_type_index("function"), 6);
-  }
+  fn encode_same_line_deltas() {
+    let tokens = vec![
+      Token {
+        length: 3,
+        line: 0,
+        modifiers_bitset: 0,
+        start_character: 0,
+        token_type_index: 0,
+      },
+      Token {
+        length: 2,
+        line: 0,
+        modifiers_bitset: 0,
+        start_character: 5,
+        token_type_index: 1,
+      },
+    ];
 
-  #[test]
-  fn modifier_bitset_combines_flags() {
-    assert_eq!(Tokenizer::modifier_bitset(&["declaration"]), 1);
-    assert_eq!(Tokenizer::modifier_bitset(&["deprecated"]), 2);
     assert_eq!(
-      Tokenizer::modifier_bitset(&["declaration", "deprecated"]),
-      3
+      Tokenizer::encode_tokens(tokens),
+      [
+        lsp::SemanticToken {
+          delta_line: 0,
+          delta_start: 0,
+          length: 3,
+          token_modifiers_bitset: 0,
+          token_type: 0,
+        },
+        lsp::SemanticToken {
+          delta_line: 0,
+          delta_start: 5,
+          length: 2,
+          token_modifiers_bitset: 0,
+          token_type: 1,
+        },
+      ]
     );
   }
 
   #[test]
-  fn trailing_line_break_len_detects_crlf() {
-    let rope = Rope::from_str("foo\r\nbar");
-    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 0), 2);
-    assert_eq!(Tokenizer::trailing_line_break_len(&rope, 1), 0);
+  fn encode_empty() {
+    assert_eq!(Tokenizer::encode_tokens(Vec::new()), []);
   }
 
   #[test]
-  fn trailing_line_break_len_multibyte_before_newline() {
+  fn token_type_indices() {
     #[track_caller]
-    fn case(s: &str) {
-      assert_eq!(Tokenizer::trailing_line_break_len(&Rope::from_str(s), 0), 1);
+    fn case(name: &str, expected: u32) {
+      assert_eq!(Tokenizer::token_type_index(name), expected);
     }
 
-    case("# カ\n");
-    case("# 😀\n");
-    case("# å\n");
+    case("comment", 0);
+    case("keyword", 1);
+    case("string", 2);
+    case("operator", 3);
+    case("variable", 4);
+    case("parameter", 5);
+    case("function", 6);
+    case("namespace", 7);
+    case("decorator", 8);
+    case("boolean", 9);
   }
 
   #[test]
-  fn tokenize_cjk_comment() {
-    Tokenizer::new(&Document::from("# カ\n\nbuild:\n    echo \"foo\"\n"))
-      .tokenize()
-      .unwrap();
+  fn modifier_bitsets() {
+    #[track_caller]
+    fn case(modifiers: &[&str], expected: u32) {
+      assert_eq!(Tokenizer::modifier_bitset(modifiers), expected);
+    }
+
+    case(&[], 0);
+    case(&["declaration"], 1);
+    case(&["deprecated"], 2);
+    case(&["declaration", "deprecated"], 3);
   }
 
   #[test]
-  fn tokenize_emoji_comment() {
-    Tokenizer::new(&Document::from("# 😀\n\nbuild:\n    echo \"foo\"\n"))
-      .tokenize()
-      .unwrap();
+  fn trailing_line_break() {
+    #[track_caller]
+    fn case(s: &str, line: usize, expected: usize) {
+      assert_eq!(
+        Tokenizer::trailing_line_break_len(&Rope::from_str(s), line),
+        expected
+      );
+    }
+
+    case("foo\r\nbar", 0, 2);
+    case("foo\r\nbar", 1, 0);
+    case("foo\n", 0, 1);
+    case("foo", 0, 0);
+    case("# カ\n", 0, 1);
+    case("# 😀\n", 0, 1);
+    case("# å\n", 0, 1);
   }
 }
