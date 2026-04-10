@@ -174,14 +174,6 @@ impl<'doc> Tokenizer<'doc> {
     Self { document }
   }
 
-  fn resolve_mapping(highlight_stack: &[usize]) -> Option<TokenMap> {
-    highlight_stack.iter().rev().find_map(|index| {
-      HIGHLIGHT_MAPPINGS
-        .get(*index)
-        .and_then(|mapping| mapping.as_ref().copied())
-    })
-  }
-
   fn span_to_tokens(
     rope: &Rope,
     start_byte: usize,
@@ -224,9 +216,6 @@ impl<'doc> Tokenizer<'doc> {
 
         let end_utf16 = rope.char_to_utf16_cu(rope.byte_to_char(segment_end));
 
-        let start_character =
-          u32::try_from(start_utf16.saturating_sub(line_utf16)).ok()?;
-
         let length =
           u32::try_from(end_utf16.saturating_sub(start_utf16)).ok()?;
 
@@ -238,7 +227,10 @@ impl<'doc> Tokenizer<'doc> {
           length,
           line: u32::try_from(line_idx).unwrap_or(0),
           modifiers_bitset: mapping.modifiers_bitset,
-          start_character,
+          start_character: u32::try_from(
+            start_utf16.saturating_sub(line_utf16),
+          )
+          .ok()?,
           token_type_index: mapping.token_type_index,
         })
       })
@@ -286,16 +278,22 @@ impl<'doc> Tokenizer<'doc> {
           highlight_stack.pop();
           None
         }
-        Ok(HighlightEvent::Source { start, end }) => {
-          Self::resolve_mapping(&highlight_stack).map(|mapping| {
+        Ok(HighlightEvent::Source { start, end }) => highlight_stack
+          .iter()
+          .rev()
+          .find_map(|index| {
+            HIGHLIGHT_MAPPINGS
+              .get(*index)
+              .and_then(|mapping| mapping.as_ref().copied())
+          })
+          .map(|mapping| {
             Ok(Self::span_to_tokens(
               &self.document.content,
               start,
               end,
               mapping,
             ))
-          })
-        }
+          }),
       })
       .collect::<Result<Vec<_>>>()?
       .into_iter()
