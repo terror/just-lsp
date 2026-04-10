@@ -339,7 +339,9 @@ mod tests {
     token_type: &'static str,
   }
 
-  fn to_expected(tokens: &[lsp::SemanticToken]) -> Vec<Expected> {
+  fn tokenize(source: &str) -> Vec<Expected> {
+    let tokens = Tokenizer::new(&Document::from(source)).tokenize().unwrap();
+
     let (mut line, mut start) = (0u32, 0u32);
 
     tokens
@@ -364,14 +366,10 @@ mod tests {
       .collect()
   }
 
-  fn tokenize_to_expected(source: &str) -> Vec<Expected> {
-    to_expected(&Tokenizer::new(&Document::from(source)).tokenize().unwrap())
-  }
-
   #[test]
   fn recipe() {
     assert_eq!(
-      tokenize_to_expected("foo:\n"),
+      tokenize("foo:\n"),
       [
         Expected {
           line: 0,
@@ -394,7 +392,7 @@ mod tests {
   #[test]
   fn assignment() {
     assert_eq!(
-      tokenize_to_expected("foo := \"bar\"\n"),
+      tokenize("foo := \"bar\"\n"),
       [
         Expected {
           line: 0,
@@ -424,7 +422,7 @@ mod tests {
   #[test]
   fn alias() {
     assert_eq!(
-      tokenize_to_expected(indoc! {"
+      tokenize(indoc! {"
         foo:
 
         alias bar := foo
@@ -472,9 +470,7 @@ mod tests {
   #[test]
   fn conditional() {
     assert_eq!(
-      tokenize_to_expected(
-        "foo := if \"a\" == \"b\" { \"c\" } else { \"d\" }\n"
-      ),
+      tokenize("foo := if \"a\" == \"b\" { \"c\" } else { \"d\" }\n"),
       [
         Expected {
           line: 0,
@@ -574,7 +570,7 @@ mod tests {
   #[test]
   fn function_call() {
     assert_eq!(
-      tokenize_to_expected("foo := env(\"bar\")\n"),
+      tokenize("foo := env(\"bar\")\n"),
       [
         Expected {
           line: 0,
@@ -625,7 +621,7 @@ mod tests {
   #[test]
   fn comment() {
     assert_eq!(
-      tokenize_to_expected("# foo\n"),
+      tokenize("# foo\n"),
       [Expected {
         line: 0,
         start: 0,
@@ -639,7 +635,7 @@ mod tests {
   #[test]
   fn boolean_setting() {
     assert_eq!(
-      tokenize_to_expected("set export := true\n"),
+      tokenize("set export := true\n"),
       [
         Expected {
           line: 0,
@@ -676,7 +672,7 @@ mod tests {
   #[test]
   fn attribute() {
     assert_eq!(
-      tokenize_to_expected(indoc! {"
+      tokenize(indoc! {"
         [private]
         foo:
       "}),
@@ -723,7 +719,7 @@ mod tests {
   #[test]
   fn parameters() {
     assert_eq!(
-      tokenize_to_expected("foo bar baz:\n"),
+      tokenize("foo bar baz:\n"),
       [
         Expected {
           line: 0,
@@ -760,7 +756,7 @@ mod tests {
   #[test]
   fn dependencies() {
     assert_eq!(
-      tokenize_to_expected(indoc! {"
+      tokenize(indoc! {"
         foo:
         bar: foo
       "}),
@@ -807,7 +803,7 @@ mod tests {
   #[test]
   fn import() {
     assert_eq!(
-      tokenize_to_expected("import \"foo.just\"\n"),
+      tokenize("import \"foo.just\"\n"),
       [
         Expected {
           line: 0,
@@ -830,7 +826,7 @@ mod tests {
   #[test]
   fn module_declaration() {
     assert_eq!(
-      tokenize_to_expected("mod foo\n"),
+      tokenize("mod foo\n"),
       [
         Expected {
           line: 0,
@@ -853,7 +849,7 @@ mod tests {
   #[test]
   fn shebang() {
     assert_eq!(
-      tokenize_to_expected(indoc! {"
+      tokenize(indoc! {"
         foo:
           #!/usr/bin/env bash
       "}),
@@ -886,7 +882,7 @@ mod tests {
   #[test]
   fn export_assignment() {
     assert_eq!(
-      tokenize_to_expected("export foo := \"bar\"\n"),
+      tokenize("export foo := \"bar\"\n"),
       [
         Expected {
           line: 0,
@@ -923,7 +919,7 @@ mod tests {
   #[test]
   fn escape_sequence() {
     assert_eq!(
-      tokenize_to_expected("foo := \"bar\\n\"\n"),
+      tokenize("foo := \"bar\\n\"\n"),
       [
         Expected {
           line: 0,
@@ -966,14 +962,14 @@ mod tests {
 
   #[test]
   fn empty_document() {
-    assert_eq!(tokenize_to_expected(""), []);
+    assert_eq!(tokenize(""), []);
   }
 
   #[test]
   fn multibyte_comment() {
     #[track_caller]
     fn case(source: &str) {
-      let tokens = tokenize_to_expected(source);
+      let tokens = tokenize(source);
       assert_eq!(tokens.len(), 1);
       assert_eq!(tokens[0].token_type, "comment");
       assert_eq!(tokens[0].line, 0);
