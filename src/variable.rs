@@ -1,10 +1,10 @@
 use super::*;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct Variable {
-  pub(crate) content: String,
-  pub(crate) export: bool,
-  pub(crate) name: TextNode,
-  pub(crate) range: lsp::Range,
-  pub(crate) unexport: bool,
+pub struct Variable {
+  pub content: String,
+  pub export: bool,
+  pub name: TextNode,
+  pub range: lsp::Range,
+  pub unexport: bool,
 }

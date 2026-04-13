@@ -1,19 +1,19 @@
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Recipe {
-  pub(crate) attributes: Vec<Attribute>,
-  pub(crate) content: String,
-  pub(crate) dependencies: Vec<Dependency>,
-  pub(crate) name: TextNode,
-  pub(crate) parameters: Vec<Parameter>,
-  pub(crate) range: lsp::Range,
-  pub(crate) shebang: Option<TextNode>,
+pub struct Recipe {
+  pub attributes: Vec<Attribute>,
+  pub content: String,
+  pub dependencies: Vec<Dependency>,
+  pub name: TextNode,
+  pub parameters: Vec<Parameter>,
+  pub range: lsp::Range,
+  pub shebang: Option<TextNode>,
 }
 
 impl Recipe {
   #[must_use]
-  pub(crate) fn find_attribute(&self, name: &str) -> Option<&Attribute> {
+  pub fn find_attribute(&self, name: &str) -> Option<&Attribute> {
     self
       .attributes
       .iter()
@@ -21,7 +21,7 @@ impl Recipe {
   }
 
   #[must_use]
-  pub(crate) fn groups(&self) -> HashSet<Group> {
+  pub fn groups(&self) -> HashSet<Group> {
     let mut groups = HashSet::new();
 
     for attribute in &self.attributes {
@@ -40,7 +40,7 @@ impl Recipe {
   }
 
   #[must_use]
-  pub(crate) fn has_attribute(&self, name: &str) -> bool {
+  pub fn has_attribute(&self, name: &str) -> bool {
     self
       .attributes
       .iter()

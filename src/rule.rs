@@ -10,7 +10,7 @@ macro_rules! define_rule {
     }
   ) => {
     $(#[$doc])*
-    pub(crate) struct $name;
+    pub struct $name;
 
     impl Rule for $name {
       fn id(&self) -> &'static str {
@@ -67,7 +67,7 @@ mod unused_parameters;
 mod unused_variables;
 mod working_directory_conflict;
 
-pub(crate) trait Rule: Sync {
+pub trait Rule: Sync {
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
 

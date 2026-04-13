@@ -621,6 +621,7 @@ dependencies = [
  "serde_json",
  "target",
  "tempfile",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tower-lsp",

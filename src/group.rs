@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum Group {
+pub enum Group {
   Any,
   Dragonfly,
   Freebsd,
@@ -12,12 +12,12 @@ pub(crate) enum Group {
 
 impl Group {
   #[must_use]
-  pub(crate) fn conflicts_with(self, other: Group) -> bool {
+  pub fn conflicts_with(self, other: Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
 
   #[must_use]
-  pub(crate) fn targets(attribute: &str) -> Option<Vec<Self>> {
+  pub fn targets(attribute: &str) -> Option<Vec<Self>> {
     match attribute {
       "dragonfly" => Some(vec![Group::Dragonfly]),
       "freebsd" => Some(vec![Group::Freebsd]),

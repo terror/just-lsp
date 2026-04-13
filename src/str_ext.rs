@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) trait StrExt {
+pub trait StrExt {
   /// Returns a `Point` describing the tree-sitter point that would
   /// be reached after inserting this UTF-8 text.
   fn point_delta(&self) -> Point;

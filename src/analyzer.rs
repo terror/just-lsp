@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub(crate) struct Analyzer<'a> {
+pub struct Analyzer<'a> {
   config: Option<&'a Config>,
   document: &'a Document,
 }
@@ -21,7 +21,8 @@ impl<'a> Analyzer<'a> {
   /// Rules that return `None` from `severity()` are filtered out, so
   /// config can suppress individual rules entirely. Diagnostics are
   /// sorted by position then message for deterministic output.
-  pub(crate) fn analyze(&self) -> Vec<Diagnostic> {
+  #[must_use]
+  pub fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(self.document);
 
     let default = Config::default();
@@ -64,7 +65,7 @@ impl<'a> Analyzer<'a> {
   /// When no config is set, `Config::default()` is used, which leaves
   /// all rule severities at their built-in defaults.
   #[must_use]
-  pub(crate) fn config(self, config: &'a Config) -> Self {
+  pub fn config(self, config: &'a Config) -> Self {
     Self {
       config: Some(config),
       ..self

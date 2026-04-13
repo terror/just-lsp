@@ -1,111 +1,46 @@
 use {
-  alias::Alias,
-  analyzer::Analyzer,
-  anyhow::{Context, Error, anyhow, bail},
+  anyhow::{Error, anyhow, bail},
   arguments::Arguments,
   ariadne::{Color, Label, Report, ReportKind, sources},
-  attribute::Attribute,
-  attribute_target::AttributeTarget,
-  builtin::Builtin,
-  builtins::BUILTINS,
   clap::Parser as Clap,
   command::Command,
-  config::Config,
-  count::Count,
-  dependency::Dependency,
-  diagnostic::Diagnostic,
-  document::Document,
   env_logger::Env,
-  function::Function,
-  function_call::FunctionCall,
-  group::Group,
-  import::Import,
-  module::Module,
-  node_ext::NodeExt,
-  parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
-  point_ext::PointExt,
-  position_ext::PositionExt,
-  recipe::Recipe,
+  just_lsp::*,
   resolver::Resolver,
-  rope_ext::RopeExt,
   ropey::Rope,
-  rule::Rule,
-  rule_context::RuleContext,
-  scope::Scope,
-  serde::{Deserialize, Serialize},
   server::Server,
-  setting::{Setting, SettingKind},
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     env,
-    fmt::{self, Debug, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter},
     fs,
-    iter::{once, successors},
-    ops::ControlFlow,
     path::PathBuf,
     process,
-    sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool},
+    sync::{Arc, LazyLock, atomic::AtomicBool},
     time::Instant,
   },
-  str_ext::StrExt,
   subcommand::Subcommand,
   symbol::Symbol,
-  tempfile::Builder,
-  text_node::TextNode,
   tokenizer::Tokenizer,
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
-  tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
+  tree_sitter::Node,
   tree_sitter_highlight::{
     Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
   },
-  variable::Variable,
 };
 
-mod alias;
-mod analyzer;
 mod arguments;
-mod attribute;
-mod attribute_target;
-mod builtin;
-mod builtins;
 mod command;
-mod config;
-mod count;
-mod dependency;
-mod diagnostic;
-mod document;
-mod function;
-mod function_call;
-mod group;
-mod import;
-mod module;
-mod node_ext;
-mod parameter;
-mod point_ext;
-mod position_ext;
-mod recipe;
 mod resolver;
-mod rope_ext;
-mod rule;
-mod rule_context;
-mod scope;
 mod server;
-mod setting;
-mod str_ext;
 mod subcommand;
 mod symbol;
-mod text_node;
 mod tokenizer;
-mod variable;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
-
-unsafe extern "C" {
-  pub(crate) fn tree_sitter_just() -> Language;
-}
 
 #[tokio::main]
 async fn main() {
