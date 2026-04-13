@@ -26,7 +26,7 @@ pub use {
   dependency::Dependency,
   diagnostic::Diagnostic,
   document::Document,
-  error::{Error, Result},
+  error::Error,
   function::Function,
   function_call::FunctionCall,
   group::Group,
@@ -77,6 +77,8 @@ mod setting;
 mod str_ext;
 mod text_node;
 mod variable;
+
+type Result<T = ()> = std::result::Result<T, Error>;
 
 // SAFETY: tree_sitter_just returns a static language definition.
 unsafe extern "C" {
