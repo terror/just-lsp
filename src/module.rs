@@ -1,15 +1,16 @@
 use super::*;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Module {
-  pub(crate) name: TextNode,
-  pub(crate) optional: bool,
-  pub(crate) path: Option<TextNode>,
-  pub(crate) range: lsp::Range,
+pub struct Module {
+  pub name: TextNode,
+  pub optional: bool,
+  pub path: Option<TextNode>,
+  pub range: lsp::Range,
 }
 
 impl Module {
-  pub(crate) fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
+  #[must_use]
+  pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
     let base_dir = base_uri.to_file_path().ok()?.parent()?.to_path_buf();
 
     if let Some(path_node) = &self.path {
@@ -39,7 +40,7 @@ impl Module {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, tempfile::Builder};
 
   fn module(name: &str, path: Option<&str>) -> Module {
     Module {

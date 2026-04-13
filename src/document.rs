@@ -1,14 +1,13 @@
 use super::*;
 
 #[derive(Debug)]
-pub(crate) struct Document {
-  pub(crate) content: Rope,
-  pub(crate) tree: Option<Tree>,
-  pub(crate) uri: lsp::Url,
-  pub(crate) version: i32,
+pub struct Document {
+  pub content: Rope,
+  pub tree: Option<Tree>,
+  pub uri: lsp::Url,
+  pub version: i32,
 }
 
-#[cfg(test)]
 impl From<&str> for Document {
   fn from(value: &str) -> Self {
     let mut document = Self {
@@ -47,7 +46,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 
 impl Document {
   #[must_use]
-  pub(crate) fn aliases(&self) -> Vec<Alias> {
+  pub fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -78,7 +77,7 @@ impl Document {
   /// # Errors
   ///
   /// Returns an [`Error`] if tree-sitter fails to parse the updated document.
-  pub(crate) fn apply_change(
+  pub fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
@@ -106,7 +105,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn attributes(&self) -> Vec<Attribute> {
+  pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -150,7 +149,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn find_function(&self, name: &str) -> Option<Function> {
+  pub fn find_function(&self, name: &str) -> Option<Function> {
     self
       .functions()
       .into_iter()
@@ -158,7 +157,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn find_recipe(&self, name: &str) -> Option<Recipe> {
+  pub fn find_recipe(&self, name: &str) -> Option<Recipe> {
     self
       .recipes()
       .into_iter()
@@ -166,27 +165,36 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn find_variable(&self, name: &str) -> Option<Variable> {
+  pub fn find_variable(&self, name: &str) -> Option<Variable> {
     self
       .variables()
       .into_iter()
       .find(|var| var.name.value == name)
   }
 
-  pub(crate) fn format(&self) -> Result<String> {
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if formatting fails.
+  pub fn format(&self) -> Result<String> {
     let file = if let Ok(path) = self.uri.to_file_path() {
-      Builder::new()
+      tempfile::Builder::new()
         .prefix(".justfile-fmt-")
-        .tempfile_in(path.parent().context("file path has no parent")?)?
+        .tempfile_in(
+          path
+            .parent()
+            .ok_or_else(|| Error::Format("file path has no parent".into()))?,
+        )?
     } else {
-      Builder::new().prefix(".justfile-fmt-").tempfile()?
+      tempfile::Builder::new()
+        .prefix(".justfile-fmt-")
+        .tempfile()?
     };
 
     let content = self.content.to_string();
 
     fs::write(&file, content.as_bytes())?;
 
-    let output = process::Command::new("just")
+    let output = std::process::Command::new("just")
       .arg("--fmt")
       .arg("--unstable")
       .arg("--quiet")
@@ -195,17 +203,17 @@ impl Document {
       .output()?;
 
     if !output.status.success() {
-      bail!(
+      return Err(Error::Format(format!(
         "just formatting failed: {}",
         String::from_utf8_lossy(&output.stderr)
-      );
+      )));
     }
 
     Ok(fs::read_to_string(&file)?)
   }
 
   #[must_use]
-  pub(crate) fn function_calls(&self) -> Vec<FunctionCall> {
+  pub fn function_calls(&self) -> Vec<FunctionCall> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -242,7 +250,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn functions(&self) -> Vec<Function> {
+  pub fn functions(&self) -> Vec<Function> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -286,7 +294,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn get_node_text(&self, node: &Node) -> String {
+  pub fn get_node_text(&self, node: &Node) -> String {
     self
       .content
       .slice(
@@ -297,7 +305,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn imports(&self) -> Vec<Import> {
+  pub fn imports(&self) -> Vec<Import> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -323,7 +331,7 @@ impl Document {
 
   #[must_use]
   #[allow(dead_code)]
-  pub(crate) fn modules(&self) -> Vec<Module> {
+  pub fn modules(&self) -> Vec<Module> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -353,12 +361,26 @@ impl Document {
     })
   }
 
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
+  /// contents fail to parse.
+  pub fn new(source: &str, uri: lsp::Url) -> Result<Self> {
+    let mut document = Self {
+      content: Rope::from_str(source),
+      tree: None,
+      uri,
+      version: 0,
+    };
+
+    document.parse()?;
+
+    Ok(document)
+  }
+
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
-  pub(crate) fn node_at_position(
-    &self,
-    position: lsp::Position,
-  ) -> Option<Node<'_>> {
+  pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     let tree = self.tree.as_ref()?;
     let point = position.point(self);
     tree.root_node().descendant_for_point_range(point, point)
@@ -370,7 +392,7 @@ impl Document {
   ///
   /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
   /// contents fail to parse.
-  pub(crate) fn parse(&mut self) -> Result {
+  pub fn parse(&mut self) -> Result {
     let mut parser = Parser::new();
 
     // SAFETY: tree_sitter_just returns a static language definition.
@@ -384,7 +406,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn recipes(&self) -> Vec<Recipe> {
+  pub fn recipes(&self) -> Vec<Recipe> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -513,7 +535,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn settings(&self) -> Vec<Setting> {
+  pub fn settings(&self) -> Vec<Setting> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()
@@ -525,7 +547,7 @@ impl Document {
   }
 
   #[must_use]
-  pub(crate) fn variables(&self) -> Vec<Variable> {
+  pub fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
         .root_node()

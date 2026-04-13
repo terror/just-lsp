@@ -7,7 +7,7 @@
 //!
 //! ```
 //! use {
-//!   just_lsp_rope_ext::RopeExt,
+//!   just_lsp::RopeExt,
 //!   ropey::Rope,
 //!   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent}
 //! };
@@ -32,21 +32,21 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Position {
-  pub(crate) byte: usize,
-  pub(crate) char: usize,
-  pub(crate) point: Point,
+pub struct Position {
+  pub byte: usize,
+  pub char: usize,
+  pub point: Point,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Edit<'a> {
-  pub(crate) end_char: usize,
-  pub(crate) input_edit: InputEdit,
-  pub(crate) start_char: usize,
-  pub(crate) text: &'a str,
+pub struct Edit<'a> {
+  pub end_char: usize,
+  pub input_edit: InputEdit,
+  pub start_char: usize,
+  pub text: &'a str,
 }
 
-pub(crate) trait RopeExt {
+pub trait RopeExt {
   fn apply_edit(&mut self, edit: &Edit);
   fn build_edit<'a>(
     &self,

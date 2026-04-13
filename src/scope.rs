@@ -1,17 +1,17 @@
 use super::*;
 
-pub(crate) struct Scope<'a> {
+pub struct Scope<'a> {
   current_recipe: Option<String>,
   document: &'a Document,
   globals: HashSet<String>,
   locals: HashSet<String>,
-  pub(crate) recipe_identifier_usage: HashMap<String, HashSet<String>>,
-  pub(crate) unresolved_identifiers: Vec<(String, lsp::Range)>,
-  pub(crate) variable_usage: HashMap<String, bool>,
+  pub recipe_identifier_usage: HashMap<String, HashSet<String>>,
+  pub unresolved_identifiers: Vec<(String, lsp::Range)>,
+  pub variable_usage: HashMap<String, bool>,
 }
 
 impl<'a> Scope<'a> {
-  pub(crate) fn analyze(context: &RuleContext<'a>) -> Self {
+  pub fn analyze(context: &RuleContext<'a>) -> Self {
     let mut scope = Self::new(context);
 
     let Some(tree) = context.tree() else {

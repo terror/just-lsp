@@ -1,20 +1,21 @@
 use super::*;
 
 #[derive(Clone, Debug, Default, Deserialize)]
-pub(crate) struct Config {
+pub struct Config {
   #[serde(default)]
-  pub(crate) rules: HashMap<String, RuleConfig>,
+  pub rules: HashMap<String, RuleConfig>,
 }
 
 impl Config {
-  pub(crate) fn rule_config(&self, id: &str) -> RuleConfig {
+  #[must_use]
+  pub fn rule_config(&self, id: &str) -> RuleConfig {
     self.rules.get(id).cloned().unwrap_or_default()
   }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum RuleLevel {
+pub enum RuleLevel {
   Error,
   Hint,
   #[serde(alias = "info")]
@@ -36,7 +37,7 @@ impl From<RuleLevel> for lsp::DiagnosticSeverity {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum RuleConfig {
+pub enum RuleConfig {
   Level(RuleLevel),
   Settings {
     #[serde(default)]
@@ -51,14 +52,16 @@ impl Default for RuleConfig {
 }
 
 impl RuleConfig {
-  pub(crate) fn level(&self) -> Option<RuleLevel> {
+  #[must_use]
+  pub fn level(&self) -> Option<RuleLevel> {
     match self {
       RuleConfig::Level(level) => Some(*level),
       RuleConfig::Settings { level } => *level,
     }
   }
 
-  pub(crate) fn severity(
+  #[must_use]
+  pub fn severity(
     &self,
     default: lsp::DiagnosticSeverity,
   ) -> Option<lsp::DiagnosticSeverity> {

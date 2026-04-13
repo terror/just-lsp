@@ -1,6 +1,7 @@
 use super::*;
 
-pub(crate) trait PointExt {
+pub trait PointExt {
+  #[must_use]
   fn advance(self, delta: Point) -> Self;
   fn position(&self, document: &Document) -> lsp::Position;
 }

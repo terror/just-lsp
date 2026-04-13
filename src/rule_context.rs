@@ -2,7 +2,7 @@ use super::*;
 
 type BuiltinRef = &'static Builtin<'static>;
 
-pub(crate) struct RuleContext<'a> {
+pub struct RuleContext<'a> {
   aliases: OnceLock<Vec<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
   builtin_attributes_map: OnceLock<HashMap<&'static str, Vec<BuiltinRef>>>,
@@ -24,7 +24,7 @@ pub(crate) struct RuleContext<'a> {
 }
 
 impl<'a> RuleContext<'a> {
-  pub(crate) fn aliases(&self) -> &[Alias] {
+  pub fn aliases(&self) -> &[Alias] {
     self
       .aliases
       .get_or_init(|| {
@@ -36,17 +36,14 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub(crate) fn attributes(&self) -> &[Attribute] {
+  pub fn attributes(&self) -> &[Attribute] {
     self
       .attributes
       .get_or_init(|| self.document.attributes())
       .as_slice()
   }
 
-  pub(crate) fn builtin_attributes(
-    &self,
-    name: &str,
-  ) -> &[&'static Builtin<'static>] {
+  pub fn builtin_attributes(&self, name: &str) -> &[&'static Builtin<'static>] {
     self
       .builtin_attributes_map()
       .get(name)
@@ -69,7 +66,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn builtin_function(
+  pub fn builtin_function(
     &self,
     name: &str,
   ) -> Option<&'static Builtin<'static>> {
@@ -92,7 +89,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn builtin_setting(
+  pub fn builtin_setting(
     &self,
     name: &str,
   ) -> Option<&'static Builtin<'static>> {
@@ -115,11 +112,11 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn document(&self) -> &'a Document {
+  pub fn document(&self) -> &'a Document {
     self.document
   }
 
-  pub(crate) fn document_variable_names(&self) -> &HashSet<String> {
+  pub fn document_variable_names(&self) -> &HashSet<String> {
     self.document_variable_names.get_or_init(|| {
       self
         .variables()
@@ -129,14 +126,14 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn function_calls(&self) -> &[FunctionCall] {
+  pub fn function_calls(&self) -> &[FunctionCall] {
     self
       .function_calls
       .get_or_init(|| self.document.function_calls())
       .as_slice()
   }
 
-  pub(crate) fn functions(&self) -> &[Function] {
+  pub fn functions(&self) -> &[Function] {
     self
       .functions
       .get_or_init(|| {
@@ -148,7 +145,8 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub(crate) fn new(document: &'a Document) -> Self {
+  #[must_use]
+  pub fn new(document: &'a Document) -> Self {
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
@@ -171,14 +169,14 @@ impl<'a> RuleContext<'a> {
     }
   }
 
-  pub(crate) fn recipe(&self, name: &str) -> Option<&Recipe> {
+  pub fn recipe(&self, name: &str) -> Option<&Recipe> {
     self
       .recipes()
       .iter()
       .find(|recipe| recipe.name.value == name)
   }
 
-  pub(crate) fn recipe_names(&self) -> &HashSet<String> {
+  pub fn recipe_names(&self) -> &HashSet<String> {
     self.recipe_names.get_or_init(|| {
       self
         .recipes()
@@ -188,7 +186,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn recipe_parameters(&self) -> &HashMap<String, Vec<Parameter>> {
+  pub fn recipe_parameters(&self) -> &HashMap<String, Vec<Parameter>> {
     self.recipe_parameters.get_or_init(|| {
       self
         .recipes()
@@ -198,7 +196,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn recipes(&self) -> &[Recipe] {
+  pub fn recipes(&self) -> &[Recipe] {
     self
       .recipes
       .get_or_init(|| {
@@ -266,17 +264,17 @@ impl<'a> RuleContext<'a> {
     }
   }
 
-  pub(crate) fn scope(&self) -> &Scope {
+  pub fn scope(&self) -> &Scope {
     self.scope.get_or_init(|| Scope::analyze(self))
   }
 
-  pub(crate) fn setting_enabled(&self, name: &str) -> bool {
+  pub fn setting_enabled(&self, name: &str) -> bool {
     self.settings().iter().any(|setting| {
       setting.name == name && matches!(setting.kind, SettingKind::Boolean(true))
     })
   }
 
-  pub(crate) fn settings(&self) -> &[Setting] {
+  pub fn settings(&self) -> &[Setting] {
     self
       .settings
       .get_or_init(|| {
@@ -288,11 +286,11 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub(crate) fn tree(&self) -> Option<&Tree> {
+  pub fn tree(&self) -> Option<&Tree> {
     self.document.tree.as_ref()
   }
 
-  pub(crate) fn user_function_names(&self) -> &HashSet<String> {
+  pub fn user_function_names(&self) -> &HashSet<String> {
     self.user_function_names.get_or_init(|| {
       self
         .functions()
@@ -302,7 +300,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn variable_and_builtin_names(&self) -> &HashSet<String> {
+  pub fn variable_and_builtin_names(&self) -> &HashSet<String> {
     self.variable_and_builtin_names.get_or_init(|| {
       let mut names = self.document_variable_names().clone();
 
@@ -315,7 +313,7 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub(crate) fn variables(&self) -> &[Variable] {
+  pub fn variables(&self) -> &[Variable] {
     self
       .variables
       .get_or_init(|| {
@@ -330,7 +328,9 @@ impl<'a> RuleContext<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*, indoc::indoc, pretty_assertions::assert_eq, tempfile::Builder,
+  };
 
   #[test]
   fn imported_recipes_are_merged() {

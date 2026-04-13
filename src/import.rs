@@ -1,14 +1,15 @@
 use super::*;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Import {
-  pub(crate) optional: bool,
-  pub(crate) path: TextNode,
-  pub(crate) range: lsp::Range,
+pub struct Import {
+  pub optional: bool,
+  pub path: TextNode,
+  pub range: lsp::Range,
 }
 
 impl Import {
-  pub(crate) fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
+  #[must_use]
+  pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
     let raw = self.path.value.trim_matches(|c| c == '\'' || c == '"');
 
     if raw.is_empty() {
@@ -27,7 +28,7 @@ impl Import {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, tempfile::Builder};
 
   fn import(path: &str) -> Import {
     Import {

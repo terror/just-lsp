@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) static BUILTINS: [Builtin<'_>; 172] = [
+pub static BUILTINS: [Builtin<'_>; 172] = [
   Builtin::Attribute {
     name: "arg",
     description: "Print help string `HELP` for `ARG` in usage messages.",

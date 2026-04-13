@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub(crate) enum SettingKind {
+pub enum SettingKind {
   Array,
   Boolean(bool),
   String,
@@ -29,15 +29,15 @@ impl PartialEq for SettingKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Setting {
-  pub(crate) kind: SettingKind,
-  pub(crate) name: String,
-  pub(crate) range: lsp::Range,
+pub struct Setting {
+  pub kind: SettingKind,
+  pub name: String,
+  pub range: lsp::Range,
 }
 
 impl Setting {
   #[must_use]
-  pub(crate) fn from_node(node: &Node, document: &Document) -> Option<Self> {
+  pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
     let name = document.get_node_text(&node.child(1)?);
