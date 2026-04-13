@@ -2,10 +2,12 @@ use {
   just_lsp::{Analyzer, Document},
   lsp_types::DiagnosticSeverity,
   serde::Serialize,
+  typeshare::typeshare,
   wasm_bindgen::prelude::*,
 };
 
 #[derive(Serialize)]
+#[typeshare]
 struct Diagnostic {
   end_character: u32,
   end_line: u32,
