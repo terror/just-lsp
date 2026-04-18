@@ -189,6 +189,36 @@ https://github.com/jackTabsCode/zed-just, written by
 [@mattrobenolt](https://github.com/mattrobenolt). Follow the instructions in
 that repository to get it setup on your system.
 
+
+If you want to develop on zed against your local `just-lsp`, add something like this to
+your `settings.json`.
+```settings.json
+ "lsp": {
+    "just-lsp": {
+      "binary": {
+        "path": "~/just-lsp/target/debug/just-lsp",
+      },
+    },
+  },
+  "languages": {
+    "Just": {
+      "language_servers": ["just-lsp"],
+    },
+  },
+```
+
+
+Add a new key binding to restart lsp to `keymap.json`
+
+
+
+```
+    "context": "Editor",
+    "bindings": {
+      "ctrl-r l": "editor::RestartLanguageServer"
+    }
+```
+
 ## Configuration
 
 `just-lsp` accepts configuration through the LSP `initializationOptions` object,
