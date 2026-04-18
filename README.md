@@ -219,6 +219,9 @@ Add a new key binding to restart lsp to `keymap.json`
     }
 ```
 
+
+or use `editor: restart language server` in the command palette.
+
 ## Configuration
 
 `just-lsp` accepts configuration through the LSP `initializationOptions` object,
