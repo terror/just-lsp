@@ -333,36 +333,9 @@ mod tests {
     assert_eq!(
       ranges,
       vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 3
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 9
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 12
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 6,
-            character: 13
-          },
-          end: lsp::Position {
-            line: 6,
-            character: 16
-          },
-        },
+        lsp::Range::at(0, 0, 0, 3),
+        lsp::Range::at(3, 9, 3, 12),
+        lsp::Range::at(6, 13, 6, 16),
       ]
     );
   }
@@ -402,36 +375,9 @@ mod tests {
     assert_eq!(
       ranges,
       vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 5,
-            character: 4
-          },
-          end: lsp::Position {
-            line: 5,
-            character: 7
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 6,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 6,
-            character: 13
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 7,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 7,
-            character: 13
-          },
-        },
+        lsp::Range::at(5, 4, 5, 7),
+        lsp::Range::at(6, 10, 6, 13),
+        lsp::Range::at(7, 10, 7, 13),
       ]
     );
   }
@@ -464,28 +410,7 @@ mod tests {
 
     assert_eq!(
       ranges,
-      vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 2,
-            character: 4
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 7
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 13
-          },
-        },
-      ]
+      vec![lsp::Range::at(2, 4, 2, 7), lsp::Range::at(3, 10, 3, 13),]
     );
 
     let document = Document::from(indoc! {
@@ -515,36 +440,9 @@ mod tests {
     assert_eq!(
       ranges,
       vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 3
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 13
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 16
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 19
-          },
-        },
+        lsp::Range::at(0, 0, 0, 3),
+        lsp::Range::at(3, 10, 3, 13),
+        lsp::Range::at(3, 16, 3, 19),
       ]
     );
   }
@@ -588,46 +486,10 @@ mod tests {
     assert_eq!(
       ranges,
       vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 3
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 13
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 10,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 10,
-            character: 13
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 11,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 11,
-            character: 13
-          },
-        },
+        lsp::Range::at(0, 0, 0, 3),
+        lsp::Range::at(3, 10, 3, 13),
+        lsp::Range::at(10, 10, 10, 13),
+        lsp::Range::at(11, 10, 11, 13),
       ]
     );
   }
@@ -660,28 +522,7 @@ mod tests {
 
     assert_eq!(
       ranges,
-      vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 1,
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 2,
-            character: 4,
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 5,
-          },
-        },
-      ]
+      vec![lsp::Range::at(0, 0, 0, 1), lsp::Range::at(2, 4, 2, 5),]
     );
   }
 
@@ -705,19 +546,7 @@ mod tests {
     let definition =
       resolver.resolve_identifier_definition(&identifier).unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0,
-        },
-        end: lsp::Position {
-          line: 1,
-          character: 0,
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 1, 0));
   }
 
   #[test]
@@ -747,19 +576,7 @@ mod tests {
       .map(|reference| reference.range)
       .collect::<Vec<_>>();
 
-    assert_eq!(
-      ranges,
-      vec![lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0,
-        },
-        end: lsp::Position {
-          line: 0,
-          character: 1,
-        },
-      },]
-    );
+    assert_eq!(ranges, vec![lsp::Range::at(0, 0, 0, 1),]);
   }
 
   #[test]
@@ -790,28 +607,7 @@ mod tests {
 
     assert_eq!(
       ranges,
-      vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 5
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 8
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 2,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 2,
-            character: 3
-          },
-        },
-      ]
+      vec![lsp::Range::at(0, 5, 0, 8), lsp::Range::at(2, 0, 2, 3),]
     );
   }
 
@@ -848,28 +644,7 @@ mod tests {
 
     assert_eq!(
       ranges,
-      vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 1
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 10
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 11
-          },
-        },
-      ]
+      vec![lsp::Range::at(0, 0, 0, 1), lsp::Range::at(3, 10, 3, 11),]
     );
   }
 
@@ -894,19 +669,7 @@ mod tests {
     let definition =
       resolver.resolve_identifier_definition(&identifier).unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0
-        },
-        end: lsp::Position {
-          line: 3,
-          character: 0
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 3, 0));
   }
 
   #[test]
@@ -938,28 +701,7 @@ mod tests {
 
     assert_eq!(
       ranges,
-      vec![
-        lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 3
-          },
-        },
-        lsp::Range {
-          start: lsp::Position {
-            line: 3,
-            character: 6
-          },
-          end: lsp::Position {
-            line: 3,
-            character: 9
-          },
-        },
-      ]
+      vec![lsp::Range::at(0, 0, 0, 3), lsp::Range::at(3, 6, 3, 9),]
     );
   }
 
@@ -1014,19 +756,7 @@ mod tests {
       .resolve_identifier_definition(&foo_dependency)
       .unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0
-        },
-        end: lsp::Position {
-          line: 3,
-          character: 0
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 3, 0));
   }
 
   #[test]
@@ -1049,19 +779,7 @@ mod tests {
     let definition =
       resolver.resolve_identifier_definition(&var_usage).unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0
-        },
-        end: lsp::Position {
-          line: 1,
-          character: 0
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 1, 0));
   }
 
   #[test]
@@ -1083,19 +801,7 @@ mod tests {
       .resolve_identifier_definition(&param_usage)
       .unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 4
-        },
-        end: lsp::Position {
-          line: 0,
-          character: 19
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 4, 0, 19));
   }
 
   #[test]
@@ -1139,19 +845,7 @@ mod tests {
       .resolve_identifier_definition(&recipe_name)
       .unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0
-        },
-        end: lsp::Position {
-          line: 2,
-          character: 0
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 2, 0));
   }
 
   #[test]
@@ -1595,19 +1289,7 @@ mod tests {
       .resolve_identifier_definition(&call_identifier)
       .unwrap();
 
-    assert_eq!(
-      definition.range,
-      lsp::Range {
-        start: lsp::Position {
-          line: 0,
-          character: 0
-        },
-        end: lsp::Position {
-          line: 0,
-          character: 3
-        },
-      }
-    );
+    assert_eq!(definition.range, lsp::Range::at(0, 0, 0, 3));
   }
 
   #[test]

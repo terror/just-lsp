@@ -2087,16 +2087,7 @@ mod tests {
         uri: "file:///test.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 7,
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 13,
-            },
-          }),
+          range: Some(lsp::Range::at(1, 7, 1, 13)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
@@ -2129,16 +2120,7 @@ mod tests {
         uri: "file:///missing.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 0,
-            },
-          }),
+          range: Some(lsp::Range::at(0, 0, 0, 0)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
@@ -3031,16 +3013,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///empty.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, 0, 0),
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3071,16 +3044,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, 0, 0),
       })
       .response(CodeActionResponse {
         id: 2,
@@ -3124,16 +3088,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 10,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 10,
-          },
-        },
+        range: lsp::Range::at(0, 10, 0, 10),
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3174,16 +3129,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 10,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 10,
-          },
-        },
+        range: lsp::Range::at(0, 10, 0, 10),
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3224,16 +3170,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 3,
-          },
-        },
+        range: lsp::Range::at(0, 0, 0, 3),
       })
       .response(json!({
         "jsonrpc": "2.0",
