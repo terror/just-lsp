@@ -1019,16 +1019,7 @@ impl Inner {
     let changes = HashMap::from([(
       document_uri.clone(),
       vec![lsp::TextEdit {
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: u32::MAX,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, u32::MAX, 0),
         new_text: String::new(),
       }],
     )]);
@@ -1082,16 +1073,7 @@ impl Inner {
                   let changes = HashMap::from([(
                     document_uri.clone(),
                     vec![lsp::TextEdit {
-                      range: lsp::Range {
-                        start: lsp::Position {
-                          line: current_line,
-                          character: 0,
-                        },
-                        end: lsp::Position {
-                          line: current_line,
-                          character: 0,
-                        },
-                      },
+                      range: lsp::Range::at(current_line, 0, current_line, 0),
                       new_text: buffer.trim().into(),
                     }],
                   )]);
@@ -1124,16 +1106,7 @@ impl Inner {
             let changes = HashMap::from([(
               document_uri.clone(),
               vec![lsp::TextEdit {
-                range: lsp::Range {
-                  start: lsp::Position {
-                    line: current_line,
-                    character: 0,
-                  },
-                  end: lsp::Position {
-                    line: current_line,
-                    character: 0,
-                  },
-                },
+                range: lsp::Range::at(current_line, 0, current_line, 0),
                 new_text: buffer.trim().into(),
               }],
             )]);

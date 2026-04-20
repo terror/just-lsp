@@ -89,24 +89,6 @@ impl Parameter {
 mod tests {
   use super::*;
 
-  fn create_range(
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
-    end_char: u32,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_char,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_char,
-      },
-    }
-  }
-
   #[test]
   fn parse_normal_parameter() {
     let input = "target";
