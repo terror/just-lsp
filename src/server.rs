@@ -282,6 +282,8 @@ impl Inner {
         }));
       }
 
+      actions.extend(Quickfixer::new(document, &params).collect());
+
       return Ok(Some(actions));
     }
 
@@ -3106,6 +3108,138 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_quickfix() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 10,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 10,
+          },
+        },
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 14 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_or_default_quickfix() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var_or_default(\"BAR\", \"baz\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 10,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 10,
+          },
+        },
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var_or_default` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 25 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_outside_range() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range {
+          start: lsp::Position {
+            line: 0,
+            character: 0,
+          },
+          end: lsp::Position {
+            line: 0,
+            character: 3,
+          },
+        },
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
       .run()
       .await
   }

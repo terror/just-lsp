@@ -36,6 +36,8 @@ pub use {
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
+  quickfix::Quickfixer,
+  range_ext::RangeExt,
   recipe::Recipe,
   rope_ext::{Edit, Position as RopePosition, RopeExt},
   rule::Rule,
@@ -68,6 +70,8 @@ mod node_ext;
 mod parameter;
 mod point_ext;
 mod position_ext;
+mod quickfix;
+mod range_ext;
 mod recipe;
 mod rope_ext;
 mod rule;
