@@ -89,11 +89,11 @@ impl<'a> Quickfixer<'a> {
   #[must_use]
   pub fn new(
     document: &'a Document,
-    params: &'a lsp::CodeActionParams,
+    parameters: &'a lsp::CodeActionParams,
   ) -> Self {
     Self {
       document,
-      parameters: params,
+      parameters,
     }
   }
 }
