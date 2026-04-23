@@ -31,7 +31,7 @@ impl PartialEq for SettingKind {
 #[derive(Debug, PartialEq)]
 pub struct Setting {
   pub kind: SettingKind,
-  pub name: String,
+  pub name: TextNode,
   pub range: lsp::Range,
 }
 
@@ -40,7 +40,12 @@ impl Setting {
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
-    let name = document.get_node_text(&node.child(1)?);
+    let name_node = node.child(1)?;
+
+    let name = TextNode {
+      value: document.get_node_text(&name_node),
+      range: name_node.get_range(document),
+    };
 
     let mut cursor = node.walk();
 
@@ -82,7 +87,10 @@ mod tests {
     assert_eq!(
       Document::from("set foo := true\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -94,7 +102,10 @@ mod tests {
     assert_eq!(
       Document::from("set foo := false\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::Boolean(false),
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -106,7 +117,10 @@ mod tests {
     assert_eq!(
       Document::from("set export\n").settings(),
       vec![Setting {
-        name: "export".to_string(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -118,7 +132,10 @@ mod tests {
     assert_eq!(
       Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
       vec![Setting {
-        name: "shell".to_string(),
+        name: TextNode {
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
+        },
         kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -130,7 +147,10 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar\"\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -142,7 +162,10 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar := baz\"\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
       }],
@@ -160,17 +183,26 @@ mod tests {
       .settings(),
       vec![
         Setting {
-          name: "foo".to_string(),
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(0, 4, 0, 7),
+          },
           kind: SettingKind::Boolean(true),
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
-          name: "bar".to_string(),
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(1, 4, 1, 7),
+          },
           kind: SettingKind::String,
           range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
-          name: "shell".to_string(),
+          name: TextNode {
+            value: "shell".into(),
+            range: lsp::Range::at(2, 4, 2, 9),
+          },
           kind: SettingKind::Array,
           range: lsp::Range::at(2, 0, 3, 0),
         },

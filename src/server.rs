@@ -618,7 +618,7 @@ impl Inner {
       for setting in document.settings() {
         #[allow(deprecated)]
         symbols.push(lsp::DocumentSymbol {
-          name: setting.name,
+          name: setting.name.value,
           detail: Some(setting.kind.to_string()),
           kind: lsp::SymbolKind::PROPERTY,
           tags: None,

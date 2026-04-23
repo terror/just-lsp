@@ -11,7 +11,7 @@ define_rule! {
 
       for setting in context.settings() {
         let Some(Builtin::Setting { kind, .. }) =
-          context.builtin_setting(&setting.name)
+          context.builtin_setting(&setting.name.value)
         else {
           continue;
         };
@@ -21,7 +21,7 @@ define_rule! {
         }
 
         diagnostics.push(Diagnostic::error(
-          format!("Setting `{}` expects a {kind} value", setting.name),
+          format!("Setting `{}` expects a {kind} value", setting.name.value),
           setting.range,
         ));
       }
