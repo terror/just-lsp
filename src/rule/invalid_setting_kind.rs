@@ -21,7 +21,7 @@ define_rule! {
         }
 
         diagnostics.push(Diagnostic::error(
-          format!("Setting `{}` expects a {kind} value", setting.name,),
+          format!("Setting `{}` expects a {kind} value", setting.name),
           setting.range,
         ));
       }

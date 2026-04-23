@@ -152,7 +152,7 @@ mod tests {
       );
 
       for (diagnostic, (expected_message, expected_severity)) in
-        diagnostics.into_iter().zip(messages.into_iter())
+        diagnostics.into_iter().zip(messages)
       {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
 
