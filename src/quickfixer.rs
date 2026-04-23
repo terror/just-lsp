@@ -187,23 +187,18 @@ mod tests {
       "Replace `windows-powershell` with `windows-shell`"
     );
 
-    let edits = action
-      .edit
-      .as_ref()
-      .unwrap()
-      .changes
-      .as_ref()
-      .unwrap()
-      .values()
-      .next()
-      .unwrap();
-
     assert_eq!(
-      edits,
-      &vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 4, 0, 22),
-        new_text: "windows-shell".to_string(),
-      }]
+      action.edit,
+      Some(lsp::WorkspaceEdit {
+        changes: Some(HashMap::from([(
+          lsp::Url::parse("file:///test.just").unwrap(),
+          vec![lsp::TextEdit {
+            range: lsp::Range::at(0, 4, 0, 22),
+            new_text: "windows-shell".to_string(),
+          }],
+        )])),
+        ..Default::default()
+      }),
     );
   }
 
