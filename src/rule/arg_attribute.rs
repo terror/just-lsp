@@ -88,7 +88,7 @@ impl ArgAttributeRule {
     let unknown_parameter =
       Self::parameter_unknown(context, attribute, &parameter_name).then(|| {
         Diagnostic::error(
-          format!("`[arg]` references unknown parameter `{parameter_name}`",),
+          format!("`[arg]` references unknown parameter `{parameter_name}`"),
           name_node.get_range(document),
         )
       });

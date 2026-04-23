@@ -77,24 +77,6 @@ impl Setting {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn range(
-    start_line: u32,
-    start_character: u32,
-    end_line: u32,
-    end_character: u32,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
   #[test]
   fn parse_boolean_with_value() {
     assert_eq!(
@@ -102,7 +84,7 @@ mod tests {
       vec![Setting {
         name: "foo".to_string(),
         kind: SettingKind::Boolean(true),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -114,7 +96,7 @@ mod tests {
       vec![Setting {
         name: "foo".to_string(),
         kind: SettingKind::Boolean(false),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -126,7 +108,7 @@ mod tests {
       vec![Setting {
         name: "export".to_string(),
         kind: SettingKind::Boolean(true),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -138,7 +120,7 @@ mod tests {
       vec![Setting {
         name: "shell".to_string(),
         kind: SettingKind::Array,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -150,7 +132,7 @@ mod tests {
       vec![Setting {
         name: "foo".to_string(),
         kind: SettingKind::String,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -162,7 +144,7 @@ mod tests {
       vec![Setting {
         name: "foo".to_string(),
         kind: SettingKind::String,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -180,17 +162,17 @@ mod tests {
         Setting {
           name: "foo".to_string(),
           kind: SettingKind::Boolean(true),
-          range: range(0, 0, 1, 0),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
           name: "bar".to_string(),
           kind: SettingKind::String,
-          range: range(1, 0, 2, 0),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
           name: "shell".to_string(),
           kind: SettingKind::Array,
-          range: range(2, 0, 3, 0),
+          range: lsp::Range::at(2, 0, 3, 0),
         },
       ],
     );

@@ -148,7 +148,7 @@ impl Builtin<'_> {
             format!("{name}(${{1:name:string}})")
           }
           "semver_matches" => {
-            format!("{name}(${{1:version:string}}, ${{2:requirement:string}})",)
+            format!("{name}(${{1:version:string}}, ${{2:requirement:string}})")
           }
           "shell" => {
             format!("{name}(${{1:command:string}}${{2:, args:string...}})")

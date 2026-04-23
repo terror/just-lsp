@@ -282,6 +282,8 @@ impl Inner {
         }));
       }
 
+      actions.extend(Quickfixer::new(document, &params).collect());
+
       return Ok(Some(actions));
     }
 
@@ -1017,16 +1019,7 @@ impl Inner {
     let changes = HashMap::from([(
       document_uri.clone(),
       vec![lsp::TextEdit {
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: u32::MAX,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, u32::MAX, 0),
         new_text: String::new(),
       }],
     )]);
@@ -1080,16 +1073,7 @@ impl Inner {
                   let changes = HashMap::from([(
                     document_uri.clone(),
                     vec![lsp::TextEdit {
-                      range: lsp::Range {
-                        start: lsp::Position {
-                          line: current_line,
-                          character: 0,
-                        },
-                        end: lsp::Position {
-                          line: current_line,
-                          character: 0,
-                        },
-                      },
+                      range: lsp::Range::at(current_line, 0, current_line, 0),
                       new_text: buffer.trim().into(),
                     }],
                   )]);
@@ -1122,16 +1106,7 @@ impl Inner {
             let changes = HashMap::from([(
               document_uri.clone(),
               vec![lsp::TextEdit {
-                range: lsp::Range {
-                  start: lsp::Position {
-                    line: current_line,
-                    character: 0,
-                  },
-                  end: lsp::Position {
-                    line: current_line,
-                    character: 0,
-                  },
-                },
+                range: lsp::Range::at(current_line, 0, current_line, 0),
                 new_text: buffer.trim().into(),
               }],
             )]);
@@ -2085,16 +2060,7 @@ mod tests {
         uri: "file:///test.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range {
-            start: lsp::Position {
-              line: 1,
-              character: 7,
-            },
-            end: lsp::Position {
-              line: 1,
-              character: 13,
-            },
-          }),
+          range: Some(lsp::Range::at(1, 7, 1, 13)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
@@ -2127,16 +2093,7 @@ mod tests {
         uri: "file:///missing.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range {
-            start: lsp::Position {
-              line: 0,
-              character: 0,
-            },
-            end: lsp::Position {
-              line: 0,
-              character: 0,
-            },
-          }),
+          range: Some(lsp::Range::at(0, 0, 0, 0)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
@@ -3029,16 +2986,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///empty.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, 0, 0),
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3069,16 +3017,7 @@ mod tests {
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
-        range: lsp::Range {
-          start: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-          end: lsp::Position {
-            line: 0,
-            character: 0,
-          },
-        },
+        range: lsp::Range::at(0, 0, 0, 0),
       })
       .response(CodeActionResponse {
         id: 2,
@@ -3106,6 +3045,111 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_quickfix() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 10, 0, 10),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 14 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_or_default_quickfix() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var_or_default(\"BAR\", \"baz\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 10, 0, 10),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var_or_default` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 25 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_outside_range() -> Result {
+    Test::new()?
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 0, 0, 3),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
       .run()
       .await
   }
