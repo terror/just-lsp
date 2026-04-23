@@ -160,7 +160,7 @@ mod tests {
     assert_eq!(actions.len(), 1);
 
     let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
-      panic!("expected CodeAction");
+      unreachable!("expected CodeAction");
     };
 
     assert_eq!(action.title, "Replace `env_var` with `env`");
@@ -179,7 +179,7 @@ mod tests {
     assert_eq!(actions.len(), 1);
 
     let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
-      panic!("expected CodeAction");
+      unreachable!("expected CodeAction");
     };
 
     assert_eq!(
@@ -187,11 +187,16 @@ mod tests {
       "Replace `windows-powershell` with `windows-shell`"
     );
 
-    let edit = action.edit.as_ref().unwrap();
-
-    let changes = edit.changes.as_ref().unwrap();
-
-    let edits = changes.values().next().unwrap();
+    let edits = action
+      .edit
+      .as_ref()
+      .unwrap()
+      .changes
+      .as_ref()
+      .unwrap()
+      .values()
+      .next()
+      .unwrap();
 
     assert_eq!(
       edits,
