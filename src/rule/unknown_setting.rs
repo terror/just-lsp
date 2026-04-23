@@ -10,9 +10,9 @@ define_rule! {
       let mut diagnostics = Vec::new();
 
       for setting in context.settings() {
-        if context.builtin_setting(&setting.name).is_none() {
+        if context.builtin_setting(&setting.name.value).is_none() {
           diagnostics.push(Diagnostic::error(
-            format!("Unknown setting `{}`", setting.name),
+            format!("Unknown setting `{}`", setting.name.value),
             setting.range,
           ));
         }

@@ -52,37 +52,19 @@ impl Recipe {
 mod tests {
   use super::*;
 
-  fn create_range(
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
-    end_char: u32,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_char,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_char,
-      },
-    }
-  }
-
   #[test]
   fn recipe_groups_no_attributes() {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(0, 0, 0, 4),
+        range: lsp::Range::at(0, 0, 0, 4),
       },
       attributes: vec![],
       dependencies: vec![],
       shebang: None,
       parameters: vec![],
       content: "test:\n  echo test".to_string(),
-      range: create_range(0, 0, 2, 0),
+      range: lsp::Range::at(0, 0, 2, 0),
     };
 
     assert_eq!(recipe.groups(), HashSet::from([Group::Any]));
@@ -93,22 +75,22 @@ mod tests {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(1, 0, 1, 4),
+        range: lsp::Range::at(1, 0, 1, 4),
       },
       attributes: vec![Attribute {
         name: TextNode {
           value: "linux".to_string(),
-          range: create_range(0, 1, 0, 6),
+          range: lsp::Range::at(0, 1, 0, 6),
         },
         arguments: vec![],
         target: Some(AttributeTarget::Recipe),
-        range: create_range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
       dependencies: vec![],
       shebang: None,
       parameters: vec![],
       content: "[linux]\ntest:\n  echo test".to_string(),
-      range: create_range(0, 0, 3, 0),
+      range: lsp::Range::at(0, 0, 3, 0),
     };
 
     assert_eq!(recipe.groups(), HashSet::from([Group::Linux]));
@@ -119,33 +101,33 @@ mod tests {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(2, 0, 2, 4),
+        range: lsp::Range::at(2, 0, 2, 4),
       },
       attributes: vec![
         Attribute {
           name: TextNode {
             value: "linux".to_string(),
-            range: create_range(0, 1, 0, 6),
+            range: lsp::Range::at(0, 1, 0, 6),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(0, 0, 1, 0),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Attribute {
           name: TextNode {
             value: "windows".to_string(),
-            range: create_range(1, 1, 1, 8),
+            range: lsp::Range::at(1, 1, 1, 8),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(1, 0, 2, 0),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
       ],
       dependencies: vec![],
       shebang: None,
       parameters: vec![],
       content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
-      range: create_range(0, 0, 4, 0),
+      range: lsp::Range::at(0, 0, 4, 0),
     };
 
     assert_eq!(
@@ -159,80 +141,80 @@ mod tests {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(8, 0, 8, 4),
+        range: lsp::Range::at(8, 0, 8, 4),
       },
       attributes: vec![
         Attribute {
           name: TextNode {
             value: "linux".to_string(),
-            range: create_range(0, 1, 0, 6),
+            range: lsp::Range::at(0, 1, 0, 6),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(0, 0, 1, 0),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Attribute {
           name: TextNode {
             value: "windows".to_string(),
-            range: create_range(1, 1, 1, 8),
+            range: lsp::Range::at(1, 1, 1, 8),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(1, 0, 2, 0),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Attribute {
           name: TextNode {
             value: "macos".to_string(),
-            range: create_range(2, 1, 2, 6),
+            range: lsp::Range::at(2, 1, 2, 6),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(2, 0, 3, 0),
+          range: lsp::Range::at(2, 0, 3, 0),
         },
         Attribute {
           name: TextNode {
             value: "unix".to_string(),
-            range: create_range(3, 1, 3, 5),
+            range: lsp::Range::at(3, 1, 3, 5),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(3, 0, 4, 0),
+          range: lsp::Range::at(3, 0, 4, 0),
         },
         Attribute {
           name: TextNode {
             value: "dragonfly".to_string(),
-            range: create_range(4, 1, 4, 10),
+            range: lsp::Range::at(4, 1, 4, 10),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(4, 0, 5, 0),
+          range: lsp::Range::at(4, 0, 5, 0),
         },
         Attribute {
           name: TextNode {
             value: "freebsd".to_string(),
-            range: create_range(5, 1, 5, 8),
+            range: lsp::Range::at(5, 1, 5, 8),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(5, 0, 6, 0),
+          range: lsp::Range::at(5, 0, 6, 0),
         },
         Attribute {
           name: TextNode {
             value: "netbsd".to_string(),
-            range: create_range(6, 1, 6, 7),
+            range: lsp::Range::at(6, 1, 6, 7),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(6, 0, 7, 0),
+          range: lsp::Range::at(6, 0, 7, 0),
         },
         Attribute {
           name: TextNode {
             value: "openbsd".to_string(),
-            range: create_range(7, 1, 7, 8),
+            range: lsp::Range::at(7, 1, 7, 8),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: create_range(7, 0, 8, 0),
+          range: lsp::Range::at(7, 0, 8, 0),
         },
       ],
       dependencies: vec![],
@@ -241,7 +223,7 @@ mod tests {
       content:
         "[linux]\n[windows]\n[macos]\n[unix]\n[dragonfly]\n[freebsd]\n[netbsd]\n[openbsd]\ntest:\n  echo test"
           .to_string(),
-      range: create_range(0, 0, 10, 0),
+      range: lsp::Range::at(0, 0, 10, 0),
     };
 
     assert_eq!(
@@ -263,22 +245,22 @@ mod tests {
     let recipe = Recipe {
       name: TextNode {
         value: "test".into(),
-        range: create_range(1, 0, 1, 4),
+        range: lsp::Range::at(1, 0, 1, 4),
       },
       attributes: vec![Attribute {
         name: TextNode {
           value: "private".to_string(),
-          range: create_range(0, 1, 0, 8),
+          range: lsp::Range::at(0, 1, 0, 8),
         },
         arguments: vec![],
         target: Some(AttributeTarget::Recipe),
-        range: create_range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
       dependencies: vec![],
       shebang: None,
       parameters: vec![],
       content: "[private]\ntest:\n  echo test".to_string(),
-      range: create_range(0, 0, 3, 0),
+      range: lsp::Range::at(0, 0, 3, 0),
     };
 
     assert_eq!(recipe.groups(), HashSet::from([Group::Any]));

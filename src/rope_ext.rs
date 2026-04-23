@@ -157,26 +157,12 @@ impl RopeExt for Rope {
 mod tests {
   use {super::*, pretty_assertions::assert_eq, ropey::Rope};
 
-  type Range = (u32, u32, u32, u32);
-
-  fn to_lsp_range(
-    (start_line, start_character, end_line, end_character): Range,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
-  fn change(text: &str, range: Range) -> lsp::TextDocumentContentChangeEvent {
+  fn change(
+    text: &str,
+    range: lsp::Range,
+  ) -> lsp::TextDocumentContentChangeEvent {
     lsp::TextDocumentContentChangeEvent {
-      range: Some(to_lsp_range(range)),
+      range: Some(range),
       range_length: None,
       text: text.into(),
     }
@@ -186,7 +172,7 @@ mod tests {
   fn apply_insert_into_empty_document() {
     let mut rope = Rope::from_str("");
 
-    let change = change("🧪\nnew", (0, 0, 0, 0));
+    let change = change("🧪\nnew", lsp::Range::at(0, 0, 0, 0));
 
     let edit = rope.build_edit(&change);
 
@@ -216,7 +202,7 @@ mod tests {
   fn apply_insert_edit_updates_rope_contents() {
     let mut rope = Rope::from_str("hello world");
 
-    let change = change("rope", (0, 6, 0, 11));
+    let change = change("rope", lsp::Range::at(0, 6, 0, 11));
 
     let edit = rope.build_edit(&change);
 
@@ -246,7 +232,7 @@ mod tests {
   fn apply_insert_edit_respects_utf16_columns() {
     let mut rope = Rope::from_str("ab");
 
-    let change = change("🧪", (0, 1, 0, 1));
+    let change = change("🧪", lsp::Range::at(0, 1, 0, 1));
 
     let edit = rope.build_edit(&change);
 
@@ -276,7 +262,7 @@ mod tests {
   fn apply_delete_edit_respects_utf16_columns() {
     let mut rope = Rope::from_str("a😊b");
 
-    let change = change("", (0, 1, 0, 3));
+    let change = change("", lsp::Range::at(0, 1, 0, 3));
 
     let edit = rope.build_edit(&change);
 
@@ -342,7 +328,7 @@ mod tests {
   fn replacement_across_surrogates_is_consistent() {
     let mut rope = Rope::from_str("foo😊bar");
 
-    let change = change("🧪", (0, 3, 0, 5));
+    let change = change("🧪", lsp::Range::at(0, 3, 0, 5));
 
     let edit = rope.build_edit(&change);
 
@@ -372,7 +358,7 @@ mod tests {
   fn multiline_edit_handles_utf16_offsets() {
     let mut rope = Rope::from_str("foo😊\nbar");
 
-    let change = change("XX", (0, 2, 1, 1));
+    let change = change("XX", lsp::Range::at(0, 2, 1, 1));
 
     let edit = rope.build_edit(&change);
 
@@ -402,7 +388,7 @@ mod tests {
   fn append_beyond_eof_updates_point() {
     let mut rope = Rope::from_str("hi");
 
-    let change = change("🧪\nnew", (0, 2, 0, 2));
+    let change = change("🧪\nnew", lsp::Range::at(0, 2, 0, 2));
 
     let edit = rope.build_edit(&change);
 

@@ -77,26 +77,9 @@ impl<'a> Analyzer<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  type RangeSpec = (u32, u32, u32, u32);
-
-  fn to_lsp_range(
-    (start_line, start_character, end_line, end_character): RangeSpec,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
   #[derive(Debug)]
   enum Message<'a> {
-    Scoped { text: &'a str, range: RangeSpec },
+    Scoped { text: &'a str, range: lsp::Range },
     Text(&'a str),
   }
 
@@ -169,7 +152,7 @@ mod tests {
       );
 
       for (diagnostic, (expected_message, expected_severity)) in
-        diagnostics.into_iter().zip(messages.into_iter())
+        diagnostics.into_iter().zip(messages)
       {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
 
@@ -177,7 +160,7 @@ mod tests {
           Message::Text(expected) => assert_eq!(diagnostic.message, *expected),
           Message::Scoped { text, range } => {
             assert_eq!(diagnostic.message, *text);
-            assert_eq!(diagnostic.range, to_lsp_range(range));
+            assert_eq!(diagnostic.range, range);
           }
         }
       }
@@ -235,11 +218,11 @@ mod tests {
     })
     .error(Message::Scoped {
       text: "Duplicate alias `bar`",
-      range: (4, 0, 4, 16),
+      range: lsp::Range::at(4, 0, 4, 16),
     })
     .error(Message::Scoped {
       text: "Duplicate alias `bar`",
-      range: (5, 0, 5, 16),
+      range: lsp::Range::at(5, 0, 5, 16),
     })
     .run();
   }
@@ -1820,7 +1803,7 @@ mod tests {
     })
     .warning(Message::Scoped {
       text: "Parameter `fourth` appears unused",
-      range: (2, 25, 2, 31),
+      range: lsp::Range::at(2, 25, 2, 31),
     })
     .run();
   }
