@@ -12,14 +12,14 @@ define_rule! {
         if let Some(Builtin::Setting {
           deprecated: Some(replacement),
           ..
-        }) = context.builtin_setting(&setting.name)
+        }) = context.builtin_setting(&setting.name.value)
         {
           diagnostics.push(Diagnostic::warning(
             format!(
               "`{}` is deprecated, use `{replacement}` instead",
-              setting.name
+              setting.name.value
             ),
-            setting.range,
+            setting.name.range,
           ));
         }
       }

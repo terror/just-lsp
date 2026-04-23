@@ -696,7 +696,10 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "shell".into(),
+        name: TextNode {
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
+        },
         kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0)
       }]
@@ -774,7 +777,10 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "export".into(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0)
       }]
@@ -796,7 +802,10 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "export".into(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0)
       }]
@@ -905,17 +914,26 @@ mod tests {
       settings,
       vec![
         Setting {
-          name: "export".into(),
+          name: TextNode {
+            value: "export".into(),
+            range: lsp::Range::at(0, 4, 0, 10),
+          },
           kind: SettingKind::Boolean(true),
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
-          name: "shell".into(),
+          name: TextNode {
+            value: "shell".into(),
+            range: lsp::Range::at(1, 4, 1, 9),
+          },
           kind: SettingKind::Array,
           range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
-          name: "bar".into(),
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(2, 4, 2, 7),
+          },
           kind: SettingKind::String,
           range: lsp::Range::at(2, 0, 3, 0),
         }
@@ -938,7 +956,10 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
       }]

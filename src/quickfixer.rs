@@ -8,61 +8,52 @@ pub struct Quickfixer<'a> {
 impl<'a> Quickfixer<'a> {
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let mut actions = Vec::new();
-    actions.extend(self.deprecated_functions());
-    actions
+    self
+      .deprecated_replacements()
+      .into_iter()
+      .filter(|(name, _, _)| name.range.overlaps(self.parameters.range))
+      .map(|(name, code, replacement)| {
+        self.replacement_action(&name, code, replacement)
+      })
+      .collect()
   }
 
-  fn deprecated_function_replacement(name: &str) -> Option<&'static str> {
-    BUILTINS.iter().find_map(|builtin| match builtin {
-      Builtin::Function {
-        name: builtin_name,
-        deprecated: Some(replacement),
-        ..
-      } if *builtin_name == name => Some(*replacement),
-      _ => None,
-    })
-  }
+  fn deprecated_replacements(
+    &self,
+  ) -> Vec<(TextNode, &'static str, &'static str)> {
+    let functions =
+      self
+        .document
+        .function_calls()
+        .into_iter()
+        .filter_map(|call| {
+          let replacement =
+            BUILTINS.iter().find_map(|builtin| match builtin {
+              Builtin::Function {
+                name,
+                deprecated: Some(replacement),
+                ..
+              } if *name == call.name.value => Some(*replacement),
+              _ => None,
+            })?;
 
-  fn deprecated_functions(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let mut actions = Vec::new();
+          Some((call.name, "deprecated-function", replacement))
+        });
 
-    for function_call in self.document.function_calls() {
-      if !function_call.name.range.overlaps(self.parameters.range) {
-        continue;
-      }
+    let settings = self.document.settings().into_iter().filter_map(|setting| {
+      let replacement = BUILTINS.iter().find_map(|builtin| match builtin {
+        Builtin::Setting {
+          name,
+          deprecated: Some(replacement),
+          ..
+        } if *name == setting.name.value => Some(*replacement),
+        _ => None,
+      })?;
 
-      let Some(replacement) =
-        Self::deprecated_function_replacement(&function_call.name.value)
-      else {
-        continue;
-      };
+      Some((setting.name, "deprecated-setting", replacement))
+    });
 
-      let diagnostics = self
-        .matching_diagnostics(function_call.name.range, "deprecated-function");
-
-      actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-        title: format!(
-          "Replace `{}` with `{}`",
-          function_call.name.value, replacement
-        ),
-        kind: Some(lsp::CodeActionKind::QUICKFIX),
-        diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
-        edit: Some(lsp::WorkspaceEdit {
-          changes: Some(HashMap::from([(
-            self.parameters.text_document.uri.clone(),
-            vec![lsp::TextEdit {
-              range: function_call.name.range,
-              new_text: replacement.to_string(),
-            }],
-          )])),
-          ..Default::default()
-        }),
-        ..Default::default()
-      }));
-    }
-
-    actions
+    functions.chain(settings).collect()
   }
 
   fn matching_diagnostics(
@@ -95,6 +86,32 @@ impl<'a> Quickfixer<'a> {
       document,
       parameters,
     }
+  }
+
+  fn replacement_action(
+    &self,
+    name: &TextNode,
+    code: &str,
+    replacement: &str,
+  ) -> lsp::CodeActionOrCommand {
+    let diagnostics = self.matching_diagnostics(name.range, code);
+
+    lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+      title: format!("Replace `{}` with `{}`", name.value, replacement),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
+      edit: Some(lsp::WorkspaceEdit {
+        changes: Some(HashMap::from([(
+          self.parameters.text_document.uri.clone(),
+          vec![lsp::TextEdit {
+            range: name.range,
+            new_text: replacement.to_string(),
+          }],
+        )])),
+        ..Default::default()
+      }),
+      ..Default::default()
+    })
   }
 }
 
@@ -150,16 +167,53 @@ mod tests {
   }
 
   #[test]
-  fn deprecated_function_replacement() {
-    #[track_caller]
-    fn case(name: &str, expected: Option<&'static str>) {
-      assert_eq!(Quickfixer::deprecated_function_replacement(name), expected);
-    }
+  fn collect_replaces_deprecated_setting() {
+    let document = Document::from("set windows-powershell := true\n");
 
-    case("env_var", Some("env"));
-    case("env_var_or_default", Some("env"));
-    case("env", None);
-    case("nonexistent", None);
+    let actions = Quickfixer::new(
+      &document,
+      &parameters(lsp::Range::at(0, 4, 0, 4), vec![]),
+    )
+    .collect();
+
+    assert_eq!(actions.len(), 1);
+
+    let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
+      panic!("expected CodeAction");
+    };
+
+    assert_eq!(
+      action.title,
+      "Replace `windows-powershell` with `windows-shell`"
+    );
+
+    let edit = action.edit.as_ref().unwrap();
+
+    let changes = edit.changes.as_ref().unwrap();
+
+    let edits = changes.values().next().unwrap();
+
+    assert_eq!(
+      edits,
+      &vec![lsp::TextEdit {
+        range: lsp::Range::at(0, 4, 0, 22),
+        new_text: "windows-shell".to_string(),
+      }]
+    );
+  }
+
+  #[test]
+  fn collect_ignores_setting_outside_range() {
+    let document =
+      Document::from("set windows-powershell := true\nset export := true\n");
+
+    let actions = Quickfixer::new(
+      &document,
+      &parameters(lsp::Range::at(1, 4, 1, 4), vec![]),
+    )
+    .collect();
+
+    assert_eq!(actions, vec![]);
   }
 
   #[test]
