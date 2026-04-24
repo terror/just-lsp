@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.3](https://github.com/terror/just-lsp/releases/tag/0.4.3) - 2026-04-24
+
+### Added
+
+- Expand builtin hover documentation (#349)
+- Add quickfix actions for deprecated settings (#347)
+- Add quickfix actions for deprecated function calls (#342)
+
+### Misc
+
+- Assert exact values in resolver tests (#348)
+- Bump tokio from 1.51.1 to 1.52.1 (#346)
+- Bump clap from 4.6.0 to 4.6.1 (#345)
+- Bump thiserror from 2.0.17 to 2.0.18 (#338)
+- Bump tree-sitter-highlight from 0.26.7 to 0.26.8 (#337)
+- Bump cc from 1.2.59 to 1.2.60 (#336)
+- Bump tokio from 1.51.0 to 1.51.1 (#335)
+- Expose library interface (#333)
+
 ## [0.4.2](https://github.com/terror/just-lsp/releases/tag/0.4.2) - 2026-04-09
 
 ### Added
