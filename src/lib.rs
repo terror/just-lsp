@@ -3,7 +3,7 @@ use {
   serde::{Deserialize, Serialize},
   std::{
     collections::{HashMap, HashSet},
-    fmt::{self, Debug, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
     ops::ControlFlow,

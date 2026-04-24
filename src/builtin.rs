@@ -5,20 +5,16 @@ pub enum Builtin<'a> {
   Attribute {
     name: &'a str,
     description: &'a str,
-    version: &'a str,
     targets: &'a [AttributeTarget],
-    syntax: Option<&'a str>,
     min_args: usize,
     max_args: Option<usize>,
   },
   Constant {
     name: &'a str,
     description: &'a str,
-    value: &'a str,
   },
   Function {
     name: &'a str,
-    signature: &'a str,
     description: &'a str,
     required_arguments: usize,
     accepts_variadic: bool,
@@ -28,7 +24,6 @@ pub enum Builtin<'a> {
     name: &'a str,
     kind: SettingKind,
     description: &'a str,
-    default: &'a str,
     deprecated: Option<&'a str>,
   },
 }
@@ -186,178 +181,17 @@ impl Builtin<'_> {
     }
   }
 
+  #[must_use]
   pub fn documentation(&self) -> lsp::MarkupContent {
-    match self {
-      Self::Attribute {
-        name,
-        description,
-        version,
-        targets,
-        syntax,
-        ..
-      } => {
-        let mut documentation =
-          format!("**Attribute**: [{name}]\n{description}");
-
-        if let Some(params) = syntax {
-          let _ = write!(documentation, "\n**Syntax**: [{name}({params})]");
-        }
-
-        let _ = write!(documentation, "\n**Introduced in**: {version}");
-
-        let targets = targets
-          .iter()
-          .map(ToString::to_string)
-          .collect::<Vec<String>>();
-
-        let _ =
-          write!(documentation, "\n**Target(s)**: {}", targets.join(", "));
-
-        lsp::MarkupContent {
-          kind: lsp::MarkupKind::Markdown,
-          value: documentation,
-        }
-      }
-      Self::Constant {
-        description, value, ..
-      } => lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: format!("{description}\n{value}"),
-      },
-      Self::Function {
-        name,
-        signature,
-        description,
-        deprecated,
-        ..
-      } => {
-        let example = match *name {
-          "absolute_path" => "absolute_path(\"./foo\") => \"/path/to/foo\"",
-          "append" => "append(\"/src\", \"foo bar\") => \"foo/src bar/src\"",
-          "arch" => "arch() => \"x86_64\"",
-          "blake3" => "blake3(\"hello\") => \"a1744eeb6b921a9193df*...\"",
-          "canonicalize" => "canonicalize(\"../foo/.\") => \"/path/to/foo\"",
-          "capitalize" => "capitalize(\"hello\") => \"Hello\"",
-          "choose" => "choose(\"5\", \"abcdef\") => \"bcafe\"",
-          "clean" => "clean(\"foo//bar/../baz\") => \"foo/baz\"",
-          "datetime" => "datetime(\"%Y-%m-%d\") => \"2023-07-14\"",
-          "encode_uri_component" => {
-            "encode_uri_component(\"a+b\") => \"a%2Bb\""
-          }
-          "env" => {
-            "env(\"HOME\") => \"/home/user\"\nenv(\"MISSING\", \"default\") => \"default\""
-          }
-          "env_var" => "env_var(\"HOME\") => \"/home/user\"",
-          "env_var_or_default" => {
-            "env_var_or_default(\"MISSING\", \"default\") => \"default\""
-          }
-          "error" => "error(\"Something went wrong\") => *aborts execution*",
-          "extension" => "extension(\"foo.txt\") => \"txt\"",
-          "file_name" => "file_name(\"/path/to/foo.txt\") => \"foo.txt\"",
-          "file_stem" => "file_stem(\"/path/to/foo.txt\") => \"foo\"",
-          "home_directory" => "home_directory() => \"/home/user\"",
-          "invocation_directory" => {
-            "invocation_directory() => \"/path/to/current/dir\""
-          }
-          "is_dependency" => "is_dependency() => \"false\"",
-          "join" => "join(\"foo\", \"bar\", \"baz\") => \"foo/bar/baz\"",
-          "just_executable" => "just_executable() => \"/usr/bin/just\"",
-          "just_pid" => "just_pid() => \"12345\"",
-          "justfile" => "justfile() => \"/path/to/justfile\"",
-          "justfile_directory" => "justfile_directory() => \"/path/to\"",
-          "kebabcase" => "kebabcase(\"HelloWorld\") => \"hello-world\"",
-          "lowercase" => "lowercase(\"Hello\") => \"hello\"",
-          "lowercamelcase" => {
-            "lowercamelcase(\"hello_world\") => \"helloWorld\""
-          }
-          "num_cpus" => "num_cpus() => 8",
-          "os" => "os() => \"linux\"",
-          "os_family" => "os_family() => \"unix\"",
-          "parent_directory" => {
-            "parent_directory(\"/path/to/foo.txt\") => \"/path/to\""
-          }
-          "path_exists" => "path_exists(\"/etc/passwd\") => \"true\"",
-          "prepend" => "prepend(\"src/\", \"foo bar\") => \"src/foo src/bar\"",
-          "quote" => "quote(\"hello 'world'\") => \"'hello \\'world\\''\"",
-          "read" => "read(\"foo.txt\") => \"contents of foo.txt\"",
-          "replace" => "replace(\"hello\", \"l\", \"x\") => \"hexxo\"",
-          "replace_regex" => {
-            "replace_regex(\"hello\", \"[aeiou]\", \"X\") => \"hXllX\""
-          }
-          "require" => "require(\"bash\") => \"/bin/bash\"",
-          "semver_matches" => {
-            "semver_matches(\"1.2.3\", \">1.0.0\") => \"true\""
-          }
-          "sha256" => "sha256(\"hello\") => \"2cf24dba5fb0a30e*...\"",
-          "hell" => "shell(\"echo $1\", \"hello\") => \"hello\"",
-          "style" => "style(\"error\") => \"\\e[31m\"",
-          "trim" => "trim(\"  hello  \") => \"hello\"",
-          "trim_end" => "trim_end(\"hello  \") => \"hello\"",
-          "trim_start" => "trim_start(\"  hello\") => \"hello\"",
-          "uppercamelcase" => {
-            "uppercamelcase(\"hello_world\") => \"HelloWorld\""
-          }
-          "uppercase" => "uppercase(\"hello\") => \"HELLO\"",
-          "uuid" => "uuid() => \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\"",
-          "which" => {
-            "which(\"bash\") => \"/bin/bash\"\nwhich(\"nonexistent\") => \"\""
-          }
-          "without_extension" => {
-            "without_extension(\"/path/to/foo.txt\") => \"/path/to/foo\""
-          }
-          _ => "",
-        };
-
-        let mut documentation = String::new();
-
-        if let Some(replacement) = deprecated {
-          let _ = write!(
-            documentation,
-            "**Deprecated**: Use `{replacement}` instead.\n\n"
-          );
-        }
-
-        documentation.push_str(description);
-
-        let _ = write!(documentation, "\n```\n{signature}\n```");
-
-        if !example.is_empty() {
-          documentation.push_str("\n**Examples:**\n```\n");
-          documentation.push_str(example);
-          documentation.push_str("\n```");
-        }
-
-        lsp::MarkupContent {
-          kind: lsp::MarkupKind::Markdown,
-          value: documentation,
-        }
-      }
-      Self::Setting {
-        name,
-        kind,
-        description,
-        default,
-        deprecated,
-      } => {
-        let mut documentation = String::new();
-
-        if let Some(replacement) = deprecated {
-          let _ = write!(
-            documentation,
-            "**Deprecated**: Use `{replacement}` instead.\n\n"
-          );
-        }
-
-        let _ = write!(documentation, "**Setting**: {name}\n{description}");
-
-        let _ = write!(documentation, "\n**Type**: {kind}");
-        let _ = write!(documentation, "\n**Default**: {default}");
-
-        lsp::MarkupContent {
-          kind: lsp::MarkupKind::Markdown,
-          value: documentation,
-        }
-      }
+    lsp::MarkupContent {
+      kind: lsp::MarkupKind::Markdown,
+      value: (match self {
+        Self::Attribute { description, .. }
+        | Self::Constant { description, .. }
+        | Self::Function { description, .. }
+        | Self::Setting { description, .. } => description,
+      })
+      .to_string(),
     }
   }
 }
