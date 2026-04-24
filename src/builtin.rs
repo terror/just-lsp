@@ -16,9 +16,8 @@ pub enum Builtin<'a> {
   Function {
     name: &'a str,
     aliases: &'a [&'a str],
+    kind: FunctionKind,
     description: &'a str,
-    required_arguments: usize,
-    accepts_variadic: bool,
     deprecated: Option<&'a str>,
   },
   Setting {

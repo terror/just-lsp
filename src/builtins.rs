@@ -1,4 +1,4 @@
-use {super::*, indoc::indoc};
+use super::*;
 
 pub static BUILTINS: [Builtin<'_>; 150] = [
   Builtin::Attribute {
@@ -878,6 +878,7 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
   Builtin::Function {
     name: "absolute_path",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the absolute form of `path`, resolved against the current
@@ -889,13 +890,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "append",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
@@ -905,13 +905,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "arch",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Instruction set architecture of the host machine.
@@ -926,13 +925,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "blake3",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the BLAKE3 hash of `string` as a lowercase hex string.
@@ -942,26 +940,24 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "blake3_file",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
       string. Aborts if the file cannot be read.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "cache_directory",
     aliases: &["cache_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       User-specific cache directory.
@@ -972,13 +968,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `{FOLDERID_LocalAppData}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "canonicalize",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Canonicalize `path` by resolving symlinks and removing `.`,
@@ -990,13 +985,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "capitalize",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return `s` with the first character uppercased and the rest
@@ -1007,13 +1001,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "choose",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Return a string of `n` randomly selected characters from
@@ -1024,13 +1017,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "clean",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Simplify `path` by removing extra path separators, intermediate
@@ -1043,13 +1035,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "config_directory",
     aliases: &["config_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       User-specific configuration directory.
@@ -1060,13 +1051,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `{FOLDERID_RoamingAppData}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "config_local_directory",
     aliases: &["config_local_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Local user-specific configuration directory, for configuration
@@ -1076,13 +1066,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `{FOLDERID_LocalAppData}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "data_directory",
     aliases: &["data_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       User-specific data directory.
@@ -1093,13 +1082,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `{FOLDERID_RoamingAppData}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "data_local_directory",
     aliases: &["data_local_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Local user-specific data directory, for data that should not
@@ -1109,13 +1097,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `{FOLDERID_LocalAppData}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "datetime",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the current local time formatted with `format`.
@@ -1129,13 +1116,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "datetime_utc",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the current UTC time formatted with `format`.
@@ -1145,13 +1131,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       for the full set of specifiers.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "encode_uri_component",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Percent-encode every character in `s` except
@@ -1163,13 +1148,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "env",
     aliases: &[],
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
       Retrieve the environment variable named `key`.
@@ -1187,13 +1171,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: true,
     deprecated: None,
   },
   Builtin::Function {
     name: "env_var",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       **Deprecated**: use `env(key)` instead.
@@ -1202,13 +1185,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       variable is unset.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: Some("env"),
   },
   Builtin::Function {
     name: "env_var_or_default",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       **Deprecated**: use `env(key, default)` instead.
@@ -1217,13 +1199,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `default` when the variable is unset.
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: Some("env"),
   },
   Builtin::Function {
     name: "error",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Abort execution and report `message` to the user. Diverges and
@@ -1235,13 +1216,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "executable_directory",
     aliases: &["executable_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       User-specific executable directory.
@@ -1251,13 +1231,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       well-defined value, so use with care on that platform.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "extension",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the file extension of `path`, not including the leading
@@ -1268,13 +1247,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "file_name",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the file name of `path` with any leading directory
@@ -1285,13 +1263,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "file_stem",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the file name of `path` without its extension or any
@@ -1302,13 +1279,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "home_directory",
     aliases: &["home_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       The user's home directory.
@@ -1317,13 +1293,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       returns `{FOLDERID_Profile}`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "invocation_directory",
     aliases: &["invocation_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1342,13 +1317,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "invocation_directory_native",
     aliases: &["invocation_dir_native"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1358,13 +1332,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       Cygwin style on Windows.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "is_dependency",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Return the string `\"true\"` if the current recipe is being run
@@ -1372,13 +1345,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       invoked directly from the command line.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "join",
     aliases: &[],
+    kind: FunctionKind::BinaryPlus,
     description: indoc! {
       "
       Join two or more path components.
@@ -1393,13 +1365,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: true,
     deprecated: None,
   },
   Builtin::Function {
     name: "just_executable",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Absolute path to the `just` executable that is currently running.
@@ -1410,25 +1381,23 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "just_pid",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Process ID of the running `just` executable, as a decimal string.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "justfile",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Absolute path to the current `justfile`.
@@ -1438,13 +1407,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       evaluated.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "justfile_directory",
     aliases: &["justfile_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Absolute path to the parent directory of the current `justfile`.
@@ -1455,13 +1423,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "kebabcase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `kebab-case`.
@@ -1471,13 +1438,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "lowercase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to lowercase.
@@ -1487,13 +1453,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "lowercamelcase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `lowerCamelCase`.
@@ -1503,13 +1468,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "num_cpus",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Number of logical CPUs available on the host machine.
@@ -1520,13 +1484,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "os",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Host operating system.
@@ -1536,13 +1499,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       `solaris`, or `windows`.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "os_family",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Host operating system family. Returns `unix` or `windows`.
@@ -1555,13 +1517,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "parent_directory",
     aliases: &["parent_dir"],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the parent directory of `path`. Aborts if `path` has no
@@ -1572,13 +1533,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "path_exists",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return `\"true\"` if `path` points at an existing filesystem
@@ -1588,13 +1548,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       symlinks or when the path is inaccessible.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "prepend",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
@@ -1604,13 +1563,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "quote",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
@@ -1624,26 +1582,24 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "read",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the contents of the file at `path` as a string. Aborts if
       the file cannot be read.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "replace",
     aliases: &[],
+    kind: FunctionKind::Ternary,
     description: indoc! {
       "
       Replace every occurrence of `from` in `s` with `to`.
@@ -1653,13 +1609,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 3,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "replace_regex",
     aliases: &[],
+    kind: FunctionKind::Ternary,
     description: indoc! {
       "
       Replace every match of `regex` in `s` with `replacement`.
@@ -1675,13 +1630,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 3,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "require",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -1696,13 +1650,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "runtime_directory",
     aliases: &["runtime_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       The user-specific runtime directory.
@@ -1712,13 +1665,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       be unset on some platforms, in which case the function aborts.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "semver_matches",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
@@ -1729,38 +1681,35 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "sha256",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the SHA-256 hash of `string` as a lowercase hex string.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "sha256_file",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the SHA-256 hash of the file at `path` as a lowercase hex
       string. Aborts if the file cannot be read.
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "shell",
     aliases: &[],
+    kind: FunctionKind::UnaryPlus,
     description: indoc! {
       "
       Return the standard output of shell script `command`, with zero
@@ -1779,13 +1728,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: true,
     deprecated: None,
   },
   Builtin::Function {
     name: "shoutykebabcase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `SHOUTY-KEBAB-CASE`.
@@ -1795,13 +1743,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "shoutysnakecase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `SHOUTY_SNAKE_CASE`.
@@ -1811,13 +1758,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "snakecase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `snake_case`.
@@ -1827,13 +1773,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "module_directory",
     aliases: &["module_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Directory of the current module file. Behaves like
@@ -1841,13 +1786,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       directory of the current `mod` source file inside submodules.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "module_file",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Path of the current module file. Behaves like `justfile()` in
@@ -1855,13 +1799,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       file inside submodules.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "source_directory",
     aliases: &["source_dir"],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Directory of the current source file. Behaves like
@@ -1870,13 +1813,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       called from within an imported or submodule file.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "source_file",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Path of the current source file. Behaves like `justfile()` in
@@ -1885,13 +1827,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       file.
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "style",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
@@ -1910,13 +1851,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "titlecase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `Title Case`.
@@ -1926,13 +1866,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Remove leading and trailing whitespace from `s`.
@@ -1942,13 +1881,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_end",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Remove trailing whitespace from `s`.
@@ -1958,13 +1896,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_end_match",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Remove a single trailing occurrence of `substring` from `s` if
@@ -1976,13 +1913,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_end_matches",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Repeatedly remove trailing occurrences of `substring` from `s`
@@ -1994,13 +1930,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_start",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Remove leading whitespace from `s`.
@@ -2010,13 +1945,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_start_match",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Remove a single leading occurrence of `substring` from `s` if
@@ -2028,13 +1962,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "trim_start_matches",
     aliases: &[],
+    kind: FunctionKind::Binary,
     description: indoc! {
       "
       Repeatedly remove leading occurrences of `substring` from `s`
@@ -2045,13 +1978,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 2,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "uppercamelcase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to `UpperCamelCase` (also known as PascalCase).
@@ -2061,13 +1993,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "uppercase",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Convert `s` to uppercase.
@@ -2077,13 +2008,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "uuid",
     aliases: &[],
+    kind: FunctionKind::Nullary,
     description: indoc! {
       "
       Generate a random version 4 UUID.
@@ -2093,13 +2023,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 0,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "which",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -2117,13 +2046,12 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Function {
     name: "without_extension",
     aliases: &[],
+    kind: FunctionKind::Unary,
     description: indoc! {
       "
       Return `path` with its extension removed. Aborts if `path` has
@@ -2134,8 +2062,6 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       ```
       "
     },
-    required_arguments: 1,
-    accepts_variadic: false,
     deprecated: None,
   },
   Builtin::Setting {

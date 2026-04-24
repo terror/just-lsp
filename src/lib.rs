@@ -1,4 +1,5 @@
 use {
+  indoc::indoc,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
@@ -6,7 +7,7 @@ use {
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
-    ops::ControlFlow,
+    ops::{ControlFlow, RangeInclusive},
     path::PathBuf,
     sync::OnceLock,
   },
@@ -29,6 +30,7 @@ pub use {
   error::Error,
   function::Function,
   function_call::FunctionCall,
+  function_kind::FunctionKind,
   group::Group,
   import::Import,
   module::Module,
@@ -43,7 +45,8 @@ pub use {
   rule::Rule,
   rule_context::RuleContext,
   scope::Scope,
-  setting::{Setting, SettingKind},
+  setting::Setting,
+  setting_kind::SettingKind,
   str_ext::StrExt,
   text_node::TextNode,
   variable::Variable,
@@ -63,6 +66,7 @@ mod document;
 mod error;
 mod function;
 mod function_call;
+mod function_kind;
 mod group;
 mod import;
 mod module;
@@ -78,6 +82,7 @@ mod rule;
 mod rule_context;
 mod scope;
 mod setting;
+mod setting_kind;
 mod str_ext;
 mod text_node;
 mod variable;
