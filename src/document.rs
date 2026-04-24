@@ -579,23 +579,6 @@ mod tests {
     pretty_assertions::assert_eq,
   };
 
-  type RangeSpec = (u32, u32, u32, u32);
-
-  fn range(
-    (start_line, start_character, end_line, end_character): RangeSpec,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
   #[test]
   fn create_document() {
     let content = indoc! {"
@@ -627,7 +610,7 @@ mod tests {
         version: 2,
       },
       content_changes: vec![lsp::TextDocumentContentChangeEvent {
-        range: Some(range((1, 7, 1, 13))),
+        range: Some(lsp::Range::at(1, 7, 1, 13)),
         range_length: None,
         text: "\"bar\"".to_string(),
       }],
@@ -668,13 +651,13 @@ mod tests {
       Recipe {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
         content: "foo:\n  echo \"foo\"".into(),
         parameters: vec![],
-        range: range((0, 0, 3, 0)),
+        range: lsp::Range::at(0, 0, 3, 0),
         shebang: None,
       }
     );
@@ -684,13 +667,13 @@ mod tests {
       Recipe {
         name: TextNode {
           value: "bar".into(),
-          range: range((3, 0, 3, 3))
+          range: lsp::Range::at(3, 0, 3, 3)
         },
         attributes: vec![],
         dependencies: vec![],
         content: "bar:\n  echo \"bar\"".into(),
         parameters: vec![],
-        range: range((3, 0, 5, 0)),
+        range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       }
     );
@@ -713,9 +696,12 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "shell".into(),
+        name: TextNode {
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
+        },
         kind: SettingKind::Array,
-        range: range((0, 0, 1, 0))
+        range: lsp::Range::at(0, 0, 1, 0)
       }]
     );
   }
@@ -737,13 +723,13 @@ mod tests {
       vec![Alias {
         name: TextNode {
           value: "a1".into(),
-          range: range((0, 6, 0, 8))
+          range: lsp::Range::at(0, 6, 0, 8)
         },
         value: TextNode {
           value: "foo".into(),
-          range: range((0, 12, 0, 15))
+          range: lsp::Range::at(0, 12, 0, 15)
         },
-        range: range((0, 0, 0, 15))
+        range: lsp::Range::at(0, 0, 0, 15)
       }]
     );
   }
@@ -765,13 +751,13 @@ mod tests {
       vec![Alias {
         name: TextNode {
           value: "a1".into(),
-          range: range((0, 6, 0, 8))
+          range: lsp::Range::at(0, 6, 0, 8)
         },
         value: TextNode {
           value: "tools::build".into(),
-          range: range((0, 12, 0, 24))
+          range: lsp::Range::at(0, 12, 0, 24)
         },
-        range: range((0, 0, 0, 24))
+        range: lsp::Range::at(0, 0, 0, 24)
       }]
     );
   }
@@ -791,9 +777,12 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "export".into(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
-        range: range((0, 0, 1, 0))
+        range: lsp::Range::at(0, 0, 1, 0)
       }]
     );
   }
@@ -813,9 +802,12 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "export".into(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
-        range: range((0, 0, 1, 0))
+        range: lsp::Range::at(0, 0, 1, 0)
       }]
     );
   }
@@ -839,24 +831,24 @@ mod tests {
         Alias {
           name: TextNode {
             value: "duplicate".into(),
-            range: range((0, 6, 0, 15))
+            range: lsp::Range::at(0, 6, 0, 15)
           },
           value: TextNode {
             value: "foo".into(),
-            range: range((0, 19, 0, 22))
+            range: lsp::Range::at(0, 19, 0, 22)
           },
-          range: range((0, 0, 0, 22))
+          range: lsp::Range::at(0, 0, 0, 22)
         },
         Alias {
           name: TextNode {
             value: "duplicate".into(),
-            range: range((1, 6, 1, 15))
+            range: lsp::Range::at(1, 6, 1, 15)
           },
           value: TextNode {
             value: "bar".into(),
-            range: range((1, 19, 1, 22))
+            range: lsp::Range::at(1, 19, 1, 22)
           },
-          range: range((1, 0, 1, 22))
+          range: lsp::Range::at(1, 0, 1, 22)
         }
       ]
     );
@@ -881,24 +873,24 @@ mod tests {
         Alias {
           name: TextNode {
             value: "a1".into(),
-            range: range((0, 6, 0, 8)),
+            range: lsp::Range::at(0, 6, 0, 8),
           },
           value: TextNode {
             value: "foo".into(),
-            range: range((0, 12, 0, 15)),
+            range: lsp::Range::at(0, 12, 0, 15),
           },
-          range: range((0, 0, 0, 15)),
+          range: lsp::Range::at(0, 0, 0, 15),
         },
         Alias {
           name: TextNode {
             value: "a2".into(),
-            range: range((1, 6, 1, 8)),
+            range: lsp::Range::at(1, 6, 1, 8),
           },
           value: TextNode {
             value: "bar".into(),
-            range: range((1, 12, 1, 15)),
+            range: lsp::Range::at(1, 12, 1, 15),
           },
-          range: range((1, 0, 1, 15)),
+          range: lsp::Range::at(1, 0, 1, 15),
         }
       ]
     );
@@ -922,19 +914,28 @@ mod tests {
       settings,
       vec![
         Setting {
-          name: "export".into(),
+          name: TextNode {
+            value: "export".into(),
+            range: lsp::Range::at(0, 4, 0, 10),
+          },
           kind: SettingKind::Boolean(true),
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
-          name: "shell".into(),
+          name: TextNode {
+            value: "shell".into(),
+            range: lsp::Range::at(1, 4, 1, 9),
+          },
           kind: SettingKind::Array,
-          range: range((1, 0, 2, 0)),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
-          name: "bar".into(),
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(2, 4, 2, 7),
+          },
           kind: SettingKind::String,
-          range: range((2, 0, 3, 0)),
+          range: lsp::Range::at(2, 0, 3, 0),
         }
       ]
     );
@@ -955,9 +956,12 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
-        name: "bar".into(),
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
-        range: range((0, 0, 1, 0)),
+        range: lsp::Range::at(0, 0, 1, 0),
       }]
     );
   }
@@ -981,63 +985,63 @@ mod tests {
         Variable {
           name: TextNode {
             value: "tmpdir".into(),
-            range: range((0, 0, 0, 6)),
+            range: lsp::Range::at(0, 0, 0, 6),
           },
           export: false,
           unexport: false,
           content: "tmpdir  := `mktemp -d`".into(),
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Variable {
           name: TextNode {
             value: "version".into(),
-            range: range((1, 0, 1, 7)),
+            range: lsp::Range::at(1, 0, 1, 7),
           },
           export: false,
           unexport: false,
           content: "version := \"0.2.7\"".into(),
-          range: range((1, 0, 2, 0)),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Variable {
           name: TextNode {
             value: "tardir".into(),
-            range: range((2, 0, 2, 6)),
+            range: lsp::Range::at(2, 0, 2, 6),
           },
           export: false,
           unexport: false,
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
-          range: range((2, 0, 3, 0)),
+          range: lsp::Range::at(2, 0, 3, 0),
         },
         Variable {
           name: TextNode {
             value: "tarball".into(),
-            range: range((3, 0, 3, 7)),
+            range: lsp::Range::at(3, 0, 3, 7),
           },
           export: false,
           unexport: false,
           content: "tarball := tardir + \".tar.gz\"".into(),
-          range: range((3, 0, 4, 0)),
+          range: lsp::Range::at(3, 0, 4, 0),
         },
         Variable {
           name: TextNode {
             value: "config".into(),
-            range: range((4, 0, 4, 6)),
+            range: lsp::Range::at(4, 0, 4, 6),
           },
           export: false,
           unexport: false,
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
-          range: range((4, 0, 5, 0)),
+          range: lsp::Range::at(4, 0, 5, 0),
         },
         Variable {
           name: TextNode {
             value: "EDITOR".into(),
-            range: range((5, 7, 5, 13)),
+            range: lsp::Range::at(5, 7, 5, 13),
           },
           export: true,
           unexport: false,
           content: "EDITOR := 'nvim'".into(),
-          range: range((5, 7, 6, 0)),
+          range: lsp::Range::at(5, 7, 6, 0),
         },
       ]
     );
@@ -1061,12 +1065,12 @@ mod tests {
       vec![Variable {
         name: TextNode {
           value: "PATH".into(),
-          range: range((1, 7, 1, 11)),
+          range: lsp::Range::at(1, 7, 1, 11),
         },
         export: true,
         unexport: false,
         content: "PATH := '/usr/local/bin'".into(),
-        range: range((1, 7, 2, 0)),
+        range: lsp::Range::at(1, 7, 2, 0),
       }]
     );
   }
@@ -1088,12 +1092,12 @@ mod tests {
       vec![Variable {
         name: TextNode {
           value: "FOO".into(),
-          range: range((0, 9, 0, 12)),
+          range: lsp::Range::at(0, 9, 0, 12),
         },
         export: false,
         unexport: true,
         content: "FOO := 'bar'".into(),
-        range: range((0, 9, 1, 0)),
+        range: lsp::Range::at(0, 9, 1, 0),
       }]
     );
   }
@@ -1126,13 +1130,13 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
-        range: range((0, 0, 3, 0)),
+        range: lsp::Range::at(0, 0, 3, 0),
         shebang: None,
       })
     );
@@ -1142,13 +1146,13 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "bar".into(),
-          range: range((3, 0, 3, 3))
+          range: lsp::Range::at(3, 0, 3, 3)
         },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "bar:\n  echo \"bar\"".into(),
-        range: range((3, 0, 5, 0)),
+        range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       })
     );
@@ -1219,7 +1223,7 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "baz".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
@@ -1229,20 +1233,20 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "first".into(),
-            range: range((0, 4, 0, 9)),
+            range: lsp::Range::at(0, 4, 0, 9),
           },
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Normal,
             default_value: Some("\"default\"".into()),
             content: "second=\"default\"".into(),
-            range: range((0, 10, 0, 26)),
+            range: lsp::Range::at(0, 10, 0, 26),
           }
         ],
         content:
           "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
-        range: range((0, 0, 2, 0)),
+        range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       })
     );
@@ -1265,17 +1269,17 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "bar".into(),
-          range: range((3, 0, 3, 3))
+          range: lsp::Range::at(3, 0, 3, 3)
         },
         attributes: vec![],
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![],
-          range: range((3, 5, 3, 8)),
+          range: lsp::Range::at(3, 5, 3, 8),
         }],
         parameters: vec![],
         content: "bar: foo\n  echo \"bar\"".into(),
-        range: range((3, 0, 5, 0)),
+        range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       })
     );
@@ -1301,17 +1305,17 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "baz".into(),
-          range: range((6, 0, 6, 3))
+          range: lsp::Range::at(6, 0, 6, 3)
         },
         attributes: vec![],
         dependencies: vec![Dependency {
           name: "tools::foo".into(),
           arguments: vec![],
-          range: range((6, 5, 6, 15)),
+          range: lsp::Range::at(6, 5, 6, 15),
         }],
         parameters: vec![],
         content: "baz: tools::foo\n  echo \"baz\"".into(),
-        range: range((6, 0, 8, 0)),
+        range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       })
     );
@@ -1334,7 +1338,7 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "bar".into(),
-          range: range((3, 0, 3, 3))
+          range: lsp::Range::at(3, 0, 3, 3)
         },
         attributes: vec![],
         dependencies: vec![Dependency {
@@ -1342,18 +1346,18 @@ mod tests {
           arguments: vec![
             TextNode {
               value: "'value1'".into(),
-              range: range((3, 10, 3, 18)),
+              range: lsp::Range::at(3, 10, 3, 18),
             },
             TextNode {
               value: "'value2'".into(),
-              range: range((3, 19, 3, 27)),
+              range: lsp::Range::at(3, 19, 3, 27),
             }
           ],
-          range: range((3, 5, 3, 28)),
+          range: lsp::Range::at(3, 5, 3, 28),
         }],
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
-        range: range((3, 0, 5, 0)),
+        range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       })
     );
@@ -1375,7 +1379,7 @@ mod tests {
       recipe.shebang,
       Some(TextNode {
         value: "#!/usr/bin/env bash".into(),
-        range: range((1, 2, 1, 21)),
+        range: lsp::Range::at(1, 2, 1, 21),
       })
     );
   }
@@ -1400,24 +1404,24 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "baz".into(),
-          range: range((6, 0, 6, 3))
+          range: lsp::Range::at(6, 0, 6, 3)
         },
         attributes: vec![],
         dependencies: vec![
           Dependency {
             name: "foo".into(),
             arguments: vec![],
-            range: range((6, 5, 6, 8)),
+            range: lsp::Range::at(6, 5, 6, 8),
           },
           Dependency {
             name: "bar".into(),
             arguments: vec![],
-            range: range((6, 9, 6, 12)),
+            range: lsp::Range::at(6, 9, 6, 12),
           }
         ],
         parameters: vec![],
         content: "baz: foo bar\n  echo \"baz\"".into(),
-        range: range((6, 0, 8, 0)),
+        range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       })
     );
@@ -1437,7 +1441,7 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "bar".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
@@ -1447,18 +1451,18 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "target".into(),
-            range: range((0, 4, 0, 10)),
+            range: lsp::Range::at(0, 4, 0, 10),
           },
           Parameter {
             name: "lol".into(),
             kind: ParameterKind::Export,
             default_value: None,
             content: "$lol".into(),
-            range: range((0, 11, 0, 15)),
+            range: lsp::Range::at(0, 11, 0, 15),
           }
         ],
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
-        range: range((0, 0, 2, 0)),
+        range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       })
     );
@@ -1478,7 +1482,7 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "baz".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
@@ -1488,20 +1492,20 @@ mod tests {
             kind: ParameterKind::Normal,
             default_value: None,
             content: "first".into(),
-            range: range((0, 4, 0, 9)),
+            range: lsp::Range::at(0, 4, 0, 9),
           },
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Variadic(VariadicType::OneOrMore),
             default_value: Some("\"default\"".into()),
             content: "+second=\"default\"".into(),
-            range: range((0, 10, 0, 27)),
+            range: lsp::Range::at(0, 10, 0, 27),
           }
         ],
         content:
           "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
-        range: range((0, 0, 2, 0)),
+        range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       })
     );
@@ -1521,13 +1525,13 @@ mod tests {
       Some(Recipe {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 0, 0, 3))
+          range: lsp::Range::at(0, 0, 0, 3)
         },
         attributes: vec![],
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
-        range: range((0, 0, 2, 0)),
+        range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       })
     );
@@ -1555,41 +1559,41 @@ mod tests {
         Attribute {
           name: TextNode {
             value: "private".into(),
-            range: range((0, 1, 0, 8)),
+            range: lsp::Range::at(0, 1, 0, 8),
           },
           arguments: vec![],
           target: Some(AttributeTarget::Recipe),
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Attribute {
           name: TextNode {
             value: "description".into(),
-            range: range((1, 1, 1, 12)),
+            range: lsp::Range::at(1, 1, 1, 12),
           },
           arguments: vec![TextNode {
             value: "\"This is a test recipe\"".into(),
-            range: range((1, 14, 1, 37)),
+            range: lsp::Range::at(1, 14, 1, 37),
           }],
           target: Some(AttributeTarget::Recipe),
-          range: range((1, 0, 2, 0)),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Attribute {
           name: TextNode {
             value: "tags".into(),
-            range: range((2, 1, 2, 5)),
+            range: lsp::Range::at(2, 1, 2, 5),
           },
           arguments: vec![
             TextNode {
               value: "\"test\"".into(),
-              range: range((2, 6, 2, 12)),
+              range: lsp::Range::at(2, 6, 2, 12),
             },
             TextNode {
               value: "\"example\"".into(),
-              range: range((2, 14, 2, 23)),
+              range: lsp::Range::at(2, 14, 2, 23),
             }
           ],
           target: Some(AttributeTarget::Recipe),
-          range: range((2, 0, 3, 0)),
+          range: lsp::Range::at(2, 0, 3, 0),
         }
       ]
     );
@@ -1626,60 +1630,60 @@ mod tests {
           arguments: vec![],
           name: TextNode {
             value: "private".into(),
-            range: range((0, 1, 0, 8)),
+            range: lsp::Range::at(0, 1, 0, 8),
           },
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
           target: Some(AttributeTarget::Recipe),
         },
         Attribute {
           arguments: vec![TextNode {
             value: "\"desc\"".into(),
-            range: range((0, 23, 0, 29)),
+            range: lsp::Range::at(0, 23, 0, 29),
           }],
           name: TextNode {
             value: "description".into(),
-            range: range((0, 10, 0, 21)),
+            range: lsp::Range::at(0, 10, 0, 21),
           },
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
           target: Some(AttributeTarget::Recipe),
         },
         Attribute {
           arguments: vec![],
           name: TextNode {
             value: "alias_attr".into(),
-            range: range((4, 1, 4, 11)),
+            range: lsp::Range::at(4, 1, 4, 11),
           },
-          range: range((4, 0, 5, 0)),
+          range: lsp::Range::at(4, 0, 5, 0),
           target: Some(AttributeTarget::Alias),
         },
         Attribute {
           arguments: vec![TextNode {
             value: "\"value\"".into(),
-            range: range((7, 10, 7, 17)),
+            range: lsp::Range::at(7, 10, 7, 17),
           }],
           name: TextNode {
             value: "var_attr".into(),
-            range: range((7, 1, 7, 9)),
+            range: lsp::Range::at(7, 1, 7, 9),
           },
-          range: range((7, 0, 8, 0)),
+          range: lsp::Range::at(7, 0, 8, 0),
           target: Some(AttributeTarget::Assignment),
         },
         Attribute {
           arguments: vec![],
           name: TextNode {
             value: "export_attr".into(),
-            range: range((10, 1, 10, 12)),
+            range: lsp::Range::at(10, 1, 10, 12),
           },
-          range: range((10, 0, 11, 0)),
+          range: lsp::Range::at(10, 0, 11, 0),
           target: Some(AttributeTarget::Assignment),
         },
         Attribute {
           arguments: vec![],
           name: TextNode {
             value: "module_attr".into(),
-            range: range((13, 1, 13, 12)),
+            range: lsp::Range::at(13, 1, 13, 12),
           },
-          range: range((13, 0, 14, 0)),
+          range: lsp::Range::at(13, 0, 14, 0),
           target: Some(AttributeTarget::Module),
         },
       ],
@@ -1703,9 +1707,9 @@ mod tests {
         optional: false,
         path: TextNode {
           value: "'foo/bar.just'".into(),
-          range: range((0, 7, 0, 21)),
+          range: lsp::Range::at(0, 7, 0, 21),
         },
-        range: range((0, 0, 0, 21)),
+        range: lsp::Range::at(0, 0, 0, 21),
       }]
     );
   }
@@ -1724,9 +1728,9 @@ mod tests {
         optional: true,
         path: TextNode {
           value: "'foo/bar.just'".into(),
-          range: range((0, 8, 0, 22)),
+          range: lsp::Range::at(0, 8, 0, 22),
         },
-        range: range((0, 0, 0, 22)),
+        range: lsp::Range::at(0, 0, 0, 22),
       }]
     );
   }
@@ -1747,17 +1751,17 @@ mod tests {
           optional: false,
           path: TextNode {
             value: "'foo.just'".into(),
-            range: range((0, 7, 0, 17)),
+            range: lsp::Range::at(0, 7, 0, 17),
           },
-          range: range((0, 0, 0, 17)),
+          range: lsp::Range::at(0, 0, 0, 17),
         },
         Import {
           optional: true,
           path: TextNode {
             value: "'bar.just'".into(),
-            range: range((1, 8, 1, 18)),
+            range: lsp::Range::at(1, 8, 1, 18),
           },
-          range: range((1, 0, 1, 18)),
+          range: lsp::Range::at(1, 0, 1, 18),
         },
       ]
     );
@@ -1776,11 +1780,11 @@ mod tests {
       vec![Module {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 4, 0, 7)),
+          range: lsp::Range::at(0, 4, 0, 7),
         },
         optional: false,
         path: None,
-        range: range((0, 0, 0, 7)),
+        range: lsp::Range::at(0, 0, 0, 7),
       }]
     );
   }
@@ -1798,14 +1802,14 @@ mod tests {
       vec![Module {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 4, 0, 7)),
+          range: lsp::Range::at(0, 4, 0, 7),
         },
         optional: false,
         path: Some(TextNode {
           value: "\"./utils.just\"".into(),
-          range: range((0, 8, 0, 22)),
+          range: lsp::Range::at(0, 8, 0, 22),
         }),
-        range: range((0, 0, 0, 22)),
+        range: lsp::Range::at(0, 0, 0, 22),
       }]
     );
   }
@@ -1823,11 +1827,11 @@ mod tests {
       vec![Module {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 5, 0, 8)),
+          range: lsp::Range::at(0, 5, 0, 8),
         },
         optional: true,
         path: None,
-        range: range((0, 0, 0, 8)),
+        range: lsp::Range::at(0, 0, 0, 8),
       }]
     );
   }
@@ -1847,23 +1851,23 @@ mod tests {
         Module {
           name: TextNode {
             value: "foo".into(),
-            range: range((0, 4, 0, 7)),
+            range: lsp::Range::at(0, 4, 0, 7),
           },
           optional: false,
           path: None,
-          range: range((0, 0, 0, 7)),
+          range: lsp::Range::at(0, 0, 0, 7),
         },
         Module {
           name: TextNode {
             value: "bar".into(),
-            range: range((1, 5, 1, 8)),
+            range: lsp::Range::at(1, 5, 1, 8),
           },
           optional: true,
           path: Some(TextNode {
             value: "\"bar.just\"".into(),
-            range: range((1, 9, 1, 19)),
+            range: lsp::Range::at(1, 9, 1, 19),
           }),
-          range: range((1, 0, 1, 19)),
+          range: lsp::Range::at(1, 0, 1, 19),
         },
       ]
     );
@@ -1888,26 +1892,26 @@ mod tests {
           arguments: vec![],
           name: TextNode {
             value: "arch".into(),
-            range: range((1, 9, 1, 13)),
+            range: lsp::Range::at(1, 9, 1, 13),
           },
-          range: range((1, 9, 1, 15)),
+          range: lsp::Range::at(1, 9, 1, 15),
         },
         FunctionCall {
           arguments: vec![
             TextNode {
               value: "\"HOME\"".into(),
-              range: range((2, 17, 2, 23)),
+              range: lsp::Range::at(2, 17, 2, 23),
             },
             TextNode {
               value: "\"fallback\"".into(),
-              range: range((2, 25, 2, 35)),
+              range: lsp::Range::at(2, 25, 2, 35),
             },
           ],
           name: TextNode {
             value: "env_var".into(),
-            range: range((2, 9, 2, 16)),
+            range: lsp::Range::at(2, 9, 2, 16),
           },
-          range: range((2, 9, 2, 36)),
+          range: lsp::Range::at(2, 9, 2, 36),
         },
       ],
     );
@@ -1929,34 +1933,34 @@ mod tests {
         Function {
           name: TextNode {
             value: "hello".into(),
-            range: range((0, 0, 0, 5)),
+            range: lsp::Range::at(0, 0, 0, 5),
           },
           parameters: vec![TextNode {
             value: "name".into(),
-            range: range((0, 6, 0, 10)),
+            range: lsp::Range::at(0, 6, 0, 10),
           }],
           body: "f\"Hello, \" + name".into(),
           content: "hello(name) := f\"Hello, \" + name".into(),
-          range: range((0, 0, 1, 0)),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Function {
           name: TextNode {
             value: "greet".into(),
-            range: range((2, 0, 2, 5)),
+            range: lsp::Range::at(2, 0, 2, 5),
           },
           parameters: vec![
             TextNode {
               value: "a".into(),
-              range: range((2, 6, 2, 7)),
+              range: lsp::Range::at(2, 6, 2, 7),
             },
             TextNode {
               value: "b".into(),
-              range: range((2, 9, 2, 10)),
+              range: lsp::Range::at(2, 9, 2, 10),
             },
           ],
           body: "hello(a) + \" and \" + hello(b)".into(),
           content: "greet(a, b) := hello(a) + \" and \" + hello(b)".into(),
-          range: range((2, 0, 3, 0)),
+          range: lsp::Range::at(2, 0, 3, 0),
         },
       ],
     );
@@ -1987,12 +1991,12 @@ mod tests {
       vec![Function {
         name: TextNode {
           value: "foo".into(),
-          range: range((0, 0, 0, 3)),
+          range: lsp::Range::at(0, 0, 0, 3),
         },
         parameters: vec![],
         body: "\"bar\"".into(),
         content: "foo() := \"bar\"".into(),
-        range: range((0, 0, 1, 0)),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }

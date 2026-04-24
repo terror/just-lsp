@@ -56,7 +56,7 @@ impl<'a> RuleContext<'a> {
     self.builtin_attributes_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         if let Builtin::Attribute { name, .. } = builtin {
           map.entry(*name).or_insert_with(Vec::new).push(builtin);
         }
@@ -79,9 +79,13 @@ impl<'a> RuleContext<'a> {
     self.builtin_function_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
-        if let Builtin::Function { name, .. } = builtin {
+      for builtin in BUILTINS {
+        if let Builtin::Function { name, aliases, .. } = builtin {
           map.entry(*name).or_insert(builtin);
+
+          for alias in *aliases {
+            map.entry(*alias).or_insert(builtin);
+          }
         }
       }
 
@@ -102,7 +106,7 @@ impl<'a> RuleContext<'a> {
     self.builtin_setting_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         if let Builtin::Setting { name, .. } = builtin {
           map.entry(*name).or_insert(builtin);
         }
@@ -270,7 +274,8 @@ impl<'a> RuleContext<'a> {
 
   pub fn setting_enabled(&self, name: &str) -> bool {
     self.settings().iter().any(|setting| {
-      setting.name == name && matches!(setting.kind, SettingKind::Boolean(true))
+      setting.name.value == name
+        && matches!(setting.kind, SettingKind::Boolean(true))
     })
   }
 
@@ -462,7 +467,7 @@ mod tests {
     let setting_names = context
       .settings()
       .iter()
-      .map(|s| s.name.as_str())
+      .map(|s| s.name.value.as_str())
       .collect::<Vec<_>>();
 
     assert_eq!(setting_names, ["dotenv-load", "export"]);

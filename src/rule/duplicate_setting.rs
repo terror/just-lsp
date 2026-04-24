@@ -11,9 +11,9 @@ define_rule! {
       let mut seen = HashSet::new();
 
       for setting in context.settings() {
-        if !seen.insert(setting.name.clone()) {
+        if !seen.insert(setting.name.value.clone()) {
           diagnostics.push(Diagnostic::error(
-            format!("Duplicate setting `{}`", setting.name),
+            format!("Duplicate setting `{}`", setting.name.value),
             setting.range,
           ));
         }

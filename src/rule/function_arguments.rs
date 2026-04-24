@@ -12,27 +12,33 @@ define_rule! {
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if let Some(Builtin::Function {
-          required_arguments,
-          accepts_variadic,
-          ..
-        }) = context.builtin_function(function_name.as_str())
+        if let Some(Builtin::Function { kind, .. }) =
+          context.builtin_function(function_name.as_str())
         {
+          let range = kind.argument_range();
+
+          let (min, max) = (*range.start(), *range.end());
+
           let argument_count = function_call.arguments.len();
 
-          if argument_count < *required_arguments {
+          if argument_count < min {
             diagnostics.push(Diagnostic::error(
               format!(
-                "Function `{function_name}` requires at least {required_arguments} {}, but {argument_count} provided",
-                Count("argument", *required_arguments)
+                "Function `{function_name}` requires at least {min} {}, but {argument_count} provided",
+                Count("argument", min)
               ),
               function_call.range,
             ));
-          } else if !accepts_variadic && argument_count > *required_arguments {
+          } else if argument_count > max {
+            let upper = if min == max {
+              format!("{max} {}", Count("argument", max))
+            } else {
+              format!("at most {max} {}", Count("argument", max))
+            };
+
             diagnostics.push(Diagnostic::error(
               format!(
-                "Function `{function_name}` accepts {required_arguments} {}, but {argument_count} provided",
-                Count("argument", *required_arguments)
+                "Function `{function_name}` accepts {upper}, but {argument_count} provided"
               ),
               function_call.range,
             ));
