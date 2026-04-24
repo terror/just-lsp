@@ -209,19 +209,22 @@ impl<'a> Resolver<'a> {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
-      "function_call" => self
-        .document
-        .find_function(&name)
-        .map(Symbol::Function)
-        .or_else(|| {
-          BUILTINS
+      "function_call" => {
+        self
+          .document
+          .find_function(&name)
+          .map(Symbol::Function)
+          .or_else(|| {
+            BUILTINS
             .iter()
             .find(|builtin| matches!(
               builtin,
-              Builtin::Function { name: function_name, .. } if name == *function_name
+              Builtin::Function { name: function_name, aliases, .. }
+                if name == *function_name || aliases.contains(&name.as_str())
             ))
             .map(Symbol::Builtin)
-        }),
+          })
+      }
       "function_definition" => {
         self.document.find_function(&name).map(Symbol::Function)
       }

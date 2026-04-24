@@ -1,6 +1,6 @@
 use {super::*, indoc::indoc};
 
-pub static BUILTINS: [Builtin<'_>; 164] = [
+pub static BUILTINS: [Builtin<'_>; 150] = [
   Builtin::Attribute {
     name: "arg",
     description: indoc! {
@@ -877,6 +877,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "absolute_path",
+    aliases: &[],
     description: indoc! {
       "
       Return the absolute form of `path`, resolved against the current
@@ -894,6 +895,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "append",
+    aliases: &[],
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
@@ -909,6 +911,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "arch",
+    aliases: &[],
     description: indoc! {
       "
       Instruction set architecture of the host machine.
@@ -929,6 +932,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "blake3",
+    aliases: &[],
     description: indoc! {
       "
       Return the BLAKE3 hash of `string` as a lowercase hex string.
@@ -944,6 +948,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "blake3_file",
+    aliases: &[],
     description: indoc! {
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
@@ -956,22 +961,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "cache_directory",
-    description: indoc! {
-      "
-      User-specific cache directory.
-
-      On Unix, follows the XDG Base Directory Specification
-      (`$XDG_CACHE_HOME` or `$HOME/.cache`). On macOS, returns
-      `~/Library/Caches`. On Windows, returns
-      `{FOLDERID_LocalAppData}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "cache_dir",
+    aliases: &["cache_dir"],
     description: indoc! {
       "
       User-specific cache directory.
@@ -988,6 +978,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "canonicalize",
+    aliases: &[],
     description: indoc! {
       "
       Canonicalize `path` by resolving symlinks and removing `.`,
@@ -1005,6 +996,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "capitalize",
+    aliases: &[],
     description: indoc! {
       "
       Return `s` with the first character uppercased and the rest
@@ -1021,6 +1013,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "choose",
+    aliases: &[],
     description: indoc! {
       "
       Return a string of `n` randomly selected characters from
@@ -1037,6 +1030,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "clean",
+    aliases: &[],
     description: indoc! {
       "
       Simplify `path` by removing extra path separators, intermediate
@@ -1055,22 +1049,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "config_directory",
-    description: indoc! {
-      "
-      User-specific configuration directory.
-
-      On Unix, follows the XDG Base Directory Specification
-      (`$XDG_CONFIG_HOME` or `$HOME/.config`). On macOS, returns
-      `~/Library/Application Support`. On Windows, returns
-      `{FOLDERID_RoamingAppData}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "config_dir",
+    aliases: &["config_dir"],
     description: indoc! {
       "
       User-specific configuration directory.
@@ -1087,21 +1066,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "config_local_directory",
-    description: indoc! {
-      "
-      Local user-specific configuration directory, for configuration
-      that should not roam or sync between machines.
-
-      On Unix, follows XDG conventions. On Windows, returns
-      `{FOLDERID_LocalAppData}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "config_local_dir",
+    aliases: &["config_local_dir"],
     description: indoc! {
       "
       Local user-specific configuration directory, for configuration
@@ -1117,22 +1082,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "data_directory",
-    description: indoc! {
-      "
-      User-specific data directory.
-
-      On Unix, follows the XDG Base Directory Specification
-      (`$XDG_DATA_HOME` or `$HOME/.local/share`). On macOS, returns
-      `~/Library/Application Support`. On Windows, returns
-      `{FOLDERID_RoamingAppData}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "data_dir",
+    aliases: &["data_dir"],
     description: indoc! {
       "
       User-specific data directory.
@@ -1149,21 +1099,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "data_local_directory",
-    description: indoc! {
-      "
-      Local user-specific data directory, for data that should not
-      roam or sync between machines.
-
-      On Unix, follows XDG conventions. On Windows, returns
-      `{FOLDERID_LocalAppData}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "data_local_dir",
+    aliases: &["data_local_dir"],
     description: indoc! {
       "
       Local user-specific data directory, for data that should not
@@ -1179,6 +1115,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "datetime",
+    aliases: &[],
     description: indoc! {
       "
       Return the current local time formatted with `format`.
@@ -1198,6 +1135,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "datetime_utc",
+    aliases: &[],
     description: indoc! {
       "
       Return the current UTC time formatted with `format`.
@@ -1213,6 +1151,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "encode_uri_component",
+    aliases: &[],
     description: indoc! {
       "
       Percent-encode every character in `s` except
@@ -1230,6 +1169,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "env",
+    aliases: &[],
     description: indoc! {
       "
       Retrieve the environment variable named `key`.
@@ -1253,6 +1193,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "env_var",
+    aliases: &[],
     description: indoc! {
       "
       **Deprecated**: use `env(key)` instead.
@@ -1267,6 +1208,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "env_var_or_default",
+    aliases: &[],
     description: indoc! {
       "
       **Deprecated**: use `env(key, default)` instead.
@@ -1281,6 +1223,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "error",
+    aliases: &[],
     description: indoc! {
       "
       Abort execution and report `message` to the user. Diverges and
@@ -1298,21 +1241,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "executable_directory",
-    description: indoc! {
-      "
-      User-specific executable directory.
-
-      On Unix, follows the XDG Base Directory Specification
-      (`$XDG_BIN_HOME` or `$HOME/.local/bin`). On Windows, returns no
-      well-defined value, so use with care on that platform.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "executable_dir",
+    aliases: &["executable_dir"],
     description: indoc! {
       "
       User-specific executable directory.
@@ -1328,6 +1257,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "extension",
+    aliases: &[],
     description: indoc! {
       "
       Return the file extension of `path`, not including the leading
@@ -1344,6 +1274,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "file_name",
+    aliases: &[],
     description: indoc! {
       "
       Return the file name of `path` with any leading directory
@@ -1360,6 +1291,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "file_stem",
+    aliases: &[],
     description: indoc! {
       "
       Return the file name of `path` without its extension or any
@@ -1376,20 +1308,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "home_directory",
-    description: indoc! {
-      "
-      The user's home directory.
-
-      On Unix, returns `$HOME`. On macOS, returns `$HOME`. On Windows,
-      returns `{FOLDERID_Profile}`.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "home_dir",
+    aliases: &["home_dir"],
     description: indoc! {
       "
       The user's home directory.
@@ -1404,30 +1323,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "invocation_directory",
-    description: indoc! {
-      "
-      The absolute path of the directory in which `just` was invoked,
-      before it `chdir`'d to the justfile directory.
-
-      On Windows, paths are converted to Cygwin-style forward-slash
-      form via `cygpath`. Use `invocation_directory_native()` to keep
-      the native path on all platforms.
-
-      Useful when a recipe needs to operate on files relative to where
-      the user ran `just` rather than where the justfile lives.
-
-      ```just
-      rustfmt:
-        find {{invocation_directory()}} -name '*.rs' -exec rustfmt {} \\\\;
-      ```
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "invocation_dir",
+    aliases: &["invocation_dir"],
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1452,21 +1348,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "invocation_directory_native",
-    description: indoc! {
-      "
-      The absolute path of the directory in which `just` was invoked,
-      in the host's native path format.
-
-      Unlike `invocation_directory()`, this does not convert paths to
-      Cygwin style on Windows.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "invocation_dir_native",
+    aliases: &["invocation_dir_native"],
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1482,6 +1364,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "is_dependency",
+    aliases: &[],
     description: indoc! {
       "
       Return the string `\"true\"` if the current recipe is being run
@@ -1495,6 +1378,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "join",
+    aliases: &[],
     description: indoc! {
       "
       Join two or more path components.
@@ -1515,6 +1399,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "just_executable",
+    aliases: &[],
     description: indoc! {
       "
       Absolute path to the `just` executable that is currently running.
@@ -1531,6 +1416,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "just_pid",
+    aliases: &[],
     description: indoc! {
       "
       Process ID of the running `just` executable, as a decimal string.
@@ -1542,6 +1428,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "justfile",
+    aliases: &[],
     description: indoc! {
       "
       Absolute path to the current `justfile`.
@@ -1557,22 +1444,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "justfile_directory",
-    description: indoc! {
-      "
-      Absolute path to the parent directory of the current `justfile`.
-
-      ```just
-      script:
-        {{justfile_directory()}}/scripts/deploy
-      ```
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "justfile_dir",
+    aliases: &["justfile_dir"],
     description: indoc! {
       "
       Absolute path to the parent directory of the current `justfile`.
@@ -1589,6 +1461,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "kebabcase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `kebab-case`.
@@ -1604,6 +1477,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "lowercase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to lowercase.
@@ -1619,6 +1493,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "lowercamelcase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `lowerCamelCase`.
@@ -1634,6 +1509,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "num_cpus",
+    aliases: &[],
     description: indoc! {
       "
       Number of logical CPUs available on the host machine.
@@ -1650,6 +1526,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "os",
+    aliases: &[],
     description: indoc! {
       "
       Host operating system.
@@ -1665,6 +1542,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "os_family",
+    aliases: &[],
     description: indoc! {
       "
       Host operating system family. Returns `unix` or `windows`.
@@ -1682,23 +1560,8 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
     deprecated: None,
   },
   Builtin::Function {
-    name: "parent_dir",
-    description: indoc! {
-      "
-      Return the parent directory of `path`. Aborts if `path` has no
-      parent (e.g. the filesystem root).
-
-      ```just
-      parent_directory(\"/foo/bar.txt\")  # => \"/foo\"
-      ```
-      "
-    },
-    required_arguments: 1,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
     name: "parent_directory",
+    aliases: &["parent_dir"],
     description: indoc! {
       "
       Return the parent directory of `path`. Aborts if `path` has no
@@ -1715,6 +1578,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "path_exists",
+    aliases: &[],
     description: indoc! {
       "
       Return `\"true\"` if `path` points at an existing filesystem
@@ -1730,6 +1594,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "prepend",
+    aliases: &[],
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
@@ -1745,6 +1610,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "quote",
+    aliases: &[],
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
@@ -1764,6 +1630,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "read",
+    aliases: &[],
     description: indoc! {
       "
       Return the contents of the file at `path` as a string. Aborts if
@@ -1776,6 +1643,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "replace",
+    aliases: &[],
     description: indoc! {
       "
       Replace every occurrence of `from` in `s` with `to`.
@@ -1791,6 +1659,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "replace_regex",
+    aliases: &[],
     description: indoc! {
       "
       Replace every match of `regex` in `s` with `replacement`.
@@ -1812,6 +1681,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "require",
+    aliases: &[],
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -1832,21 +1702,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "runtime_directory",
-    description: indoc! {
-      "
-      The user-specific runtime directory.
-
-      Follows the XDG Base Directory Specification on Unix; returns
-      the platform-specified runtime directory on other systems. May
-      be unset on some platforms, in which case the function aborts.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "runtime_dir",
+    aliases: &["runtime_dir"],
     description: indoc! {
       "
       The user-specific runtime directory.
@@ -1862,6 +1718,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "semver_matches",
+    aliases: &[],
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
@@ -1878,6 +1735,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "sha256",
+    aliases: &[],
     description: indoc! {
       "
       Return the SHA-256 hash of `string` as a lowercase hex string.
@@ -1889,6 +1747,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "sha256_file",
+    aliases: &[],
     description: indoc! {
       "
       Return the SHA-256 hash of the file at `path` as a lowercase hex
@@ -1901,6 +1760,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "shell",
+    aliases: &[],
     description: indoc! {
       "
       Return the standard output of shell script `command`, with zero
@@ -1925,6 +1785,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "shoutykebabcase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `SHOUTY-KEBAB-CASE`.
@@ -1940,6 +1801,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "shoutysnakecase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `SHOUTY_SNAKE_CASE`.
@@ -1955,6 +1817,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "snakecase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `snake_case`.
@@ -1970,19 +1833,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "module_directory",
-    description: indoc! {
-      "
-      Directory of the current module file. Behaves like
-      `justfile_directory()` in the root justfile, but resolves to the
-      directory of the current `mod` source file inside submodules.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "module_dir",
+    aliases: &["module_dir"],
     description: indoc! {
       "
       Directory of the current module file. Behaves like
@@ -1996,6 +1847,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "module_file",
+    aliases: &[],
     description: indoc! {
       "
       Path of the current module file. Behaves like `justfile()` in
@@ -2009,20 +1861,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "source_directory",
-    description: indoc! {
-      "
-      Directory of the current source file. Behaves like
-      `justfile_directory()` in the root justfile, but resolves to the
-      directory of the current `import` or `mod` source file when
-      called from within an imported or submodule file.
-      "
-    },
-    required_arguments: 0,
-    accepts_variadic: false,
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "source_dir",
+    aliases: &["source_dir"],
     description: indoc! {
       "
       Directory of the current source file. Behaves like
@@ -2037,6 +1876,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "source_file",
+    aliases: &[],
     description: indoc! {
       "
       Path of the current source file. Behaves like `justfile()` in
@@ -2051,6 +1891,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "style",
+    aliases: &[],
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
@@ -2075,6 +1916,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "titlecase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `Title Case`.
@@ -2090,6 +1932,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim",
+    aliases: &[],
     description: indoc! {
       "
       Remove leading and trailing whitespace from `s`.
@@ -2105,6 +1948,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_end",
+    aliases: &[],
     description: indoc! {
       "
       Remove trailing whitespace from `s`.
@@ -2120,6 +1964,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_end_match",
+    aliases: &[],
     description: indoc! {
       "
       Remove a single trailing occurrence of `substring` from `s` if
@@ -2137,6 +1982,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_end_matches",
+    aliases: &[],
     description: indoc! {
       "
       Repeatedly remove trailing occurrences of `substring` from `s`
@@ -2154,6 +2000,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_start",
+    aliases: &[],
     description: indoc! {
       "
       Remove leading whitespace from `s`.
@@ -2169,6 +2016,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_start_match",
+    aliases: &[],
     description: indoc! {
       "
       Remove a single leading occurrence of `substring` from `s` if
@@ -2186,6 +2034,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "trim_start_matches",
+    aliases: &[],
     description: indoc! {
       "
       Repeatedly remove leading occurrences of `substring` from `s`
@@ -2202,6 +2051,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "uppercamelcase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to `UpperCamelCase` (also known as PascalCase).
@@ -2217,6 +2067,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "uppercase",
+    aliases: &[],
     description: indoc! {
       "
       Convert `s` to uppercase.
@@ -2232,6 +2083,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "uuid",
+    aliases: &[],
     description: indoc! {
       "
       Generate a random version 4 UUID.
@@ -2247,6 +2099,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "which",
+    aliases: &[],
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -2270,6 +2123,7 @@ pub static BUILTINS: [Builtin<'_>; 164] = [
   },
   Builtin::Function {
     name: "without_extension",
+    aliases: &[],
     description: indoc! {
       "
       Return `path` with its extension removed. Aborts if `path` has

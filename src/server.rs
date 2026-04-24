@@ -406,7 +406,7 @@ impl Inner {
       }
 
       for builtin in &BUILTINS {
-        completion_items.push(builtin.completion_item());
+        completion_items.extend(builtin.completion_items());
       }
 
       return Ok(Some(lsp::CompletionResponse::Array(completion_items)));

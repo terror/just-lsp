@@ -80,8 +80,12 @@ impl<'a> RuleContext<'a> {
       let mut map = HashMap::new();
 
       for builtin in &BUILTINS {
-        if let Builtin::Function { name, .. } = builtin {
+        if let Builtin::Function { name, aliases, .. } = builtin {
           map.entry(*name).or_insert(builtin);
+
+          for alias in *aliases {
+            map.entry(*alias).or_insert(builtin);
+          }
         }
       }
 
