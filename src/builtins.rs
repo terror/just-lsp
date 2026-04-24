@@ -1,158 +1,26 @@
 use {super::*, indoc::indoc};
 
-pub static BUILTINS: [Builtin<'_>; 172] = [
+pub static BUILTINS: [Builtin<'_>; 162] = [
   Builtin::Attribute {
     name: "arg",
     description: indoc! {
       "
-      Print help string `HELP` for parameter `ARG` in generated usage
-      messages.
+      Configure a recipe parameter.
 
-      Used to customize the `--help` output of `just --command` and the
-      recipe's own usage line.
+      Accepts a parameter name followed by one or more keyword
+      arguments that customize how the parameter is surfaced on the
+      command line:
 
-      ```just
-      [arg(NAME, help=\"the name to greet\")]
-      greet NAME:
-        @echo Hello, {{NAME}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Require values of parameter `ARG` to be passed with the long option
-      `--LONG`.
+      - `help=\"HELP\"` sets the usage-message help string.
+      - `long=\"LONG\"` requires the value to be passed with `--LONG`.
+      - `short=\"S\"` requires the value to be passed with `-S`.
+      - `value=\"VALUE\"` makes the option a flag that substitutes
+        `VALUE` when present. Combine with `long` and/or `short`.
+      - `pattern=\"PATTERN\"` requires the value to match a regular
+        expression. Patterns are full-match; `just` rejects the
+        invocation if the supplied value does not match.
 
-      Callers must invoke the recipe as `just RECIPE --LONG value`
-      instead of passing the value positionally.
-
-      ```just
-      [arg(NAME, long=\"name\")]
-      greet NAME:
-        @echo Hello, {{NAME}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Require values of parameter `ARG` to be passed with the short option
-      `-S`.
-
-      Callers must invoke the recipe as `just RECIPE -S value` instead
-      of passing the value positionally.
-
-      ```just
-      [arg(NAME, short=\"n\")]
-      greet NAME:
-        @echo Hello, {{NAME}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Make a long option a *flag* that does not take a value, instead
-      substituting `VALUE` for the parameter when `--LONG` is passed.
-
-      Useful for boolean-style switches backed by recipe parameters.
-
-      ```just
-      [arg(VERBOSE, long=\"verbose\", value=\"true\")]
-      build VERBOSE=\"false\":
-        @echo verbose={{VERBOSE}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Make a short option a *flag* that does not take a value, instead
-      substituting `VALUE` for the parameter when `-S` is passed.
-
-      Useful for boolean-style switches backed by recipe parameters.
-
-      ```just
-      [arg(VERBOSE, short=\"v\", value=\"true\")]
-      build VERBOSE=\"false\":
-        @echo verbose={{VERBOSE}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Make an option with both long and short forms a *flag* that does
-      not take a value, instead substituting `VALUE` for the parameter
-      when either `--LONG` or `-S` is passed.
-
-      ```just
-      [arg(VERBOSE, long=\"verbose\", short=\"v\", value=\"true\")]
-      build VERBOSE=\"false\":
-        @echo verbose={{VERBOSE}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Require values of parameter `ARG` to match a regular expression
-      `PATTERN`.
-
-      Patterns are full-match; `just` rejects the invocation if the
-      supplied value does not match.
-
-      ```just
-      [arg(VERSION, pattern=\"^v[0-9]+\\\\.[0-9]+\\\\.[0-9]+$\")]
-      release VERSION:
-        @echo releasing {{VERSION}}
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
-  },
-  Builtin::Attribute {
-    name: "arg",
-    description: indoc! {
-      "
-      Configure a recipe parameter with one or more options.
-
-      A catch-all form that accepts any combination of `help`, `long`,
-      `short`, `value`, and `pattern` keyword arguments, separated by
-      commas.
+      Multiple keys may be combined in a single `[arg(...)]`.
 
       ```just
       [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
@@ -192,35 +60,22 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
       "
       Require confirmation in the terminal prior to executing the recipe.
 
-      Can be overridden by passing `--yes` to `just`, which auto-confirms
-      any recipe marked with this attribute.
+      With no argument, uses the default prompt. Pass a single string
+      to override with a custom prompt.
 
-      Recipes that depend on a recipe requiring confirmation will not run
-      if the confirmation is denied. Recipes listed on the command line
-      after a confirmation-required recipe are also skipped if the
-      confirmation is denied.
+      Can be overridden by passing `--yes` to `just`, which
+      auto-confirms any recipe marked with this attribute.
+
+      Recipes that depend on a recipe requiring confirmation will not
+      run if the confirmation is denied. Recipes listed on the command
+      line after a confirmation-required recipe are also skipped if
+      the confirmation is denied.
 
       ```just
       [confirm]
       delete-all:
         rm -rf *
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
-  },
-  Builtin::Attribute {
-    name: "confirm",
-    description: indoc! {
-      "
-      Require confirmation prior to executing the recipe with a custom
-      prompt `PROMPT` instead of the default.
 
-      Overridden by `--yes` like the bare `[confirm]` form.
-
-      ```just
       [confirm(\"Are you sure you want to delete everything?\")]
       delete-everything:
         rm -rf *
@@ -228,7 +83,7 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
+    min_args: 0,
     max_args: Some(1),
   },
   Builtin::Attribute {
@@ -256,35 +111,19 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
     name: "doc",
     description: indoc! {
       "
-      Suppress the recipe's or module's documentation comment.
+      Set or suppress the recipe's or module's documentation comment.
 
-      When present with no argument, any `#`-prefixed comment
-      immediately above the recipe or `mod` statement is omitted from
-      `just --list` and other doc surfaces.
+      With no argument, any `#`-prefixed comment immediately above the
+      recipe or `mod` statement is omitted from `just --list` and
+      other doc surfaces. With a string argument, that string is used
+      as the documentation instead of any comment above.
 
       ```just
       # This comment will not appear in --list output.
       [doc]
       internal:
         @echo internal
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
-  },
-  Builtin::Attribute {
-    name: "doc",
-    description: indoc! {
-      "
-      Set the recipe's or module's documentation comment to `DOC`.
 
-      Overrides any `#`-prefixed comment immediately above the recipe
-      or `mod` statement. The supplied string is what `just --list` and
-      other doc surfaces display.
-
-      ```just
       [doc(\"Build the project in release mode\")]
       build:
         cargo build --release
@@ -292,7 +131,7 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
       "
     },
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
-    min_args: 1,
+    min_args: 0,
     max_args: Some(1),
   },
   Builtin::Attribute {
@@ -650,13 +489,18 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
     name: "script",
     description: indoc! {
       "
-      Execute the recipe as a script, using the interpreter configured
-      by `set script-interpreter := [...]` (default: `['sh', '-eu']`).
+      Execute the recipe as a script.
+
+      With no argument, uses the interpreter configured by
+      `set script-interpreter := [...]` (default: `['sh', '-eu']`).
+      With an argument, uses the supplied `COMMAND` as the
+      interpreter, bypassing the `script-interpreter` setting.
 
       Instead of running each line separately through the shell, the
       entire recipe body is written to a temporary file and passed to
-      the interpreter as a single script. This makes multi-line control
-      flow, here-docs, and shell-specific features work as written.
+      the interpreter as a single script. This makes multi-line
+      control flow, here-docs, and shell-specific features work as
+      written.
 
       ```just
       set script-interpreter := ['bash', '-eu']
@@ -666,34 +510,15 @@ pub static BUILTINS: [Builtin<'_>; 172] = [
         for i in 1 2 3; do
           echo $i
         done
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
-  },
-  Builtin::Attribute {
-    name: "script",
-    description: indoc! {
-      "
-      Execute the recipe as a script interpreted by the supplied
-      `COMMAND`.
 
-      The recipe body is written to a temporary file and passed to
-      `COMMAND` as its final argument. Use this to invoke a specific
-      interpreter for a single recipe without changing the global
-      `script-interpreter` setting.
-
-      ```just
       [script(\"python3\")]
-      hello:
+      hello-py:
         print(\"hello from python\")
       ```
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
+    min_args: 0,
     max_args: None,
   },
   Builtin::Attribute {
