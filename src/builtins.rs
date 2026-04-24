@@ -3,6 +3,7 @@ use super::*;
 pub static BUILTINS: [Builtin<'_>; 150] = [
   Builtin::Attribute {
     name: "arg",
+    kind: AttributeKind::UnaryPlus,
     description: indoc! {
       "
       Configure a recipe parameter.
@@ -30,11 +31,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
   },
   Builtin::Attribute {
     name: "env",
+    kind: AttributeKind::Binary,
     description: indoc! {
       "
       Set environment variable `ENV_VAR` to `VALUE` for the recipe.
@@ -51,11 +51,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 2,
-    max_args: Some(2),
   },
   Builtin::Attribute {
     name: "confirm",
+    kind: AttributeKind::Optional,
     description: indoc! {
       "
       Require confirmation in the terminal prior to executing the recipe.
@@ -83,11 +82,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(1),
   },
   Builtin::Attribute {
     name: "default",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Use this recipe as the module's default recipe.
@@ -104,11 +102,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "doc",
+    kind: AttributeKind::Optional,
     description: indoc! {
       "
       Set or suppress the recipe's or module's documentation comment.
@@ -131,11 +128,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(1),
   },
   Builtin::Attribute {
     name: "extension",
+    kind: AttributeKind::Unary,
     description: indoc! {
       "
       Set the file extension used when writing a shebang recipe's script
@@ -154,11 +150,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: Some(1),
   },
   Builtin::Attribute {
     name: "group",
+    kind: AttributeKind::Unary,
     description: indoc! {
       "
       Place the recipe or module in the named group `NAME`.
@@ -180,11 +175,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: Some(1),
   },
   Builtin::Attribute {
     name: "metadata",
+    kind: AttributeKind::UnaryPlus,
     description: indoc! {
       "
       Attach arbitrary metadata `METADATA` to the recipe.
@@ -201,11 +195,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: None,
   },
   Builtin::Attribute {
     name: "dragonfly",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on DragonFly BSD.
@@ -224,11 +217,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "freebsd",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on FreeBSD.
@@ -245,11 +237,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "linux",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on Linux.
@@ -272,11 +263,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "macos",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on macOS.
@@ -295,11 +285,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "no-cd",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Don't change directory before executing the recipe.
@@ -319,11 +308,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "exit-message",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Print an error message if the recipe fails.
@@ -334,11 +322,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "no-exit-message",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Don't print an error message if the recipe fails.
@@ -357,11 +344,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "no-quiet",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Override globally quiet recipes and always echo the recipe lines.
@@ -380,11 +366,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "netbsd",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on NetBSD.
@@ -395,11 +380,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "openbsd",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on OpenBSD.
@@ -410,11 +394,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "parallel",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Run this recipe's dependencies in parallel.
@@ -431,11 +414,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "positional-arguments",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Turn on positional arguments for this recipe.
@@ -458,11 +440,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "private",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Make a recipe, alias, variable, or module private.
@@ -485,11 +466,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       AttributeTarget::Module,
       AttributeTarget::Recipe,
     ],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "script",
+    kind: AttributeKind::Variadic,
     description: indoc! {
       "
       Execute the recipe as a script.
@@ -521,11 +501,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: None,
   },
   Builtin::Attribute {
     name: "unix",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on Unix-like platforms, including macOS.
@@ -543,11 +522,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "windows",
+    kind: AttributeKind::Nullary,
     description: indoc! {
       "
       Enable the recipe on Windows.
@@ -564,11 +542,10 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 0,
-    max_args: Some(0),
   },
   Builtin::Attribute {
     name: "working-directory",
+    kind: AttributeKind::Unary,
     description: indoc! {
       "
       Set the recipe's working directory to `PATH`.
@@ -585,8 +562,6 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
       "
     },
     targets: &[AttributeTarget::Recipe],
-    min_args: 1,
-    max_args: Some(1),
   },
   Builtin::Constant {
     name: "HEX",

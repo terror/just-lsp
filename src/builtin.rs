@@ -4,10 +4,9 @@ use super::*;
 pub enum Builtin<'a> {
   Attribute {
     name: &'a str,
+    kind: AttributeKind,
     description: &'a str,
     targets: &'a [AttributeTarget],
-    min_args: usize,
-    max_args: Option<usize>,
   },
   Constant {
     name: &'a str,

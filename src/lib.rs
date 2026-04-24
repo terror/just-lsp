@@ -19,6 +19,7 @@ pub use {
   alias::Alias,
   analyzer::Analyzer,
   attribute::Attribute,
+  attribute_kind::AttributeKind,
   attribute_target::AttributeTarget,
   builtin::Builtin,
   builtins::BUILTINS,
@@ -55,6 +56,7 @@ pub use {
 mod alias;
 mod analyzer;
 mod attribute;
+mod attribute_kind;
 mod attribute_target;
 mod builtin;
 mod builtins;
