@@ -25,6 +25,7 @@ build:
 build-wasm:
   just -f vendor/tree-sitter-just/justfile build-wasm
   cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
+  RUST_LOG=warn typeshare -l typescript -o www/src/lib/types.ts crates/just-lsp-wasm
 
 [group: 'check']
 check:
@@ -89,8 +90,8 @@ update-changelog:
 
 [group: 'dev']
 update-parser:
-  cd vendor/tree-sitter-just && npx tree-sitter generate
-  cd vendor/tree-sitter-just && npx tree-sitter test
+  cd vendor/tree-sitter-just && tree-sitter generate
+  cd vendor/tree-sitter-just && tree-sitter test
   cargo test
 
 [group: 'dev']

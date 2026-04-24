@@ -123,7 +123,7 @@ format-check: configure-compile-database
 
 # Generate the parser
 gen *extra-args:
-	npx tree-sitter generate {{ extra-args }}
+	tree-sitter generate {{ extra-args }}
 	python3 build-flavored-queries.py
 
 	# Run formatting only on generated files
@@ -135,7 +135,7 @@ gen *extra-args:
 		echo "skipping clang-format"
 
 build-wasm: gen
-    npx tree-sitter build --wasm
+    tree-sitter build --wasm
 
 alias t := test
 

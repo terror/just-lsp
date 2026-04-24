@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@/lib/types';
+import type { SyntaxNode } from '@/lib/syntax-node';
 import { positionToOffset } from '@/lib/utils';
 import { Text } from '@codemirror/state';
 import { ChevronDown, ChevronRight } from 'lucide-react';
