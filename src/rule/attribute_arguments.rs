@@ -20,29 +20,31 @@ define_rule! {
 
         let argument_count = attribute.arguments.len();
 
-        let bounds = matching
+        let ranges = matching
           .iter()
           .copied()
-          .filter_map(|attr| match attr {
-            Builtin::Attribute { min_args, max_args, .. } => Some((*min_args, *max_args)),
+          .filter_map(|attribute| match attribute {
+            Builtin::Attribute { kind, .. } => Some(kind.argument_range()),
             _ => None,
           })
           .collect::<Vec<_>>();
 
-        let is_valid = bounds
+        let is_valid = ranges
           .iter()
-          .any(|(min, max)| argument_count >= *min && max.is_none_or(|m| argument_count <= m));
+          .any(|range| range.contains(&argument_count));
 
         if is_valid {
           continue;
         }
 
-        let min = bounds.iter().map(|(min, _)| *min).min().unwrap_or(0);
+        let min = ranges.iter().map(|range| *range.start()).min().unwrap_or(0);
 
-        let max = bounds
+        let max = ranges
           .iter()
-          .map(|(_, max)| *max)
-          .try_fold(0, |acc, max| max.map(|value| acc.max(value)));
+          .map(|range| *range.end())
+          .try_fold(0, |acc, max| {
+            if max == usize::MAX { None } else { Some(acc.max(max)) }
+          });
 
         let expected = match max {
           Some(max) if min == max => format!("{min}"),
@@ -54,7 +56,7 @@ define_rule! {
           format!(
             "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
             Count("argument", argument_count),
-            if min == 1 && max.is_none_or(|m| m == 1) { "argument" } else { "arguments" },
+            if min == 1 && max.is_none_or(|max| max == 1) { "argument" } else { "arguments" },
           ),
           attribute.range,
         ));
