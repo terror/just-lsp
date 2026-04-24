@@ -405,7 +405,7 @@ impl Inner {
         });
       }
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         completion_items.extend(builtin.completion_items());
       }
 

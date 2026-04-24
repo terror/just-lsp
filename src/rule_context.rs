@@ -56,7 +56,7 @@ impl<'a> RuleContext<'a> {
     self.builtin_attributes_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         if let Builtin::Attribute { name, .. } = builtin {
           map.entry(*name).or_insert_with(Vec::new).push(builtin);
         }
@@ -79,7 +79,7 @@ impl<'a> RuleContext<'a> {
     self.builtin_function_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         if let Builtin::Function { name, aliases, .. } = builtin {
           map.entry(*name).or_insert(builtin);
 
@@ -106,7 +106,7 @@ impl<'a> RuleContext<'a> {
     self.builtin_setting_map.get_or_init(|| {
       let mut map = HashMap::new();
 
-      for builtin in &BUILTINS {
+      for builtin in BUILTINS {
         if let Builtin::Setting { name, .. } = builtin {
           map.entry(*name).or_insert(builtin);
         }

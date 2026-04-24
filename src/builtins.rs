@@ -1,6 +1,6 @@
 use super::*;
 
-pub static BUILTINS: [Builtin<'_>; 150] = [
+pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
     name: "arg",
     kind: AttributeKind::UnaryPlus,
@@ -2418,3 +2418,57 @@ pub static BUILTINS: [Builtin<'_>; 150] = [
     deprecated: None,
   },
 ];
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn no_duplicate_names() {
+    #[track_caller]
+    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
+      let mut seen = HashSet::new();
+
+      for name in names {
+        assert!(
+          seen.insert(name),
+          "duplicate {kind} name in BUILTINS: {name}",
+        );
+      }
+    }
+
+    case(
+      "attribute",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Attribute { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "constant",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Constant { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "function",
+      BUILTINS.iter().flat_map(|builtin| match builtin {
+        Builtin::Function { name, aliases, .. } => once(*name)
+          .chain(aliases.iter().copied())
+          .collect::<Vec<_>>(),
+        _ => Vec::new(),
+      }),
+    );
+
+    case(
+      "setting",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Setting { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+  }
+}
