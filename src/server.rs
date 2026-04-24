@@ -405,8 +405,8 @@ impl Inner {
         });
       }
 
-      for builtin in &BUILTINS {
-        completion_items.push(builtin.completion_item());
+      for builtin in BUILTINS {
+        completion_items.extend(builtin.completion_items());
       }
 
       return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
@@ -2299,7 +2299,20 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```",
+        content: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        },
         kind: "markdown",
         start_line: 1,
         start_char: 9,
@@ -2371,7 +2384,18 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "Lowercase hexadecimal digit string\n\"0123456789abcdef\"",
+        content: indoc! {
+          "
+          Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
+
+          Useful as the alphabet argument to `choose()` for generating
+          random hex strings.
+
+          ```just
+          token := choose('32', HEX)
+          ```
+          "
+        },
         kind: "markdown",
         start_line: 1,
         start_char: 10,
@@ -2422,7 +2446,20 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```",
+        content: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        },
         kind: "markdown",
         start_line: 4,
         start_char: 10,
@@ -2456,7 +2493,24 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Attribute**: [no-cd]\nDon't change directory before executing recipe.\n**Introduced in**: 1.9.0\n**Target(s)**: recipe",
+        content: indoc! {
+          "
+          Don't change directory before executing the recipe.
+
+          Normally `just` runs recipes with the current directory set to
+          the directory containing the `justfile`. With `[no-cd]`, the
+          recipe runs with the current directory unchanged, so it can use
+          paths relative to the invocation directory or operate on the
+          user's current directory.
+
+          ```just
+          [no-cd]
+          commit file:
+            git add {{file}}
+            git commit
+          ```
+          "
+        },
         kind: "markdown",
         start_line: 0,
         start_char: 1,
@@ -2491,7 +2545,26 @@ mod tests {
       })
       .response(HoverResponse {
         id: 2,
-        content: "**Setting**: export\nExport all variables as environment variables.\n**Type**: boolean\n**Default**: false",
+        content: indoc! {
+          "
+          Export every top-level `just` variable as an environment
+          variable.
+
+          Equivalent to prefixing each assignment with `export`, so
+          recipes and backticks see the variables as `$NAME` rather than
+          needing `{{ name }}` interpolation.
+
+          ```just
+          set export
+
+          a := \"hello\"
+
+          @foo b:
+            echo $a
+            echo $b
+          ```
+          "
+        },
         kind: "markdown",
         start_line: 0,
         start_char: 4,

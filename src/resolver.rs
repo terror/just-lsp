@@ -209,19 +209,22 @@ impl<'a> Resolver<'a> {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
-      "function_call" => self
-        .document
-        .find_function(&name)
-        .map(Symbol::Function)
-        .or_else(|| {
-          BUILTINS
+      "function_call" => {
+        self
+          .document
+          .find_function(&name)
+          .map(Symbol::Function)
+          .or_else(|| {
+            BUILTINS
             .iter()
             .find(|builtin| matches!(
               builtin,
-              Builtin::Function { name: function_name, .. } if name == *function_name
+              Builtin::Function { name: function_name, aliases, .. }
+                if name == *function_name || aliases.contains(&name.as_str())
             ))
             .map(Symbol::Builtin)
-        }),
+          })
+      }
       "function_definition" => {
         self.document.find_function(&name).map(Symbol::Function)
       }
@@ -840,7 +843,21 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```".to_string(),
+        value: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        }
+        .to_string(),
       })
     );
   }
@@ -870,7 +887,14 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: "Red text\n\"\\e[31m\"".to_string(),
+        value: indoc! {
+          "
+          ANSI escape sequence for red foreground text: `\\e[31m`.
+
+          Terminate styled output with `NORMAL` to reset.
+          "
+        }
+        .to_string(),
       })
     );
   }
@@ -901,7 +925,25 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: "**Attribute**: [no-cd]\nDon't change directory before executing recipe.\n**Introduced in**: 1.9.0\n**Target(s)**: recipe".to_string(),
+        value: indoc! {
+          "
+          Don't change directory before executing the recipe.
+
+          Normally `just` runs recipes with the current directory set to
+          the directory containing the `justfile`. With `[no-cd]`, the
+          recipe runs with the current directory unchanged, so it can use
+          paths relative to the invocation directory or operate on the
+          user's current directory.
+
+          ```just
+          [no-cd]
+          commit file:
+            git add {{file}}
+            git commit
+          ```
+          "
+        }
+        .to_string(),
       })
     );
   }
@@ -933,7 +975,27 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: "**Setting**: export\nExport all variables as environment variables.\n**Type**: boolean\n**Default**: false".to_string(),
+        value: indoc! {
+          "
+          Export every top-level `just` variable as an environment
+          variable.
+
+          Equivalent to prefixing each assignment with `export`, so
+          recipes and backticks see the variables as `$NAME` rather than
+          needing `{{ name }}` interpolation.
+
+          ```just
+          set export
+
+          a := \"hello\"
+
+          @foo b:
+            echo $a
+            echo $b
+          ```
+          "
+        }
+        .to_string(),
       })
     );
   }
@@ -976,7 +1038,21 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::Markdown,
-        value: "Instruction set architecture\n```\narch() -> string\n```\n**Examples:**\n```\narch() => \"x86_64\"\n```".to_string(),
+        value: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        }
+        .to_string(),
       })
     );
   }
