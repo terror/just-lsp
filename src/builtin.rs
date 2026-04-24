@@ -83,6 +83,8 @@ impl Builtin<'_> {
           | "just_executable"
           | "just_pid"
           | "uuid"
+          | "runtime_directory"
+          | "runtime_dir"
           | "cache_directory"
           | "cache_dir"
           | "config_directory"

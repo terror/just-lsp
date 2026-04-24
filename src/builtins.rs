@@ -1,6 +1,6 @@
 use {super::*, indoc::indoc};
 
-pub static BUILTINS: [Builtin<'_>; 162] = [
+pub static BUILTINS: [Builtin<'_>; 164] = [
   Builtin::Attribute {
     name: "arg",
     description: indoc! {
@@ -164,7 +164,8 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
       Place the recipe or module in the named group `NAME`.
 
       Groups are used by `just --list` to visually cluster related
-      recipes. A recipe may belong to only one group.
+      recipes. `[group(...)]` may be repeated on the same recipe or
+      module to place it in multiple groups.
 
       ```just
       [group(\"build\")]
@@ -172,7 +173,8 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
         cargo build
 
       [group(\"build\")]
-      release:
+      [group(\"release\")]
+      package:
         cargo build --release
       ```
       "
@@ -463,7 +465,7 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "private",
     description: indoc! {
       "
-      Make a recipe, alias, or variable private.
+      Make a recipe, alias, variable, or module private.
 
       Private items are hidden from `just --list` and `just
       --summary`, but are still callable by name and usable as
@@ -480,6 +482,7 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     targets: &[
       AttributeTarget::Alias,
       AttributeTarget::Assignment,
+      AttributeTarget::Module,
       AttributeTarget::Recipe,
     ],
     min_args: 0,
@@ -971,7 +974,12 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "cache_dir",
     description: indoc! {
       "
-      User-specific cache directory. Alias for `cache_directory()`.
+      User-specific cache directory.
+
+      On Unix, follows the XDG Base Directory Specification
+      (`$XDG_CACHE_HOME` or `$HOME/.cache`). On macOS, returns
+      `~/Library/Caches`. On Windows, returns
+      `{FOLDERID_LocalAppData}`.
       "
     },
     required_arguments: 0,
@@ -1065,8 +1073,12 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "config_dir",
     description: indoc! {
       "
-      User-specific configuration directory. Alias for
-      `config_directory()`.
+      User-specific configuration directory.
+
+      On Unix, follows the XDG Base Directory Specification
+      (`$XDG_CONFIG_HOME` or `$HOME/.config`). On macOS, returns
+      `~/Library/Application Support`. On Windows, returns
+      `{FOLDERID_RoamingAppData}`.
       "
     },
     required_arguments: 0,
@@ -1092,8 +1104,11 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "config_local_dir",
     description: indoc! {
       "
-      Local user-specific configuration directory. Alias for
-      `config_local_directory()`.
+      Local user-specific configuration directory, for configuration
+      that should not roam or sync between machines.
+
+      On Unix, follows XDG conventions. On Windows, returns
+      `{FOLDERID_LocalAppData}`.
       "
     },
     required_arguments: 0,
@@ -1120,7 +1135,12 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "data_dir",
     description: indoc! {
       "
-      User-specific data directory. Alias for `data_directory()`.
+      User-specific data directory.
+
+      On Unix, follows the XDG Base Directory Specification
+      (`$XDG_DATA_HOME` or `$HOME/.local/share`). On macOS, returns
+      `~/Library/Application Support`. On Windows, returns
+      `{FOLDERID_RoamingAppData}`.
       "
     },
     required_arguments: 0,
@@ -1146,8 +1166,11 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "data_local_dir",
     description: indoc! {
       "
-      Local user-specific data directory. Alias for
-      `data_local_directory()`.
+      Local user-specific data directory, for data that should not
+      roam or sync between machines.
+
+      On Unix, follows XDG conventions. On Windows, returns
+      `{FOLDERID_LocalAppData}`.
       "
     },
     required_arguments: 0,
@@ -1292,8 +1315,11 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "executable_dir",
     description: indoc! {
       "
-      User-specific executable directory. Alias for
-      `executable_directory()`.
+      User-specific executable directory.
+
+      On Unix, follows the XDG Base Directory Specification
+      (`$XDG_BIN_HOME` or `$HOME/.local/bin`). On Windows, returns no
+      well-defined value, so use with care on that platform.
       "
     },
     required_arguments: 0,
@@ -1366,7 +1392,10 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "home_dir",
     description: indoc! {
       "
-      The user's home directory. Alias for `home_directory()`.
+      The user's home directory.
+
+      On Unix, returns `$HOME`. On macOS, returns `$HOME`. On Windows,
+      returns `{FOLDERID_Profile}`.
       "
     },
     required_arguments: 0,
@@ -1401,7 +1430,20 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "invocation_dir",
     description: indoc! {
       "
-      Alias for `invocation_directory()`.
+      The absolute path of the directory in which `just` was invoked,
+      before it `chdir`'d to the justfile directory.
+
+      On Windows, paths are converted to Cygwin-style forward-slash
+      form via `cygpath`. Use `invocation_directory_native()` to keep
+      the native path on all platforms.
+
+      Useful when a recipe needs to operate on files relative to where
+      the user ran `just` rather than where the justfile lives.
+
+      ```just
+      rustfmt:
+        find {{invocation_directory()}} -name '*.rs' -exec rustfmt {} \\\\;
+      ```
       "
     },
     required_arguments: 0,
@@ -1427,7 +1469,11 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "invocation_dir_native",
     description: indoc! {
       "
-      Alias for `invocation_directory_native()`.
+      The absolute path of the directory in which `just` was invoked,
+      in the host's native path format.
+
+      Unlike `invocation_directory()`, this does not convert paths to
+      Cygwin style on Windows.
       "
     },
     required_arguments: 0,
@@ -1529,7 +1575,12 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "justfile_dir",
     description: indoc! {
       "
-      Alias for `justfile_directory()`.
+      Absolute path to the parent directory of the current `justfile`.
+
+      ```just
+      script:
+        {{justfile_directory()}}/scripts/deploy
+      ```
       "
     },
     required_arguments: 0,
@@ -1634,7 +1685,12 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "parent_dir",
     description: indoc! {
       "
-      Parent directory of `path`. Alias for `parent_directory()`.
+      Return the parent directory of `path`. Aborts if `path` has no
+      parent (e.g. the filesystem root).
+
+      ```just
+      parent_directory(\"/foo/bar.txt\")  # => \"/foo\"
+      ```
       "
     },
     required_arguments: 1,
@@ -1775,6 +1831,36 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     deprecated: None,
   },
   Builtin::Function {
+    name: "runtime_directory",
+    description: indoc! {
+      "
+      The user-specific runtime directory.
+
+      Follows the XDG Base Directory Specification on Unix; returns
+      the platform-specified runtime directory on other systems. May
+      be unset on some platforms, in which case the function aborts.
+      "
+    },
+    required_arguments: 0,
+    accepts_variadic: false,
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "runtime_dir",
+    description: indoc! {
+      "
+      The user-specific runtime directory.
+
+      Follows the XDG Base Directory Specification on Unix; returns
+      the platform-specified runtime directory on other systems. May
+      be unset on some platforms, in which case the function aborts.
+      "
+    },
+    required_arguments: 0,
+    accepts_variadic: false,
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "semver_matches",
     description: indoc! {
       "
@@ -1899,7 +1985,9 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "module_dir",
     description: indoc! {
       "
-      Alias for `module_directory()`.
+      Directory of the current module file. Behaves like
+      `justfile_directory()` in the root justfile, but resolves to the
+      directory of the current `mod` source file inside submodules.
       "
     },
     required_arguments: 0,
@@ -1937,7 +2025,10 @@ pub static BUILTINS: [Builtin<'_>; 162] = [
     name: "source_dir",
     description: indoc! {
       "
-      Alias for `source_directory()`.
+      Directory of the current source file. Behaves like
+      `justfile_directory()` in the root justfile, but resolves to the
+      directory of the current `import` or `mod` source file when
+      called from within an imported or submodule file.
       "
     },
     required_arguments: 0,
