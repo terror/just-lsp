@@ -1022,15 +1022,17 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&document);
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    assert!(
-      resolver
-        .resolve_identifier_hover(&root.find("text").unwrap())
-        .is_none()
+    let hover = Resolver::new(&document).resolve_identifier_hover(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("text")
+        .unwrap(),
     );
+
+    assert_eq!(hover, None);
   }
 
   #[test]
