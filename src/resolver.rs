@@ -410,14 +410,17 @@ mod tests {
       "
     });
 
-    let resolver = Resolver::new(&document);
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let var_usage = root.find("value > identifier").unwrap();
-
-    let definition =
-      resolver.resolve_identifier_definition(&var_usage).unwrap();
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
 
     assert_eq!(
       definition,
