@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub(crate) struct Analyze {
   #[arg(
     value_name = "PATH",
