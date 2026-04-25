@@ -25,6 +25,7 @@ impl<'a> Resolver<'a> {
       range: match self.resolve_symbol(identifier)? {
         Symbol::Builtin(_) => identifier.get_range(self.document),
         Symbol::Function(function) => function.name.range,
+        Symbol::FunctionParameter(parameter) => parameter.range,
         Symbol::Parameter(parameter) => parameter.range,
         Symbol::Recipe(recipe) => recipe.range,
         Symbol::Variable(variable) => variable.range,
@@ -48,6 +49,10 @@ impl<'a> Resolver<'a> {
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: function.content,
+          },
+          Symbol::FunctionParameter(parameter) => lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: parameter.value,
           },
           Symbol::Parameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
@@ -114,6 +119,19 @@ impl<'a> Resolver<'a> {
           Symbol::Function(_) => {
             candidate_parent_kind == "function_call"
               || candidate_parent_kind == "function_definition"
+          }
+          Symbol::FunctionParameter(_) => {
+            let in_same_function = matches!(
+              (
+                identifier.get_parent("function_definition"),
+                candidate.get_parent("function_definition"),
+              ),
+              (Some(f1), Some(f2)) if f1.id() == f2.id()
+            );
+
+            in_same_function
+              && ["value", "function_parameters"]
+                .contains(&candidate_parent_kind)
           }
           Symbol::Parameter(_) => {
             let in_same_recipe = matches!(
@@ -228,6 +246,16 @@ impl<'a> Resolver<'a> {
       "function_definition" => {
         self.document.find_function(&name).map(Symbol::Function)
       }
+      "function_parameters" => {
+        identifier.get_function(self.document).and_then(|function| {
+          function
+            .parameters
+            .iter()
+            .find(|parameter| parameter.value == name)
+            .cloned()
+            .map(Symbol::FunctionParameter)
+        })
+      }
       "parameter" | "variadic_parameter" => {
         identifier.get_recipe(self.document).and_then(|recipe| {
           recipe
@@ -253,6 +281,16 @@ impl<'a> Resolver<'a> {
                 .find(|parameter| parameter.name == name)
                 .cloned()
                 .map(Symbol::Parameter)
+            })
+            .or_else(|| {
+              identifier.get_function(self.document).and_then(|function| {
+                function
+                  .parameters
+                  .iter()
+                  .find(|parameter| parameter.value == name)
+                  .cloned()
+                  .map(Symbol::FunctionParameter)
+              })
             })
             .or_else(|| {
               self.document.find_variable(&name).map(Symbol::Variable)
@@ -552,6 +590,35 @@ mod tests {
       lsp::Location {
         uri: document.uri.clone(),
         range: lsp::Range::at(0, 0, 0, 3),
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_user_function_parameter_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 4, 0, 5),
       }
     );
   }
@@ -1166,6 +1233,35 @@ mod tests {
   }
 
   #[test]
+  fn resolve_user_function_parameter_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "x".to_string(),
+      })
+    );
+  }
+
+  #[test]
   fn resolve_recipe_references() {
     let document = Document::from(indoc! {
       "
@@ -1596,6 +1692,45 @@ mod tests {
         lsp::Location {
           uri: document.uri.clone(),
           range: lsp::Range::at(4, 10, 4, 13),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_user_function_parameter_references() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + x
+
+      bar(x) := x
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("function_parameters > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 4, 0, 5),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 10, 0, 11),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 14, 0, 15),
         },
       ]
     );
