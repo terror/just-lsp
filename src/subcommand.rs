@@ -2,7 +2,7 @@ use {super::*, analyze::Analyze};
 
 mod analyze;
 
-#[derive(Clap)]
+#[derive(Parser)]
 pub(crate) enum Subcommand {
   Analyze(Analyze),
 }

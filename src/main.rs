@@ -2,7 +2,7 @@ use {
   anyhow::{Error, anyhow, bail},
   arguments::Arguments,
   ariadne::{Color, Label, Report, ReportKind, sources},
-  clap::Parser as Clap,
+  clap::{Parser, builder::styling},
   command::Command,
   env_logger::Env,
   just_lsp::*,
