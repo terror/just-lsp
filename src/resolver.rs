@@ -182,12 +182,21 @@ impl<'a> Resolver<'a> {
               return !shadowed_by_preceding_parameter;
             }
 
-            candidate.get_recipe(self.document).is_some_and(|recipe| {
-              !recipe
+            if let Some(recipe) = candidate.get_recipe(self.document) {
+              return !recipe
                 .parameters
                 .iter()
-                .any(|parameter| parameter.name == name)
-            })
+                .any(|parameter| parameter.name == name);
+            }
+
+            if let Some(function) = candidate.get_function(self.document) {
+              return !function
+                .parameters
+                .iter()
+                .any(|parameter| parameter.value == name);
+            }
+
+            true
           }
         }
       })
@@ -1540,6 +1549,104 @@ mod tests {
       vec![lsp::Location {
         uri: document.uri.clone(),
         range: lsp::Range::at(0, 0, 0, 1),
+      }]
+    );
+  }
+
+  #[test]
+  fn resolve_variable_references_in_assignment_value() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'x'
+      bar := foo
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 3),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(1, 7, 1, 10),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_variable_references_in_user_function_body() {
+    let document = Document::from(indoc! {
+      "
+      base := 'x'
+
+      join(ext) := base + ext
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 4),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 13, 2, 17),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_variable_excludes_user_function_parameter_shadow() {
+    let document = Document::from(indoc! {
+      "
+      base := 'global'
+
+      join(base) := base + '!'
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 0, 4),
       }]
     );
   }
