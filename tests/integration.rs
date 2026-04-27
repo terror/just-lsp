@@ -118,9 +118,10 @@ impl<'a> Test<'a> {
       normalized.push('\n');
     }
 
-    normalized
-      .replace(&self.tempdir.path().display().to_string(), "[ROOT]")
-      .replace('\\', "/")
+    normalized.replace('\\', "/").replace(
+      &self.tempdir.path().display().to_string().replace('\\', "/"),
+      "[ROOT]",
+    )
   }
 
   fn run(self) -> Result {
@@ -214,7 +215,9 @@ fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
     .expected_status(1)
-    .expected_stderr("error: No such file or directory (os error 2)\n")
+    .expected_stderr(
+      "error: could not read `missing.justfile`: file not found\n",
+    )
     .run()
 }
 
@@ -224,7 +227,7 @@ fn analyze_errors_when_explicit_path_is_directory() -> Result {
     .file("subdir/.keep", "")
     .argument("subdir")
     .expected_status(1)
-    .expected_stderr("error: Is a directory (os error 21)\n")
+    .expected_stderr("error: could not read `subdir`: path is a directory\n")
     .run()
 }
 
