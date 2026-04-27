@@ -3,7 +3,7 @@ use {
   executable_path::executable_path,
   indoc::indoc,
   pretty_assertions::assert_eq,
-  std::{env, fs, iter::once, process::Command, str, path::PathBuf},
+  std::{env, fs, iter::once, path::PathBuf, process::Command, str},
   tempfile::{Builder, TempDir},
 };
 
