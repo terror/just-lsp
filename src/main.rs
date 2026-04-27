@@ -44,6 +44,10 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 #[tokio::main]
 async fn main() {
+  if env::var_os("NO_COLOR").is_some() {
+    yansi::disable();
+  }
+
   let env = Env::default().default_filter_or("info");
 
   env_logger::Builder::from_env(env).init();
