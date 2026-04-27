@@ -4,7 +4,7 @@ use {
   indoc::indoc,
   pretty_assertions::assert_eq,
   std::{fs, iter::once, path::PathBuf, process::Command, str},
-  tempfile::{Builder, TempDir},
+  tempfile::TempDir,
 };
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -101,7 +101,7 @@ impl<'a> Test<'a> {
       expected_stderr: String::new(),
       expected_stdout: String::new(),
       files: Vec::new(),
-      tempdir: Builder::new().prefix("just-lsp-test").tempdir()?,
+      tempdir: TempDir::with_prefix("just-lsp-test")?,
     })
   }
 
