@@ -44,6 +44,8 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 #[tokio::main]
 async fn main() {
+  use yansi::Paint;
+
   if env::var_os("NO_COLOR").is_some() {
     yansi::disable();
   }
@@ -53,12 +55,12 @@ async fn main() {
   env_logger::Builder::from_env(env).init();
 
   if let Err(error) = Arguments::parse().run().await {
-    eprintln!("error: {error}");
+    eprintln!("{} {error}", "error:".red().bold());
 
     for (i, error) in error.chain().skip(1).enumerate() {
       if i == 0 {
         eprintln!();
-        eprintln!("because:");
+        eprintln!("{}", "because:".bold());
       }
 
       eprintln!("- {error}");
@@ -67,7 +69,7 @@ async fn main() {
     let backtrace = error.backtrace();
 
     if backtrace.status() == BacktraceStatus::Captured {
-      eprintln!("backtrace:");
+      eprintln!("{}", "backtrace:".bold());
       eprintln!("{backtrace}");
     }
 
