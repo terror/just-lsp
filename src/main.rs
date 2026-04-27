@@ -14,7 +14,7 @@ use {
     collections::{BTreeMap, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs,
+    fs, io,
     path::PathBuf,
     process,
     sync::{Arc, LazyLock, atomic::AtomicBool},

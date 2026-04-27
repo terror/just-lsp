@@ -3,7 +3,7 @@ use {
   executable_path::executable_path,
   indoc::indoc,
   pretty_assertions::assert_eq,
-  std::{fs, iter::once, process::Command, str},
+  std::{fs, iter::once, path::PathBuf, process::Command, str},
   tempfile::TempDir,
 };
 
@@ -46,7 +46,7 @@ impl<'a> Test<'a> {
     command
   }
 
-  fn current_dir(&self) -> std::path::PathBuf {
+  fn current_dir(&self) -> PathBuf {
     if let Some(directory) = &self.directory {
       self.tempdir.path().join(directory)
     } else {
@@ -105,7 +105,7 @@ impl<'a> Test<'a> {
     })
   }
 
-  fn normalize(&self, text: &str) -> String {
+  fn normalize(&self, text: &str) -> Result<String> {
     let mut normalized = text
       .lines()
       .map(str::trim_end)
@@ -116,9 +116,19 @@ impl<'a> Test<'a> {
       normalized.push('\n');
     }
 
-    normalized
-      .replace(&self.tempdir.path().display().to_string(), "[ROOT]")
-      .replace('\\', "/")
+    let root = self.tempdir.path().display().to_string().replace('\\', "/");
+
+    let canonical_root = fs::canonicalize(self.tempdir.path())?
+      .display()
+      .to_string()
+      .replace('\\', "/");
+
+    Ok(
+      normalized
+        .replace('\\', "/")
+        .replace(&canonical_root, "[ROOT]")
+        .replace(&root, "[ROOT]"),
+    )
   }
 
   fn run(self) -> Result {
@@ -136,7 +146,7 @@ impl<'a> Test<'a> {
 
     let output = self.command().output()?;
 
-    let stderr = self.normalize(str::from_utf8(&output.stderr)?);
+    let stderr = self.normalize(str::from_utf8(&output.stderr)?)?;
 
     assert_eq!(
       output.status.code(),
@@ -150,12 +160,45 @@ impl<'a> Test<'a> {
       assert_eq!(stderr, self.expected_stderr);
     }
 
-    let stdout = self.normalize(str::from_utf8(&output.stdout)?);
+    let stdout = self.normalize(str::from_utf8(&output.stdout)?)?;
 
     assert_eq!(stdout, self.expected_stdout);
 
     Ok(())
   }
+}
+
+#[test]
+fn analyze_accepts_absolute_justfile_path() -> Result {
+  let test = Test::new()?;
+
+  let path = test.tempdir.path().join("justfile").display().to_string();
+
+  test
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument(&path)
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ [ROOT]/justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
+    .run()
 }
 
 #[test]
@@ -171,6 +214,37 @@ fn analyze_accepts_clean_justfile() -> Result {
       },
     )
     .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
+  Test::new()?
+    .argument("missing.justfile")
+    .expected_status(1)
+    .expected_stderr(
+      "error: could not read `missing.justfile`: file not found\n",
+    )
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_explicit_path_is_directory() -> Result {
+  Test::new()?
+    .file("subdir/.keep", "")
+    .argument("subdir")
+    .expected_status(1)
+    .expected_stderr("error: could not read `subdir`: path is a directory\n")
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_justfile_cannot_be_found() -> Result {
+  Test::new()?
+    .expected_status(1)
+    .expected_stderr(
+      "error: could not find `justfile` in current directory or any parent directory\n",
+    )
     .run()
 }
 
@@ -191,7 +265,36 @@ fn analyze_finds_justfile_in_parent_directory() -> Result {
 }
 
 #[test]
-fn analyze_reports_warnings_without_failing() -> Result {
+fn analyze_reports_diagnostics_for_nested_relative_path() -> Result {
+  Test::new()?
+    .file(
+      "subdir/justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument("subdir/justfile")
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ subdir/justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_diagnostics_for_parent_justfile() -> Result {
   Test::new()?
     .file(
       "justfile",
@@ -204,11 +307,11 @@ fn analyze_reports_warnings_without_failing() -> Result {
         "#
       },
     )
-    .argument("justfile")
+    .directory("foo/bar")
     .expected_stdout(indoc! {
       r#"
       warning[unused-variables]: unused variable
-         ╭─[ justfile:1:1 ]
+         ╭─[ [ROOT]/justfile:1:1 ]
          │
        1 │ foo := "bar"
          │ ─┬─
@@ -248,11 +351,96 @@ fn analyze_reports_errors_and_fails() -> Result {
 }
 
 #[test]
-fn analyze_errors_when_justfile_cannot_be_found() -> Result {
+fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
   Test::new()?
-    .expected_status(1)
-    .expected_stderr(
-      "error: could not find `justfile` in current directory or any parent directory\n",
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        baz:
+          echo {{qux()}}
+        "#
+      },
     )
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      error[unknown-function]: unknown function
+         ╭─[ justfile:4:10 ]
+         │
+       4 │   echo {{qux()}}
+         │          ─┬─
+         │           ╰─── Unknown function `qux`
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_syntax_errors_and_fails() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo
+          echo "foo"
+        "#
+      },
+    )
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      r#"
+      error[syntax-errors]: syntax errors
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ ╭─▶ foo
+       2 │ ├─▶   echo "foo"
+         │ │
+         │ ╰────────────────── Syntax error near `foo echo "foo"`
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_warnings_without_failing() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
     .run()
 }

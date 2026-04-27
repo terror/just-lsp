@@ -17,7 +17,20 @@ impl Analyze {
       None => Subcommand::find_justfile()?,
     };
 
-    let content = fs::read_to_string(&path)?;
+    if path.is_dir() {
+      bail!("could not read `{}`: path is a directory", path.display());
+    }
+
+    let content =
+      fs::read_to_string(&path).map_err(|error| match error.kind() {
+        io::ErrorKind::NotFound => {
+          anyhow!("could not read `{}`: file not found", path.display())
+        }
+        io::ErrorKind::PermissionDenied => {
+          anyhow!("could not read `{}`: permission denied", path.display())
+        }
+        _ => anyhow!("could not read `{}`: {error}", path.display()),
+      })?;
 
     let absolute_path = if path.is_absolute() {
       path.clone()
