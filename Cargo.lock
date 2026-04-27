@@ -292,6 +292,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "executable-path"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed24d6e921ad38aab6fd62771e8efb75ace61383312a663bcfcf268033d15d8b"
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -612,6 +618,7 @@ dependencies = [
  "clap",
  "dirs",
  "env_logger",
+ "executable-path",
  "indoc",
  "inventory",
  "log",
@@ -628,6 +635,7 @@ dependencies = [
  "tower-test",
  "tree-sitter",
  "tree-sitter-highlight",
+ "yansi",
 ]
 
 [[package]]
