@@ -3,8 +3,8 @@ use {
   executable_path::executable_path,
   indoc::indoc,
   pretty_assertions::assert_eq,
-  std::{fs, iter::once, process::Command, str},
-  tempfile::TempDir,
+  std::{env, fs, iter::once, process::Command, str},
+  tempfile::{Builder, TempDir},
 };
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
@@ -101,7 +101,9 @@ impl<'a> Test<'a> {
       expected_stderr: String::new(),
       expected_stdout: String::new(),
       files: Vec::new(),
-      tempdir: TempDir::with_prefix("just-lsp-test")?,
+      tempdir: Builder::new()
+        .prefix("just-lsp-test")
+        .tempdir_in(fs::canonicalize(env::temp_dir())?)?,
     })
   }
 
@@ -159,6 +161,39 @@ impl<'a> Test<'a> {
 }
 
 #[test]
+fn analyze_accepts_absolute_justfile_path() -> Result {
+  let test = Test::new()?;
+
+  let path = test.tempdir.path().join("justfile").display().to_string();
+
+  test
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument(&path)
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ [ROOT]/justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
 fn analyze_accepts_clean_justfile() -> Result {
   Test::new()?
     .file(
@@ -171,6 +206,35 @@ fn analyze_accepts_clean_justfile() -> Result {
       },
     )
     .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
+  Test::new()?
+    .argument("missing.justfile")
+    .expected_status(1)
+    .expected_stderr("error: No such file or directory (os error 2)\n")
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_explicit_path_is_directory() -> Result {
+  Test::new()?
+    .file("subdir/.keep", "")
+    .argument("subdir")
+    .expected_status(1)
+    .expected_stderr("error: Is a directory (os error 21)\n")
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_justfile_cannot_be_found() -> Result {
+  Test::new()?
+    .expected_status(1)
+    .expected_stderr(
+      "error: could not find `justfile` in current directory or any parent directory\n",
+    )
     .run()
 }
 
@@ -191,7 +255,36 @@ fn analyze_finds_justfile_in_parent_directory() -> Result {
 }
 
 #[test]
-fn analyze_reports_warnings_without_failing() -> Result {
+fn analyze_reports_diagnostics_for_nested_relative_path() -> Result {
+  Test::new()?
+    .file(
+      "subdir/justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument("subdir/justfile")
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ subdir/justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_diagnostics_for_parent_justfile() -> Result {
   Test::new()?
     .file(
       "justfile",
@@ -204,11 +297,11 @@ fn analyze_reports_warnings_without_failing() -> Result {
         "#
       },
     )
-    .argument("justfile")
+    .directory("foo/bar")
     .expected_stdout(indoc! {
       r#"
       warning[unused-variables]: unused variable
-         ╭─[ justfile:1:1 ]
+         ╭─[ [ROOT]/justfile:1:1 ]
          │
        1 │ foo := "bar"
          │ ─┬─
@@ -248,11 +341,96 @@ fn analyze_reports_errors_and_fails() -> Result {
 }
 
 #[test]
-fn analyze_errors_when_justfile_cannot_be_found() -> Result {
+fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
   Test::new()?
-    .expected_status(1)
-    .expected_stderr(
-      "error: could not find `justfile` in current directory or any parent directory\n",
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        baz:
+          echo {{qux()}}
+        "#
+      },
     )
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      error[unknown-function]: unknown function
+         ╭─[ justfile:4:10 ]
+         │
+       4 │   echo {{qux()}}
+         │          ─┬─
+         │           ╰─── Unknown function `qux`
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_syntax_errors_and_fails() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo
+          echo "foo"
+        "#
+      },
+    )
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      r#"
+      error[syntax-errors]: syntax errors
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ ╭─▶ foo
+       2 │ ├─▶   echo "foo"
+         │ │
+         │ ╰────────────────── Syntax error near `foo echo "foo"`
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_warnings_without_failing() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        foo := "bar"
+
+        bar:
+          echo bar
+        "#
+      },
+    )
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-variables]: unused variable
+         ╭─[ justfile:1:1 ]
+         │
+       1 │ foo := "bar"
+         │ ─┬─
+         │  ╰─── Variable `foo` appears unused
+      ───╯
+      "#
+    })
     .run()
 }
