@@ -3,7 +3,7 @@ use {
   executable_path::executable_path,
   indoc::indoc,
   pretty_assertions::assert_eq,
-  std::{env, fs, iter::once, path::PathBuf, process::Command, str},
+  std::{fs, iter::once, path::PathBuf, process::Command, str},
   tempfile::{Builder, TempDir},
 };
 
@@ -101,13 +101,11 @@ impl<'a> Test<'a> {
       expected_stderr: String::new(),
       expected_stdout: String::new(),
       files: Vec::new(),
-      tempdir: Builder::new()
-        .prefix("just-lsp-test")
-        .tempdir_in(fs::canonicalize(env::temp_dir())?)?,
+      tempdir: Builder::new().prefix("just-lsp-test").tempdir()?,
     })
   }
 
-  fn normalize(&self, text: &str) -> String {
+  fn normalize(&self, text: &str) -> Result<String> {
     let mut normalized = text
       .lines()
       .map(str::trim_end)
@@ -118,9 +116,18 @@ impl<'a> Test<'a> {
       normalized.push('\n');
     }
 
-    normalized.replace('\\', "/").replace(
-      &self.tempdir.path().display().to_string().replace('\\', "/"),
-      "[ROOT]",
+    let root = self.tempdir.path().display().to_string().replace('\\', "/");
+
+    let canonical_root = fs::canonicalize(self.tempdir.path())?
+      .display()
+      .to_string()
+      .replace('\\', "/");
+
+    Ok(
+      normalized
+        .replace('\\', "/")
+        .replace(&canonical_root, "[ROOT]")
+        .replace(&root, "[ROOT]"),
     )
   }
 
@@ -139,7 +146,7 @@ impl<'a> Test<'a> {
 
     let output = self.command().output()?;
 
-    let stderr = self.normalize(str::from_utf8(&output.stderr)?);
+    let stderr = self.normalize(str::from_utf8(&output.stderr)?)?;
 
     assert_eq!(
       output.status.code(),
@@ -153,7 +160,7 @@ impl<'a> Test<'a> {
       assert_eq!(stderr, self.expected_stderr);
     }
 
-    let stdout = self.normalize(str::from_utf8(&output.stdout)?);
+    let stdout = self.normalize(str::from_utf8(&output.stdout)?)?;
 
     assert_eq!(stdout, self.expected_stdout);
 
