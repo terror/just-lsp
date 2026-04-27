@@ -3,7 +3,7 @@ use {
   executable_path::executable_path,
   indoc::indoc,
   pretty_assertions::assert_eq,
-  std::{env, fs, iter::once, process::Command, str},
+  std::{env, fs, iter::once, process::Command, str, path::PathBuf},
   tempfile::{Builder, TempDir},
 };
 
@@ -46,7 +46,7 @@ impl<'a> Test<'a> {
     command
   }
 
-  fn current_dir(&self) -> std::path::PathBuf {
+  fn current_dir(&self) -> PathBuf {
     if let Some(directory) = &self.directory {
       self.tempdir.path().join(directory)
     } else {
