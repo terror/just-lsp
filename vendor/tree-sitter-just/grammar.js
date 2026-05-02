@@ -194,8 +194,10 @@ module.exports = grammar({
     _expression_inner: ($) =>
       choice(
         $.if_expression,
-        prec.left(2, seq($._expression_recurse, "+", $._expression_recurse)),
-        prec.left(1, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
+        prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
       ),
 

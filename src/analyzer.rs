@@ -180,6 +180,21 @@ mod tests {
   }
 
   #[test]
+  fn accepts_logical_operators() {
+    Test::new(indoc! {
+      "
+      foo := '' || 'bar'
+      bar := 'foo' && 'bar'
+
+      baz:
+        echo {{ foo }}
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn aliases_basic() {
     Test::new(indoc! {
       "
