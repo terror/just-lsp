@@ -305,8 +305,8 @@ parser in `vendor/tree-sitter-just`. After changing the grammar or query files,
 rebuild and test the parser with the following commands:
 
 ```bash
-`cd vendor/tree-sitter-just && npx tree-sitter generate`
-`cd vendor/tree-sitter-just && npx tree-sitter test`
+`cd vendor/tree-sitter-just && tree-sitter generate`
+`cd vendor/tree-sitter-just && tree-sitter test`
 `cargo test`
 ```
 

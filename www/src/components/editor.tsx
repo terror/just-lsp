@@ -1,7 +1,6 @@
+import { useEditorSettings } from '@/contexts/editor-settings-context';
 import { Extension } from '@codemirror/state';
 import CodeMirror from '@uiw/react-codemirror';
-
-import { useEditorSettings } from '../providers/editor-settings-provider';
 
 interface EditorProps {
   value: string;

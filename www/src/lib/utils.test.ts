@@ -1,6 +1,6 @@
 import { EditorState } from '@codemirror/state';
 import { describe, expect, it, mock } from 'bun:test';
-import { type Tree } from 'web-tree-sitter';
+import { type Language, type Parser, type Tree } from 'web-tree-sitter';
 
 import { cn, parse, positionToOffset } from './utils';
 
@@ -33,7 +33,7 @@ describe('positionToOffset', () => {
 describe('parse', () => {
   it('sets language and calls parse', () => {
     const mockParser = {
-      setLanguage: mock(() => {}),
+      setLanguage: mock(() => undefined),
       parse: mock(() => ({ rootNode: {} }) as unknown as Tree),
     };
 
@@ -41,8 +41,8 @@ describe('parse', () => {
     const code = 'const x = 1;';
 
     const result = parse({
-      parser: mockParser as any,
-      language: mockLanguage as any,
+      parser: mockParser as unknown as Parser,
+      language: mockLanguage as unknown as Language,
       code,
     });
 
