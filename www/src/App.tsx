@@ -7,6 +7,7 @@ import { Bot, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import defaultJustfile from '../../justfile?raw';
+import { AboutDialog } from './components/about-dialog';
 import { EditorPane } from './components/editor-pane';
 import { TreePane } from './components/tree-pane';
 import { useEditorExtensions } from './hooks/use-editor-extensions';
@@ -66,6 +67,9 @@ const App = () => {
         <a href='/' className='font-semibold'>
           just-lsp
         </a>
+        <div className='ml-auto'>
+          <AboutDialog />
+        </div>
       </div>
 
       <div className='flex-1 overflow-hidden p-4'>
