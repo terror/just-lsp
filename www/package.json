@@ -3,11 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "overrides": {
-    "@babel/helper-compilation-targets": "^7.28.6",
-    "baseline-browser-mapping": "^2.10.25",
-    "browserslist": "^4.28.2"
-  },
   "scripts": {
     "build": "tsc && vite build",
     "dev": "vite",
