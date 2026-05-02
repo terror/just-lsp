@@ -5,8 +5,8 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view';
-import type { Language, Parser, Query } from 'web-tree-sitter';
-import { Parser as TreeSitterParser } from 'web-tree-sitter';
+import type { Language, Parser } from 'web-tree-sitter';
+import { Query, Parser as TreeSitterParser } from 'web-tree-sitter';
 
 import highlightsQuerySource from '../../../queries/highlights.scm?raw';
 
@@ -87,7 +87,7 @@ export const createJustSyntaxHighlightingExtension = (
   let query: Query;
 
   try {
-    query = language.query(highlightsQuerySource);
+    query = new Query(language, highlightsQuerySource);
   } catch (error) {
     console.error('Failed to compile Just highlight query', error);
     return [];

@@ -1,42 +1,10 @@
+import {
+  EditorSettings,
+  EditorSettingsContext,
+  defaultSettings,
+} from '@/contexts/editor-settings-context';
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { ReactNode, createContext, useContext, useEffect } from 'react';
-
-export interface EditorSettings {
-  fontSize: number;
-  keybindings: 'default' | 'vim';
-  lineNumbers: boolean;
-  lineWrapping: boolean;
-  tabSize: number;
-}
-
-const defaultSettings: EditorSettings = {
-  fontSize: 14,
-  keybindings: 'default',
-  lineNumbers: true,
-  lineWrapping: true,
-  tabSize: 2,
-};
-
-type EditorSettingsContextType = {
-  settings: EditorSettings;
-  updateSettings: (settings: Partial<EditorSettings>) => void;
-};
-
-const EditorSettingsContext = createContext<
-  EditorSettingsContextType | undefined
->(undefined);
-
-export const useEditorSettings = () => {
-  const context = useContext(EditorSettingsContext);
-
-  if (context === undefined) {
-    throw new Error(
-      'useEditorSettings must be used within an EditorSettingsProvider'
-    );
-  }
-
-  return context;
-};
+import { ReactNode, useEffect } from 'react';
 
 export const EditorSettingsProvider = ({
   children,
