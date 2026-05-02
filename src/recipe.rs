@@ -229,6 +229,7 @@ mod tests {
     assert_eq!(
       recipe.groups(),
       HashSet::from([
+        Group::Android,
         Group::Dragonfly,
         Group::Freebsd,
         Group::Linux,

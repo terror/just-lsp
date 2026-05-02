@@ -2,6 +2,27 @@ use super::*;
 
 pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
+    name: "android",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Enable the recipe on Android.
+
+      Part of the platform-gating family of attributes
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
+      the BSDs). When any platform attribute is present, the recipe is
+      only enabled when one of the active platforms matches.
+
+      ```just
+      [android]
+      install:
+        adb install app.apk
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "arg",
     kind: AttributeKind::UnaryPlus,
     description: indoc! {
@@ -117,10 +138,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Enable the recipe on DragonFly BSD.
 
       Part of the platform-gating family of attributes
-      (`[linux]`, `[macos]`, `[unix]`, `[windows]`, `[freebsd]`,
-      `[openbsd]`, `[netbsd]`, `[dragonfly]`). When any platform
-      attribute is present, the recipe is only enabled when one of the
-      active platforms matches.
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`,
+      `[freebsd]`, `[openbsd]`, `[netbsd]`, `[dragonfly]`). When any
+      platform attribute is present, the recipe is only enabled when
+      one of the active platforms matches.
 
       ```just
       [dragonfly]
@@ -240,9 +261,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Enable the recipe on Linux.
 
       Part of the platform-gating family of attributes
-      (`[linux]`, `[macos]`, `[unix]`, `[windows]`, and the BSDs). When
-      any platform attribute is present, the recipe is only enabled
-      when one of the active platforms matches. Useful for writing
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
+      the BSDs). When any platform attribute is present, the recipe is
+      only enabled when one of the active platforms matches. Useful for writing
       cross-platform justfiles that dispatch on the host OS.
 
       ```just
@@ -511,8 +532,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       Part of the platform-gating family of attributes. When any
       platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches. `[unix]` matches Linux,
-      macOS, and the BSDs.
+      one of the active platforms matches. `[unix]` matches Android,
+      Linux, macOS, and the BSDs.
 
       ```just
       [unix]
