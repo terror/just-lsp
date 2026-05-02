@@ -1493,6 +1493,21 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "module_path",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      `::`-separated path to the current module.
+
+      In the root justfile this returns the empty string. Inside a
+      submodule, it returns the module path used to address recipes in
+      that module.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "num_cpus",
     aliases: &[],
     kind: FunctionKind::Nullary,
