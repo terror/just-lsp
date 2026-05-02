@@ -39,6 +39,51 @@ foo := "abc" + 'def'
         (string)))))
 
 ================================================================================
+logical operators
+================================================================================
+
+foo := '' || 'bar'
+bar := 'foo' && 'bar'
+baz := 'foo' && '' || 'bar'
+qux := 'foo' || 'bar' + 'baz'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))
+      (value
+        (string)))))
+
+================================================================================
 paths
 ================================================================================
 
