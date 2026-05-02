@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Group {
-  Any,
   Android,
+  Any,
   Dragonfly,
   Freebsd,
   Linux,
