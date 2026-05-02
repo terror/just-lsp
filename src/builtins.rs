@@ -2252,6 +2252,25 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "no-cd",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Don't change directory before executing recipes in the current
+      module.
+
+      By default, `just` executes recipes with the current directory set
+      to the directory containing the justfile. This setting leaves the
+      current directory unchanged for every recipe in the module.
+
+      Individual recipes can also opt in with `[no-cd]`, and
+      `[working-directory(PATH)]` can override the working directory for a
+      specific recipe.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "no-exit-message",
     kind: SettingKind::Boolean(false),
     description: indoc! {
