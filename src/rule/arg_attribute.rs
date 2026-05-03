@@ -67,7 +67,9 @@ impl ArgAttributeRule {
     let positional = identifier
       .siblings()
       .take_while(|node| node.kind() != "identifier")
-      .filter(|node| node.kind() == "string")
+      .filter(|node| {
+        node.kind() == "expression" && node.start_byte() != node.end_byte()
+      })
       .collect::<Vec<_>>();
 
     let kwargs = identifier

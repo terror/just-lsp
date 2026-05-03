@@ -1230,7 +1230,7 @@
                             "members": [
                               {
                                 "type": "SYMBOL",
-                                "name": "string"
+                                "name": "expression"
                               },
                               {
                                 "type": "SYMBOL",
@@ -1252,7 +1252,7 @@
                                   "members": [
                                     {
                                       "type": "SYMBOL",
-                                      "name": "string"
+                                      "name": "expression"
                                     },
                                     {
                                       "type": "SYMBOL",
@@ -1333,7 +1333,7 @@
                                   "members": [
                                     {
                                       "type": "SYMBOL",
-                                      "name": "string"
+                                      "name": "expression"
                                     },
                                     {
                                       "type": "SYMBOL",
@@ -1355,7 +1355,7 @@
                                         "members": [
                                           {
                                             "type": "SYMBOL",
-                                            "name": "string"
+                                            "name": "expression"
                                           },
                                           {
                                             "type": "SYMBOL",
@@ -2411,7 +2411,12 @@
       "value": "\\s"
     }
   ],
-  "conflicts": [],
+  "conflicts": [
+    [
+      "value",
+      "attribute_named_param"
+    ]
+  ],
   "precedences": [],
   "externals": [
     {

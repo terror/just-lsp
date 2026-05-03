@@ -124,7 +124,11 @@ impl Document {
                 .siblings()
                 .take_while(|sibling| sibling.kind() != "identifier")
                 .filter(|sibling| {
-                  matches!(sibling.kind(), "string" | "attribute_named_param")
+                  sibling.start_byte() != sibling.end_byte()
+                    && matches!(
+                      sibling.kind(),
+                      "string" | "expression" | "attribute_named_param"
+                    )
                 })
                 .map(|argument_node| TextNode {
                   value: self.get_node_text(&argument_node),
@@ -432,10 +436,11 @@ impl Document {
                     .siblings()
                     .take_while(|sibling| sibling.kind() != "identifier")
                     .filter(|sibling| {
-                      matches!(
-                        sibling.kind(),
-                        "string" | "attribute_named_param"
-                      )
+                      sibling.start_byte() != sibling.end_byte()
+                        && matches!(
+                          sibling.kind(),
+                          "string" | "expression" | "attribute_named_param"
+                        )
                     })
                     .map(|argument_node| TextNode {
                       value: self.get_node_text(&argument_node),
