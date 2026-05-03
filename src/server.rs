@@ -665,12 +665,19 @@ impl Inner {
             .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
             .unwrap_or(PathBuf::new());
 
-          let recipe_arguments = Vec::new();
+          let mut recipe_arguments = Vec::new();
 
-          if !parameters.is_empty() {
+
+          for param in &parameters {
+            if let Some(default_value) = &param.default_value {
+              recipe_arguments.push(default_value.to_string());
+            }
+          }
+
+          if parameters.len() != recipe_arguments.len() {
             self.client.show_message(
               lsp::MessageType::WARNING,
-              "Running a recipe code action with parameters is not yet supported."
+              "Running a recipe with non-default arguments is not yet supported."
             )
             .await;
 
@@ -990,10 +997,9 @@ impl Inner {
     .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
 
     let mut command = tokio::process::Command::new("just");
-
     command.arg(recipe_name);
 
-    for argument in recipe_arguments {
+    for argument in &recipe_arguments {
       command.arg(argument);
     }
 
