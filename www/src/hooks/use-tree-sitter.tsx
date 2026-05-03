@@ -22,7 +22,7 @@ export function useTreeSitter(): UseTreeSitter {
         setLoading(true);
 
         await Parser.init({
-          locateFile(scriptName: string, _scriptDirectory: string) {
+          locateFile(scriptName: string) {
             return scriptName;
           },
         });

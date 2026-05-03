@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.3](https://github.com/terror/just-lsp/releases/tag/0.4.3) - 2026-04-24
+
+### Added
+
+- Expand builtin hover documentation ([#349](https://github.com/terror/just-lsp/pull/349) by [terror](https://github.com/terror))
+- Add quickfix actions for deprecated settings ([#347](https://github.com/terror/just-lsp/pull/347) by [terror](https://github.com/terror))
+- Add quickfix actions for deprecated function calls ([#342](https://github.com/terror/just-lsp/pull/342) by [terror](https://github.com/terror))
+
+### Misc
+
+- Assert exact values in resolver tests ([#348](https://github.com/terror/just-lsp/pull/348) by [terror](https://github.com/terror))
+- Bump tokio from 1.51.1 to 1.52.1 ([#346](https://github.com/terror/just-lsp/pull/346) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.6.0 to 4.6.1 ([#345](https://github.com/terror/just-lsp/pull/345) by [app/dependabot](https://github.com/app/dependabot))
+- Bump thiserror from 2.0.17 to 2.0.18 ([#338](https://github.com/terror/just-lsp/pull/338) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.7 to 0.26.8 ([#337](https://github.com/terror/just-lsp/pull/337) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.59 to 1.2.60 ([#336](https://github.com/terror/just-lsp/pull/336) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tokio from 1.51.0 to 1.51.1 ([#335](https://github.com/terror/just-lsp/pull/335) by [app/dependabot](https://github.com/app/dependabot))
+- Expose library interface ([#333](https://github.com/terror/just-lsp/pull/333) by [terror](https://github.com/terror))
+
 ## [0.4.2](https://github.com/terror/just-lsp/releases/tag/0.4.2) - 2026-04-09
 
 ### Added

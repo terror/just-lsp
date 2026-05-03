@@ -1,6 +1,6 @@
+import { useEditorSettings } from '@/contexts/editor-settings-context';
 import { highlightExtension } from '@/lib/cm-highlight-extension';
 import { createJustSyntaxHighlightingExtension } from '@/lib/just-syntax-highlighting';
-import { useEditorSettings } from '@/providers/editor-settings-provider';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';

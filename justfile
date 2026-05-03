@@ -105,10 +105,30 @@ update-changelog:
 
 [group: 'dev']
 update-parser:
-  cd vendor/tree-sitter-just && npx tree-sitter generate
-  cd vendor/tree-sitter-just && npx tree-sitter test
+  cd vendor/tree-sitter-just && tree-sitter generate
+  cd vendor/tree-sitter-just && tree-sitter test
   cargo test
 
 [group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
+
+[group: 'web']
+[working-directory: 'www']
+web-build: build-wasm
+  bun run build
+
+[group: 'web']
+[working-directory: 'www']
+web-dev: build-wasm
+  bun run dev
+
+[group: 'web']
+[working-directory: 'www']
+web-format:
+  bun run format
+
+[group: 'web']
+[working-directory: 'www']
+web-install:
+  bun install

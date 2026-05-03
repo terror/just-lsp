@@ -73,6 +73,8 @@ module.exports = grammar({
   ],
   word: ($) => $.identifier,
 
+  conflicts: ($) => [[$.value, $.attribute_named_param]],
+
   rules: {
     // justfile      : item* EOF
     source_file: ($) =>
@@ -194,8 +196,10 @@ module.exports = grammar({
     _expression_inner: ($) =>
       choice(
         $.if_expression,
-        prec.left(2, seq($._expression_recurse, "+", $._expression_recurse)),
-        prec.left(1, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
+        prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
       ),
 
@@ -290,10 +294,10 @@ module.exports = grammar({
             seq(
               $.identifier,
               "(",
-              field("argument", comma_sep1(choice(
-                $.string,
-                $.attribute_named_param,
-              ))),
+              field(
+                "argument",
+                comma_sep1(choice($.expression, $.attribute_named_param)),
+              ),
               ")",
             ),
             seq($.identifier, ":", field("argument", $.string)),

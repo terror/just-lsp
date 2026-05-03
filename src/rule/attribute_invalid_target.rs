@@ -18,7 +18,7 @@ define_rule! {
 
         if attribute.target.is_none() {
           diagnostics.push(Diagnostic::error(
-            format!("Attribute `{attribute_name}` applied to invalid target",),
+            format!("Attribute `{attribute_name}` applied to invalid target"),
             attribute.range,
           ));
         }
