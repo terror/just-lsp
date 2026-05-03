@@ -70,7 +70,7 @@ impl<'a> Scope<'a> {
   /// so parameter self-references like `foo foo` still count as usage for the
   /// `unused-parameters` rule.
   fn record(&mut self, identifier: Node<'_>) {
-    if identifier.start_byte() == identifier.end_byte() {
+    if identifier.is_missing() {
       return;
     }
 
