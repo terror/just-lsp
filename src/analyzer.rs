@@ -643,6 +643,18 @@ mod tests {
   }
 
   #[test]
+  fn confirm_attribute_accepts_expression() {
+    Test::new(indoc! {
+      r#"
+      [confirm("Deploy to " + env + "?")]
+      deploy env:
+        echo {{env}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_unknown() {
     Test::new(indoc! {
       "
@@ -2852,10 +2864,7 @@ mod tests {
       "Attribute `arg` got 0 arguments but takes at least 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
-    .error(
-      "Missing identifier in attribute named param",
-      lsp::Range::at(0, 5, 0, 5),
-    )
+    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
     .run();
   }
 

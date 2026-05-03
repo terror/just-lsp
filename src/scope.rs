@@ -70,6 +70,10 @@ impl<'a> Scope<'a> {
   /// so parameter self-references like `foo foo` still count as usage for the
   /// `unused-parameters` rule.
   fn record(&mut self, identifier: Node<'_>) {
+    if identifier.start_byte() == identifier.end_byte() {
+      return;
+    }
+
     let name = self.document.get_node_text(&identifier);
 
     if let Some(recipe_name) = &self.current_recipe {
