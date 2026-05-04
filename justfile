@@ -44,10 +44,6 @@ fmt:
   cargo fmt
 
 [group: 'format']
-fmt-web:
-  cd www && bun run format
-
-[group: 'format']
 fmt-check:
   cargo fmt --all -- --check
 
@@ -109,7 +105,7 @@ web-dev: build-wasm
 
 [group: 'web']
 [working-directory: 'www']
-web-format:
+web-fmt:
   bun run format
 
 [group: 'web']

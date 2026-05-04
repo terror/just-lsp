@@ -12,6 +12,7 @@ import { EditorPane } from './components/editor-pane';
 import { TreePane } from './components/tree-pane';
 import { useEditorExtensions } from './hooks/use-editor-extensions';
 import { usePersistedDoc } from './hooks/use-persisted-doc';
+import { useStackedLayout } from './hooks/use-stacked-layout';
 import { useSyntaxTree } from './hooks/use-syntax-tree';
 import { useTreeSitter } from './hooks/use-tree-sitter';
 
@@ -20,6 +21,8 @@ const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 
 const App = () => {
   const { parser, language: justLanguage, loading, error } = useTreeSitter();
+  const stackedLayout = useStackedLayout();
+  const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
   const [doc, setDoc] = usePersistedDoc(
     EDITOR_STORAGE_KEY,
@@ -74,8 +77,9 @@ const App = () => {
 
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
-          autoSaveId={PANEL_LAYOUT_STORAGE_KEY}
-          direction='horizontal'
+          key={panelDirection}
+          autoSaveId={`${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`}
+          direction={panelDirection}
           className='h-full rounded border'
         >
           <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
