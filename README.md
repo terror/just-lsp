@@ -189,6 +189,22 @@ https://github.com/jackTabsCode/zed-just, written by
 [@mattrobenolt](https://github.com/mattrobenolt). Follow the instructions in
 that repository to get it setup on your system.
 
+
+
+Add a new key binding to restart lsp to `keymap.json`
+
+
+
+```
+    "context": "Editor",
+    "bindings": {
+      "ctrl-r l": "editor::RestartLanguageServer"
+    }
+```
+
+
+or use `editor: restart language server` in the command palette.
+
 ## Configuration
 
 `just-lsp` accepts configuration through the LSP `initializationOptions` object,
@@ -291,6 +307,29 @@ end
 As in the basic example above, we use `cmp_nvim_lsp.default_capabilities()` so
 that the dev build inherits completion-related capabilities from `nvim-cmp`.
 Swap in your own table if you use a different completion plugin.
+
+
+
+### Zed
+
+
+
+If you want to develop on zed against your local `just-lsp`, add something like this to
+your `settings.json`.
+```settings.json
+ "lsp": {
+    "just-lsp": {
+      "binary": {
+        "path": "~/just-lsp/target/debug/just-lsp",
+      },
+    },
+  },
+  "languages": {
+    "Just": {
+      "language_servers": ["just-lsp"],
+    },
+  },
+```
 
 **n.b.** This setup requires the
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) plugin (and
