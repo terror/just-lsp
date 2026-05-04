@@ -305,9 +305,9 @@ parser in `vendor/tree-sitter-just`. After changing the grammar or query files,
 rebuild and test the parser with the following commands:
 
 ```bash
-`cd vendor/tree-sitter-just && tree-sitter generate`
-`cd vendor/tree-sitter-just && tree-sitter test`
-`cargo test`
+just -f vendor/tree-sitter-just/justfile gen
+cd vendor/tree-sitter-just && tree-sitter test
+cargo test
 ```
 
 **n.b.** `just update-parser` will run all of the above for you.
