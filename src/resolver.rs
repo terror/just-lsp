@@ -45,7 +45,7 @@ impl<'a> Resolver<'a> {
     Some(lsp::Hover {
       contents: lsp::HoverContents::Markup(
         match self.resolve_symbol(identifier)? {
-          Symbol::Builtin(builtin) => builtin.documentation(),
+          Symbol::Builtin(builtin) => builtin.description(),
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: function.content,

@@ -35,7 +35,7 @@ impl Builtin<'_> {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::KEYWORD),
         documentation: Some(lsp::Documentation::MarkupContent(
-          self.documentation(),
+          self.description(),
         )),
         insert_text: Some(name.to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
@@ -46,7 +46,7 @@ impl Builtin<'_> {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::CONSTANT),
         documentation: Some(lsp::Documentation::MarkupContent(
-          self.documentation(),
+          self.description(),
         )),
         insert_text: Some(name.to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
@@ -61,7 +61,7 @@ impl Builtin<'_> {
         label: name.to_string(),
         kind: Some(lsp::CompletionItemKind::PROPERTY),
         documentation: Some(lsp::Documentation::MarkupContent(
-          self.documentation(),
+          self.description(),
         )),
         insert_text: Some(name.to_string()),
         insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
@@ -72,7 +72,7 @@ impl Builtin<'_> {
   }
 
   #[must_use]
-  pub fn documentation(&self) -> lsp::MarkupContent {
+  pub fn description(&self) -> lsp::MarkupContent {
     lsp::MarkupContent {
       kind: lsp::MarkupKind::Markdown,
       value: (match self {
@@ -108,6 +108,10 @@ impl Builtin<'_> {
       | "justfile"
       | "justfile_directory"
       | "justfile_dir"
+      | "module_file"
+      | "module_directory"
+      | "module_dir"
+      | "module_path"
       | "source_file"
       | "source_directory"
       | "source_dir"
@@ -194,12 +198,93 @@ impl Builtin<'_> {
       label: name.to_string(),
       kind: Some(lsp::CompletionItemKind::FUNCTION),
       documentation: Some(lsp::Documentation::MarkupContent(
-        self.documentation(),
+        self.description(),
       )),
       insert_text: Some(snippet),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       sort_text: Some(format!("z{name}")),
       ..Default::default()
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn fallback_function_completion_snippet() {
+    let items = Builtin::Function {
+      name: "foo",
+      aliases: &[],
+      kind: FunctionKind::Nullary,
+      description: "",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items,
+      vec![lsp::CompletionItem {
+        label: "foo".into(),
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: String::new()
+          },
+        )),
+        insert_text: Some("foo(${1:})".into()),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        sort_text: Some("zfoo".into()),
+        ..Default::default()
+      }],
+    );
+  }
+
+  #[test]
+  fn function_alias_uses_alias_snippet() {
+    let items = Builtin::Function {
+      name: "home_directory",
+      aliases: &["home_dir"],
+      kind: FunctionKind::Nullary,
+      description: "bar",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items,
+      vec![
+        lsp::CompletionItem {
+          label: "home_directory".into(),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::Markdown,
+              value: "bar".into(),
+            },
+          )),
+          insert_text: Some("home_directory()".into()),
+          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+          sort_text: Some("zhome_directory".into()),
+          ..Default::default()
+        },
+        lsp::CompletionItem {
+          label: "home_dir".into(),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::Markdown,
+              value: "bar".into(),
+            },
+          )),
+          insert_text: Some("home_dir()".into()),
+          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+          sort_text: Some("zhome_dir".into()),
+          ..Default::default()
+        },
+      ],
+    );
   }
 }
