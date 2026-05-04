@@ -39,203 +39,153 @@ impl From<Parameter> for ParameterJson {
 
 impl Parameter {
   #[must_use]
-  pub fn parse(text: &str, range: lsp::Range) -> Option<Self> {
-    let parts: Vec<&str> = text.split('=').collect();
+  pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
+    let (parameter_node, kind) = if node.kind() == "variadic_parameter" {
+      let kleene = document.get_node_text(&node.child_by_field_name("kleene")?);
 
-    let (param_name, default_value) = if parts.len() > 1 {
-      (
-        parts[0].trim(),
-        Some(parts[1..].join("=").trim().to_string()),
-      )
+      let kind = match kleene.as_str() {
+        "+" => ParameterKind::Variadic(VariadicType::OneOrMore),
+        "*" => ParameterKind::Variadic(VariadicType::ZeroOrMore),
+        _ => return None,
+      };
+
+      (node.find("^parameter")?, kind)
     } else {
-      (text.trim(), None)
+      let kind = if node.child(0).is_some_and(|child| child.kind() == "$") {
+        ParameterKind::Export
+      } else {
+        ParameterKind::Normal
+      };
+
+      (*node, kind)
     };
 
-    if param_name.is_empty() {
-      return None;
-    }
+    let name =
+      document.get_node_text(&parameter_node.child_by_field_name("name")?);
 
-    let (name, kind) = if let Some(stripped) = param_name.strip_prefix('$') {
-      (stripped.to_string(), ParameterKind::Export)
-    } else if let Some(stripped) = param_name.strip_prefix('+') {
-      (
-        stripped.to_string(),
-        ParameterKind::Variadic(VariadicType::OneOrMore),
-      )
-    } else if let Some(stripped) = param_name.strip_prefix('*') {
-      (
-        stripped.to_string(),
-        ParameterKind::Variadic(VariadicType::ZeroOrMore),
-      )
-    } else {
-      (param_name.to_string(), ParameterKind::Normal)
-    };
-
-    if name.is_empty() {
-      return None;
-    }
+    let default_value = parameter_node
+      .child_by_field_name("default")
+      .map(|node| document.get_node_text(&node));
 
     Some(Parameter {
-      name: name.trim().into(),
+      name,
       kind,
       default_value,
-      content: text.trim().to_string(),
-      range,
+      content: document.get_node_text(node).trim().to_string(),
+      range: node.get_range(document),
     })
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, pretty_assertions::assert_eq};
 
   #[test]
   fn parse_normal_parameter() {
-    let input = "target";
-
-    let range = lsp::Range::at(0, 0, 0, 6);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo target:\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "target".to_string(),
         kind: ParameterKind::Normal,
         default_value: None,
         content: "target".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
     );
   }
 
   #[test]
   fn parse_parameter_with_default() {
-    let input = "tests=\"default\"";
-
-    let range = lsp::Range::at(0, 0, 0, 15);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo tests=\"default\":\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "tests".to_string(),
         kind: ParameterKind::Normal,
         default_value: Some("\"default\"".to_string()),
         content: "tests=\"default\"".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 19),
+      }],
     );
   }
 
   #[test]
   fn parse_parameter_with_complex_default() {
-    let input = "triple=(arch + \"-unknown-unknown\")";
-
-    let range = lsp::Range::at(0, 0, 0, 32);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo triple=(arch + \"-unknown-unknown\"):\n").recipes()
+        [0]
+        .parameters,
+      vec![Parameter {
         name: "triple".to_string(),
         kind: ParameterKind::Normal,
         default_value: Some("(arch + \"-unknown-unknown\")".to_string()),
         content: "triple=(arch + \"-unknown-unknown\")".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 38),
+      }],
     );
   }
 
   #[test]
   fn parse_export_parameter() {
-    let input = "$bar";
-
-    let range = lsp::Range::at(0, 0, 0, 4);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo $bar:\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "bar".to_string(),
         kind: ParameterKind::Export,
         default_value: None,
         content: "$bar".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 8),
+      }],
     );
   }
 
   #[test]
   fn parse_variadic_one_or_more_parameter() {
-    let input = "+FILES";
-
-    let range = lsp::Range::at(0, 0, 0, 6);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo +FILES:\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "FILES".to_string(),
         kind: ParameterKind::Variadic(VariadicType::OneOrMore),
         default_value: None,
         content: "+FILES".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
     );
   }
 
   #[test]
   fn parse_variadic_zero_or_more_parameter() {
-    let input = "*FLAGS";
-
-    let range = lsp::Range::at(0, 0, 0, 6);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo *FLAGS:\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "FLAGS".to_string(),
         kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
         default_value: None,
         content: "*FLAGS".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
     );
   }
 
   #[test]
   fn parse_variadic_with_default() {
-    let input = "+FLAGS='-q'";
-
-    let range = lsp::Range::at(0, 0, 0, 12);
-
-    let param = Parameter::parse(input, range).unwrap();
-
     assert_eq!(
-      param,
-      Parameter {
+      Document::from("foo +FLAGS='-q':\n").recipes()[0].parameters,
+      vec![Parameter {
         name: "FLAGS".to_string(),
         kind: ParameterKind::Variadic(VariadicType::OneOrMore),
         default_value: Some("'-q'".to_string()),
         content: "+FLAGS='-q'".to_string(),
-        range,
-      }
+        range: lsp::Range::at(0, 4, 0, 15),
+      }],
     );
   }
 
   #[test]
   fn invalid_parameter_input() {
-    let range = lsp::Range::at(0, 0, 0, 0);
-
-    assert_eq!(Parameter::parse("", range), None);
-    assert_eq!(Parameter::parse("$", range), None);
-    assert_eq!(Parameter::parse("+", range), None);
-    assert_eq!(Parameter::parse("*", range), None);
+    assert_eq!(Document::from("foo:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo $:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo +:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo *:\n").recipes()[0].parameters, vec![]);
   }
 }
