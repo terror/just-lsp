@@ -6,22 +6,24 @@ define_rule! {
     id: "function-parameters",
     message: "invalid function parameters",
     run(context) {
-      let mut diagnostics = Vec::new();
+      context
+        .functions()
+        .iter()
+        .flat_map(|function| {
+          let mut seen = HashSet::new();
 
-      for function in context.functions() {
-        let mut seen = HashSet::new();
-
-        for parameter in &function.parameters {
-          if !seen.insert(parameter.value.clone()) {
-            diagnostics.push(Diagnostic::error(
-              format!("Duplicate parameter `{}`", parameter.value),
-              parameter.range,
-            ));
-          }
-        }
-      }
-
-      diagnostics
+          function
+            .parameters
+            .iter()
+            .filter(move |parameter| !seen.insert(parameter.value.clone()))
+            .map(|parameter| {
+              Diagnostic::error(
+                format!("Duplicate parameter `{}`", parameter.value),
+                parameter.range,
+              )
+            })
+        })
+        .collect()
     }
   }
 }
