@@ -547,6 +547,10 @@
                                 }
                               ]
                             }
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "expression"
                           }
                         ]
                       }
@@ -2411,12 +2415,7 @@
       "value": "\\s"
     }
   ],
-  "conflicts": [
-    [
-      "value",
-      "attribute_named_param"
-    ]
-  ],
+  "conflicts": [["value", "attribute_named_param"]],
   "precedences": [],
   "externals": [
     {

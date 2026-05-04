@@ -1644,6 +1644,20 @@ mod tests {
   }
 
   #[test]
+  fn settings_string_type_correct_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'development'
+      set dotenv-path := '.env.' + env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_shell_array_accepts_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
@@ -1653,6 +1667,24 @@ mod tests {
         echo "foo"
       "#
     })
+    .run();
+  }
+
+  #[test]
+  fn settings_boolean_type_error_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'true'
+      set export := env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `export` expects a boolean value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -1669,6 +1701,24 @@ mod tests {
     .error(
       "Setting `dotenv-path` expects a string value",
       lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_unknown_with_expression() {
+    Test::new(indoc! {
+      "
+      value := 'bar'
+      set unknown-setting := value
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(1, 0, 2, 0),
     )
     .run();
   }

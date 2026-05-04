@@ -89,7 +89,7 @@ update-changelog:
 
 [group: 'dev']
 update-parser:
-  cd vendor/tree-sitter-just && tree-sitter generate
+  just -f vendor/tree-sitter-just/justfile gen
   cd vendor/tree-sitter-just && tree-sitter test
   cargo test
 

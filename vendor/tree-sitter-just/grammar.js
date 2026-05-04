@@ -166,9 +166,7 @@ module.exports = grammar({
         optional($.string),
       ),
 
-    // setting       : 'set' 'dotenv-load' boolean?
-    //               | 'set' 'export' boolean?
-    //               | 'set' 'positional-arguments' boolean?
+    // setting       : 'set' identifier (':=' (boolean | string | string-array | expression))?
     //               | 'set' 'shell' ':=' '[' string (',' string)* ','? ']'
     setting: ($) =>
       choice(
@@ -177,7 +175,12 @@ module.exports = grammar({
           field("left", $.identifier),
           field(
             "right",
-            optional(seq(":=", choice($.boolean, $.string, array($.string)))),
+            optional(
+              seq(
+                ":=",
+                choice($.boolean, $.string, array($.string), $.expression),
+              ),
+            ),
           ),
           $._newline,
         ),
