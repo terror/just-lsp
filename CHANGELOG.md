@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.4.4](https://github.com/terror/just-lsp/releases/tag/0.4.4) - 2026-05-04
+
+### Added
+
+- Add support for expressions in settings ([#370](https://github.com/terror/just-lsp/pull/370) by [terror](https://github.com/terror))
+- Add rules for user-defined function duplicates ([#369](https://github.com/terror/just-lsp/pull/369) by [terror](https://github.com/terror))
+- Add support for expressions in attributes ([#366](https://github.com/terror/just-lsp/pull/366) by [terror](https://github.com/terror))
+- Add support for logical expression operators ([#365](https://github.com/terror/just-lsp/pull/365) by [terror](https://github.com/terror))
+- Add support for `module_path` builtin function ([#364](https://github.com/terror/just-lsp/pull/364) by [terror](https://github.com/terror))
+- Add support for `android` platform attribute ([#363](https://github.com/terror/just-lsp/pull/363) by [terror](https://github.com/terror))
+- Add support for `no-cd` setting ([#362](https://github.com/terror/just-lsp/pull/362) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix module builtin completion snippets ([#368](https://github.com/terror/just-lsp/pull/368) by [terror](https://github.com/terror))
+- Find variable references outside recipes ([#355](https://github.com/terror/just-lsp/pull/355) by [terror](https://github.com/terror))
+- Resolve user-defined function parameters ([#354](https://github.com/terror/just-lsp/pull/354) by [terror](https://github.com/terror))
+
+### Misc
+
+- Stack web playground panes on small screens ([#372](https://github.com/terror/just-lsp/pull/372) by [terror](https://github.com/terror))
+- Parse recipe parameters from syntax tree nodes ([#371](https://github.com/terror/just-lsp/pull/371) by [terror](https://github.com/terror))
+- Add about dialog to web playground ([#361](https://github.com/terror/just-lsp/pull/361) by [terror](https://github.com/terror))
+- Bump cc from 1.2.60 to 1.2.61 ([#360](https://github.com/terror/just-lsp/pull/360) by [app/dependabot](https://github.com/app/dependabot))
+- Assert diagnostic ranges in analyzer tests ([#359](https://github.com/terror/just-lsp/pull/359) by [terror](https://github.com/terror))
+- Expand `analyze` integration tests for path handling and diagnostics ([#358](https://github.com/terror/just-lsp/pull/358) by [terror](https://github.com/terror))
+- Add integration tests for `analyze` subcommand ([#357](https://github.com/terror/just-lsp/pull/357) by [terror](https://github.com/terror))
+- Style clap help output ([#356](https://github.com/terror/just-lsp/pull/356) by [terror](https://github.com/terror))
+- Extract changelog in release workflow ([#353](https://github.com/terror/just-lsp/pull/353) by [terror](https://github.com/terror))
+- Sort builtins alphabetically by name within each kind ([#351](https://github.com/terror/just-lsp/pull/351) by [terror](https://github.com/terror))
+
 ## [0.4.3](https://github.com/terror/just-lsp/releases/tag/0.4.3) - 2026-04-24
 
 ### Added
