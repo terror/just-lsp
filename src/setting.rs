@@ -34,11 +34,15 @@ impl Setting {
     let string_child =
       right_children.iter().find(|child| child.kind() == "string");
 
+    let expression_child = right_children
+      .iter()
+      .find(|child| child.kind() == "expression");
+
     let kind = if has_bracket {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
-    } else if string_child.is_some() {
+    } else if string_child.is_some() || expression_child.is_some() {
       SettingKind::String
     } else if right_children.is_empty() {
       SettingKind::Boolean(true)
@@ -133,6 +137,21 @@ mod tests {
   fn parse_string_containing_walrus() {
     assert_eq!(
       Document::from("set foo := \"bar := baz\"\n").settings(),
+      vec![Setting {
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_expression() {
+    assert_eq!(
+      Document::from("set foo := \"bar\" / baz\n").settings(),
       vec![Setting {
         name: TextNode {
           value: "foo".into(),
