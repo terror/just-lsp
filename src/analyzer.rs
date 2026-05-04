@@ -3136,4 +3136,29 @@ mod tests {
     })
     .run();
   }
+
+  #[test]
+  fn user_defined_function_duplicates() {
+    Test::new(indoc! {
+      "
+      foo() := \"bar\"
+      foo() := \"baz\"
+      foo() := \"bat\"
+      "
+    })
+    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicate_parameters() {
+    Test::new(indoc! {
+      "
+      foo(bar, bar) := bar
+      "
+    })
+    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
+    .run();
+  }
 }
