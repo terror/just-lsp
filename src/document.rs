@@ -509,10 +509,7 @@ impl Document {
                 .find_all("^parameter, ^variadic_parameter")
                 .iter()
                 .filter_map(|parameter_node| {
-                  Parameter::parse(
-                    &self.get_node_text(parameter_node),
-                    parameter_node.get_range(self),
-                  )
+                  Parameter::from_node(parameter_node, self)
                 })
                 .collect()
             });
