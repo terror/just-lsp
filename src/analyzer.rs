@@ -3048,8 +3048,6 @@ mod tests {
   fn user_defined_function_not_flagged_as_unknown() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(x) := x + \"!\"
 
       bar:
@@ -3063,8 +3061,6 @@ mod tests {
   fn user_defined_function_wrong_arity() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(x) := x + \"!\"
 
       bar:
@@ -3073,7 +3069,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 1 argument, but 2 provided",
-      lsp::Range::at(5, 10, 5, 23),
+      lsp::Range::at(3, 10, 3, 23),
     )
     .run();
   }
@@ -3082,8 +3078,6 @@ mod tests {
   fn user_defined_function_too_few_args() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(a, b) := a + b
 
       bar:
@@ -3092,7 +3086,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 2 arguments, but 1 provided",
-      lsp::Range::at(5, 10, 5, 18),
+      lsp::Range::at(3, 10, 3, 18),
     )
     .run();
   }
@@ -3101,8 +3095,6 @@ mod tests {
   fn user_defined_function_parameters_not_unresolved() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(x) := x + \"!\"
       "
     })
@@ -3113,8 +3105,6 @@ mod tests {
   fn user_defined_function_body_references_variable() {
     Test::new(indoc! {
       "
-      set unstable
-
       base := \"hello\"
 
       foo(x) := base + x
@@ -3127,12 +3117,10 @@ mod tests {
   fn user_defined_function_body_unknown_identifier() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(x) := x + unknown
       "
     })
-    .error("Variable `unknown` not found", lsp::Range::at(2, 14, 2, 21))
+    .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
     .run();
   }
 
@@ -3140,8 +3128,6 @@ mod tests {
   fn user_defined_function_no_params() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo() := \"bar\"
 
       baz:
@@ -3155,15 +3141,13 @@ mod tests {
   fn user_defined_function_duplicates() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo() := \"bar\"
       foo() := \"baz\"
       foo() := \"bat\"
       "
     })
-    .error("Duplicate function `foo`", lsp::Range::at(3, 0, 4, 0))
-    .error("Duplicate function `foo`", lsp::Range::at(4, 0, 5, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
     .run();
   }
 
@@ -3171,12 +3155,10 @@ mod tests {
   fn user_defined_function_duplicate_parameters() {
     Test::new(indoc! {
       "
-      set unstable
-
       foo(bar, bar) := bar
       "
     })
-    .error("Duplicate parameter `bar`", lsp::Range::at(2, 9, 2, 12))
+    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
     .run();
   }
 }
