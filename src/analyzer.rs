@@ -1149,6 +1149,23 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
+    Test::new(indoc! {
+      r#"
+      foo bar="baz" qux="quux":
+        #!/usr/bin/env bash
+        cat <<'JSON'
+        {
+          "foo": "bar",
+          "{{ bar }}": "{{ qux }}"
+        }
+        JSON
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
