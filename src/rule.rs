@@ -34,6 +34,7 @@ inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
 mod arg_attribute;
+mod attribute_argument_expressions;
 mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;
