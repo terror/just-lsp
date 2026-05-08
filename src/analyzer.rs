@@ -824,6 +824,58 @@ mod tests {
   }
 
   #[test]
+  fn attribute_string_literal_expression() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      [metadata(x'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attribute_expression_requires_support() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+
+      [group(foo)]
+      [group(f'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(2, 7, 2, 10),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(3, 7, 3, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn expression_attribute_arguments() {
+    Test::new(indoc! {
+      "
+      bar := 'bar'
+
+      [confirm('foo' / bar)]
+      [env('FOO', bar)]
+      [working-directory('foo' / bar)]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_multiple_metadata_allowed() {
     Test::new(indoc! {
       "
