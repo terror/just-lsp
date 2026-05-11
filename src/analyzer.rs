@@ -1940,6 +1940,19 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_shebang_marks_all_as_used() {
+    Test::new(indoc! {
+      r#"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env -S deno run
+        console.log(Deno.args)
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_disabled_still_warns() {
     Test::new(indoc! {
       "

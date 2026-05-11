@@ -25,7 +25,8 @@ define_rule! {
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
               UnusedParameterRule::positional_argument_indices(recipe),
-              UnusedParameterRule::uses_all_positional_arguments(recipe),
+              recipe.shebang.is_some()
+                || UnusedParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {
             (HashSet::new(), false)
