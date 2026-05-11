@@ -10,7 +10,7 @@ macro_rules! define_rule {
     }
   ) => {
     $(#[$doc])*
-    pub struct $name;
+    struct $name;
 
     impl Rule for $name {
       fn id(&self) -> &'static str {

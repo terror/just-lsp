@@ -92,7 +92,7 @@ struct Token {
   line: u32,
   modifiers_bitset: u32,
   start_character: u32,
-  token_type_index: u32,
+  type_index: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -141,7 +141,7 @@ impl<'doc> Tokenizer<'doc> {
           delta_start,
           length: token.length,
           token_modifiers_bitset: token.modifiers_bitset,
-          token_type: token.token_type_index,
+          token_type: token.type_index,
         })
       })
       .collect()
@@ -231,7 +231,7 @@ impl<'doc> Tokenizer<'doc> {
             start_utf16.saturating_sub(line_utf16),
           )
           .ok()?,
-          token_type_index: mapping.token_type_index,
+          type_index: mapping.token_type_index,
         })
       })
       .collect()
@@ -726,14 +726,14 @@ mod tests {
         line: 0,
         modifiers_bitset: 0,
         start_character: 0,
-        token_type_index: 0,
+        type_index: 0,
       },
       Token {
         length: 2,
         line: 0,
         modifiers_bitset: 0,
         start_character: 5,
-        token_type_index: 1,
+        type_index: 1,
       },
     ];
 
@@ -766,21 +766,21 @@ mod tests {
         line: 2,
         modifiers_bitset: 0,
         start_character: 1,
-        token_type_index: 0,
+        type_index: 0,
       },
       Token {
         length: 3,
         line: 0,
         modifiers_bitset: 0,
         start_character: 5,
-        token_type_index: 1,
+        type_index: 1,
       },
       Token {
         length: 4,
         line: 1,
         modifiers_bitset: 0,
         start_character: 0,
-        token_type_index: 2,
+        type_index: 2,
       },
     ];
 
@@ -1036,14 +1036,14 @@ mod tests {
           line: 0,
           modifiers_bitset: 0,
           start_character: 0,
-          token_type_index: Tokenizer::token_type_index("keyword"),
+          type_index: Tokenizer::token_type_index("keyword"),
         },
         Token {
           length: 3,
           line: 1,
           modifiers_bitset: 0,
           start_character: 0,
-          token_type_index: Tokenizer::token_type_index("keyword"),
+          type_index: Tokenizer::token_type_index("keyword"),
         },
       ]
     );
