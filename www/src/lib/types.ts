@@ -3,12 +3,11 @@
 */
 
 export interface Diagnostic {
-	end_character: number;
-	end_line: number;
-	id: string;
-	message: string;
-	severity: string;
-	start_character: number;
-	start_line: number;
+  end_character: number;
+  end_line: number;
+  id: string;
+  message: string;
+  severity: string;
+  start_character: number;
+  start_line: number;
 }
-
