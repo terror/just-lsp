@@ -14,26 +14,28 @@ impl<'a> Scope<'a> {
   pub fn analyze(context: &RuleContext<'a>) -> Self {
     let mut scope = Self::new(context);
 
-    let Some(tree) = context.tree() else {
-      return scope;
-    };
-
-    let root = tree.root_node();
-
-    for node in root.find_all("recipe") {
-      scope.walk_recipe(node);
-    }
-
-    for node in root.find_all("function_definition") {
-      scope.walk_function(node);
-    }
-
-    for identifier in root.find_all("expression > value > identifier") {
-      if identifier.has_any_parent(&["function_definition", "recipe"]) {
+    for document in context.documents() {
+      let Some(tree) = &document.tree else {
         continue;
+      };
+
+      let root = tree.root_node();
+
+      for node in root.find_all("recipe") {
+        scope.walk_recipe_in_document(node, document);
       }
 
-      scope.record(identifier);
+      for node in root.find_all("function_definition") {
+        scope.walk_function_in_document(node, document);
+      }
+
+      for identifier in root.find_all("expression > value > identifier") {
+        if identifier.has_any_parent(&["function_definition", "recipe"]) {
+          continue;
+        }
+
+        scope.record_in_document(identifier, document);
+      }
     }
 
     scope
@@ -69,12 +71,17 @@ impl<'a> Scope<'a> {
   /// Recipe identifier usage is recorded unconditionally before resolution,
   /// so parameter self-references like `foo foo` still count as usage for the
   /// `unused-parameters` rule.
+  #[allow(dead_code)]
   fn record(&mut self, identifier: Node<'_>) {
+    self.record_in_document(identifier, self.document)
+  }
+
+  fn record_in_document(&mut self, identifier: Node<'_>, document: &Document) {
     if identifier.is_missing() {
       return;
     }
 
-    let name = self.document.get_node_text(&identifier);
+    let name = document.get_node_text(&identifier);
 
     if let Some(recipe_name) = &self.current_recipe {
       self
@@ -99,7 +106,7 @@ impl<'a> Scope<'a> {
 
     self
       .unresolved_identifiers
-      .push((name, identifier.get_range(self.document)));
+      .push((name, identifier.get_range(document)));
   }
 
   /// Enter a function definition scope and record its body.
@@ -107,22 +114,29 @@ impl<'a> Scope<'a> {
   /// Parameters are all defined before processing the body, since `just`
   /// function parameters have no default values and cannot reference each
   /// other.
+  #[allow(dead_code)]
   fn walk_function(&mut self, function_node: Node<'_>) {
+    self.walk_function_in_document(function_node, self.document)
+  }
+
+  fn walk_function_in_document(
+    &mut self,
+    function_node: Node<'_>,
+    document: &Document,
+  ) {
     self.locals.clear();
 
     if let Some(parameters_node) =
       function_node.child_by_field_name("parameters")
     {
       for parameter_node in parameters_node.find_all("^identifier") {
-        self
-          .locals
-          .insert(self.document.get_node_text(&parameter_node));
+        self.locals.insert(document.get_node_text(&parameter_node));
       }
     }
 
     if let Some(body_node) = function_node.child_by_field_name("body") {
       for identifier in body_node.find_all("value > identifier") {
-        self.record(identifier);
+        self.record_in_document(identifier, document);
       }
     }
   }
@@ -134,12 +148,21 @@ impl<'a> Scope<'a> {
   /// parameters and globals but not `b` itself. Body identifiers inside
   /// parameter defaults are skipped in the final expression walk to avoid
   /// double-recording with the wrong scope.
+  #[allow(dead_code)]
   fn walk_recipe(&mut self, recipe_node: Node<'_>) {
+    self.walk_recipe_in_document(recipe_node, self.document)
+  }
+
+  fn walk_recipe_in_document(
+    &mut self,
+    recipe_node: Node<'_>,
+    document: &Document,
+  ) {
     let Some(name_node) = recipe_node.find("recipe_header > identifier") else {
       return;
     };
 
-    self.current_recipe = Some(self.document.get_node_text(&name_node));
+    self.current_recipe = Some(document.get_node_text(&name_node));
     self.locals.clear();
 
     if let Some(parameters_node) =
@@ -164,12 +187,12 @@ impl<'a> Scope<'a> {
           for identifier in default_node
             .find_all("^identifier, expression > value > identifier")
           {
-            self.record(identifier);
+            self.record_in_document(identifier, document);
           }
         }
 
         if let Some(name_node) = parameter_node.child_by_field_name("name") {
-          self.locals.insert(self.document.get_node_text(&name_node));
+          self.locals.insert(document.get_node_text(&name_node));
         }
       }
     }
@@ -179,7 +202,7 @@ impl<'a> Scope<'a> {
         continue;
       }
 
-      self.record(identifier);
+      self.record_in_document(identifier, document);
     }
 
     self.current_recipe = None;

@@ -120,6 +120,10 @@ impl<'a> RuleContext<'a> {
     self.document
   }
 
+  pub fn documents(&self) -> impl Iterator<Item = &Document> {
+    once(self.document).chain(self.imported_documents.iter())
+  }
+
   pub fn document_variable_names(&self) -> &HashSet<String> {
     self.document_variable_names.get_or_init(|| {
       self

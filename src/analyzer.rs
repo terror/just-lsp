@@ -3293,4 +3293,31 @@ mod tests {
     .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
     .run();
   }
+
+  #[test]
+  fn import_does_not_cause_false_unused_parameter() {
+    use {std::fs, tempfile::Builder};
+
+    let dir = Builder::new().prefix("just-lsp-test").tempdir().unwrap();
+    let import_path = dir.path().join("imported.just");
+
+    // Imported file has both used and unused parameters
+    fs::write(
+      &import_path,
+      "bar x:\n  echo {{x}}\n\nbaz unused:\n  echo nothing\n",
+    )
+    .unwrap();
+
+    let main_content = format!(
+      "import '{}'\n\nfoo name:\n  echo {{{{name}}}}\n",
+      import_path.display()
+    );
+
+    Test::new(&main_content)
+      .warning(
+        "Parameter `unused` appears unused",
+        lsp::Range::at(3, 4, 3, 10),
+      )
+      .run();
+  }
 }
