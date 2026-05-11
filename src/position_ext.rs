@@ -25,9 +25,12 @@ impl PositionExt for lsp::Position {
     let utf16_cu = usize::try_from(self.character)
       .expect("character index exceeds usize::MAX");
 
+    let line_utf16_len = line.len_utf16_cu();
+    let clamped_utf16_cu = utf16_cu.min(line_utf16_len);
+
     Point {
       row,
-      column: line.char_to_byte(line.utf16_cu_to_char(utf16_cu)),
+      column: line.char_to_byte(line.utf16_cu_to_char(clamped_utf16_cu)),
     }
   }
 }
@@ -48,5 +51,33 @@ mod tests {
     let point = position.point(&document);
 
     assert_eq!(point, Point { row: 0, column: 5 });
+  }
+
+  #[test]
+  fn clamps_out_of_bounds_utf16_character_index() {
+    let document = Document::from("short line\n");
+
+    let position = lsp::Position {
+      line: 0,
+      character: 789,
+    };
+
+    let point = position.point(&document);
+
+    assert_eq!(point, Point { row: 0, column: 11 });
+  }
+
+  #[test]
+  fn allows_position_at_end_of_line() {
+    let document = Document::from("abc");
+
+    let position = lsp::Position {
+      line: 0,
+      character: 3,
+    };
+
+    let point = position.point(&document);
+
+    assert_eq!(point, Point { row: 0, column: 3 });
   }
 }
