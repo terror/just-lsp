@@ -268,7 +268,7 @@ impl<'a> RuleContext<'a> {
     }
   }
 
-  pub fn scope(&self) -> &Scope {
+  pub fn scope(&self) -> &Scope<'_> {
     self.scope.get_or_init(|| Scope::analyze(self))
   }
 
