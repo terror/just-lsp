@@ -77,34 +77,11 @@ impl<'a> Analyzer<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  type RangeSpec = (u32, u32, u32, u32);
-
-  fn to_lsp_range(
-    (start_line, start_character, end_line, end_character): RangeSpec,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
-  #[derive(Debug)]
-  enum Message<'a> {
-    Scoped { text: &'a str, range: RangeSpec },
-    Text(&'a str),
-  }
-
   #[derive(Debug)]
   struct Test {
     config: Config,
     document: Document,
-    messages: Vec<(Message<'static>, Option<lsp::DiagnosticSeverity>)>,
+    messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
   }
 
   impl Test {
@@ -112,12 +89,12 @@ mod tests {
       Self { config, ..self }
     }
 
-    fn error(self, message: Message<'static>) -> Self {
+    fn error(self, message: &'static str, range: lsp::Range) -> Self {
       Self {
         messages: self
           .messages
           .into_iter()
-          .chain([(message, Some(lsp::DiagnosticSeverity::ERROR))])
+          .chain([(message, range, Some(lsp::DiagnosticSeverity::ERROR))])
           .collect(),
         ..self
       }
@@ -168,27 +145,21 @@ mod tests {
         diagnostics,
       );
 
-      for (diagnostic, (expected_message, expected_severity)) in
-        diagnostics.into_iter().zip(messages.into_iter())
+      for (diagnostic, (expected_message, expected_range, expected_severity)) in
+        diagnostics.into_iter().zip(messages)
       {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
-
-        match expected_message {
-          Message::Text(expected) => assert_eq!(diagnostic.message, *expected),
-          Message::Scoped { text, range } => {
-            assert_eq!(diagnostic.message, *text);
-            assert_eq!(diagnostic.range, to_lsp_range(range));
-          }
-        }
+        assert_eq!(diagnostic.message, expected_message);
+        assert_eq!(diagnostic.range, expected_range);
       }
     }
 
-    fn warning(self, message: Message<'static>) -> Self {
+    fn warning(self, message: &'static str, range: lsp::Range) -> Self {
       Self {
         messages: self
           .messages
           .into_iter()
-          .chain([(message, Some(lsp::DiagnosticSeverity::WARNING))])
+          .chain([(message, range, Some(lsp::DiagnosticSeverity::WARNING))])
           .collect(),
         ..self
       }
@@ -203,6 +174,21 @@ mod tests {
         {{ assert(name == \"bar\", \"msg\") }}
         {{ assert(name != \"bar\", \"msg\") }}
         {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn accepts_logical_operators() {
+    Test::new(indoc! {
+      "
+      foo := '' || 'bar'
+      bar := 'foo' && 'bar'
+
+      baz:
+        echo {{ foo }}
+        echo {{ bar }}
       "
     })
     .run();
@@ -233,14 +219,8 @@ mod tests {
       alias bar := foo
       "
     })
-    .error(Message::Scoped {
-      text: "Duplicate alias `bar`",
-      range: (4, 0, 4, 16),
-    })
-    .error(Message::Scoped {
-      text: "Duplicate alias `bar`",
-      range: (5, 0, 5, 16),
-    })
+    .error("Duplicate alias `bar`", lsp::Range::at(4, 0, 4, 16))
+    .error("Duplicate alias `bar`", lsp::Range::at(5, 0, 5, 16))
     .run();
   }
 
@@ -254,7 +234,7 @@ mod tests {
       alias bar := baz
       "
     })
-    .error(Message::Text("Recipe `baz` not found"))
+    .error("Recipe `baz` not found", lsp::Range::at(3, 13, 3, 16))
     .run();
   }
 
@@ -265,8 +245,8 @@ mod tests {
       alias foo :=
       "
     })
-    .error(Message::Text("Missing identifier in alias"))
-    .error(Message::Text("Recipe `` not found"))
+    .error("Missing identifier in alias", lsp::Range::at(0, 12, 0, 12))
+    .error("Recipe `` not found", lsp::Range::at(0, 12, 0, 12))
     .run();
   }
 
@@ -279,9 +259,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .warning(Message::Text(
+    .warning(
       "Recipe `foo` has no dependencies, so `[parallel]` has no effect",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -297,9 +278,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .warning(Message::Text(
+    .warning(
       "Recipe `foo` has only one dependency, so `[parallel]` has no effect",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -316,7 +298,10 @@ mod tests {
       alias t := other
       "
     })
-    .error(Message::Text("Recipe `t` is redefined as an alias"))
+    .error(
+      "Recipe `t` is redefined as an alias",
+      lsp::Range::at(6, 6, 6, 7),
+    )
     .run();
   }
 
@@ -333,7 +318,10 @@ mod tests {
         echo \"recipe\"
       "
     })
-    .error(Message::Text("Alias `t` is redefined as a recipe"))
+    .error(
+      "Alias `t` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 1),
+    )
     .run();
   }
 
@@ -350,8 +338,11 @@ mod tests {
       alias baz := nonexistent
       "
     })
-    .error(Message::Text("Recipe `missing` not found"))
-    .error(Message::Text("Recipe `nonexistent` not found"))
+    .error("Recipe `missing` not found", lsp::Range::at(3, 5, 3, 12))
+    .error(
+      "Recipe `nonexistent` not found",
+      lsp::Range::at(6, 13, 6, 24),
+    )
     .run();
   }
 
@@ -390,9 +381,8 @@ mod tests {
         echo \"ci\"
       "
     })
-    .error(Message::Text(
-      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module"),
-    )
+    .error(
+      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(4, 0, 5, 0))
     .run();
   }
 
@@ -406,9 +396,8 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Message::Text(
-      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module"),
-    )
+    .error(
+      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(1, 0, 2, 0))
     .run();
   }
 
@@ -422,7 +411,10 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Message::Text("Recipe attribute `script` is duplicated"))
+    .error(
+      "Recipe attribute `script` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -436,9 +428,10 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe attribute `working-directory` is duplicated",
-    ))
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -452,9 +445,10 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `build` can't combine `[working-directory]` with `[no-cd]`",
-    ))
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -495,7 +489,10 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(Message::Text("Recipe attribute `group` is duplicated"))
+    .error(
+      "Recipe attribute `group` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -508,9 +505,10 @@ mod tests {
         echo {{name}}
       "
     })
-    .error(Message::Text(
+    .error(
       "`[arg]` references unknown parameter `missing`",
-    ))
+      lsp::Range::at(0, 5, 0, 14),
+    )
     .run();
   }
 
@@ -523,9 +521,9 @@ mod tests {
         echo {{name}}
       "
     })
-    .error(Message::Text(
+    .error(
       "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
-    ))
+    lsp::Range::at(0, 13, 0, 22))
     .run();
   }
 
@@ -538,9 +536,10 @@ mod tests {
         echo {{name}}
       "
     })
-    .error(Message::Text(
+    .error(
       "`[arg]` `value=` requires `long=` or `short=`",
-    ))
+      lsp::Range::at(0, 13, 0, 23),
+    )
     .run();
   }
 
@@ -565,9 +564,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `linux` got 1 argument but takes 0 arguments",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
 
     Test::new(indoc! {
@@ -577,9 +577,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `default` got 1 argument but takes 0 arguments",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -593,9 +594,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `extension` got 0 arguments but takes 1 argument",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -641,6 +643,18 @@ mod tests {
   }
 
   #[test]
+  fn confirm_attribute_accepts_expression() {
+    Test::new(indoc! {
+      r#"
+      [confirm("Deploy to " + env + "?")]
+      deploy env:
+        echo {{env}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_unknown() {
     Test::new(indoc! {
       "
@@ -649,7 +663,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Unknown attribute `unknown_attribute`"))
+    .error(
+      "Unknown attribute `unknown_attribute`",
+      lsp::Range::at(0, 1, 0, 18),
+    )
     .run();
   }
 
@@ -663,9 +680,10 @@ mod tests {
         echo \"publish\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `publish` has both shebang line and `[script]` attribute",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -690,9 +708,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` uses `[extension]` without `[script]` or a shebang",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -733,9 +752,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `group` cannot be applied to alias target",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -748,7 +768,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Unknown attribute `foo`"))
+    .error("Unknown attribute `foo`", lsp::Range::at(0, 15, 0, 18))
     .run();
   }
 
@@ -784,9 +804,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `group` got 2 arguments but takes 1 argument",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -795,6 +816,58 @@ mod tests {
     Test::new(indoc! {
       "
       [metadata('foo', 'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attribute_string_literal_expression() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      [metadata(x'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attribute_expression_requires_support() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+
+      [group(foo)]
+      [group(f'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(2, 7, 2, 10),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(3, 7, 3, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn expression_attribute_arguments() {
+    Test::new(indoc! {
+      "
+      bar := 'bar'
+
+      [confirm('foo' / bar)]
+      [env('FOO', bar)]
+      [working-directory('foo' / bar)]
       foo:
         echo \"foo\"
       "
@@ -850,7 +923,10 @@ mod tests {
         echo \"$FOO\"
       "
     })
-    .error(Message::Text("Recipe attribute `env` is duplicated"))
+    .error(
+      "Recipe attribute `env` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -863,9 +939,10 @@ mod tests {
         echo \"$FOO\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `env` got 1 argument but takes 2 arguments",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -878,9 +955,10 @@ mod tests {
         echo \"$FOO\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `env` got 3 arguments but takes 2 arguments",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -895,9 +973,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `env` cannot be applied to alias target",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -953,9 +1032,10 @@ mod tests {
         echo {{ replace() }}
       "
     })
-    .error(Message::Text(
+    .error(
       "Function `replace` requires at least 3 arguments, but 0 provided",
-    ))
+      lsp::Range::at(1, 10, 1, 19),
+    )
     .run();
   }
 
@@ -967,9 +1047,10 @@ mod tests {
         echo {{ uppercase(\"hello\", \"extra\") }}
       "
     })
-    .error(Message::Text(
+    .error(
       "Function `uppercase` accepts 1 argument, but 2 provided",
-    ))
+      lsp::Range::at(1, 10, 1, 37),
+    )
     .run();
   }
 
@@ -981,7 +1062,10 @@ mod tests {
         echo {{ unknown_function() }}
       "
     })
-    .error(Message::Text("Unknown function `unknown_function`"))
+    .error(
+      "Unknown function `unknown_function`",
+      lsp::Range::at(1, 10, 1, 26),
+    )
     .run();
   }
 
@@ -1026,7 +1110,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Syntax error near `foo echo \"foo\"`"))
+    .error(
+      "Syntax error near `foo echo \"foo\"`",
+      lsp::Range::at(0, 0, 2, 0),
+    )
     .run();
   }
 
@@ -1039,9 +1126,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-    ))
+      lsp::Range::at(3, 0, 3, 2),
+    )
     .run();
   }
 
@@ -1053,18 +1141,18 @@ mod tests {
    \t  echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-    ))
+      lsp::Range::at(2, 0, 2, 3),
+    )
     .run();
   }
 
   #[test]
   fn recipe_inconsistent_indentation_between_lines() {
     Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
-    .error(Message::Text(
-      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`"),
-    )
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(3, 0, 3, 2))
     .run();
   }
 
@@ -1113,6 +1201,23 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
+    Test::new(indoc! {
+      r#"
+      foo bar="baz" qux="quux":
+        #!/usr/bin/env bash
+        cat <<'JSON'
+        {
+          "foo": "bar",
+          "{{ bar }}": "{{ qux }}"
+        }
+        JSON
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
@@ -1140,7 +1245,7 @@ mod tests {
       import 'nonexistent.just'
       "
     })
-    .error(Message::Text(expected))
+    .error(expected, lsp::Range::at(0, 7, 0, 25))
     .run();
   }
 
@@ -1199,7 +1304,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text("Recipe `baz` not found"))
+    .error("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
     .run();
   }
 
@@ -1214,8 +1319,8 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text("Recipe `missing1` not found"))
-    .error(Message::Text("Recipe `missing2` not found"))
+    .error("Recipe `missing1` not found", lsp::Range::at(3, 5, 3, 13))
+    .error("Recipe `missing2` not found", lsp::Range::at(3, 14, 3, 22))
     .run();
   }
 
@@ -1230,9 +1335,9 @@ mod tests {
         echo \"bar\"
       "
     })
-    .warning(Message::Text(
+    .warning(
       "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
-    ))
+    lsp::Range::at(3, 9, 3, 12))
     .run();
   }
 
@@ -1247,9 +1352,9 @@ mod tests {
         echo \"bar\"
       "
     })
-    .warning(Message::Text(
+    .warning(
       "Recipe `bar` lists dependency `foo` with the same arguments more than once; just only runs it once, so it's redundant",
-    ))
+    lsp::Range::at(3, 15, 3, 24))
     .run();
   }
 
@@ -1292,9 +1397,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Dependency `foo` requires 2 arguments, but 0 provided",
-    ))
+      lsp::Range::at(3, 5, 3, 10),
+    )
     .run();
   }
 
@@ -1309,9 +1415,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Dependency `foo` requires 2 arguments, but 1 provided",
-    ))
+      lsp::Range::at(3, 5, 3, 19),
+    )
     .run();
   }
 
@@ -1326,9 +1433,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Dependency `foo` accepts 1 argument, but 3 provided",
-    ))
+      lsp::Range::at(3, 5, 3, 37),
+    )
     .run();
   }
 
@@ -1343,7 +1451,7 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text("Variable `wow` not found"))
+    .error("Variable `wow` not found", lsp::Range::at(3, 10, 3, 13))
     .run();
   }
 
@@ -1388,9 +1496,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Dependency `foo` requires 1 argument, but 0 provided",
-    ))
+      lsp::Range::at(3, 5, 3, 10),
+    )
     .run();
   }
 
@@ -1455,7 +1564,7 @@ mod tests {
         echo \"{{arg1}}\"
       "
     })
-    .error(Message::Text("Duplicate parameter `arg1`"))
+    .error("Duplicate parameter `arg1`", lsp::Range::at(0, 33, 0, 37))
     .run();
   }
 
@@ -1467,9 +1576,10 @@ mod tests {
         echo \"{{arg1}} {{arg2}}\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Required parameter `arg2` follows a parameter with a default value",
-    ))
+      lsp::Range::at(0, 39, 0, 43),
+    )
     .run();
   }
 
@@ -1532,7 +1642,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Setting `export` expects a boolean value"))
+    .error(
+      "Setting `export` expects a boolean value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -1548,7 +1661,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Duplicate setting `export`"))
+    .error("Duplicate setting `export`", lsp::Range::at(2, 0, 3, 0))
     .run();
   }
 
@@ -1565,8 +1678,11 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Unknown setting `unknown-setting`"))
-    .error(Message::Text("Duplicate setting `export`"))
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Duplicate setting `export`", lsp::Range::at(3, 0, 4, 0))
     .run();
   }
 
@@ -1597,6 +1713,20 @@ mod tests {
   }
 
   #[test]
+  fn settings_string_type_correct_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'development'
+      set dotenv-path := '.env.' + env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_shell_array_accepts_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
@@ -1610,6 +1740,24 @@ mod tests {
   }
 
   #[test]
+  fn settings_boolean_type_error_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'true'
+      set export := env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `export` expects a boolean value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn settings_string_type_error() {
     Test::new(indoc! {
       "
@@ -1619,9 +1767,28 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Setting `dotenv-path` expects a string value",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_unknown_with_expression() {
+    Test::new(indoc! {
+      "
+      value := 'bar'
+      set unknown-setting := value
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -1635,7 +1802,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Unknown setting `unknown-setting`"))
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -1686,7 +1856,7 @@ mod tests {
         echo {{ var }}
       "
     })
-    .error(Message::Text("Variable `var` not found"))
+    .error("Variable `var` not found", lsp::Range::at(1, 10, 1, 13))
     .run();
   }
 
@@ -1698,7 +1868,7 @@ mod tests {
         echo foo
       "
     })
-    .warning(Message::Text("Parameter `bar` appears unused"))
+    .warning("Parameter `bar` appears unused", lsp::Range::at(0, 4, 0, 7))
     .run();
 
     Test::new(indoc! {
@@ -1717,7 +1887,7 @@ mod tests {
         echo foo
       "
     })
-    .warning(Message::Text("Parameter `bar` appears unused"))
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
     .run();
 
     Test::new(indoc! {
@@ -1770,6 +1940,19 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_shebang_marks_all_as_used() {
+    Test::new(indoc! {
+      r"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env -S deno run
+        console.log(Deno.args)
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_disabled_still_warns() {
     Test::new(indoc! {
       "
@@ -1777,7 +1960,7 @@ mod tests {
         ./bin/graph $1
       "
     })
-    .warning(Message::Text("Parameter `log` appears unused"))
+    .warning("Parameter `log` appears unused", lsp::Range::at(0, 6, 0, 9))
     .run();
   }
 
@@ -1791,7 +1974,10 @@ mod tests {
         ./bin/graph $2
       "
     })
-    .warning(Message::Text("Parameter `first` appears unused"))
+    .warning(
+      "Parameter `first` appears unused",
+      lsp::Range::at(2, 6, 2, 11),
+    )
     .run();
   }
 
@@ -1818,10 +2004,10 @@ mod tests {
         ./bin/graph $1 ${2} $3
       "
     })
-    .warning(Message::Scoped {
-      text: "Parameter `fourth` appears unused",
-      range: (2, 25, 2, 31),
-    })
+    .warning(
+      "Parameter `fourth` appears unused",
+      lsp::Range::at(2, 25, 2, 31),
+    )
     .run();
   }
 
@@ -1837,7 +2023,10 @@ mod tests {
         ./bin/graph $1
       "
     })
-    .warning(Message::Text("Parameter `data` appears unused"))
+    .warning(
+      "Parameter `data` appears unused",
+      lsp::Range::at(4, 6, 4, 10),
+    )
     .run();
   }
 
@@ -1855,8 +2044,8 @@ mod tests {
         echo foo
       "
     })
-    .error(Message::Text("Duplicate recipe name `foo`"))
-    .error(Message::Text("Duplicate recipe name `foo`"))
+    .error("Duplicate recipe name `foo`", lsp::Range::at(3, 0, 6, 0))
+    .error("Duplicate recipe name `foo`", lsp::Range::at(6, 0, 8, 0))
     .run();
   }
 
@@ -1871,7 +2060,7 @@ mod tests {
         echo {{ bar }}
       "
     })
-    .warning(Message::Text("Variable `foo` appears unused"))
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
     .run();
   }
 
@@ -1886,7 +2075,7 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .error(Message::Text("Duplicate variable `foo`"))
+    .error("Duplicate variable `foo`", lsp::Range::at(1, 0, 2, 0))
     .run();
   }
 
@@ -1954,7 +2143,10 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning(Message::Text("Variable `unused` appears unused"))
+    .warning(
+      "Variable `unused` appears unused",
+      lsp::Range::at(1, 0, 1, 6),
+    )
     .run();
   }
 
@@ -2015,7 +2207,7 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .error(Message::Text("Variable `foo` not found"))
+    .error("Variable `foo` not found", lsp::Range::at(0, 11, 0, 14))
     .run();
   }
 
@@ -2042,7 +2234,7 @@ mod tests {
         echo {{ a }} {{ b }}
       "
     })
-    .warning(Message::Text("Variable `a` appears unused"))
+    .warning("Variable `a` appears unused", lsp::Range::at(0, 0, 0, 1))
     .run();
   }
 
@@ -2085,7 +2277,10 @@ mod tests {
         echo {{ arg }}
       "
     })
-    .warning(Message::Text("Variable `unused_var` appears unused"))
+    .warning(
+      "Variable `unused_var` appears unused",
+      lsp::Range::at(1, 0, 1, 10),
+    )
     .run();
   }
 
@@ -2102,7 +2297,10 @@ mod tests {
         echo {{ other }}
       "
     })
-    .warning(Message::Text("Variable `param` appears unused"))
+    .warning(
+      "Variable `param` appears unused",
+      lsp::Range::at(0, 0, 0, 5),
+    )
     .run();
   }
 
@@ -2124,7 +2322,10 @@ mod tests {
         echo {{ only_in_second }}
       "
     })
-    .warning(Message::Text("Variable `never_used` appears unused"))
+    .warning(
+      "Variable `never_used` appears unused",
+      lsp::Range::at(3, 0, 3, 10),
+    )
     .run();
   }
 
@@ -2140,7 +2341,7 @@ mod tests {
         echo {{ baz }}
       "
     })
-    .warning(Message::Text("Variable `foo` appears unused"))
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
     .run();
   }
 
@@ -2156,8 +2357,8 @@ mod tests {
         echo {{ baz }}
       "
     })
-    .warning(Message::Text("Variable `foo` appears unused"))
-    .warning(Message::Text("Variable `BAR` appears unused"))
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .warning("Variable `BAR` appears unused", lsp::Range::at(1, 9, 1, 12))
     .run();
   }
 
@@ -2210,7 +2411,7 @@ mod tests {
         echo \"Building on Linux version 2\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2226,7 +2427,7 @@ mod tests {
         echo \"Building on any OS\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 6, 0))
     .run();
   }
 
@@ -2242,7 +2443,7 @@ mod tests {
         echo \"Building on every OS\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 6, 0))
     .run();
   }
 
@@ -2259,7 +2460,7 @@ mod tests {
         echo \"Building on macOS specifically\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2292,7 +2493,7 @@ mod tests {
         echo \"Building on Unix systems\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2366,7 +2567,7 @@ mod tests {
         echo \"Building on macOS\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(5, 0, 9, 0))
     .run();
   }
 
@@ -2384,7 +2585,7 @@ mod tests {
         echo \"Building on Linux again\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(5, 0, 8, 0))
     .run();
   }
 
@@ -2439,7 +2640,7 @@ mod tests {
         @echo 'hello on linux again'
       "
     })
-    .error(Message::Text("Duplicate recipe name `hello`"))
+    .error("Duplicate recipe name `hello`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2497,7 +2698,7 @@ mod tests {
         echo \"Building on DragonFly BSD\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2514,7 +2715,7 @@ mod tests {
         echo \"Building on FreeBSD\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2531,7 +2732,7 @@ mod tests {
         echo \"Building on NetBSD\"
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2545,7 +2746,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `dragonfly` is duplicated"))
+    .error(
+      "Recipe attribute `dragonfly` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -2559,7 +2763,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `freebsd` is duplicated"))
+    .error(
+      "Recipe attribute `freebsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -2573,7 +2780,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `netbsd` is duplicated"))
+    .error(
+      "Recipe attribute `netbsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -2585,7 +2795,7 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe `foo` depends on itself"))
+    .error("Recipe `foo` depends on itself", lsp::Range::at(0, 0, 2, 0))
     .run();
   }
 
@@ -2600,12 +2810,14 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` has circular dependency `foo -> bar -> foo`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
       "Recipe `bar` has circular dependency `bar -> foo -> bar`",
-    ))
+      lsp::Range::at(3, 0, 5, 0),
+    )
     .run();
   }
 
@@ -2623,15 +2835,18 @@ mod tests {
         echo \"baz\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
       "Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
       "Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`",
-    ))
+      lsp::Range::at(6, 0, 8, 0),
+    )
     .run();
   }
 
@@ -2649,12 +2864,14 @@ mod tests {
         echo \"baz\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `bar` has circular dependency `bar -> baz -> bar`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
       "Recipe `baz` has circular dependency `baz -> bar -> baz`",
-    ))
+      lsp::Range::at(6, 0, 8, 0),
+    )
     .run();
   }
 
@@ -2675,15 +2892,18 @@ mod tests {
         echo \"qux\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
       "Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(6, 0, 9, 0),
+    )
+    .error(
       "Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`",
-    ))
+      lsp::Range::at(9, 0, 11, 0),
+    )
     .run();
   }
 
@@ -2756,9 +2976,10 @@ mod tests {
         echo {{foo}}
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `arg` got 0 arguments but takes at least 1 argument",
-    ))
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -2771,10 +2992,11 @@ mod tests {
         echo {{foo}}
       "
     })
-    .error(Message::Text(
+    .error(
       "Attribute `arg` got 0 arguments but takes at least 1 argument",
-    ))
-    .error(Message::Text("Missing identifier in attribute named param"))
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
     .run();
   }
 
@@ -2798,21 +3020,26 @@ mod tests {
         echo \"z\"
       "
     })
-    .error(Message::Text(
+    .error(
       "Recipe `a` has circular dependency `a -> b -> a`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
       "Recipe `b` has circular dependency `b -> a -> b`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
       "Recipe `x` has circular dependency `x -> y -> z -> x`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(6, 0, 9, 0),
+    )
+    .error(
       "Recipe `y` has circular dependency `y -> z -> x -> y`",
-    ))
-    .error(Message::Text(
+      lsp::Range::at(9, 0, 12, 0),
+    )
+    .error(
       "Recipe `z` has circular dependency `z -> x -> y -> z`",
-    ))
+      lsp::Range::at(12, 0, 14, 0),
+    )
     .run();
   }
 
@@ -2838,7 +3065,10 @@ mod tests {
         echo {{greeting}}
       "
     })
-    .error(Message::Text("Variable `undefined_var` not found"))
+    .error(
+      "Variable `undefined_var` not found",
+      lsp::Range::at(0, 23, 0, 36),
+    )
     .run();
   }
 
@@ -2919,7 +3149,7 @@ mod tests {
       "
     })
     .config(config)
-    .error(Message::Text("Variable `foo` appears unused"))
+    .error("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
     .run();
   }
 
@@ -2942,7 +3172,7 @@ mod tests {
       "
     })
     .config(config)
-    .warning(Message::Text("Recipe `baz` not found"))
+    .warning("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
     .run();
   }
 
@@ -2969,9 +3199,10 @@ mod tests {
         echo {{ foo(\"a\", \"b\") }}
       "
     })
-    .error(Message::Text(
+    .error(
       "Function `foo` accepts 1 argument, but 2 provided",
-    ))
+      lsp::Range::at(3, 10, 3, 23),
+    )
     .run();
   }
 
@@ -2985,9 +3216,10 @@ mod tests {
         echo {{ foo(\"a\") }}
       "
     })
-    .error(Message::Text(
+    .error(
       "Function `foo` accepts 2 arguments, but 1 provided",
-    ))
+      lsp::Range::at(3, 10, 3, 18),
+    )
     .run();
   }
 
@@ -3020,7 +3252,7 @@ mod tests {
       foo(x) := x + unknown
       "
     })
-    .error(Message::Text("Variable `unknown` not found"))
+    .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
     .run();
   }
 
@@ -3034,6 +3266,31 @@ mod tests {
         echo {{ foo() }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicates() {
+    Test::new(indoc! {
+      "
+      foo() := \"bar\"
+      foo() := \"baz\"
+      foo() := \"bat\"
+      "
+    })
+    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicate_parameters() {
+    Test::new(indoc! {
+      "
+      foo(bar, bar) := bar
+      "
+    })
+    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
     .run();
   }
 }

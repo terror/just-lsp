@@ -1,37 +1,9 @@
 use super::*;
 
-#[derive(Debug)]
-pub enum SettingKind {
-  Array,
-  Boolean(bool),
-  String,
-}
-
-impl Display for SettingKind {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    match self {
-      SettingKind::Array => write!(f, "array"),
-      SettingKind::Boolean(_) => write!(f, "boolean"),
-      SettingKind::String => write!(f, "string"),
-    }
-  }
-}
-
-impl PartialEq for SettingKind {
-  fn eq(&self, other: &Self) -> bool {
-    matches!(
-      (self, other),
-      (SettingKind::Array, SettingKind::Array)
-        | (SettingKind::Boolean(_), SettingKind::Boolean(_))
-        | (SettingKind::String, SettingKind::String)
-    )
-  }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct Setting {
   pub kind: SettingKind,
-  pub name: String,
+  pub name: TextNode,
   pub range: lsp::Range,
 }
 
@@ -40,7 +12,12 @@ impl Setting {
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
-    let name = document.get_node_text(&node.child(1)?);
+    let name_node = node.child(1)?;
+
+    let name = TextNode {
+      value: document.get_node_text(&name_node),
+      range: name_node.get_range(document),
+    };
 
     let mut cursor = node.walk();
 
@@ -57,11 +34,15 @@ impl Setting {
     let string_child =
       right_children.iter().find(|child| child.kind() == "string");
 
+    let expression_child = right_children
+      .iter()
+      .find(|child| child.kind() == "expression");
+
     let kind = if has_bracket {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
-    } else if string_child.is_some() {
+    } else if string_child.is_some() || expression_child.is_some() {
       SettingKind::String
     } else if right_children.is_empty() {
       SettingKind::Boolean(true)
@@ -77,32 +58,17 @@ impl Setting {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn range(
-    start_line: u32,
-    start_character: u32,
-    end_line: u32,
-    end_character: u32,
-  ) -> lsp::Range {
-    lsp::Range {
-      start: lsp::Position {
-        line: start_line,
-        character: start_character,
-      },
-      end: lsp::Position {
-        line: end_line,
-        character: end_character,
-      },
-    }
-  }
-
   #[test]
   fn parse_boolean_with_value() {
     assert_eq!(
       Document::from("set foo := true\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::Boolean(true),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -112,9 +78,12 @@ mod tests {
     assert_eq!(
       Document::from("set foo := false\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::Boolean(false),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -124,9 +93,12 @@ mod tests {
     assert_eq!(
       Document::from("set export\n").settings(),
       vec![Setting {
-        name: "export".to_string(),
+        name: TextNode {
+          value: "export".into(),
+          range: lsp::Range::at(0, 4, 0, 10),
+        },
         kind: SettingKind::Boolean(true),
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -136,9 +108,12 @@ mod tests {
     assert_eq!(
       Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
       vec![Setting {
-        name: "shell".to_string(),
+        name: TextNode {
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
+        },
         kind: SettingKind::Array,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -148,9 +123,12 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar\"\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -160,9 +138,27 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar := baz\"\n").settings(),
       vec![Setting {
-        name: "foo".to_string(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
         kind: SettingKind::String,
-        range: range(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_expression() {
+    assert_eq!(
+      Document::from("set foo := \"bar\" / baz\n").settings(),
+      vec![Setting {
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
       }],
     );
   }
@@ -178,19 +174,28 @@ mod tests {
       .settings(),
       vec![
         Setting {
-          name: "foo".to_string(),
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(0, 4, 0, 7),
+          },
           kind: SettingKind::Boolean(true),
-          range: range(0, 0, 1, 0),
+          range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
-          name: "bar".to_string(),
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(1, 4, 1, 7),
+          },
           kind: SettingKind::String,
-          range: range(1, 0, 2, 0),
+          range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
-          name: "shell".to_string(),
+          name: TextNode {
+            value: "shell".into(),
+            range: lsp::Range::at(2, 4, 2, 9),
+          },
           kind: SettingKind::Array,
-          range: range(2, 0, 3, 0),
+          range: lsp::Range::at(2, 0, 3, 0),
         },
       ],
     );

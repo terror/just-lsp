@@ -288,7 +288,9 @@ foo:
   (recipe
     (attribute
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body
@@ -309,7 +311,9 @@ fmt:
   (recipe
     (attribute
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body
@@ -330,10 +334,44 @@ foo:
   (recipe
     (attribute
       (identifier)
-      (string)
-      (string))
+      (expression
+        (value
+          (string)))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+attribute with expression argument
+================================================================================
+
+[confirm("Deploy to " + env + "?")]
+deploy env:
+  echo foo
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (expression
+        (value
+          (string))
+        (value
+          (identifier))
+        (value
+          (string))))
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
     (recipe_body
       (recipe_line
         (text)))))
@@ -655,9 +693,13 @@ bar:
   (recipe
     (attribute
       (identifier)
-      (string)
+      (expression
+        (value
+          (string)))
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body
@@ -666,7 +708,9 @@ bar:
   (recipe
     (attribute
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body
@@ -703,7 +747,9 @@ bar:
   (recipe
     (attribute
       (identifier)
-      (string)
+      (expression
+        (value
+          (string)))
       (identifier)
       (string))
     (recipe_header

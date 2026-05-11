@@ -45,10 +45,6 @@ fmt:
   cargo fmt
 
 [group: 'format']
-fmt-web:
-  cd www && bun run format
-
-[group: 'format']
 fmt-check:
   cargo fmt --all -- --check
 
@@ -90,10 +86,30 @@ update-changelog:
 
 [group: 'dev']
 update-parser:
-  cd vendor/tree-sitter-just && tree-sitter generate
+  just -f vendor/tree-sitter-just/justfile gen
   cd vendor/tree-sitter-just && tree-sitter test
   cargo test
 
 [group: 'dev']
 watch +COMMAND='test':
   cargo watch --clear --exec "{{COMMAND}}"
+
+[group: 'web']
+[working-directory: 'www']
+web-build: build-wasm
+  bun run build
+
+[group: 'web']
+[working-directory: 'www']
+web-dev: build-wasm
+  bun run dev
+
+[group: 'web']
+[working-directory: 'www']
+web-fmt:
+  bun run format
+
+[group: 'web']
+[working-directory: 'www']
+web-install:
+  bun install

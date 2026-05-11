@@ -3,6 +3,7 @@ use super::*;
 pub trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
+  fn get_function(&self, document: &Document) -> Option<Function>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self, document: &Document) -> lsp::Range;
   fn get_recipe(&self, document: &Document) -> Option<Recipe>;
@@ -150,6 +151,14 @@ impl NodeExt for Node<'_> {
     }
 
     collect_nodes_by_kind(*self, selector)
+  }
+
+  fn get_function(&self, document: &Document) -> Option<Function> {
+    let function_node = self.get_parent("function_definition")?;
+
+    document.find_function(
+      &document.get_node_text(&function_node.child_by_field_name("name")?),
+    )
   }
 
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {

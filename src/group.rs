@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Group {
+  Android,
   Any,
   Dragonfly,
   Freebsd,
@@ -19,6 +20,7 @@ impl Group {
   #[must_use]
   pub fn targets(attribute: &str) -> Option<Vec<Self>> {
     match attribute {
+      "android" => Some(vec![Group::Android]),
       "dragonfly" => Some(vec![Group::Dragonfly]),
       "freebsd" => Some(vec![Group::Freebsd]),
       "linux" => Some(vec![Group::Linux]),
@@ -26,6 +28,7 @@ impl Group {
       "netbsd" => Some(vec![Group::Netbsd]),
       "openbsd" => Some(vec![Group::Openbsd]),
       "unix" => Some(vec![
+        Group::Android,
         Group::Dragonfly,
         Group::Freebsd,
         Group::Linux,

@@ -98,13 +98,7 @@ impl MixedIndentationRule {
   ) -> Diagnostic {
     let indent = u32::try_from(indent_length).unwrap_or(u32::MAX);
 
-    let range = lsp::Range {
-      start: lsp::Position { line, character: 0 },
-      end: lsp::Position {
-        line,
-        character: indent,
-      },
-    };
+    let range = lsp::Range::at(line, 0, line, indent);
 
     Diagnostic::error(
       format!("Recipe `{recipe_name}` mixes tabs and spaces for indentation"),

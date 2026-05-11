@@ -126,13 +126,7 @@ impl InconsistentIndentationRule {
   fn make_diagnostic(expected: &str, found: &str, line: u32) -> Diagnostic {
     let indent_chars = u32::try_from(found.chars().count()).unwrap_or(u32::MAX);
 
-    let range = lsp::Range {
-      start: lsp::Position { line, character: 0 },
-      end: lsp::Position {
-        line,
-        character: indent_chars,
-      },
-    };
+    let range = lsp::Range::at(line, 0, line, indent_chars);
 
     Diagnostic::error(
       format!(

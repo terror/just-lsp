@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useEditorSettings } from '@/providers/editor-settings-provider';
+import { useEditorSettings } from '@/contexts/editor-settings-context';
 import { Settings } from 'lucide-react';
 import { useState } from 'react';
 

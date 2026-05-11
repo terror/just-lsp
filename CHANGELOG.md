@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.4.4](https://github.com/terror/just-lsp/releases/tag/0.4.4) - 2026-05-04
+
+### Added
+
+- Add support for expressions in settings ([#370](https://github.com/terror/just-lsp/pull/370) by [terror](https://github.com/terror))
+- Add rules for user-defined function duplicates ([#369](https://github.com/terror/just-lsp/pull/369) by [terror](https://github.com/terror))
+- Add support for expressions in attributes ([#366](https://github.com/terror/just-lsp/pull/366) by [terror](https://github.com/terror))
+- Add support for logical expression operators ([#365](https://github.com/terror/just-lsp/pull/365) by [terror](https://github.com/terror))
+- Add support for `module_path` builtin function ([#364](https://github.com/terror/just-lsp/pull/364) by [terror](https://github.com/terror))
+- Add support for `android` platform attribute ([#363](https://github.com/terror/just-lsp/pull/363) by [terror](https://github.com/terror))
+- Add support for `no-cd` setting ([#362](https://github.com/terror/just-lsp/pull/362) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix module builtin completion snippets ([#368](https://github.com/terror/just-lsp/pull/368) by [terror](https://github.com/terror))
+- Find variable references outside recipes ([#355](https://github.com/terror/just-lsp/pull/355) by [terror](https://github.com/terror))
+- Resolve user-defined function parameters ([#354](https://github.com/terror/just-lsp/pull/354) by [terror](https://github.com/terror))
+
+### Misc
+
+- Stack web playground panes on small screens ([#372](https://github.com/terror/just-lsp/pull/372) by [terror](https://github.com/terror))
+- Parse recipe parameters from syntax tree nodes ([#371](https://github.com/terror/just-lsp/pull/371) by [terror](https://github.com/terror))
+- Add about dialog to web playground ([#361](https://github.com/terror/just-lsp/pull/361) by [terror](https://github.com/terror))
+- Bump cc from 1.2.60 to 1.2.61 ([#360](https://github.com/terror/just-lsp/pull/360) by [app/dependabot](https://github.com/app/dependabot))
+- Assert diagnostic ranges in analyzer tests ([#359](https://github.com/terror/just-lsp/pull/359) by [terror](https://github.com/terror))
+- Expand `analyze` integration tests for path handling and diagnostics ([#358](https://github.com/terror/just-lsp/pull/358) by [terror](https://github.com/terror))
+- Add integration tests for `analyze` subcommand ([#357](https://github.com/terror/just-lsp/pull/357) by [terror](https://github.com/terror))
+- Style clap help output ([#356](https://github.com/terror/just-lsp/pull/356) by [terror](https://github.com/terror))
+- Extract changelog in release workflow ([#353](https://github.com/terror/just-lsp/pull/353) by [terror](https://github.com/terror))
+- Sort builtins alphabetically by name within each kind ([#351](https://github.com/terror/just-lsp/pull/351) by [terror](https://github.com/terror))
+
+## [0.4.3](https://github.com/terror/just-lsp/releases/tag/0.4.3) - 2026-04-24
+
+### Added
+
+- Expand builtin hover documentation ([#349](https://github.com/terror/just-lsp/pull/349) by [terror](https://github.com/terror))
+- Add quickfix actions for deprecated settings ([#347](https://github.com/terror/just-lsp/pull/347) by [terror](https://github.com/terror))
+- Add quickfix actions for deprecated function calls ([#342](https://github.com/terror/just-lsp/pull/342) by [terror](https://github.com/terror))
+
+### Misc
+
+- Assert exact values in resolver tests ([#348](https://github.com/terror/just-lsp/pull/348) by [terror](https://github.com/terror))
+- Bump tokio from 1.51.1 to 1.52.1 ([#346](https://github.com/terror/just-lsp/pull/346) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.6.0 to 4.6.1 ([#345](https://github.com/terror/just-lsp/pull/345) by [app/dependabot](https://github.com/app/dependabot))
+- Bump thiserror from 2.0.17 to 2.0.18 ([#338](https://github.com/terror/just-lsp/pull/338) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.7 to 0.26.8 ([#337](https://github.com/terror/just-lsp/pull/337) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.59 to 1.2.60 ([#336](https://github.com/terror/just-lsp/pull/336) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tokio from 1.51.0 to 1.51.1 ([#335](https://github.com/terror/just-lsp/pull/335) by [app/dependabot](https://github.com/app/dependabot))
+- Expose library interface ([#333](https://github.com/terror/just-lsp/pull/333) by [terror](https://github.com/terror))
+
 ## [0.4.2](https://github.com/terror/just-lsp/releases/tag/0.4.2) - 2026-04-09
 
 ### Added

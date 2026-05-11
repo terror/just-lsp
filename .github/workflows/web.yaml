@@ -2,9 +2,11 @@ name: Web
 
 on:
   push:
-    branches: ['master']
+    branches:
+    - master
   pull_request:
-    branches: ['*']
+    branches:
+    - '*'
   workflow_dispatch:
 
 permissions:
@@ -13,44 +15,57 @@ permissions:
   id-token: write
 
 concurrency:
-  group: 'pages'
+  group: pages
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
 
-      - name: Install dependencies
-        working-directory: ./www
-        run: bun install
+    - name: Install dependencies
+      working-directory: ./www
+      run: bun install
 
-      - name: Test
-        working-directory: ./www
-        run: bun test
+    - name: Format
+      working-directory: ./www
+      run: bun run format-check
 
-      - name: Build
-        working-directory: ./www
-        run: bun run build
+    - name: Lint
+      working-directory: ./www
+      run: bun run lint
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './www/dist'
+    - name: Test
+      working-directory: ./www
+      run: bun test --pass-with-no-tests
+
+    - name: Build
+      working-directory: ./www
+      run: bun run build
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./www/dist
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -60,6 +75,6 @@ jobs:
     needs: build
 
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

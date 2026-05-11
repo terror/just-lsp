@@ -141,7 +141,7 @@ alias t := test
 
 # Run tests that are built into tree-sitter, as well as integration and Cargo tests
 test *ts-test-args: gen
-	npx tree-sitter test {{ ts-test-args }}
+	tree-sitter test {{ ts-test-args }}
 	@just test-parse-highlight
 	@just verify-no-error-tests
 

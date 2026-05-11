@@ -67,7 +67,9 @@ impl ArgAttributeRule {
     let positional = identifier
       .siblings()
       .take_while(|node| node.kind() != "identifier")
-      .filter(|node| node.kind() == "string")
+      .filter(|node| {
+        node.kind() == "expression" && node.start_byte() != node.end_byte()
+      })
       .collect::<Vec<_>>();
 
     let kwargs = identifier
@@ -88,7 +90,7 @@ impl ArgAttributeRule {
     let unknown_parameter =
       Self::parameter_unknown(context, attribute, &parameter_name).then(|| {
         Diagnostic::error(
-          format!("`[arg]` references unknown parameter `{parameter_name}`",),
+          format!("`[arg]` references unknown parameter `{parameter_name}`"),
           name_node.get_range(document),
         )
       });

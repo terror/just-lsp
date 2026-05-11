@@ -12,6 +12,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `alias-recipe-conflict`           | Alias/Recipe Conflicts          | Alias and recipe share a name and would shadow each other.                                                                    |
 | `unknown-attribute`               | Unknown Attribute               | Attribute name is not part of the builtin catalog.                                                                            |
 | `attribute-arguments`             | Attribute Arguments             | Attribute invocation uses the wrong number of arguments.                                                                      |
+| `attribute-argument-expressions`  | Attribute Argument Expressions  | Attribute invocation uses an expression argument where just requires a string literal.                                        |
 | `arg-attribute`                   | Arg Attribute                   | `[arg(NAME, ...)]` references an unknown parameter, uses an unknown keyword, or uses `value=` without `long=` or `short=`.    |
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                                                        |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind (recipe, alias, module, etc.).                                                |
@@ -30,6 +31,8 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `inconsistent-recipe-indentation` | Inconsistent Recipe Indentation | Recipe indentation width changes after the first indented line.                                                               |
 | `unknown-function`                | Unknown Function                | Call targets a function that isn’t part of the builtin set.                                                                   |
 | `function-arguments`              | Function Arguments              | Builtin function call uses the wrong number of arguments.                                                                     |
+| `duplicate-function`              | Duplicate Function              | User-defined function name is defined more than once.                                                                         |
+| `function-parameters`             | Function Parameters             | User-defined function parameter list has duplicates.                                                                          |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type (bool/string/array).                                                            |
 | `duplicate-setting`               | Duplicate Setting               | Setting key is configured more than once.                                                                                     |

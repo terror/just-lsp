@@ -7,18 +7,23 @@ import { Bot, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import defaultJustfile from '../../justfile?raw';
+import { AboutDialog } from './components/about-dialog';
 import { EditorPane } from './components/editor-pane';
 import { TreePane } from './components/tree-pane';
 import { useEditorExtensions } from './hooks/use-editor-extensions';
+import { useMediaQuery } from './hooks/use-media-query';
 import { usePersistedDoc } from './hooks/use-persisted-doc';
 import { useSyntaxTree } from './hooks/use-syntax-tree';
 import { useTreeSitter } from './hooks/use-tree-sitter';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
+const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
 const App = () => {
   const { parser, language: justLanguage, loading, error } = useTreeSitter();
+  const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
+  const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
   const [doc, setDoc] = usePersistedDoc(
     EDITOR_STORAGE_KEY,
@@ -66,12 +71,16 @@ const App = () => {
         <a href='/' className='font-semibold'>
           just-lsp
         </a>
+        <div className='ml-auto'>
+          <AboutDialog />
+        </div>
       </div>
 
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
-          autoSaveId={PANEL_LAYOUT_STORAGE_KEY}
-          direction='horizontal'
+          key={panelDirection}
+          autoSaveId={`${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`}
+          direction={panelDirection}
           className='h-full rounded border'
         >
           <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
