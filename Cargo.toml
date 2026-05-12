@@ -71,4 +71,4 @@ serde_json = "1.0.149"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.61"
+cc = "1.2.62"
