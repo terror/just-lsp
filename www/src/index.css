@@ -201,10 +201,6 @@
   text-decoration-style: wavy;
 }
 
-.editor-host {
-  --editor-font-size: 14px;
-}
-
 .editor-host .cm-editor {
   height: 100%;
   display: flex;
