@@ -27,12 +27,7 @@ impl<'a> RuleContext<'a> {
   pub fn aliases(&self) -> &[Alias] {
     self
       .aliases
-      .get_or_init(|| {
-        once(self.document)
-          .chain(&self.imported_documents)
-          .flat_map(Document::aliases)
-          .collect()
-      })
+      .get_or_init(|| self.documents().flat_map(Document::aliases).collect())
       .as_slice()
   }
 
@@ -130,6 +125,10 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  fn documents(&self) -> impl Iterator<Item = &Document> {
+    once(self.document).chain(self.imported_documents.iter())
+  }
+
   pub fn function_calls(&self) -> &[FunctionCall] {
     self
       .function_calls
@@ -140,12 +139,7 @@ impl<'a> RuleContext<'a> {
   pub fn functions(&self) -> &[Function] {
     self
       .functions
-      .get_or_init(|| {
-        once(self.document)
-          .chain(&self.imported_documents)
-          .flat_map(Document::functions)
-          .collect()
-      })
+      .get_or_init(|| self.documents().flat_map(Document::functions).collect())
       .as_slice()
   }
 
@@ -203,12 +197,7 @@ impl<'a> RuleContext<'a> {
   pub fn recipes(&self) -> &[Recipe] {
     self
       .recipes
-      .get_or_init(|| {
-        once(self.document)
-          .chain(&self.imported_documents)
-          .flat_map(Document::recipes)
-          .collect()
-      })
+      .get_or_init(|| self.documents().flat_map(Document::recipes).collect())
       .as_slice()
   }
 
@@ -282,12 +271,7 @@ impl<'a> RuleContext<'a> {
   pub fn settings(&self) -> &[Setting] {
     self
       .settings
-      .get_or_init(|| {
-        once(self.document)
-          .chain(&self.imported_documents)
-          .flat_map(Document::settings)
-          .collect()
-      })
+      .get_or_init(|| self.documents().flat_map(Document::settings).collect())
       .as_slice()
   }
 
@@ -321,12 +305,7 @@ impl<'a> RuleContext<'a> {
   pub fn variables(&self) -> &[Variable] {
     self
       .variables
-      .get_or_init(|| {
-        once(self.document)
-          .chain(&self.imported_documents)
-          .flat_map(Document::variables)
-          .collect()
-      })
+      .get_or_init(|| self.documents().flat_map(Document::variables).collect())
       .as_slice()
   }
 }
