@@ -876,6 +876,23 @@ mod tests {
   }
 
   #[test]
+  fn attributes_exit_message_conflicts_with_no_exit_message() {
+    Test::new(indoc! {
+      "
+      [exit-message]
+      [no-exit-message]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` can't combine `[exit-message]` with `[no-exit-message]`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn attributes_wrong_target() {
     Test::new(indoc! {
       "
