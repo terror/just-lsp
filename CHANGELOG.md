@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.5](https://github.com/terror/just-lsp/releases/tag/0.4.5) - 2026-05-20
+
+### Added
+
+- Add rule for conflicting exit message attributes (#391)
+- Add nix flake support (#387)
+- Add rule for invalid attribute expression arguments (#377)
+
+### Fixed
+
+- Fix playground font size setting (#388)
+- Fix unused parameter warning for positional shebang recipes (#379)
+- Fix open brace recipe lines (#376)
+
+### Misc
+
+- Add shared `RuleContext` document iterator (#390)
+- Bump tree-sitter from 0.26.8 to 0.26.9 (#389)
+- Use seti-inspired light syntax highlighting in web playground (#386)
+- Bump tokio from 1.52.2 to 1.52.3 (#384)
+- Bump cc from 1.2.61 to 1.2.62 (#383)
+- Enforce stricter workspace lints (#381)
+- Sort analyzer tests alphabetically (#380)
+- Bump tokio from 1.52.1 to 1.52.2 (#374)
+
 ## [0.4.4](https://github.com/terror/just-lsp/releases/tag/0.4.4) - 2026-05-04
 
 ### Added
