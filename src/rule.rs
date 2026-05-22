@@ -10,7 +10,7 @@ macro_rules! define_rule {
     }
   ) => {
     $(#[$doc])*
-    pub struct $name;
+    struct $name;
 
     impl Rule for $name {
       fn id(&self) -> &'static str {
@@ -48,6 +48,7 @@ mod duplicate_function;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_variables;
+mod exit_message_conflict;
 mod extension_without_script;
 mod function_arguments;
 mod function_parameters;

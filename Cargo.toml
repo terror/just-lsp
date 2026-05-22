@@ -1,6 +1,6 @@
 [package]
 name = "just-lsp"
-version = "0.4.4"
+version = "0.4.5"
 description = "A language server for just"
 authors = ["Liam <liam@scalzulli.com>"]
 license = "CC0-1.0"
@@ -22,36 +22,25 @@ include = [
   "/vendor/*-src/**/**.h"
 ]
 
+[workspace]
+members = [".", "crates/*"]
+
+[workspace.lints.rust]
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+arbitrary-source-item-ordering = "deny"
+pedantic = { level = "deny", priority = -1 }
+too_many_lines = "allow"
+wildcard_imports = "allow"
+
 [lints]
 workspace = true
 
 [profile.release]
 codegen-units = 1
 lto = true
-
-[workspace]
-members = [".", "crates/*"]
-
-[workspace.lints.rust]
-mismatched_lifetime_syntaxes = "allow"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
-
-[workspace.lints.clippy]
-all = { level = "deny", priority = -1 }
-arbitrary-source-item-ordering = "deny"
-enum_glob_use = "allow"
-ignore_without_reason = "allow"
-needless_pass_by_value = "allow"
-pedantic = { level = "deny", priority = -1 }
-similar_names = "allow"
-struct_excessive_bools = "allow"
-struct_field_names = "allow"
-too_many_arguments = "allow"
-too_many_lines = "allow"
-type_complexity = "allow"
-undocumented_unsafe_blocks = "deny"
-unnecessary_wraps = "allow"
-wildcard_imports = "allow"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -68,10 +57,10 @@ serde_json = "1.0.149"
 target = "2.1.0"
 tempfile = "3.27.0"
 thiserror = "2"
-tokio = { version = "1.52.2", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.18", features = ["io-util"] }
 tower-lsp = "0.20.0"
-tree-sitter = "0.26.8"
+tree-sitter = "0.26.9"
 tree-sitter-highlight = "0.26.8"
 yansi = "1.0.1"
 
@@ -82,4 +71,4 @@ serde_json = "1.0.149"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.61"
+cc = "1.2.62"

@@ -1,4 +1,5 @@
 import { useEditorSettings } from '@/contexts/editor-settings-context';
+import { base16SetiTheme } from '@/lib/base16-seti-theme';
 import { highlightExtension } from '@/lib/cm-highlight-extension';
 import { createJustSyntaxHighlightingExtension } from '@/lib/just-syntax-highlighting';
 import { EditorState, Extension } from '@codemirror/state';
@@ -20,6 +21,7 @@ export function useEditorExtensions({
 
   return useMemo(() => {
     const extensions: Extension[] = [
+      base16SetiTheme,
       EditorState.tabSize.of(settings.tabSize),
       ...createJustSyntaxHighlightingExtension(language),
       highlightExtension(highlight),

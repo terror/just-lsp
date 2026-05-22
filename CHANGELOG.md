@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.5](https://github.com/terror/just-lsp/releases/tag/0.4.5) - 2026-05-20
+
+### Added
+
+- Add rule for conflicting exit message attributes ([#391](https://github.com/terror/just-lsp/pull/391) by [terror](https://github.com/terror))
+- Add nix flake support ([#387](https://github.com/terror/just-lsp/pull/387) by [terror](https://github.com/terror))
+- Add rule for invalid attribute expression arguments ([#377](https://github.com/terror/just-lsp/pull/377) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix playground font size setting ([#388](https://github.com/terror/just-lsp/pull/388) by [terror](https://github.com/terror))
+- Fix unused parameter warning for positional shebang recipes ([#379](https://github.com/terror/just-lsp/pull/379) by [terror](https://github.com/terror))
+- Fix open brace recipe lines ([#376](https://github.com/terror/just-lsp/pull/376) by [terror](https://github.com/terror))
+
+### Misc
+
+- Add shared `RuleContext` document iterator ([#390](https://github.com/terror/just-lsp/pull/390) by [terror](https://github.com/terror))
+- Bump tree-sitter from 0.26.8 to 0.26.9 ([#389](https://github.com/terror/just-lsp/pull/389) by [app/dependabot](https://github.com/app/dependabot))
+- Use seti-inspired light syntax highlighting in web playground ([#386](https://github.com/terror/just-lsp/pull/386) by [terror](https://github.com/terror))
+- Bump tokio from 1.52.2 to 1.52.3 ([#384](https://github.com/terror/just-lsp/pull/384) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.61 to 1.2.62 ([#383](https://github.com/terror/just-lsp/pull/383) by [app/dependabot](https://github.com/app/dependabot))
+- Enforce stricter workspace lints ([#381](https://github.com/terror/just-lsp/pull/381) by [terror](https://github.com/terror))
+- Sort analyzer tests alphabetically ([#380](https://github.com/terror/just-lsp/pull/380) by [terror](https://github.com/terror))
+- Bump tokio from 1.52.1 to 1.52.2 ([#374](https://github.com/terror/just-lsp/pull/374) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.4.4](https://github.com/terror/just-lsp/releases/tag/0.4.4) - 2026-05-04
 
 ### Added

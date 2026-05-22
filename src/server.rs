@@ -1214,14 +1214,14 @@ mod tests {
   }
 
   impl Test {
-    fn new() -> Result<Self> {
+    fn new() -> Self {
       let (service, _) = LspService::new(Server::new);
 
-      Ok(Self {
+      Self {
         requests: Vec::new(),
         responses: Vec::new(),
         service: Spawn::new(service),
-      })
+      }
     }
 
     fn notification<T: IntoValue>(mut self, notification: T) -> Self {
@@ -1998,7 +1998,7 @@ mod tests {
 
   #[tokio::test]
   async fn initialize() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .run()
@@ -2007,7 +2007,7 @@ mod tests {
 
   #[tokio::test]
   async fn initialize_once() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .request(InitializeRequest { id: 1 })
@@ -2025,7 +2025,7 @@ mod tests {
 
   #[tokio::test]
   async fn shutdown() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .request(json!({
@@ -2044,7 +2044,7 @@ mod tests {
 
   #[tokio::test]
   async fn did_change_updates_document() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2086,7 +2086,7 @@ mod tests {
 
   #[tokio::test]
   async fn did_change_without_open_document_is_ignored() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidChangeNotification {
@@ -2131,7 +2131,7 @@ mod tests {
 
   #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2166,7 +2166,7 @@ mod tests {
 
   #[tokio::test]
   async fn recipe_references() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2222,7 +2222,7 @@ mod tests {
 
   #[tokio::test]
   async fn rename_recipe() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2279,7 +2279,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_builtin_function() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2325,7 +2325,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_recipe() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2361,7 +2361,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_constant() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2408,7 +2408,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_same_named_recipes_and_functions() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2472,7 +2472,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_attribute() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2523,7 +2523,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_setting() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2577,7 +2577,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_variable_in_interpolation() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2612,7 +2612,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_recipe_parameter_in_interpolation() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2646,7 +2646,7 @@ mod tests {
   #[tokio::test]
   async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
   -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2681,7 +2681,7 @@ mod tests {
 
   #[tokio::test]
   async fn hover_local_parameter() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2717,7 +2717,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_highlight() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2772,7 +2772,7 @@ mod tests {
 
   #[tokio::test]
   async fn semantic_tokens_basic() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2801,7 +2801,7 @@ mod tests {
 
   #[tokio::test]
   async fn folding_range() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2863,7 +2863,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_symbol_empty_document() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2885,7 +2885,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_symbol_with_recipes_and_variables() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2939,7 +2939,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_symbol_with_alias() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -2994,7 +2994,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_symbol_with_setting() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3049,7 +3049,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_empty_document() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3072,7 +3072,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_with_recipes() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3124,7 +3124,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_deprecated_function_quickfix() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3165,7 +3165,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_deprecated_function_or_default_quickfix() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3206,7 +3206,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_deprecated_function_outside_range() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3229,7 +3229,7 @@ mod tests {
 
   #[tokio::test]
   async fn prepare_rename_identifier() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3261,7 +3261,7 @@ mod tests {
 
   #[tokio::test]
   async fn prepare_rename_non_identifier() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3290,7 +3290,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_lens_empty_document() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3312,7 +3312,7 @@ mod tests {
 
   #[tokio::test]
   async fn code_lens_with_recipes() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3393,7 +3393,7 @@ mod tests {
 
   #[tokio::test]
   async fn document_link_empty_document() -> Result {
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3429,7 +3429,7 @@ mod tests {
       )
     };
 
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
@@ -3474,7 +3474,7 @@ mod tests {
       )
     };
 
-    Test::new()?
+    Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
