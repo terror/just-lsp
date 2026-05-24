@@ -41,4 +41,5 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `undefined-identifiers`           | Undefined Identifiers           | Identifier cannot be resolved to a parameter, variable, or builtin.                                                           |
 | `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read (unless exported).                                                                    |
+| `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                               |
 | `invalid-import-path`             | Invalid Import Path             | Non-optional import points to a path that does not exist on disk.                                                             |

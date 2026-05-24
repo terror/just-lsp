@@ -41,6 +41,7 @@ mod attribute_target_support;
 mod dependency_arguments;
 mod deprecated_function;
 mod deprecated_setting;
+mod dotenv_path_filename_conflict;
 mod duplicate_alias;
 mod duplicate_attribute;
 mod duplicate_dependencies;
