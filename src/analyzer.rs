@@ -3354,5 +3354,4 @@ mod tests {
     .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 6, 0))
     .run();
   }
-
 }
