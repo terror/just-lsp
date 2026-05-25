@@ -1218,6 +1218,50 @@ mod tests {
   }
 
   #[test]
+  fn dotenv_filename_without_path_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_and_filename_conflict() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "`dotenv-path` overrides `dotenv-filename`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_without_filename_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn duplicate_dragonfly_attribute() {
     Test::new(indoc! {
       "
