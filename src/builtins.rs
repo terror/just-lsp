@@ -2119,6 +2119,21 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "default-list",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      List available recipes instead of running the default recipe
+      when `just` is invoked without a recipe name.
+
+      ```just
+      set default-list
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "dotenv-filename",
     kind: SettingKind::String,
     description: indoc! {
