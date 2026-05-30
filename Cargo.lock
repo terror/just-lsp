@@ -726,9 +726,9 @@ name = "just-lsp-wasm"
 version = "0.0.0"
 dependencies = [
  "just-lsp",
- "lsp-types",
  "serde",
  "serde-wasm-bindgen",
+ "tower-lsp",
  "typeshare",
  "wasm-bindgen",
 ]
