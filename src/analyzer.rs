@@ -2733,6 +2733,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_default_list_recognized() {
+    Test::new(indoc! {
+      "
+      set default-list
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_guards_recognized() {
     Test::new(indoc! {
       "
