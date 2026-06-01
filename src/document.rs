@@ -179,7 +179,7 @@ impl Document {
   /// # Errors
   ///
   /// Returns an [`Error`] if formatting fails.
-  pub fn format(&self) -> Result<String> {
+  pub fn format(&self, config: &FormattingConfig) -> Result<String> {
     let file = if let Ok(path) = self.uri.to_file_path() {
       tempfile::Builder::new()
         .prefix(".justfile-fmt-")
@@ -198,13 +198,15 @@ impl Document {
 
     fs::write(&file, content.as_bytes())?;
 
-    let output = std::process::Command::new("just")
-      .arg("--fmt")
-      .arg("--unstable")
-      .arg("--quiet")
-      .arg("--justfile")
-      .arg(file.path())
-      .output()?;
+    let mut command = std::process::Command::new("just");
+
+    command.arg("--fmt").arg("--unstable").arg("--quiet");
+
+    if let Some(indentation) = &config.indentation {
+      command.arg("--indentation").arg(indentation);
+    }
+
+    let output = command.arg("--justfile").arg(file.path()).output()?;
 
     if !output.status.success() {
       return Err(Error::Format(format!(

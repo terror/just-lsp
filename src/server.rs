@@ -739,6 +739,8 @@ impl Inner {
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
+    let config = self.config.read().await;
+
     let documents = self.documents.read().await;
 
     let Some(document) = documents.get(&params.text_document.uri) else {
@@ -747,7 +749,7 @@ impl Inner {
 
     let content = document.content.to_string();
 
-    match document.format() {
+    match document.format(&config.formatting) {
       Ok(formatted) if formatted == content => Ok(Some(vec![])),
       Ok(formatted) => {
         let end = document

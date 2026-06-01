@@ -3,6 +3,8 @@ use super::*;
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct Config {
   #[serde(default)]
+  pub formatting: FormattingConfig,
+  #[serde(default)]
   pub rules: HashMap<String, RuleConfig>,
 }
 
@@ -11,6 +13,11 @@ impl Config {
   pub fn rule_config(&self, id: &str) -> RuleConfig {
     self.rules.get(id).cloned().unwrap_or_default()
   }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct FormattingConfig {
+  pub indentation: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]

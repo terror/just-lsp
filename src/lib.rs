@@ -23,7 +23,7 @@ pub use {
   attribute_target::AttributeTarget,
   builtin::Builtin,
   builtins::BUILTINS,
-  config::{Config, RuleConfig, RuleLevel},
+  config::{Config, FormattingConfig, RuleConfig, RuleLevel},
   count::Count,
   dependency::Dependency,
   diagnostic::Diagnostic,
