@@ -198,7 +198,7 @@ impl Document {
 
     fs::write(&file, content.as_bytes())?;
 
-    let mut command = std::process::Command::new("just");
+    let mut command = process::Command::new("just");
 
     command.arg("--fmt").arg("--unstable").arg("--quiet");
 
