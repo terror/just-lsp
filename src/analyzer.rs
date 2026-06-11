@@ -1640,6 +1640,17 @@ mod tests {
   }
 
   #[test]
+  fn function_calls_recipe_name_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ recipe_name() }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn function_calls_nested() {
     Test::new(indoc! {
       "

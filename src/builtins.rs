@@ -1634,6 +1634,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "recipe_name",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the name of the current recipe.
+
+      ```just
+      foo:
+        echo {{ recipe_name() }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "replace",
     aliases: &[],
     kind: FunctionKind::Ternary,

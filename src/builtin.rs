@@ -101,6 +101,7 @@ impl Builtin<'_> {
       | "os"
       | "os_family"
       | "is_dependency"
+      | "recipe_name"
       | "invocation_directory"
       | "invocation_directory_native"
       | "invocation_dir"
@@ -285,6 +286,36 @@ mod tests {
           ..Default::default()
         },
       ],
+    );
+  }
+
+  #[test]
+  fn recipe_name_uses_nullary_snippet() {
+    let items = Builtin::Function {
+      name: "recipe_name",
+      aliases: &[],
+      kind: FunctionKind::Nullary,
+      description: "bar",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items,
+      vec![lsp::CompletionItem {
+        label: "recipe_name".into(),
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: "bar".into(),
+          },
+        )),
+        insert_text: Some("recipe_name()".into()),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        sort_text: Some("zrecipe_name".into()),
+        ..Default::default()
+      }],
     );
   }
 }
