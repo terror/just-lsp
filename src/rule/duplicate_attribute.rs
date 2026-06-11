@@ -123,6 +123,11 @@ const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
     key: DuplicateKey::Name,
   },
   DuplicateConstraint {
+    name: "shell",
+    scope: DuplicateScope::Recipe,
+    key: DuplicateKey::Name,
+  },
+  DuplicateConstraint {
     name: "unix",
     scope: DuplicateScope::Recipe,
     key: DuplicateKey::Name,
