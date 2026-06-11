@@ -924,6 +924,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "assert",
+    aliases: &[],
+    kind: FunctionKind::Binary,
+    description: indoc! {
+      "
+      Abort execution with `message` if `condition` is false.
+
+      ```just
+      foo version:
+        echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "blake3",
     aliases: &[],
     kind: FunctionKind::Unary,
