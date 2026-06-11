@@ -558,6 +558,18 @@ mod tests {
   }
 
   #[test]
+  fn attributes_shell_recognized() {
+    Test::new(indoc! {
+      "
+      [shell]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_duplicate_default_between_recipes() {
     Test::new(indoc! {
       "
@@ -619,6 +631,23 @@ mod tests {
     })
     .error(
       "Recipe attribute `script` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_shell_attribute() {
+    Test::new(indoc! {
+      "
+      [shell]
+      [shell]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `shell` is duplicated",
       lsp::Range::at(1, 0, 2, 0),
     )
     .run();
@@ -1634,6 +1663,17 @@ mod tests {
       foo:
         echo {{ arch() }}
         echo {{ join(\"a\", \"b\", \"c\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_recipe_name_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ recipe_name() }}
       "
     })
     .run();
@@ -2737,6 +2777,19 @@ mod tests {
     Test::new(indoc! {
       "
       set default-list
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_default_script_recognized() {
+    Test::new(indoc! {
+      "
+      set default-script
 
       foo:
         echo \"foo\"

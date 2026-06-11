@@ -524,6 +524,27 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "shell",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Execute the recipe as a shell recipe.
+
+      This overrides `set default-script`, which otherwise makes
+      recipes default to script recipes.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "unix",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -1650,6 +1671,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "recipe_name",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the name of the current recipe.
+
+      ```just
+      foo:
+        echo {{ recipe_name() }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "replace",
     aliases: &[],
     kind: FunctionKind::Ternary,
@@ -2144,6 +2181,28 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       ```just
       set default-list
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "default-script",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Run recipes as script recipes by default instead of shell
+      recipes.
+
+      Recipes can opt back into shell execution with the `[shell]`
+      attribute.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
       ```
       "
     },

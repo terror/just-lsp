@@ -104,6 +104,7 @@ impl Builtin<'_> {
       | "os"
       | "os_family"
       | "is_dependency"
+      | "recipe_name"
       | "invocation_directory"
       | "invocation_directory_native"
       | "invocation_dir"
