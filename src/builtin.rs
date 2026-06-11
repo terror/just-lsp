@@ -96,6 +96,9 @@ impl Builtin<'_> {
       "append" => {
         format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
       }
+      "assert" => {
+        format!("{name}(${{1:condition}}, ${{2:message:string}})")
+      }
       "arch"
       | "num_cpus"
       | "os"
