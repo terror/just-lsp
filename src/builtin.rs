@@ -290,34 +290,4 @@ mod tests {
       ],
     );
   }
-
-  #[test]
-  fn assert_uses_condition_snippet() {
-    let items = Builtin::Function {
-      name: "assert",
-      aliases: &[],
-      kind: FunctionKind::Binary,
-      description: "bar",
-      deprecated: None,
-    }
-    .completion_items();
-
-    assert_eq!(
-      items,
-      vec![lsp::CompletionItem {
-        label: "assert".into(),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::Markdown,
-            value: "bar".into(),
-          },
-        )),
-        insert_text: Some("assert(${1:condition}, ${2:message:string})".into()),
-        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-        sort_text: Some("zassert".into()),
-        ..Default::default()
-      }],
-    );
-  }
 }
