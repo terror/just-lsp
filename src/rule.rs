@@ -56,6 +56,7 @@ mod function_parameters;
 mod inconsistent_indentation;
 mod invalid_import_path;
 mod invalid_setting_kind;
+mod mapped_dependencies;
 mod missing_dependencies;
 mod missing_recipe_for_alias;
 mod mixed_indentation;

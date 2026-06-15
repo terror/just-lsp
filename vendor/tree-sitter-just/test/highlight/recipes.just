@@ -74,6 +74,16 @@ fred: garply && (waldo "x")
 #                      ^^^ string
 #                         ^ punctuation.bracket
 
+mapped *args: *(fred *args)
+# <- function
+#      ^ operator
+#             ^ operator
+#              ^ punctuation.bracket
+#               ^^^^ function.call
+#                    ^ operator
+#                     ^^^^ variable
+#                         ^ punctuation.bracket
+
 # plugh
 plugh:
   echo "plugh"

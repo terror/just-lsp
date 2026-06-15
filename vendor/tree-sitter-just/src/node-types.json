@@ -263,6 +263,16 @@
     "type": "dependency_expression",
     "named": true,
     "fields": {
+      "map": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -284,6 +294,10 @@
       "types": [
         {
           "type": "expression",
+          "named": true
+        },
+        {
+          "type": "starred_dependency_argument",
           "named": true
         }
       ]
@@ -1014,6 +1028,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "starred_dependency_argument",
+    "named": true,
+    "fields": {
+      "argument": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "value",
+            "named": true
+          }
+        ]
+      },
+      "star": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          }
+        ]
+      }
     }
   },
   {

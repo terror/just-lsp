@@ -27,6 +27,7 @@ pub use {
   config::{Config, FormattingConfig, RuleConfig, RuleLevel},
   count::Count,
   dependency::Dependency,
+  dependency_argument::DependencyArgument,
   diagnostic::Diagnostic,
   document::Document,
   error::Error,
@@ -64,6 +65,7 @@ mod builtins;
 mod config;
 mod count;
 mod dependency;
+mod dependency_argument;
 mod diagnostic;
 mod document;
 mod error;

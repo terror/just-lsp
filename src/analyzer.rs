@@ -2264,6 +2264,116 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_mapped() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg:
+        echo {{arg}}
+
+      bar *args: (foo args) *(foo *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_lists() {
+    Test::new(indoc! {
+      "
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies require `set lists`",
+      lsp::Range::at(3, 11, 3, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_starred_argument() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo args: *(bar args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies must include a starred argument",
+      lsp::Range::at(5, 10, 5, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_reject_multiple_starred_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg other:
+        echo {{arg}} {{other}}
+
+      foo *args: *(bar *args *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies may not include multiple starred arguments",
+      lsp::Range::at(5, 23, 5, 24),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: (bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Starred dependency arguments require mapped dependencies",
+      lsp::Range::at(5, 16, 5, 17),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_inconsistent_indentation_between_lines() {
     Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
     .error(
@@ -3311,6 +3421,28 @@ mod tests {
     .warning(
       "Variable `unused_var` appears unused",
       lsp::Range::at(1, 0, 1, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_starred_dependency_args() {
+    Test::new(indoc! {
+      "
+      set lists
+      used := \"value\"
+      unused := \"not used\"
+
+      recipe: *(another *used)
+        echo \"foo\"
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning(
+      "Variable `unused` appears unused",
+      lsp::Range::at(2, 0, 2, 6),
     )
     .run();
   }
