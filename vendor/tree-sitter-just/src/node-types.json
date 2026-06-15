@@ -679,6 +679,21 @@
     }
   },
   {
+    "type": "not_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "parameter",
     "named": true,
     "fields": {
@@ -1112,6 +1127,10 @@
           "named": true
         },
         {
+          "type": "not_expression",
+          "named": true
+        },
+        {
           "type": "numeric_error",
           "named": true
         },
@@ -1151,6 +1170,10 @@
         }
       ]
     }
+  },
+  {
+    "type": "!",
+    "named": false
   },
   {
     "type": "!=",

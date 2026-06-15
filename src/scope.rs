@@ -28,7 +28,7 @@ impl<'a> Scope<'a> {
       scope.walk_function(node);
     }
 
-    for identifier in root.find_all("expression > value > identifier") {
+    for identifier in root.find_all("value > identifier") {
       if identifier.has_any_parent(&["function_definition", "recipe"]) {
         continue;
       }
@@ -102,16 +102,6 @@ impl<'a> Scope<'a> {
       .push((name, identifier.get_range(self.document)));
   }
 
-  fn record_value(&mut self, value_node: Node<'_>) {
-    for identifier in value_node.find_all("^identifier") {
-      self.record(identifier);
-    }
-
-    for identifier in value_node.find_all("expression > value > identifier") {
-      self.record(identifier);
-    }
-  }
-
   /// Enter a function definition scope and record its body.
   ///
   /// Parameters are all defined before processing the body, since `just`
@@ -171,9 +161,7 @@ impl<'a> Scope<'a> {
         if let Some(default_node) =
           parameter_node.child_by_field_name("default")
         {
-          for identifier in default_node
-            .find_all("^identifier, expression > value > identifier")
-          {
+          for identifier in default_node.find_all("value > identifier") {
             self.record(identifier);
           }
         }
@@ -184,20 +172,12 @@ impl<'a> Scope<'a> {
       }
     }
 
-    for identifier in recipe_node.find_all("expression > value > identifier") {
-      if identifier.has_any_parent(&[
-        "parameter",
-        "starred_dependency_argument",
-        "variadic_parameter",
-      ]) {
+    for identifier in recipe_node.find_all("value > identifier") {
+      if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
         continue;
       }
 
       self.record(identifier);
-    }
-
-    for value in recipe_node.find_all("starred_dependency_argument > value") {
-      self.record_value(value);
     }
 
     self.current_recipe = None;
@@ -361,6 +341,19 @@ mod tests {
       "
       foo := 'bar'
       baz := foo
+      "
+    })
+    .used(&["foo"])
+    .unused(&["baz"])
+    .run();
+  }
+
+  #[test]
+  fn variable_used_in_unary_assignment() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+      baz := !foo
       "
     })
     .used(&["foo"])

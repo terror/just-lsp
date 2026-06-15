@@ -254,6 +254,7 @@ module.exports = grammar({
           $.assert_expression,
           $.function_call,
           $.external_command,
+          $.not_expression,
           $.identifier,
           $.list_literal,
           $.string,
@@ -261,6 +262,8 @@ module.exports = grammar({
           seq("(", $.expression, ")"),
         ),
       ),
+
+    not_expression: ($) => prec(1, seq("!", $.value)),
 
     list_literal: ($) =>
       prec(
