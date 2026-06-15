@@ -6,6 +6,7 @@ define_rule! {
     message: "invalid mapped dependency",
     run(context) {
       let mut diagnostics = Vec::new();
+
       let lists = context.setting_enabled("lists");
 
       for recipe in context.recipes() {
