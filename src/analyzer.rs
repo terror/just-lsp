@@ -505,6 +505,7 @@ mod tests {
         {{ assert(name == \"bar\", \"msg\") }}
         {{ assert(name != \"bar\", \"msg\") }}
         {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+        {{ assert(name !~ \"^[a-z]+$\", \"msg\") }}
       "
     })
     .run();

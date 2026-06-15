@@ -233,6 +233,7 @@ module.exports = grammar({
         seq($.expression, "==", $.expression),
         seq($.expression, "!=", $.expression),
         seq($.expression, "=~", choice($.regex_literal, $.expression)),
+        seq($.expression, "!~", choice($.regex_literal, $.expression)),
         // verify whether this is valid
         $.expression,
       ),
