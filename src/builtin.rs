@@ -99,7 +99,7 @@ impl Builtin<'_> {
       "assert" => {
         format!("{name}(${{1:condition}}, ${{2:message:string}})")
       }
-      "bool" => format!("{name}(${{1:value}})"),
+      "bool" | "join_list" | "show" => format!("{name}(${{1:value}})"),
       "arch"
       | "num_cpus"
       | "os"
@@ -172,7 +172,6 @@ impl Builtin<'_> {
       "join" => format!(
         "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
       ),
-      "join_list" => format!("{name}(${{1:value}})"),
       "prepend" => {
         format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
       }
@@ -193,7 +192,6 @@ impl Builtin<'_> {
       "shell" => {
         format!("{name}(${{1:command:string}}${{2:, args:string...}})")
       }
-      "show" => format!("{name}(${{1:value}})"),
       "trim_end_match" | "trim_end_matches" | "trim_start_match"
       | "trim_start_matches" => {
         format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
