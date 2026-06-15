@@ -2825,6 +2825,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_lists_recognized() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_multiple_errors() {
     Test::new(indoc! {
       "

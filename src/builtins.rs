@@ -2417,6 +2417,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "lists",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Allow values to be lists of strings instead of only strings.
+
+      Currently unstable.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "no-cd",
     kind: SettingKind::Boolean(false),
     description: indoc! {
