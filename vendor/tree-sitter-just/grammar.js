@@ -367,10 +367,6 @@ module.exports = grammar({
 
     dependencies: ($) => repeat1(seq(optional("&&"), $.dependency)),
 
-    // dependency    : NAME
-    //               | module_path
-    //               | '(' NAME expression* ')'
-    //               | '(' module_path expression* ')'
     dependency: ($) =>
       choice(
         field("name", $.module_path),
@@ -378,14 +374,17 @@ module.exports = grammar({
         $.dependency_expression,
       ),
 
-    // contents of `(recipe expression)`
     dependency_expression: ($) =>
       seq(
+        optional(field("map", "*")),
         "(",
         field("name", choice($.module_path, $.identifier)),
-        repeat($.expression),
+        repeat(choice($.expression, $.starred_dependency_argument)),
         ")",
       ),
+
+    starred_dependency_argument: ($) =>
+      seq(field("star", "*"), field("argument", $.value)),
 
     // body          : INDENT line+ DEDENT
     recipe_body: ($) =>

@@ -102,6 +102,16 @@ impl<'a> Scope<'a> {
       .push((name, identifier.get_range(self.document)));
   }
 
+  fn record_value(&mut self, value_node: Node<'_>) {
+    for identifier in value_node.find_all("^identifier") {
+      self.record(identifier);
+    }
+
+    for identifier in value_node.find_all("expression > value > identifier") {
+      self.record(identifier);
+    }
+  }
+
   /// Enter a function definition scope and record its body.
   ///
   /// Parameters are all defined before processing the body, since `just`
@@ -175,11 +185,19 @@ impl<'a> Scope<'a> {
     }
 
     for identifier in recipe_node.find_all("expression > value > identifier") {
-      if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
+      if identifier.has_any_parent(&[
+        "parameter",
+        "starred_dependency_argument",
+        "variadic_parameter",
+      ]) {
         continue;
       }
 
       self.record(identifier);
+    }
+
+    for value in recipe_node.find_all("starred_dependency_argument > value") {
+      self.record_value(value);
     }
 
     self.current_recipe = None;

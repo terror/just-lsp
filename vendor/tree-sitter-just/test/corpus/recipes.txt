@@ -194,6 +194,143 @@ corge: foo (quux corge + banana)
         (text)))))
 
 ================================================================================
+mapped dependency calls
+================================================================================
+
+foo *args: *(bar *args)
+  body
+
+subsequent *args: && *(bar *args)
+  body
+
+unstarred args *args: *(bar args *args)
+  body
+
+outside *args: (bar *args)
+  body
+
+missing *args: *(bar args)
+  body
+
+grouped *args: *(bar *(args + " bob"))
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier)))
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (expression
+                  (value
+                    (identifier))
+                  (value
+                    (string)))))))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
 subsequent dependencies
 ================================================================================
 

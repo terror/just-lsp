@@ -26,7 +26,7 @@ pub use {
   builtins::BUILTINS,
   config::{Config, FormattingConfig, RuleConfig, RuleLevel},
   count::Count,
-  dependency::Dependency,
+  dependency::{Dependency, DependencyArgument},
   diagnostic::Diagnostic,
   document::Document,
   error::Error,

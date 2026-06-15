@@ -483,20 +483,48 @@ impl Document {
                   let arguments = dependency_node
                     .find("dependency_expression")
                     .map(|dependency_expression_node| {
+                      let mut cursor = dependency_expression_node.walk();
+
                       dependency_expression_node
-                        .find_all("^expression")
-                        .iter()
-                        .map(|argument_node| TextNode {
-                          value: self.get_node_text(argument_node),
-                          range: argument_node.get_range(self),
+                        .named_children(&mut cursor)
+                        .filter_map(|argument_node| {
+                          match argument_node.kind() {
+                            "expression" => Some(DependencyArgument {
+                              value: self.get_node_text(&argument_node),
+                              range: argument_node.get_range(self),
+                              starred: None,
+                            }),
+                            "starred_dependency_argument" => {
+                              let value_node = argument_node
+                                .child_by_field_name("argument")?;
+
+                              Some(DependencyArgument {
+                                value: self.get_node_text(&value_node),
+                                range: value_node.get_range(self),
+                                starred: argument_node
+                                  .child_by_field_name("star")
+                                  .map(|node| node.get_range(self)),
+                              })
+                            }
+                            _ => None,
+                          }
                         })
                         .collect()
                     })
                     .unwrap_or_default();
 
+                  let mapped = dependency_node
+                    .find("dependency_expression")
+                    .and_then(|dependency_expression_node| {
+                      dependency_expression_node
+                        .child_by_field_name("map")
+                        .map(|node| node.get_range(self))
+                    });
+
                   Some(Dependency {
                     name: dependency_name,
                     arguments,
+                    mapped,
                     range: dependency_node.get_range(self),
                   })
                 })
@@ -1279,6 +1307,7 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![],
+          mapped: None,
           range: lsp::Range::at(3, 5, 3, 8),
         }],
         parameters: vec![],
@@ -1315,6 +1344,7 @@ mod tests {
         dependencies: vec![Dependency {
           name: "tools::foo".into(),
           arguments: vec![],
+          mapped: None,
           range: lsp::Range::at(6, 5, 6, 15),
         }],
         parameters: vec![],
@@ -1348,19 +1378,73 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![
-            TextNode {
+            DependencyArgument {
               value: "'value1'".into(),
               range: lsp::Range::at(3, 10, 3, 18),
+              starred: None,
             },
-            TextNode {
+            DependencyArgument {
               value: "'value2'".into(),
               range: lsp::Range::at(3, 19, 3, 27),
+              starred: None,
             }
           ],
+          mapped: None,
           range: lsp::Range::at(3, 5, 3, 28),
         }],
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
+        range: lsp::Range::at(3, 0, 5, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_mapped_dependency_arguments() {
+    let document = Document::from(indoc! {
+      "
+      bar arg *args:
+        echo \"{{arg}} {{args}}\"
+
+      foo args: *(bar args *args)
+        echo \"foo\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo"),
+      Some(Recipe {
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(3, 0, 3, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: "bar".into(),
+          arguments: vec![
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 16, 3, 20),
+              starred: None,
+            },
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 22, 3, 26),
+              starred: Some(lsp::Range::at(3, 21, 3, 22)),
+            }
+          ],
+          mapped: Some(lsp::Range::at(3, 10, 3, 11)),
+          range: lsp::Range::at(3, 10, 3, 27),
+        }],
+        parameters: vec![Parameter {
+          name: "args".into(),
+          kind: ParameterKind::Normal,
+          default_value: None,
+          content: "args".into(),
+          range: lsp::Range::at(3, 4, 3, 8),
+        }],
+        content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       })
@@ -1415,11 +1499,13 @@ mod tests {
           Dependency {
             name: "foo".into(),
             arguments: vec![],
+            mapped: None,
             range: lsp::Range::at(6, 5, 6, 8),
           },
           Dependency {
             name: "bar".into(),
             arguments: vec![],
+            mapped: None,
             range: lsp::Range::at(6, 9, 6, 12),
           }
         ],
