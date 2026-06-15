@@ -223,3 +223,11 @@ foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch"
 #                                                                   ^ punctuation.bracket
 #                                                                     ^^^^^^^^^ string
 #                                                                                ^ punctuation.bracket
+
+foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
+# <- variable
+#          ^^ operator
+#             ^^ keyword.control.conditional
+#                ^^^^^^^^^^^ string
+#                            ^^ operator
+#                               ^^^^^^^^^^^^^ string

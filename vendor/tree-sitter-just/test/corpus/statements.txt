@@ -482,6 +482,33 @@ foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch"
               (string))))))))
 
 ================================================================================
+regex mismatch literal
+================================================================================
+
+foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (string)))
+          (regex_literal
+            (string)))
+        (expression
+          (value
+            (string)))
+        (else_clause
+          (expression
+            (value
+              (string))))))))
+
+================================================================================
 attribute on alias: Issue #158
 ================================================================================
 
