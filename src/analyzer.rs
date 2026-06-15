@@ -182,6 +182,17 @@ mod tests {
   }
 
   #[test]
+  fn accepts_unary_negation() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn alias_recipe_conflict_alias_then_recipe() {
     Test::new(indoc! {
       "
