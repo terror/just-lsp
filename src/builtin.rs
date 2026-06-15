@@ -99,6 +99,7 @@ impl Builtin<'_> {
       "assert" => {
         format!("{name}(${{1:condition}}, ${{2:message:string}})")
       }
+      "bool" => format!("{name}(${{1:value}})"),
       "arch"
       | "num_cpus"
       | "os"

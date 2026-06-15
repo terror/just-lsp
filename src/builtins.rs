@@ -988,6 +988,21 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "bool",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` to a canonical boolean value.
+
+      Returns `[]` when `value` is `\"\"`, `\"0\"`, `\"false\"`, or
+      `[]`, and `\"true\"` when `value` is `\"1\"` or `\"true\"`.
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "cache_directory",
     aliases: &["cache_dir"],
     kind: FunctionKind::Nullary,
