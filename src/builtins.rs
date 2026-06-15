@@ -1416,6 +1416,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "join_list",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Join the elements of `value` into a space-separated string.
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "just_executable",
     aliases: &[],
     kind: FunctionKind::Nullary,

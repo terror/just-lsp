@@ -172,6 +172,7 @@ impl Builtin<'_> {
       "join" => format!(
         "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
       ),
+      "join_list" => format!("{name}(${{1:value}})"),
       "prepend" => {
         format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
       }
