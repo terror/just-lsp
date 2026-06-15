@@ -118,6 +118,48 @@ combined := "foo" / bar() / baz
         (identifier)))))
 
 ================================================================================
+list literals
+================================================================================
+
+empty := []
+strings := ['foo', 'bar']
+trailing := [foo(), bar,]
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (function_call
+                  (identifier))))
+            (expression
+              (value
+                (identifier)))))))))
+
+================================================================================
 if
 ================================================================================
 
