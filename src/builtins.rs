@@ -1878,6 +1878,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "show",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` into a string containing its literal
+      representation. Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "snakecase",
     aliases: &[],
     kind: FunctionKind::Unary,
