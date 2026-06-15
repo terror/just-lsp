@@ -15,6 +15,12 @@ bar := "abc" + 'def' + foo
 #                    ^ operator
 #                      ^ variable
 
+negated := !foo
+# <- variable
+#       ^^ operator
+#          ^ operator
+#           ^^^ variable
+
 relative := "abc" / "def"
 # <- variable
 #        ^^ operator

@@ -28,7 +28,7 @@ impl<'a> Scope<'a> {
       scope.walk_function(node);
     }
 
-    for identifier in root.find_all("expression > value > identifier") {
+    for identifier in root.find_all("value > identifier") {
       if identifier.has_any_parent(&["function_definition", "recipe"]) {
         continue;
       }
@@ -161,9 +161,7 @@ impl<'a> Scope<'a> {
         if let Some(default_node) =
           parameter_node.child_by_field_name("default")
         {
-          for identifier in default_node
-            .find_all("^identifier, expression > value > identifier")
-          {
+          for identifier in default_node.find_all("value > identifier") {
             self.record(identifier);
           }
         }
@@ -174,7 +172,7 @@ impl<'a> Scope<'a> {
       }
     }
 
-    for identifier in recipe_node.find_all("expression > value > identifier") {
+    for identifier in recipe_node.find_all("value > identifier") {
       if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
         continue;
       }
@@ -343,6 +341,19 @@ mod tests {
       "
       foo := 'bar'
       baz := foo
+      "
+    })
+    .used(&["foo"])
+    .unused(&["baz"])
+    .run();
+  }
+
+  #[test]
+  fn variable_used_in_unary_assignment() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+      baz := !foo
       "
     })
     .used(&["foo"])
