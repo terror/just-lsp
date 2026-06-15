@@ -244,6 +244,7 @@ module.exports = grammar({
     //               | BACKTICK
     //               | INDENTED_BACKTICK
     //               | NAME
+    //               | list
     //               | string
     //               | '(' expression ')'
     value: ($) =>
@@ -253,11 +254,21 @@ module.exports = grammar({
           $.function_call,
           $.external_command,
           $.identifier,
+          $.list_literal,
           $.string,
           $.numeric_error,
           seq("(", $.expression, ")"),
         ),
       ),
+
+    list_literal: ($) =>
+      prec(
+        -1,
+        seq("[", optional(field("elements", $.list_elements)), "]"),
+      ),
+
+    list_elements: ($) =>
+      prec.left(seq($.expression, repeat(seq(",", $.expression)), optional(","))),
 
     assert_expression: ($) =>
       prec(
@@ -286,7 +297,7 @@ module.exports = grammar({
 
     // sequence      : expression ',' sequence
     //               | expression ','?
-    sequence: ($) => comma_sep1($.expression),
+    sequence: ($) => prec.left(comma_sep1($.expression)),
 
     attribute: ($) =>
       seq(

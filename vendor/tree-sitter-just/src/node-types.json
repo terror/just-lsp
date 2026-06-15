@@ -589,6 +589,37 @@
     }
   },
   {
+    "type": "list_elements",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "list_literal",
+    "named": true,
+    "fields": {
+      "elements": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "list_elements",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "module",
     "named": true,
     "fields": {
@@ -1034,6 +1065,10 @@
         },
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "list_literal",
           "named": true
         },
         {

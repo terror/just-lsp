@@ -1884,6 +1884,7 @@ mod tests {
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
+        echo {{show(['foo', 'bar'])}}
       "
     });
 
@@ -1916,6 +1917,17 @@ mod tests {
             range: lsp::Range::at(2, 9, 2, 16),
           },
           range: lsp::Range::at(2, 9, 2, 36),
+        },
+        FunctionCall {
+          arguments: vec![TextNode {
+            value: "['foo', 'bar']".into(),
+            range: lsp::Range::at(3, 14, 3, 28),
+          }],
+          name: TextNode {
+            value: "show".into(),
+            range: lsp::Range::at(3, 9, 3, 13),
+          },
+          range: lsp::Range::at(3, 9, 3, 29),
         },
       ],
     );
