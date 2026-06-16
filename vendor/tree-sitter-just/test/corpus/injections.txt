@@ -19,7 +19,14 @@ set shell := ["fooshell"]
 
 (source_file
   (setting
-    (string)))
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 set shell with args
@@ -31,10 +38,23 @@ set shell := ['nu', '-m', 'light', '-c']
 
 (source_file
   (setting
-    (string)
-    (string)
-    (string)
-    (string)))
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 set shell still parse empty
@@ -45,4 +65,8 @@ set shell := []
 --------------------------------------------------------------------------------
 
 (source_file
-  (setting))
+  (setting
+    (identifier)
+    (expression
+      (value
+        (list_literal)))))

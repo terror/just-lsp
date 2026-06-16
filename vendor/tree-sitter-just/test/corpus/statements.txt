@@ -408,8 +408,17 @@ set shell := ["powershell.exe", "-c"]
       (value
         (string))))
   (setting
-    (string)
-    (string)))
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 comment

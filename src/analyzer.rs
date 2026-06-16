@@ -2994,6 +2994,36 @@ mod tests {
   }
 
   #[test]
+  fn settings_array_type_error() {
+    Test::new(indoc! {
+      "
+      set windows-shell := \"bash\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `windows-shell` expects an array value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_array_correct() {
+    Test::new(indoc! {
+      "
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_string_type_correct() {
     Test::new(indoc! {
       "
