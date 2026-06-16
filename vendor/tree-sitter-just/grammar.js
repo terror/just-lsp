@@ -24,25 +24,6 @@ function comma_sep1(rule) {
   return seq(rule, repeat(seq(",", rule)));
 }
 
-/**
- * Creates a rule to match an array-like structure filled with `item`
- *
- * @param {RuleOrLiteral} rule
- *
- * @return {Rule}
- */
-function array(rule) {
-  const item = field("element", rule);
-  return field(
-    "array",
-    seq(
-      "[",
-      optional(field("content", seq(comma_sep1(item), optional(item)))),
-      "]",
-    ),
-  );
-}
-
 module.exports = grammar({
   name: "just",
 
@@ -166,25 +147,21 @@ module.exports = grammar({
         optional($.string),
       ),
 
-    // setting       : 'set' identifier (':=' (boolean | string | string-array | expression))?
-    //               | 'set' 'shell' ':=' '[' string (',' string)* ','? ']'
+    // setting       : 'set' identifier (':=' (boolean | string | expression))?
     setting: ($) =>
-      choice(
-        seq(
-          "set",
-          field("left", $.identifier),
-          field(
-            "right",
-            optional(
-              seq(
-                ":=",
-                choice($.boolean, $.string, array($.string), $.expression),
-              ),
+      seq(
+        "set",
+        field("left", $.identifier),
+        field(
+          "right",
+          optional(
+            seq(
+              ":=",
+              choice($.boolean, $.string, $.expression),
             ),
           ),
-          $._newline,
         ),
-        seq("set", "shell", ":=", field("right", array($.string)), $._newline),
+        $._newline,
       ),
 
     // boolean       : ':=' ('true' | 'false')

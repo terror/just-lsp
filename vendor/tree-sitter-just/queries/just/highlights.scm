@@ -14,7 +14,6 @@
 [
   "alias"
   "set"
-  "shell"
 ] @keyword
 
 [

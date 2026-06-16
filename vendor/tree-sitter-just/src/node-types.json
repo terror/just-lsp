@@ -879,47 +879,9 @@
     "type": "setting",
     "named": true,
     "fields": {
-      "array": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "[",
-            "named": false
-          },
-          {
-            "type": "]",
-            "named": false
-          }
-        ]
-      },
-      "content": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "string",
-            "named": true
-          }
-        ]
-      },
-      "element": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "string",
-            "named": true
-          }
-        ]
-      },
       "left": {
         "multiple": false,
-        "required": false,
+        "required": true,
         "types": [
           {
             "type": "identifier",
@@ -933,14 +895,6 @@
         "types": [
           {
             "type": ":=",
-            "named": false
-          },
-          {
-            "type": "[",
-            "named": false
-          },
-          {
-            "type": "]",
             "named": false
           },
           {
@@ -1366,10 +1320,6 @@
   },
   {
     "type": "set",
-    "named": false
-  },
-  {
-    "type": "shell",
     "named": false
   },
   {

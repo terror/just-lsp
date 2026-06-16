@@ -25,8 +25,6 @@ impl Setting {
       .children_by_field_name("right", &mut cursor)
       .collect::<Vec<_>>();
 
-    let has_bracket = right_children.iter().any(|child| child.kind() == "[");
-
     let boolean_child = right_children
       .iter()
       .find(|child| child.kind() == "boolean");
@@ -38,7 +36,7 @@ impl Setting {
       .iter()
       .find(|child| child.kind() == "expression");
 
-    let kind = if has_bracket {
+    let kind = if node.find("list_literal").is_some() {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
@@ -111,6 +109,24 @@ mod tests {
         name: TextNode {
           value: "shell".into(),
           range: lsp::Range::at(0, 4, 0, 9),
+        },
+        kind: SettingKind::Array,
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_hyphenated_array() {
+    assert_eq!(
+      Document::from(
+        "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
+      )
+      .settings(),
+      vec![Setting {
+        name: TextNode {
+          value: "windows-shell".into(),
+          range: lsp::Range::at(0, 4, 0, 17),
         },
         kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0),
