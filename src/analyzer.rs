@@ -75,7 +75,11 @@ impl<'a> Analyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[derive(Debug)]
   struct Test {
@@ -3061,6 +3065,52 @@ mod tests {
       "#
     })
     .run();
+  }
+
+  #[test]
+  fn settings_dotenv_lists_type_correct() {
+    #[track_caller]
+    fn case(setting: &str) {
+      Test::new(&formatdoc! {
+        r#"
+        set lists
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .run();
+    }
+
+    case("dotenv-filename");
+    case("dotenv-path");
+  }
+
+  #[test]
+  fn settings_dotenv_lists_require_lists() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      Test::new(&formatdoc! {
+        r#"
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .error(message, lsp::Range::at(0, 0, 1, 0))
+      .run();
+    }
+
+    case(
+      "dotenv-filename",
+      "Setting `dotenv-filename` expects a string value",
+    );
+    case(
+      "dotenv-path",
+      "Setting `dotenv-path` expects a string value",
+    );
   }
 
   #[test]

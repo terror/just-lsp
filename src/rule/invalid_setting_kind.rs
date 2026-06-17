@@ -16,7 +16,13 @@ define_rule! {
           continue;
         };
 
-        if setting.kind == *kind {
+        let list_dotenv_setting = matches!(
+          setting.name.value.as_str(),
+          "dotenv-filename" | "dotenv-path"
+        ) && context.setting_enabled("lists")
+          && setting.kind == SettingKind::Array;
+
+        if setting.kind == *kind || list_dotenv_setting {
           continue;
         }
 
