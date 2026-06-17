@@ -3107,6 +3107,7 @@ mod tests {
       "dotenv-filename",
       "Setting `dotenv-filename` expects a string value",
     );
+
     case(
       "dotenv-path",
       "Setting `dotenv-path` expects a string value",
