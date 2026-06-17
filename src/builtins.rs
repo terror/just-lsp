@@ -997,6 +997,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       Returns `[]` when `value` is `\"\"`, `\"0\"`, `\"false\"`, or
       `[]`, and `\"true\"` when `value` is `\"1\"` or `\"true\"`.
+
       Requires `set lists`.
       "
     },
@@ -1423,6 +1424,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Join the elements of `value` into a string separated by
       `separator`, or spaces if `separator` is not provided.
+
       Requires `set lists`.
       "
     },
@@ -1885,7 +1887,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Convert `value` into a string containing its literal
-      representation. Requires `set lists`.
+      representation.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
