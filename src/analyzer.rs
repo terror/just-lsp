@@ -1705,7 +1705,7 @@ mod tests {
     })
     .error(
       "Function `join_list` accepts at most 2 arguments, but 3 provided",
-      lsp::Range::at(2, 10, 2, 45),
+      lsp::Range::at(3, 10, 3, 45),
     )
     .run();
   }
@@ -3503,7 +3503,7 @@ mod tests {
     })
     .warning(
       "Variable `unused` appears unused",
-      lsp::Range::at(2, 0, 2, 6),
+      lsp::Range::at(3, 0, 3, 6),
     )
     .run();
   }
