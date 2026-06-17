@@ -388,7 +388,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
+      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern, flag",
     lsp::Range::at(0, 13, 0, 22))
     .run();
   }
@@ -414,6 +414,18 @@ mod tests {
     Test::new(indoc! {
       "
       [arg('foo', help=\"Help text\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag() {
+    Test::new(indoc! {
+      "
+      [arg('foo', flag)]
       bar foo:
         echo {{foo}}
       "
