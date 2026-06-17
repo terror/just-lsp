@@ -1685,6 +1685,7 @@ mod tests {
     Test::new(indoc! {
       "
       set lists
+
       foo:
         echo {{ join_list(['foo', 'bar'], ',') }}
       "
@@ -1697,6 +1698,7 @@ mod tests {
     Test::new(indoc! {
       "
       set lists
+
       foo:
         echo {{ join_list(['foo', 'bar'], ',', ';') }}
       "
@@ -3488,6 +3490,7 @@ mod tests {
     Test::new(indoc! {
       "
       set lists
+
       used := \"value\"
       unused := \"not used\"
 
