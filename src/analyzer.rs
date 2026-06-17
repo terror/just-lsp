@@ -1681,6 +1681,34 @@ mod tests {
   }
 
   #[test]
+  fn function_calls_join_list_accepts_optional_separator() {
+    Test::new(indoc! {
+      "
+      set lists
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_rejects_extra_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',', ';') }}
+      "
+    })
+    .error(
+      "Function `join_list` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(2, 10, 2, 45),
+    )
+    .run();
+  }
+
+  #[test]
   fn function_calls_recipe_name_recognized() {
     Test::new(indoc! {
       "

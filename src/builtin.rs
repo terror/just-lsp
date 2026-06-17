@@ -99,7 +99,10 @@ impl Builtin<'_> {
       "assert" => {
         format!("{name}(${{1:condition}}, ${{2:message:string}})")
       }
-      "bool" | "join_list" | "show" => format!("{name}(${{1:value}})"),
+      "bool" | "show" => format!("{name}(${{1:value}})"),
+      "join_list" => {
+        format!("{name}(${{1:value}}${{2:, separator:string}})")
+      }
       "arch"
       | "num_cpus"
       | "os"
@@ -290,6 +293,38 @@ mod tests {
           ..Default::default()
         },
       ],
+    );
+  }
+
+  #[test]
+  fn join_list_completion_snippet_includes_optional_separator() {
+    let items = Builtin::Function {
+      name: "join_list",
+      aliases: &[],
+      kind: FunctionKind::UnaryOpt,
+      description: "bar",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items,
+      vec![lsp::CompletionItem {
+        label: "join_list".into(),
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: "bar".into(),
+          },
+        )),
+        insert_text: Some(
+          "join_list(${1:value}${2:, separator:string})".into()
+        ),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        sort_text: Some("zjoin_list".into()),
+        ..Default::default()
+      }],
     );
   }
 }
