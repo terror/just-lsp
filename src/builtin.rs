@@ -192,6 +192,9 @@ impl Builtin<'_> {
       "shell" => {
         format!("{name}(${{1:command:string}}${{2:, args:string...}})")
       }
+      "split" => {
+        format!("{name}(${{1:string:string}}, ${{2:separator:string}})")
+      }
       "trim_end_match" | "trim_end_matches" | "trim_start_match"
       | "trim_start_matches" => {
         format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
@@ -290,6 +293,23 @@ mod tests {
           ..Default::default()
         },
       ],
+    );
+  }
+
+  #[test]
+  fn split_function_completion_snippet() {
+    let items = Builtin::Function {
+      name: "split",
+      aliases: &[],
+      kind: FunctionKind::Binary,
+      description: "bar",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items[0].insert_text.as_deref(),
+      Some("split(${1:string:string}, ${2:separator:string})"),
     );
   }
 }

@@ -1681,6 +1681,56 @@ mod tests {
   }
 
   #[test]
+  fn function_calls_split() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split(\"foo,bar\", \",\")
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split_too_few_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split(\"foo,bar\")
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` requires at least 2 arguments, but 1 provided",
+      lsp::Range::at(2, 7, 2, 23),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split_too_many_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split(\"foo,bar\", \",\", \"bar\")
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` accepts 2 arguments, but 3 provided",
+      lsp::Range::at(2, 7, 2, 35),
+    )
+    .run();
+  }
+
+  #[test]
   fn function_calls_recipe_name_recognized() {
     Test::new(indoc! {
       "
