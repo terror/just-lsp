@@ -79,7 +79,7 @@ eager           : attribute* 'eager' assignment
 
 export          : attribute* 'export' assignment
 
-unexport        : attribute* 'unexport' assignment
+unexport        : 'unexport' NAME _eol
 
 import          : 'import' '?'? string
 

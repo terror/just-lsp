@@ -6,5 +6,4 @@ pub struct Variable {
   pub export: bool,
   pub name: TextNode,
   pub range: lsp::Range,
-  pub unexport: bool,
 }

@@ -254,6 +254,24 @@
         }
       ]
     },
+    "_name": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "unexport"
+          },
+          "named": true,
+          "value": "identifier"
+        }
+      ]
+    },
     "assignment": {
       "type": "SEQ",
       "members": [
@@ -269,7 +287,7 @@
           "name": "left",
           "content": {
             "type": "SYMBOL",
-            "name": "identifier"
+            "name": "_name"
           }
         },
         {
@@ -334,19 +352,20 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "REPEAT",
-          "content": {
-            "type": "SYMBOL",
-            "name": "attribute"
-          }
-        },
-        {
           "type": "STRING",
           "value": "unexport"
         },
         {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_name"
+          }
+        },
+        {
           "type": "SYMBOL",
-          "name": "assignment"
+          "name": "_newline"
         }
       ]
     },
@@ -1488,7 +1507,7 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "_name"
               },
               {
                 "type": "ALIAS",
@@ -2483,7 +2502,10 @@
       "value": "\\s"
     }
   ],
-  "conflicts": [["value", "attribute_named_param"]],
+  "conflicts": [
+    ["value", "attribute_named_param"],
+    ["_name", "unexport"]
+  ],
   "precedences": [],
   "externals": [
     {

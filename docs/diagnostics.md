@@ -38,6 +38,8 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type (bool/string/array).                                                            |
 | `duplicate-setting`               | Duplicate Setting               | Setting key is configured more than once.                                                                                     |
 | `duplicate-variable`              | Duplicate Variable              | Variable assignment reuses a name without allowing duplicates.                                                                |
+| `duplicate-unexport`              | Duplicate Unexport              | Environment variable name is unexported more than once.                                                                       |
+| `export-unexport-conflict`        | Export/Unexport Conflict        | Variable is both assigned and unexported.                                                                                     |
 | `undefined-identifiers`           | Undefined Identifiers           | Identifier cannot be resolved to a parameter, variable, or builtin.                                                           |
 | `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read (unless exported).                                                                    |

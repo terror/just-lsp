@@ -52,6 +52,7 @@ pub use {
   setting_kind::SettingKind,
   str_ext::StrExt,
   text_node::TextNode,
+  unexport::Unexport,
   variable::Variable,
 };
 
@@ -90,6 +91,7 @@ mod setting;
 mod setting_kind;
 mod str_ext;
 mod text_node;
+mod unexport;
 mod variable;
 
 type Result<T = ()> = std::result::Result<T, Error>;

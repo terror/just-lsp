@@ -18,6 +18,7 @@ pub struct RuleContext<'a> {
   recipes: OnceLock<Vec<Recipe>>,
   scope: OnceLock<Scope<'a>>,
   settings: OnceLock<Vec<Setting>>,
+  unexports: OnceLock<Vec<Unexport>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
   variables: OnceLock<Vec<Variable>>,
@@ -161,6 +162,7 @@ impl<'a> RuleContext<'a> {
       recipes: OnceLock::new(),
       scope: OnceLock::new(),
       settings: OnceLock::new(),
+      unexports: OnceLock::new(),
       user_function_names: OnceLock::new(),
       variable_and_builtin_names: OnceLock::new(),
       variables: OnceLock::new(),
@@ -277,6 +279,13 @@ impl<'a> RuleContext<'a> {
 
   pub fn tree(&self) -> Option<&Tree> {
     self.document.tree.as_ref()
+  }
+
+  pub fn unexports(&self) -> &[Unexport] {
+    self
+      .unexports
+      .get_or_init(|| self.documents().flat_map(Document::unexports).collect())
+      .as_slice()
   }
 
   pub fn user_function_names(&self) -> &HashSet<String> {

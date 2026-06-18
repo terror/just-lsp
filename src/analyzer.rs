@@ -3388,11 +3388,11 @@ mod tests {
   }
 
   #[test]
-  fn unexported_variables_warned() {
+  fn unexported_names_are_not_variables() {
     Test::new(indoc! {
       "
       foo := \"unused value\"
-      unexport BAR := \"unexported but unused\"
+      unexport BAR
       baz := \"used value\"
 
       recipe:
@@ -3400,7 +3400,36 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
-    .warning("Variable `BAR` appears unused", lsp::Range::at(1, 9, 1, 12))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_unexports_are_rejected() {
+    Test::new(indoc! {
+      "
+      unexport FOO
+      unexport FOO
+      "
+    })
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(1, 9, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_conflict_is_rejected() {
+    Test::new(indoc! {
+      "
+      unexport FOO
+      export FOO := \"bar\"
+      "
+    })
+    .error(
+      "Variable FOO is both exported and unexported",
+      lsp::Range::at(1, 7, 1, 10),
+    )
     .run();
   }
 
