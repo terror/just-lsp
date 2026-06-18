@@ -196,7 +196,7 @@ impl Builtin<'_> {
         format!("{name}(${{1:command:string}}${{2:, args:string...}})")
       }
       "split" => {
-        format!("{name}(${{1:string:string}}, ${{2:separator:string}})")
+        format!("{name}(${{1:string:string}}${{2:, separator:string}})")
       }
       "trim_end_match" | "trim_end_matches" | "trim_start_match"
       | "trim_start_matches" => {

@@ -1940,10 +1940,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "split",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
-      Split `string` on `separator`, returning a list.
+      Split `string` on `separator`, or whitespace if `separator` is
+      not provided, returning a list.
+
       Requires `set lists`.
       "
     },
