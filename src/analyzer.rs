@@ -1733,6 +1733,7 @@ mod tests {
       set lists
 
       foo := split(\"foo,bar\", \",\")
+
       bar:
         echo {{ foo }}
       "
@@ -1747,6 +1748,7 @@ mod tests {
       set lists
 
       foo := split(\"foo,bar\")
+
       bar:
         echo {{ foo }}
       "
@@ -1765,6 +1767,7 @@ mod tests {
       set lists
 
       foo := split(\"foo,bar\", \",\", \"bar\")
+
       bar:
         echo {{ foo }}
       "
