@@ -493,7 +493,7 @@ mod tests {
         "
       };
 
-      let start = 13 + keyword.len() as u32;
+      let start = u32::try_from(13 + keyword.len()).unwrap();
 
       Test::new(&content)
         .error(
