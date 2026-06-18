@@ -1938,6 +1938,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "split",
+    aliases: &[],
+    kind: FunctionKind::Binary,
+    description: indoc! {
+      "
+      Split `string` on `separator`, returning a list.
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "style",
     aliases: &[],
     kind: FunctionKind::Unary,
