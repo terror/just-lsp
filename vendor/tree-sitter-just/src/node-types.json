@@ -130,10 +130,6 @@
           {
             "type": "expression",
             "named": true
-          },
-          {
-            "type": "string",
-            "named": true
           }
         ]
       }

@@ -311,7 +311,7 @@ module.exports = grammar({
               ),
               ")",
             ),
-            seq($.identifier, ":", field("argument", $.string)),
+            seq($.identifier, ":", field("argument", $.expression)),
           ),
         ),
         "]",

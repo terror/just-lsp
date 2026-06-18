@@ -577,20 +577,26 @@ mod tests {
     Test::new(indoc! {
       "
       foo := 'foo'
+      bar := 'bar'
 
       [group(foo)]
-      [group(f'bar')]
+      [group: bar]
+      [group(f'baz')]
       foo:
         echo \"foo\"
       "
     })
     .error(
       "Attribute `group` arguments must be string literals",
-      lsp::Range::at(2, 7, 2, 10),
+      lsp::Range::at(3, 7, 3, 10),
     )
     .error(
       "Attribute `group` arguments must be string literals",
-      lsp::Range::at(3, 7, 3, 13),
+      lsp::Range::at(4, 8, 4, 11),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(5, 7, 5, 13),
     )
     .run();
   }
@@ -1628,8 +1634,31 @@ mod tests {
       [working-directory('foo' / bar)]
       foo:
         echo \"foo\"
+
+      [confirm: 'foo' / bar]
+      [working-directory: 'foo' / bar]
+      baz:
+        echo \"foo\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_shorthand_reports_argument_count() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+
+      [env: foo]
+      recipe:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `env` got 1 argument but takes 2 arguments",
+      lsp::Range::at(2, 0, 3, 0),
+    )
     .run();
   }
 
