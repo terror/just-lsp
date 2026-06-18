@@ -99,7 +99,10 @@ impl Builtin<'_> {
       "assert" => {
         format!("{name}(${{1:condition}}, ${{2:message:string}})")
       }
-      "bool" | "join_list" | "show" => format!("{name}(${{1:value}})"),
+      "bool" | "show" => format!("{name}(${{1:value}})"),
+      "join_list" => {
+        format!("{name}(${{1:value}}${{2:, separator:string}})")
+      }
       "arch"
       | "num_cpus"
       | "os"

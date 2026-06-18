@@ -75,7 +75,11 @@ impl<'a> Analyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[derive(Debug)]
   struct Test {
@@ -388,7 +392,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
+      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern, flag",
     lsp::Range::at(0, 13, 0, 22))
     .run();
   }
@@ -414,6 +418,18 @@ mod tests {
     Test::new(indoc! {
       "
       [arg('foo', help=\"Help text\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag() {
+    Test::new(indoc! {
+      "
+      [arg('foo', flag)]
       bar foo:
         echo {{foo}}
       "
@@ -1677,6 +1693,36 @@ mod tests {
         echo {{ join(\"a\", \"b\", \"c\") }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_accepts_optional_separator() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_rejects_extra_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',', ';') }}
+      "
+    })
+    .error(
+      "Function `join_list` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(3, 10, 3, 45),
+    )
     .run();
   }
 
@@ -3114,6 +3160,53 @@ mod tests {
   }
 
   #[test]
+  fn settings_dotenv_lists_type_correct() {
+    #[track_caller]
+    fn case(setting: &str) {
+      Test::new(&formatdoc! {
+        r#"
+        set lists
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .run();
+    }
+
+    case("dotenv-filename");
+    case("dotenv-path");
+  }
+
+  #[test]
+  fn settings_dotenv_lists_require_lists() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      Test::new(&formatdoc! {
+        r#"
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .error(message, lsp::Range::at(0, 0, 1, 0))
+      .run();
+    }
+
+    case(
+      "dotenv-filename",
+      "Setting `dotenv-filename` expects a string value",
+    );
+
+    case(
+      "dotenv-path",
+      "Setting `dotenv-path` expects a string value",
+    );
+  }
+
+  #[test]
   fn settings_string_type_error() {
     Test::new(indoc! {
       "
@@ -3510,6 +3603,7 @@ mod tests {
     Test::new(indoc! {
       "
       set lists
+
       used := \"value\"
       unused := \"not used\"
 
@@ -3522,7 +3616,7 @@ mod tests {
     })
     .warning(
       "Variable `unused` appears unused",
-      lsp::Range::at(2, 0, 2, 6),
+      lsp::Range::at(3, 0, 3, 6),
     )
     .run();
   }
