@@ -351,6 +351,7 @@ function
 ================================================================================
 
 foo := some_fn("param1", param2)
+bar := env_var("foo",)
 
 --------------------------------------------------------------------------------
 
@@ -367,7 +368,17 @@ foo := some_fn("param1", param2)
                 (string)))
             (expression
               (value
-                (identifier)))))))))
+                (identifier))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (function_call
+          (identifier)
+          (sequence
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 export

@@ -294,7 +294,7 @@ module.exports = grammar({
 
     // sequence      : expression ',' sequence
     //               | expression ','?
-    sequence: ($) => prec.left(comma_sep1($.expression)),
+    sequence: ($) => prec.left(seq(comma_sep1($.expression), optional(","))),
 
     attribute: ($) =>
       seq(
