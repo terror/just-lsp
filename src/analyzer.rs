@@ -1691,11 +1691,13 @@ mod tests {
   #[test]
   fn format_strings_with_function_calls() {
     Test::new(indoc! {
-      r"
+      r#"
       info := f'arch: {{arch()}}'
+      more := f'upper: {{uppercase("foo",)}}'
       foo:
         echo {{info}}
-      "
+        echo {{more}}
+      "#
     })
     .run();
   }
@@ -1736,6 +1738,7 @@ mod tests {
       foo:
         echo {{ arch() }}
         echo {{ join(\"a\", \"b\", \"c\") }}
+        echo {{ uppercase(\"foo\",) }}
       "
     })
     .run();
