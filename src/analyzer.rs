@@ -1772,34 +1772,40 @@ mod tests {
 
   #[test]
   fn function_calls_split() {
-    Test::new(indoc! {
-      "
-      set lists
+    #[track_caller]
+    fn case(expression: &str) {
+      Test::new(&formatdoc! {
+        "
+        set lists
 
-      foo := split(\"foo,bar\", \",\")
+        foo := {expression}
 
-      bar:
-        echo {{ foo }}
-      "
-    })
-    .run();
+        bar:
+          echo {{{{ foo }}}}
+        "
+      })
+      .run();
+    }
+
+    case("split(\"foo bar\")");
+    case("split(\"foo,bar\", \",\")");
   }
 
   #[test]
-  fn function_calls_split_too_few_args() {
+  fn function_calls_split_rejects_missing_argument() {
     Test::new(indoc! {
       "
       set lists
 
-      foo := split(\"foo,bar\")
+      foo := split()
 
       bar:
         echo {{ foo }}
       "
     })
     .error(
-      "Function `split` requires at least 2 arguments, but 1 provided",
-      lsp::Range::at(2, 7, 2, 23),
+      "Function `split` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(2, 7, 2, 14),
     )
     .run();
   }
@@ -1817,7 +1823,7 @@ mod tests {
       "
     })
     .error(
-      "Function `split` accepts 2 arguments, but 3 provided",
+      "Function `split` accepts at most 2 arguments, but 3 provided",
       lsp::Range::at(2, 7, 2, 35),
     )
     .run();
