@@ -305,7 +305,7 @@ module.exports = grammar({
     attribute_named_param: ($) =>
       seq(
         field("name", $.identifier),
-        optional(seq("=", field("value", $.string))),
+        optional(seq("=", field("value", $.expression))),
       ),
 
     // A complete recipe

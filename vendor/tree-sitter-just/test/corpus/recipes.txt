@@ -514,6 +514,48 @@ deploy env:
         (text)))))
 
 ================================================================================
+attribute named parameter with expression value
+================================================================================
+
+[arg("bar", long="bar", value=foo + "baz")]
+foo bar:
+  echo {{bar}}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (expression
+        (value
+          (string)))
+      (attribute_named_param
+        (identifier)
+        (expression
+          (value
+            (string))))
+      (attribute_named_param
+        (identifier)
+        (expression
+          (value
+            (identifier))
+          (value
+            (string)))))
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
 stacked attributes
 ================================================================================
 
