@@ -381,7 +381,24 @@ module.exports = grammar({
         repeat1(choice($.text, $.interpolation)),
       ),
 
-    recipe_line_prefix: (_) => choice("@-", "-@", "@", "-"),
+    recipe_line_prefix: (_) =>
+      choice(
+        "@-?",
+        "@?-",
+        "-@?",
+        "-?@",
+        "?@-",
+        "?-@",
+        "@-",
+        "@?",
+        "-@",
+        "-?",
+        "?@",
+        "?-",
+        "@",
+        "-",
+        "?",
+      ),
 
     // Any shebang. Needs a named field to apply injection queries correctly.
     shebang: ($) =>
