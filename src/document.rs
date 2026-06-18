@@ -579,6 +579,28 @@ impl Document {
   }
 
   #[must_use]
+  pub fn unexports(&self) -> Vec<Unexport> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("unexport")
+        .iter()
+        .filter_map(|unexport_node| {
+          let name_node = unexport_node.child_by_field_name("name")?;
+
+          Some(Unexport {
+            name: TextNode {
+              value: self.get_node_text(&name_node),
+              range: name_node.get_range(self),
+            },
+            range: unexport_node.get_range(self),
+          })
+        })
+        .collect()
+    })
+  }
+
+  #[must_use]
   pub fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -594,7 +616,6 @@ impl Document {
               range: identifier_node.get_range(self),
             },
             export: identifier_node.get_parent("export").is_some(),
-            unexport: identifier_node.get_parent("unexport").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
             range: assignment_node.get_range(self),
           })
@@ -1020,7 +1041,6 @@ mod tests {
             range: lsp::Range::at(0, 0, 0, 6),
           },
           export: false,
-          unexport: false,
           content: "tmpdir  := `mktemp -d`".into(),
           range: lsp::Range::at(0, 0, 1, 0),
         },
@@ -1030,7 +1050,6 @@ mod tests {
             range: lsp::Range::at(1, 0, 1, 7),
           },
           export: false,
-          unexport: false,
           content: "version := \"0.2.7\"".into(),
           range: lsp::Range::at(1, 0, 2, 0),
         },
@@ -1040,7 +1059,6 @@ mod tests {
             range: lsp::Range::at(2, 0, 2, 6),
           },
           export: false,
-          unexport: false,
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
           range: lsp::Range::at(2, 0, 3, 0),
         },
@@ -1050,7 +1068,6 @@ mod tests {
             range: lsp::Range::at(3, 0, 3, 7),
           },
           export: false,
-          unexport: false,
           content: "tarball := tardir + \".tar.gz\"".into(),
           range: lsp::Range::at(3, 0, 4, 0),
         },
@@ -1060,7 +1077,6 @@ mod tests {
             range: lsp::Range::at(4, 0, 4, 6),
           },
           export: false,
-          unexport: false,
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
           range: lsp::Range::at(4, 0, 5, 0),
@@ -1071,7 +1087,6 @@ mod tests {
             range: lsp::Range::at(5, 7, 5, 13),
           },
           export: true,
-          unexport: false,
           content: "EDITOR := 'nvim'".into(),
           range: lsp::Range::at(5, 7, 6, 0),
         },
@@ -1100,7 +1115,6 @@ mod tests {
           range: lsp::Range::at(1, 7, 1, 11),
         },
         export: true,
-        unexport: false,
         content: "PATH := '/usr/local/bin'".into(),
         range: lsp::Range::at(1, 7, 2, 0),
       }]
@@ -1108,28 +1122,25 @@ mod tests {
   }
 
   #[test]
-  fn unexport_variable_is_marked_unexported() {
+  fn get_unexports() {
     let document = Document::from(indoc! {
       "
-      unexport FOO := 'bar'
+      unexport FOO
       "
     });
 
-    let variables = document.variables();
+    let unexports = document.unexports();
 
-    assert_eq!(variables.len(), 1);
+    assert_eq!(unexports.len(), 1);
 
     assert_eq!(
-      variables,
-      vec![Variable {
+      unexports,
+      vec![Unexport {
         name: TextNode {
           value: "FOO".into(),
           range: lsp::Range::at(0, 9, 0, 12),
         },
-        export: false,
-        unexport: true,
-        content: "FOO := 'bar'".into(),
-        range: lsp::Range::at(0, 9, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }]
     );
   }

@@ -54,7 +54,7 @@ module.exports = grammar({
   ],
   word: ($) => $.identifier,
 
-  conflicts: ($) => [[$.value, $.attribute_named_param]],
+  conflicts: ($) => [[$.value, $.attribute_named_param], [$._name, $.unexport]],
 
   rules: {
     // justfile      : item* EOF
@@ -115,11 +115,13 @@ module.exports = grammar({
     // module_path   : NAME '::' NAME ('::' NAME)*
     module_path: ($) =>
       seq($.identifier, repeat1(seq("::", $.identifier))),
+    _name: ($) => choice($.identifier, alias("unexport", $.identifier)),
+
     // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) =>
       seq(
         repeat($.attribute),
-        field("left", $.identifier),
+        field("left", $._name),
         ":=",
         field("right", $.expression),
         $._newline,
@@ -131,8 +133,8 @@ module.exports = grammar({
     // export        : attribute* 'export' assignment
     export: ($) => seq(repeat($.attribute), "export", $.assignment),
 
-    // unexport      : attribute* 'unexport' assignment
-    unexport: ($) => seq(repeat($.attribute), "unexport", $.assignment),
+    // unexport      : 'unexport' NAME _eol
+    unexport: ($) => seq("unexport", field("name", $._name), $._newline),
 
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
@@ -335,7 +337,10 @@ module.exports = grammar({
     recipe_header: ($) =>
       seq(
         optional("@"),
-        field("name", choice($.identifier, alias("import", $.identifier))),
+        field(
+          "name",
+          choice($._name, alias("import", $.identifier)),
+        ),
         optional($.parameters),
         ":",
         optional($.dependencies),
