@@ -466,6 +466,50 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_value_accepts_expression() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+
+      [arg('bar', long='bar', value=foo / 'baz')]
+      bar bar:
+        echo {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_string_kwargs_reject_expressions() {
+    #[track_caller]
+    fn case(keyword: &'static str) {
+      let content = formatdoc! {
+        "
+        foo := 'foo'
+
+        [arg('bar', {keyword}=foo)]
+        bar bar:
+          echo {{{{bar}}}}
+        "
+      };
+
+      let start = 13 + keyword.len() as u32;
+
+      Test::new(&content)
+        .error(
+          "Attribute `arg` arguments must be string literals",
+          lsp::Range::at(2, start, 2, start + 3),
+        )
+        .run();
+    }
+
+    case("help");
+    case("long");
+    case("pattern");
+    case("short");
+  }
+
+  #[test]
   fn arg_attribute_with_long_option() {
     Test::new(indoc! {
       "

@@ -58,6 +58,23 @@ impl ArgAttributeRule {
       .any(|parameter| parameter.name == parameter_name)
   }
 
+  fn string_literal_expression(node: Node) -> bool {
+    let Some(value) = node.find("^value") else {
+      return false;
+    };
+
+    let mut cursor = value.walk();
+
+    let children = value.named_children(&mut cursor).collect::<Vec<_>>();
+
+    match children.as_slice() {
+      [child] => {
+        child.kind() == "string" && child.find("format_string").is_none()
+      }
+      _ => false,
+    }
+  }
+
   fn validate(
     context: &RuleContext,
     attribute: Node,
@@ -118,6 +135,23 @@ impl ArgAttributeRule {
         .map(|node| document.get_node_text(&node))
     };
 
+    let invalid_string_kwargs = kwargs.iter().filter_map(|node| {
+      let name = kwarg_name(node)?;
+
+      if !matches!(name.as_str(), "help" | "long" | "pattern" | "short") {
+        return None;
+      }
+
+      let value = node.child_by_field_name("value")?;
+
+      (!Self::string_literal_expression(value)).then(|| {
+        Diagnostic::error(
+          "Attribute `arg` arguments must be string literals".to_string(),
+          value.get_range(document),
+        )
+      })
+    });
+
     let value_without_option = kwargs
       .iter()
       .find(|node| kwarg_name(node).as_deref() == Some("value"))
@@ -136,6 +170,7 @@ impl ArgAttributeRule {
     unknown_parameter
       .into_iter()
       .chain(unknown_kwargs)
+      .chain(invalid_string_kwargs)
       .chain(value_without_option)
       .collect()
   }

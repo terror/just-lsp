@@ -152,7 +152,7 @@ attribute_argument
                 | attribute_named_param
 
 attribute_named_param
-                : NAME ('=' string)?
+                : NAME ('=' expression)?
 
 recipe          : attribute* recipe_header NEWLINE recipe_body?
 
