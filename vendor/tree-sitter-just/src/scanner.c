@@ -231,7 +231,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
   if (valid_symbols[TEXT]) {
     if (lexer->get_column(lexer) == scanner->prev_indent &&
         (lexer->lookahead == '\n' || lexer->lookahead == '@' ||
-         lexer->lookahead == '-')) {
+         lexer->lookahead == '-' || lexer->lookahead == '?')) {
       return false;
     }
 

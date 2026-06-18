@@ -179,10 +179,21 @@ recipe_body     : INDENT (shebang NEWLINE)? (recipe_line NEWLINE | NEWLINE)* DED
 recipe_line     : recipe_line_prefix? (TEXT | interpolation)+
 
 recipe_line_prefix
-                : '@-'
+                : '@-?'
+                | '@?-'
+                | '-@?'
+                | '-?@'
+                | '?@-'
+                | '?-@'
+                | '@-'
+                | '@?'
                 | '-@'
+                | '-?'
+                | '?@'
+                | '?-'
                 | '@'
                 | '-'
+                | '?'
 
 shebang         : SHEBANG
 

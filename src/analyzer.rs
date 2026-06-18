@@ -2120,6 +2120,21 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_guard_prefixes() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?guard
+        @?quiet_guard
+        ?@guard_quiet
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
     Test::new(indoc! {
       r#"

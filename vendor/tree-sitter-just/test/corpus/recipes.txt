@@ -42,6 +42,44 @@ quiet
         (text)))))
 
 ================================================================================
+guard prefixes
+================================================================================
+
+foo:
+  ?guard
+  @?quiet_guard
+  ?@guard_quiet
+  -?guard_infallible
+  @-?quiet_infallible_guard
+  ?-@guard_infallible_quiet
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text)))))
+
+================================================================================
 dependencies
 ================================================================================
 
