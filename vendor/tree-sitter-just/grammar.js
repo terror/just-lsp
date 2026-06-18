@@ -168,16 +168,42 @@ module.exports = grammar({
     boolean: (_) => choice("true", "false"),
 
     // expression    : 'if' condition '{' expression '}' 'else' '{' expression '}'
-    //               | value '/' expression
-    //               | value '+' expression
+    //               | expression '++' expression
+    //               | expression '/' expression
+    //               | expression '+' expression
+    //               | expression '==' expression
+    //               | expression '!=' expression
+    //               | expression '=~' expression
+    //               | expression '!~' expression
+    //               | expression '&&' expression
+    //               | expression '||' expression
     //               | value
     expression: ($) => seq(optional("/"), $._expression_inner),
 
     _expression_inner: ($) =>
       choice(
         $.if_expression,
+        prec.left(4, seq($._expression_recurse, "++", $._expression_recurse)),
+        prec.left(4, seq($._expression_recurse, "/", $._expression_recurse)),
         prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
-        prec.left(3, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "==", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "!=", $._expression_recurse)),
+        prec.left(
+          3,
+          seq(
+            $._expression_recurse,
+            "=~",
+            choice($.regex_literal, $._expression_recurse),
+          ),
+        ),
+        prec.left(
+          3,
+          seq(
+            $._expression_recurse,
+            "!~",
+            choice($.regex_literal, $._expression_recurse),
+          ),
+        ),
         prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
         prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
@@ -202,18 +228,8 @@ module.exports = grammar({
 
     _braced_expr: ($) => seq("{", field("body", $.expression), "}"),
 
-    // condition     : expression '==' expression
-    //               | expression '!=' expression
-    //               | expression '=~' expression
-    condition: ($) =>
-      choice(
-        seq($.expression, "==", $.expression),
-        seq($.expression, "!=", $.expression),
-        seq($.expression, "=~", choice($.regex_literal, $.expression)),
-        seq($.expression, "!~", choice($.regex_literal, $.expression)),
-        // verify whether this is valid
-        $.expression,
-      ),
+    // condition     : expression
+    condition: ($) => $.expression,
 
     // Capture this special for injections
     regex_literal: ($) => prec(1, $.string),

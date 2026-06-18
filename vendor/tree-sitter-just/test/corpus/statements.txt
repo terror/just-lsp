@@ -119,8 +119,7 @@ bar := assert('foo' == 'bar', 'baz')
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))))))
   (assignment
@@ -132,8 +131,7 @@ bar := assert('foo' == 'bar', 'baz')
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))
           (expression
@@ -173,6 +171,47 @@ combined := "foo" / bar() / baz
           (identifier)))
       (value
         (identifier)))))
+
+================================================================================
+list expressions
+================================================================================
+
+concat := ['foo'] ++ ['bar']
+comparison := 'foo' == 'foo'
+regex := 'foo' =~ '^f'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string))))))
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (regex_literal
+        (string)))))
 
 ================================================================================
 list literals
@@ -232,8 +271,7 @@ foo := if bar == baz { qux } else { quux }
         (condition
           (expression
             (value
-              (identifier)))
-          (expression
+              (identifier))
             (value
               (identifier))))
         (expression
@@ -266,8 +304,7 @@ foo := if a == "x" {
         (condition
           (expression
             (value
-              (identifier)))
-          (expression
+              (identifier))
             (value
               (string))))
         (expression
@@ -277,8 +314,7 @@ foo := if a == "x" {
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))
           (expression
@@ -293,8 +329,7 @@ foo := if a == "x" {
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))
           (expression
@@ -536,9 +571,9 @@ foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch"
         (condition
           (expression
             (value
-              (string)))
-          (regex_literal
-            (string)))
+              (string))
+            (regex_literal
+              (string))))
         (expression
           (value
             (string)))
@@ -563,9 +598,9 @@ foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
         (condition
           (expression
             (value
-              (string)))
-          (regex_literal
-            (string)))
+              (string))
+            (regex_literal
+              (string))))
         (expression
           (value
             (string)))

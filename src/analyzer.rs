@@ -2142,6 +2142,25 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_list_expressions() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := ['foo'] ++ ['bar']
+      bar := 'foo' == 'foo'
+      baz := 'foo' =~ '^f'
+
+      qux:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
     Test::new(indoc! {
       r#"
