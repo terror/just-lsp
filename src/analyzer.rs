@@ -562,6 +562,7 @@ mod tests {
     Test::new(indoc! {
       "
       foo name:
+        {{ assert(name == \"bar\") }}
         {{ assert(name == \"bar\", \"msg\") }}
         {{ assert(name != \"bar\", \"msg\") }}
         {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}

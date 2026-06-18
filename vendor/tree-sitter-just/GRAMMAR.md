@@ -131,7 +131,7 @@ value           : assert_expression
                 | '(' expression ')'
 
 assert_expression
-                : 'assert' '(' condition ',' expression ','? ')'
+                : 'assert' '(' condition (',' expression ','?)? ')'
 
 function_call   : NAME '(' sequence? ')'
 

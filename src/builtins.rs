@@ -947,10 +947,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "assert",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
-      Abort execution with `message` if `condition` is false.
+      Abort execution with `message` if `condition` is false, or the
+      condition source if `message` is not provided.
 
       ```just
       foo version:
