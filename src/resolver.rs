@@ -995,7 +995,8 @@ mod tests {
         kind: lsp::MarkupKind::Markdown,
         value: indoc! {
           "
-          Abort execution with `message` if `condition` is false.
+          Abort execution with `message` if `condition` is false, or the
+          condition source if `message` is not provided.
 
           ```just
           foo version:

@@ -101,6 +101,46 @@ qux := 'foo' || 'bar' + 'baz'
         (string)))))
 
 ================================================================================
+assert expression
+================================================================================
+
+foo := assert('foo' == 'foo')
+bar := assert('foo' == 'bar', 'baz')
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (assert_expression
+          (identifier)
+          (condition
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (assert_expression
+          (identifier)
+          (condition
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))
+          (expression
+            (value
+              (string))))))))
+
+================================================================================
 paths
 ================================================================================
 
