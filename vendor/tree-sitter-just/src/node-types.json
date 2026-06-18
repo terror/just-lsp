@@ -200,15 +200,11 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
           "type": "expression",
-          "named": true
-        },
-        {
-          "type": "regex_literal",
           "named": true
         }
       ]
@@ -393,6 +389,10 @@
       "types": [
         {
           "type": "if_expression",
+          "named": true
+        },
+        {
+          "type": "regex_literal",
           "named": true
         },
         {
@@ -1175,6 +1175,10 @@
   },
   {
     "type": "+",
+    "named": false
+  },
+  {
+    "type": "++",
     "named": false
   },
   {

@@ -100,8 +100,13 @@ expression      : '/'? expression_inner
 
 expression_inner
                 : if_expression
-                | expression_inner '+' expression_inner
+                | expression_inner '++' expression_inner
                 | expression_inner '/' expression_inner
+                | expression_inner '+' expression_inner
+                | expression_inner '==' expression_inner
+                | expression_inner '!=' expression_inner
+                | expression_inner '=~' (regex_literal | expression_inner)
+                | expression_inner '!~' (regex_literal | expression_inner)
                 | expression_inner '&&' expression_inner
                 | expression_inner '||' expression_inner
                 | value
@@ -115,10 +120,7 @@ else_clause     : 'else' braced_expression
 braced_expression
                 : '{' expression '}'
 
-condition       : expression '==' expression
-                | expression '!=' expression
-                | expression '=~' (regex_literal | expression)
-                | expression
+condition       : expression
 
 regex_literal   : string
 
