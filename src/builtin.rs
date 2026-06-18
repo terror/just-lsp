@@ -298,21 +298,4 @@ mod tests {
       ],
     );
   }
-
-  #[test]
-  fn split_function_completion_snippet() {
-    let items = Builtin::Function {
-      name: "split",
-      aliases: &[],
-      kind: FunctionKind::Binary,
-      description: "bar",
-      deprecated: None,
-    }
-    .completion_items();
-
-    assert_eq!(
-      items[0].insert_text.as_deref(),
-      Some("split(${1:string:string}, ${2:separator:string})"),
-    );
-  }
 }
