@@ -6,6 +6,7 @@ define_rule! {
     message: "duplicate unexport",
     run(context) {
       let mut diagnostics = Vec::new();
+
       let mut seen = HashSet::new();
 
       for unexport in context.unexports() {
