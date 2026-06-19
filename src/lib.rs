@@ -41,6 +41,7 @@ pub use {
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
+  quickfix::Quickfix,
   quickfixer::Quickfixer,
   range_ext::RangeExt,
   recipe::Recipe,
@@ -80,6 +81,7 @@ mod node_ext;
 mod parameter;
 mod point_ext;
 mod position_ext;
+mod quickfix;
 mod quickfixer;
 mod range_ext;
 mod recipe;

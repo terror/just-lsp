@@ -7,6 +7,8 @@ macro_rules! define_rule {
       id: $id:literal,
       message: $message:literal,
       run($context:ident) $body:block
+      $(, quickfixes($quickfix_context:ident) $quickfix_body:block)?
+      $(,)?
     }
   ) => {
     $(#[$doc])*
@@ -24,6 +26,15 @@ macro_rules! define_rule {
       fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
         $body
       }
+
+      $(
+        fn quickfixes(
+          &self,
+          $quickfix_context: &RuleContext<'_>,
+        ) -> Vec<Quickfix> {
+          $quickfix_body
+        }
+      )?
     }
 
     inventory::submit!(&$name as &dyn Rule);
@@ -85,4 +96,9 @@ pub trait Rule: Sync {
 
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
+
+  /// Return quickfixes that can be applied for diagnostics produced by this rule.
+  fn quickfixes(&self, _context: &RuleContext<'_>) -> Vec<Quickfix> {
+    Vec::new()
+  }
 }

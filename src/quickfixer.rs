@@ -1,59 +1,59 @@
 use super::*;
 
 pub struct Quickfixer<'a> {
+  config: Option<&'a Config>,
   document: &'a Document,
   parameters: &'a lsp::CodeActionParams,
 }
 
 impl<'a> Quickfixer<'a> {
+  fn action(&self, code: &str, quickfix: Quickfix) -> lsp::CodeActionOrCommand {
+    let diagnostics = self.matching_diagnostics(quickfix.range, code);
+
+    lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+      title: quickfix.title,
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
+      edit: Some(lsp::WorkspaceEdit {
+        changes: Some(HashMap::from([(
+          self.parameters.text_document.uri.clone(),
+          quickfix.edits,
+        )])),
+        ..Default::default()
+      }),
+      ..Default::default()
+    })
+  }
+
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    self
-      .deprecated_replacements()
+    let context = RuleContext::new(self.document);
+
+    let default = Config::default();
+
+    let config = self.config.unwrap_or(&default);
+
+    inventory::iter::<&dyn Rule>
       .into_iter()
-      .filter(|(name, _, _)| name.range.overlaps(self.parameters.range))
-      .map(|(name, code, replacement)| {
-        self.replacement_action(&name, code, replacement)
+      .filter(|rule| {
+        config.rule_config(rule.id()).level() != Some(RuleLevel::Off)
+      })
+      .flat_map(|rule| {
+        rule
+          .quickfixes(&context)
+          .into_iter()
+          .filter(|quickfix| quickfix.range.overlaps(self.parameters.range))
+          .map(|quickfix| self.action(rule.id(), quickfix))
       })
       .collect()
   }
 
-  fn deprecated_replacements(
-    &self,
-  ) -> Vec<(TextNode, &'static str, &'static str)> {
-    let functions =
-      self
-        .document
-        .function_calls()
-        .into_iter()
-        .filter_map(|call| {
-          let replacement =
-            BUILTINS.iter().find_map(|builtin| match builtin {
-              Builtin::Function {
-                name,
-                deprecated: Some(replacement),
-                ..
-              } if *name == call.name.value => Some(*replacement),
-              _ => None,
-            })?;
-
-          Some((call.name, "deprecated-function", replacement))
-        });
-
-    let settings = self.document.settings().into_iter().filter_map(|setting| {
-      let replacement = BUILTINS.iter().find_map(|builtin| match builtin {
-        Builtin::Setting {
-          name,
-          deprecated: Some(replacement),
-          ..
-        } if *name == setting.name.value => Some(*replacement),
-        _ => None,
-      })?;
-
-      Some((setting.name, "deprecated-setting", replacement))
-    });
-
-    functions.chain(settings).collect()
+  #[must_use]
+  pub fn config(self, config: &'a Config) -> Self {
+    Self {
+      config: Some(config),
+      ..self
+    }
   }
 
   fn matching_diagnostics(
@@ -83,35 +83,10 @@ impl<'a> Quickfixer<'a> {
     parameters: &'a lsp::CodeActionParams,
   ) -> Self {
     Self {
+      config: None,
       document,
       parameters,
     }
-  }
-
-  fn replacement_action(
-    &self,
-    name: &TextNode,
-    code: &str,
-    replacement: &str,
-  ) -> lsp::CodeActionOrCommand {
-    let diagnostics = self.matching_diagnostics(name.range, code);
-
-    lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: format!("Replace `{}` with `{}`", name.value, replacement),
-      kind: Some(lsp::CodeActionKind::QUICKFIX),
-      diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
-      edit: Some(lsp::WorkspaceEdit {
-        changes: Some(HashMap::from([(
-          self.parameters.text_document.uri.clone(),
-          vec![lsp::TextEdit {
-            range: name.range,
-            new_text: replacement.to_string(),
-          }],
-        )])),
-        ..Default::default()
-      }),
-      ..Default::default()
-    })
   }
 }
 
@@ -119,43 +94,26 @@ impl<'a> Quickfixer<'a> {
 mod tests {
   use {super::*, pretty_assertions::assert_eq};
 
-  fn diagnostic(range: lsp::Range, code: &str) -> lsp::Diagnostic {
-    lsp::Diagnostic {
-      range,
-      code: Some(lsp::NumberOrString::String(code.to_string())),
-      ..Default::default()
-    }
-  }
-
-  fn parameters(
-    range: lsp::Range,
-    diagnostics: Vec<lsp::Diagnostic>,
-  ) -> lsp::CodeActionParams {
-    lsp::CodeActionParams {
-      text_document: lsp::TextDocumentIdentifier {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-      },
-      range,
-      context: lsp::CodeActionContext {
-        diagnostics,
-        ..Default::default()
-      },
-      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-      partial_result_params: lsp::PartialResultParams::default(),
-    }
-  }
-
   #[test]
   fn collect_filters_multiple_calls_by_range() {
     let document = Document::from(
       "foo := env_var(\"A\")\nbar := env_var_or_default(\"B\", \"C\")\n",
     );
 
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(0, 10, 0, 10), vec![]),
-    )
-    .collect();
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: lsp::Range::at(0, 10, 0, 10),
+      context: lsp::CodeActionContext {
+        diagnostics: vec![],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let actions = Quickfixer::new(&document, &parameters).collect();
 
     assert_eq!(actions.len(), 1);
 
@@ -167,14 +125,44 @@ mod tests {
   }
 
   #[test]
+  fn collect_ignores_setting_outside_range() {
+    let document =
+      Document::from("set windows-powershell := true\nset export := true\n");
+
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: lsp::Range::at(1, 4, 1, 4),
+      context: lsp::CodeActionContext {
+        diagnostics: vec![],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    assert_eq!(Quickfixer::new(&document, &parameters).collect(), vec![]);
+  }
+
+  #[test]
   fn collect_replaces_deprecated_setting() {
     let document = Document::from("set windows-powershell := true\n");
 
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(0, 4, 0, 4), vec![]),
-    )
-    .collect();
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: lsp::Range::at(0, 4, 0, 4),
+      context: lsp::CodeActionContext {
+        diagnostics: vec![],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let actions = Quickfixer::new(&document, &parameters).collect();
 
     assert_eq!(actions.len(), 1);
 
@@ -203,15 +191,32 @@ mod tests {
   }
 
   #[test]
-  fn collect_ignores_setting_outside_range() {
-    let document =
-      Document::from("set windows-powershell := true\nset export := true\n");
+  fn collect_skips_disabled_rules() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "deprecated-function": "off"
+      }
+    }))
+    .unwrap();
 
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(1, 4, 1, 4), vec![]),
-    )
-    .collect();
+    let document = Document::from("foo := env_var(\"A\")\n");
+
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: lsp::Range::at(0, 10, 0, 10),
+      context: lsp::CodeActionContext {
+        diagnostics: vec![],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let actions = Quickfixer::new(&document, &parameters)
+      .config(&config)
+      .collect();
 
     assert_eq!(actions, vec![]);
   }
@@ -222,16 +227,44 @@ mod tests {
 
     let target = lsp::Range::at(0, 7, 0, 14);
 
-    let diagnostics = vec![
-      diagnostic(target, "deprecated-function"),
-      diagnostic(target, "other-rule"),
-      diagnostic(lsp::Range::at(1, 0, 1, 5), "deprecated-function"),
-    ];
+    let diagnostic = lsp::Diagnostic {
+      range: target,
+      code: Some(lsp::NumberOrString::String(
+        "deprecated-function".to_string(),
+      )),
+      ..Default::default()
+    };
 
-    assert_eq!(
-      Quickfixer::new(&document, &parameters(target, diagnostics))
-        .matching_diagnostics(target, "deprecated-function"),
-      vec![diagnostic(target, "deprecated-function")]
-    );
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: target,
+      context: lsp::CodeActionContext {
+        diagnostics: vec![
+          diagnostic.clone(),
+          lsp::Diagnostic {
+            range: target,
+            code: Some(lsp::NumberOrString::String("other-rule".to_string())),
+            ..Default::default()
+          },
+          lsp::Diagnostic {
+            range: lsp::Range::at(1, 0, 1, 5),
+            code: Some(lsp::NumberOrString::String(
+              "deprecated-function".to_string(),
+            )),
+            ..Default::default()
+          },
+        ],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let diagnostics = Quickfixer::new(&document, &parameters)
+      .matching_diagnostics(target, "deprecated-function");
+
+    assert_eq!(diagnostics, vec![diagnostic]);
   }
 }

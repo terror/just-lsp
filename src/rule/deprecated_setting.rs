@@ -25,6 +25,24 @@ define_rule! {
       }
 
       diagnostics
+    },
+    quickfixes(context) {
+      let mut quickfixes = Vec::new();
+
+      for setting in context.settings() {
+        if let Some(Builtin::Setting {
+          deprecated: Some(replacement),
+          ..
+        }) = context.builtin_setting(&setting.name.value)
+        {
+          quickfixes.push(Quickfix::replacement(
+            &setting.name,
+            replacement.to_string(),
+          ));
+        }
+      }
+
+      quickfixes
     }
   }
 }
