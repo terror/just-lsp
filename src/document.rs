@@ -467,68 +467,91 @@ impl Document {
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
             .map(|dependencies_node| {
-              dependencies_node
-                .find_all("dependency")
-                .into_iter()
-                .filter_map(|dependency_node| {
-                  let dependency_name = dependency_node
-                    .child_by_field_name("name")
-                    .or_else(|| {
-                      dependency_node
-                        .find("dependency_expression")
-                        .and_then(|node| node.child_by_field_name("name"))
-                    })
-                    .map(|node| self.get_node_text(&node))?;
+              let mut dependencies = Vec::new();
+              let mut phase = DependencyPhase::Prior;
 
-                  let arguments = dependency_node
-                    .find("dependency_expression")
-                    .map(|dependency_expression_node| {
-                      let mut cursor = dependency_expression_node.walk();
+              for index in 0..dependencies_node.child_count() {
+                let Ok(index) = index.try_into() else {
+                  continue;
+                };
 
-                      dependency_expression_node
-                        .named_children(&mut cursor)
-                        .filter_map(|argument_node| {
-                          match argument_node.kind() {
-                            "expression" => Some(DependencyArgument {
-                              value: self.get_node_text(&argument_node),
-                              range: argument_node.get_range(self),
-                              starred: None,
-                            }),
-                            "starred_dependency_argument" => {
-                              let value_node = argument_node
-                                .child_by_field_name("argument")?;
+                let Some(node) = dependencies_node.child(index) else {
+                  continue;
+                };
 
-                              Some(DependencyArgument {
-                                value: self.get_node_text(&value_node),
-                                range: value_node.get_range(self),
-                                starred: argument_node
-                                  .child_by_field_name("star")
-                                  .map(|node| node.get_range(self)),
-                              })
+                match node.kind() {
+                  "&&" => {
+                    phase = DependencyPhase::Subsequent;
+                  }
+                  "dependency" => {
+                    let dependency_node = node;
+
+                    let Some(dependency_name) = dependency_node
+                      .child_by_field_name("name")
+                      .or_else(|| {
+                        dependency_node
+                          .find("dependency_expression")
+                          .and_then(|node| node.child_by_field_name("name"))
+                      })
+                      .map(|node| self.get_node_text(&node))
+                    else {
+                      continue;
+                    };
+
+                    let arguments = dependency_node
+                      .find("dependency_expression")
+                      .map(|dependency_expression_node| {
+                        let mut cursor = dependency_expression_node.walk();
+
+                        dependency_expression_node
+                          .named_children(&mut cursor)
+                          .filter_map(|argument_node| {
+                            match argument_node.kind() {
+                              "expression" => Some(DependencyArgument {
+                                value: self.get_node_text(&argument_node),
+                                range: argument_node.get_range(self),
+                                starred: None,
+                              }),
+                              "starred_dependency_argument" => {
+                                let value_node = argument_node
+                                  .child_by_field_name("argument")?;
+
+                                Some(DependencyArgument {
+                                  value: self.get_node_text(&value_node),
+                                  range: value_node.get_range(self),
+                                  starred: argument_node
+                                    .child_by_field_name("star")
+                                    .map(|node| node.get_range(self)),
+                                })
+                              }
+                              _ => None,
                             }
-                            _ => None,
-                          }
-                        })
-                        .collect()
-                    })
-                    .unwrap_or_default();
+                          })
+                          .collect()
+                      })
+                      .unwrap_or_default();
 
-                  let mapped = dependency_node
-                    .find("dependency_expression")
-                    .and_then(|dependency_expression_node| {
-                      dependency_expression_node
-                        .child_by_field_name("map")
-                        .map(|node| node.get_range(self))
+                    let mapped = dependency_node
+                      .find("dependency_expression")
+                      .and_then(|dependency_expression_node| {
+                        dependency_expression_node
+                          .child_by_field_name("map")
+                          .map(|node| node.get_range(self))
+                      });
+
+                    dependencies.push(Dependency {
+                      name: dependency_name,
+                      arguments,
+                      mapped,
+                      phase,
+                      range: dependency_node.get_range(self),
                     });
+                  }
+                  _ => {}
+                }
+              }
 
-                  Some(Dependency {
-                    name: dependency_name,
-                    arguments,
-                    mapped,
-                    range: dependency_node.get_range(self),
-                  })
-                })
-                .collect::<Vec<_>>()
+              dependencies
             })
             .unwrap_or_default();
 
@@ -1319,6 +1342,7 @@ mod tests {
           name: "foo".into(),
           arguments: vec![],
           mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(3, 5, 3, 8),
         }],
         parameters: vec![],
@@ -1356,6 +1380,7 @@ mod tests {
           name: "tools::foo".into(),
           arguments: vec![],
           mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(6, 5, 6, 15),
         }],
         parameters: vec![],
@@ -1401,6 +1426,7 @@ mod tests {
             }
           ],
           mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(3, 5, 3, 28),
         }],
         parameters: vec![],
@@ -1446,6 +1472,7 @@ mod tests {
             }
           ],
           mapped: Some(lsp::Range::at(3, 10, 3, 11)),
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(3, 10, 3, 27),
         }],
         parameters: vec![Parameter {
@@ -1511,12 +1538,14 @@ mod tests {
             name: "foo".into(),
             arguments: vec![],
             mapped: None,
+            phase: DependencyPhase::Prior,
             range: lsp::Range::at(6, 5, 6, 8),
           },
           Dependency {
             name: "bar".into(),
             arguments: vec![],
             mapped: None,
+            phase: DependencyPhase::Prior,
             range: lsp::Range::at(6, 9, 6, 12),
           }
         ],
@@ -1525,6 +1554,33 @@ mod tests {
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       })
+    );
+  }
+
+  #[test]
+  fn recipe_with_subsequent_dependency() {
+    let recipe = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: foo && bar
+        echo \"baz\"
+      "
+    })
+    .find_recipe("baz")
+    .unwrap();
+
+    assert_eq!(
+      recipe
+        .dependencies
+        .into_iter()
+        .map(|dependency| dependency.phase)
+        .collect::<Vec<_>>(),
+      vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
     );
   }
 
