@@ -171,9 +171,11 @@ mod tests {
   }
 
   #[test]
-  fn accepts_logical_operators() {
+  fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "
+      set lists
+
       foo := '' || 'bar'
       bar := 'foo' && 'bar'
 
@@ -186,9 +188,11 @@ mod tests {
   }
 
   #[test]
-  fn accepts_unary_negation() {
+  fn accepts_unary_negation_with_lists() {
     Test::new(indoc! {
       "
+      set lists
+
       foo bar:
         echo {{ !bar }}
       "
@@ -446,11 +450,29 @@ mod tests {
   fn arg_attribute_with_flag() {
     Test::new(indoc! {
       "
+      set lists
+
       [arg('foo', flag)]
       bar foo:
         echo {{foo}}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag_requires_lists() {
+    Test::new(indoc! {
+      "
+      [arg('foo', flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`flag` arguments require `set lists`",
+      lsp::Range::at(0, 12, 0, 16),
+    )
     .run();
   }
 
@@ -2034,6 +2056,267 @@ mod tests {
   }
 
   #[test]
+  fn list_features_allow_shadowed_functions_without_lists() {
+    Test::new(indoc! {
+      "
+      bool(value) := value
+      join_list(value) := value
+      show(value) := value
+      split(value) := value
+      which(value) := value
+
+      foo := bool('foo')
+      bar := join_list('bar')
+      baz := show('baz')
+      qux := split('qux')
+      quux := which('quux')
+
+      recipe:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+        echo {{ qux }}
+        echo {{ quux }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_features_bool_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := bool('true')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `bool()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_comparison_as_value_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' == 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "comparison operators require `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_if_without_else_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' == 'b' { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` without `else` requires `set lists`",
+      lsp::Range::at(0, 7, 0, 9),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_join_list_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := join_list('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `join_list()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_concatenation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' ++ 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list concatenation operator `++` requires `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_literals_require_lists() {
+    Test::new(indoc! {
+      "
+      foo := ['bar']
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list literals require `set lists`",
+      lsp::Range::at(0, 7, 0, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_and_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'foo' && 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 13, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_or_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := '' || 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 10, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_negation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .error(
+      "negation operator requires `set lists`",
+      lsp::Range::at(1, 10, 1, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_assert_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar') }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(1, 17, 1, 22),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_if_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' { 'b' } else { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_show_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := show('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `show()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_split_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := split('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `split()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_which_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := which('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `which()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
   fn linux_openbsd_no_conflict() {
     Test::new(indoc! {
       "
@@ -3359,7 +3642,7 @@ mod tests {
   #[test]
   fn settings_dotenv_lists_require_lists() {
     #[track_caller]
-    fn case(setting: &str, message: &'static str) {
+    fn case(setting: &str, range: lsp::Range) {
       Test::new(&formatdoc! {
         r#"
         set {setting} := ["foo", "bar"]
@@ -3368,19 +3651,12 @@ mod tests {
           echo "foo"
         "#
       })
-      .error(message, lsp::Range::at(0, 0, 1, 0))
+      .error("list literals require `set lists`", range)
       .run();
     }
 
-    case(
-      "dotenv-filename",
-      "Setting `dotenv-filename` expects a string value",
-    );
-
-    case(
-      "dotenv-path",
-      "Setting `dotenv-path` expects a string value",
-    );
+    case("dotenv-filename", lsp::Range::at(0, 23, 0, 37));
+    case("dotenv-path", lsp::Range::at(0, 19, 0, 33));
   }
 
   #[test]
