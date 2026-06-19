@@ -146,6 +146,48 @@ mod tests {
   }
 
   #[test]
+  fn collect_removes_parallel_attribute() {
+    let document = Document::from("[parallel]\nfoo: bar\nbar:\n");
+
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier {
+        uri: lsp::Url::parse("file:///test.just").unwrap(),
+      },
+      range: lsp::Range::at(0, 0, 1, 0),
+      context: lsp::CodeActionContext {
+        diagnostics: vec![],
+        ..Default::default()
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let actions = Quickfixer::new(&document, &parameters).collect();
+
+    assert_eq!(actions.len(), 1);
+
+    let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
+      unreachable!("expected CodeAction");
+    };
+
+    assert_eq!(action.title, "Remove `[parallel]`");
+
+    assert_eq!(
+      action.edit,
+      Some(lsp::WorkspaceEdit {
+        changes: Some(HashMap::from([(
+          lsp::Url::parse("file:///test.just").unwrap(),
+          vec![lsp::TextEdit {
+            range: lsp::Range::at(0, 0, 1, 0),
+            new_text: String::new(),
+          }],
+        )])),
+        ..Default::default()
+      }),
+    );
+  }
+
+  #[test]
   fn collect_replaces_deprecated_setting() {
     let document = Document::from("set windows-powershell := true\n");
 
