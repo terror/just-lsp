@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.4.7](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-06-16
+
+### Fixed
+
+- Fix `windows-shell` array setting diagnostics ([#424](https://github.com/terror/just-lsp/pull/424) by [terror](https://github.com/terror))
+
+### Misc
+
+- Bump cc from 1.2.63 to 1.2.64 ([#423](https://github.com/terror/just-lsp/pull/423) by [app/dependabot](https://github.com/app/dependabot))
+- Update just semantic highlight query builtins ([#421](https://github.com/terror/just-lsp/pull/421) by [terror](https://github.com/terror))
+
+## [0.4.6](https://github.com/terror/just-lsp/releases/tag/0.4.6) - 2026-06-15
+
+### Added
+
+- Add support for mapped dependencies ([#419](https://github.com/terror/just-lsp/pull/419) by [terror](https://github.com/terror))
+- Add unary negation grammar support ([#418](https://github.com/terror/just-lsp/pull/418) by [terror](https://github.com/terror))
+- Add regex mismatch grammar support ([#417](https://github.com/terror/just-lsp/pull/417) by [terror](https://github.com/terror))
+- Add support for list literals ([#416](https://github.com/terror/just-lsp/pull/416) by [terror](https://github.com/terror))
+- Add support for `lists` setting ([#415](https://github.com/terror/just-lsp/pull/415) by [terror](https://github.com/terror))
+- Add support for `show` builtin function ([#414](https://github.com/terror/just-lsp/pull/414) by [terror](https://github.com/terror))
+- Add support for `join_list` builtin function ([#413](https://github.com/terror/just-lsp/pull/413) by [terror](https://github.com/terror))
+- Add support for `bool` builtin function ([#412](https://github.com/terror/just-lsp/pull/412) by [terror](https://github.com/terror))
+- Add support for `assert` builtin function ([#408](https://github.com/terror/just-lsp/pull/408) by [terror](https://github.com/terror))
+- Add support for default script builtins ([#407](https://github.com/terror/just-lsp/pull/407) by [terror](https://github.com/terror))
+- Add support for `recipe_name` builtin function ([#409](https://github.com/terror/just-lsp/pull/409) by [terror](https://github.com/terror))
+- Add configurable formatting indentation ([#402](https://github.com/terror/just-lsp/pull/402) by [terror](https://github.com/terror))
+- Add support for `default-list` setting ([#400](https://github.com/terror/just-lsp/pull/400) by [terror](https://github.com/terror))
+- Add rule for conflicting dotenv path and filename settings ([#394](https://github.com/terror/just-lsp/pull/394) by [terror](https://github.com/terror))
+
+### Misc
+
+- Update tree-sitter grammar documentation ([#410](https://github.com/terror/just-lsp/pull/410) by [terror](https://github.com/terror))
+- Bump log from 0.4.31 to 0.4.32 ([#406](https://github.com/terror/just-lsp/pull/406) by [app/dependabot](https://github.com/app/dependabot))
+- Bump regex from 1.12.3 to 1.12.4 ([#405](https://github.com/terror/just-lsp/pull/405) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.62 to 1.2.63 ([#404](https://github.com/terror/just-lsp/pull/404) by [app/dependabot](https://github.com/app/dependabot))
+- Bump log from 0.4.30 to 0.4.31 ([#403](https://github.com/terror/just-lsp/pull/403) by [app/dependabot](https://github.com/app/dependabot))
+- Use `tower-lsp` types in wasm crate ([#399](https://github.com/terror/just-lsp/pull/399) by [terror](https://github.com/terror))
+- Bump serde_json from 1.0.149 to 1.0.150 ([#398](https://github.com/terror/just-lsp/pull/398) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.8 to 0.26.9 ([#396](https://github.com/terror/just-lsp/pull/396) by [app/dependabot](https://github.com/app/dependabot))
+- Bump log from 0.4.29 to 0.4.30 ([#395](https://github.com/terror/just-lsp/pull/395) by [app/dependabot](https://github.com/app/dependabot))
+- Expose analyzer diagnostics from `just-lsp-wasm` crate ([#393](https://github.com/terror/just-lsp/pull/393) by [terror](https://github.com/terror))
+
 ## [0.4.5](https://github.com/terror/just-lsp/releases/tag/0.4.5) - 2026-05-20
 
 ### Added

@@ -524,6 +524,27 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "shell",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Execute the recipe as a shell recipe.
+
+      This overrides `set default-script`, which otherwise makes
+      recipes default to script recipes.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "unix",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -881,6 +902,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       working directory. Does not follow symlinks or canonicalize. For
       that, use `canonicalize()`.
 
+      With `set lists`, applies to each list element individually.
+
       ```just
       absolute_path(\"./bar.txt\")  # in /foo -> \"/foo/bar.txt\"
       ```
@@ -895,6 +918,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       append(\"/src\", \"foo bar baz\")  # => \"foo/src bar/src baz/src\"
@@ -924,6 +950,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "assert",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Abort execution with `message` if `condition` is false, or the
+      condition source if `message` is not provided.
+
+      ```just
+      foo version:
+        echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "blake3",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -946,6 +989,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
       string. Aborts if the file cannot be read.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "bool",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` to a canonical boolean value.
+
+      Returns `[]` when `value` is `\"\"`, `\"0\"`, `\"false\"`, or
+      `[]`, and `\"true\"` when `value` is `\"1\"` or `\"true\"`.
+      All other values are errors.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1158,6 +1218,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       unset. Called with two arguments, returns `default` when the
       variable is unset.
 
+      With `set lists`, `key` may be a list of names, checked in
+      order. The first set variable is returned; if none are set,
+      `default` is returned or execution aborts if no default is
+      provided.
+
       A default can be substituted for an *empty* value (not just an
       unset one) with the `||` operator, currently unstable:
 
@@ -1336,9 +1401,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Nullary,
     description: indoc! {
       "
-      Return the string `\"true\"` if the current recipe is being run
-      as a dependency of another recipe, and `\"false\"` if it was
-      invoked directly from the command line.
+      Return whether the current recipe is being run as a dependency
+      of another recipe.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
       "
     },
     deprecated: None,
@@ -1359,6 +1426,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```just
       join(\"foo/bar\", \"baz\")  # => \"foo/bar/baz\"
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "join_list",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Join the elements of `value` into a string separated by
+      `separator`, or spaces if `separator` is not provided.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1578,11 +1659,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Unary,
     description: indoc! {
       "
-      Return `\"true\"` if `path` points at an existing filesystem
-      entity, `\"false\"` otherwise.
+      Return whether `path` points at an existing filesystem entity.
 
-      Symbolic links are traversed. Returns `\"false\"` for broken
-      symlinks or when the path is inaccessible.
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise. Symbolic links are
+      traversed; broken symlinks and inaccessible paths are false.
       "
     },
     deprecated: None,
@@ -1594,6 +1675,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       prepend(\"src/\", \"foo bar baz\")  # => \"src/foo src/bar src/baz\"
@@ -1609,6 +1693,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
+
+      With `set lists`, applies to each list element individually.
 
       Replaces every single quote with `'\\''` and surrounds the
       result in single quotes. Sufficient for `sh` and most
@@ -1629,6 +1715,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the contents of the file at `path` as a string. Aborts if
       the file cannot be read.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "recipe_name",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the name of the current recipe.
+
+      ```just
+      foo:
+        echo {{ recipe_name() }}
+      ```
       "
     },
     deprecated: None,
@@ -1711,7 +1813,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
-      `requirement`, returning `\"true\"` or `\"false\"`.
+      `requirement`.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
 
       ```just
       semver_matches(\"1.2.3\", \">=1.0.0\")  # => \"true\"
@@ -1798,6 +1903,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "show",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` into a string containing its literal
+      representation.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "snakecase",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -1836,6 +1955,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       the root justfile, but resolves to the current `import` or `mod`
       source file when called from within an imported or submodule
       file.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "split",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Split `string` on `separator`, or whitespace if `separator` is
+      not provided, returning a list.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -2043,15 +2176,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
-      `name` and return its full path, or the empty string if no such
-      executable is found.
+      `name` and return its full path, or `[]` if no such executable
+      is found.
 
       Unlike `require()`, does not abort on missing executables, so
-      this is useful for optional tooling. Currently unstable; requires
-      `set unstable`.
+      this is useful for optional tooling.
+
+      Requires `set lists`.
 
       ```just
-      set unstable
+      set lists
 
       bosh := which(\"bosh\")
       ```
@@ -2113,6 +2247,43 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       a := \"foo\"
       a := \"bar\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "default-list",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      List available recipes instead of running the default recipe
+      when `just` is invoked without a recipe name.
+
+      ```just
+      set default-list
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "default-script",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Run recipes as script recipes by default instead of shell
+      recipes.
+
+      Recipes can opt back into shell execution with the `[shell]`
+      attribute.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
       ```
       "
     },
@@ -2283,6 +2454,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       referenced by the recipe being run. Useful when some assignments
       involve expensive backticks or `shell()` calls that only a subset
       of recipes need.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "lists",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Allow values to be lists of strings instead of only strings.
+
+      Currently unstable.
       "
     },
     deprecated: None,

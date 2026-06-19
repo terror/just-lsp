@@ -9,6 +9,7 @@ use {
     iter::{once, successors},
     ops::{ControlFlow, RangeInclusive},
     path::PathBuf,
+    process,
     sync::OnceLock,
   },
   tower_lsp::lsp_types as lsp,
@@ -23,9 +24,11 @@ pub use {
   attribute_target::AttributeTarget,
   builtin::Builtin,
   builtins::BUILTINS,
-  config::{Config, RuleConfig, RuleLevel},
+  config::{Config, FormattingConfig, RuleConfig, RuleLevel},
   count::Count,
   dependency::Dependency,
+  dependency_argument::DependencyArgument,
+  dependency_phase::DependencyPhase,
   diagnostic::Diagnostic,
   document::Document,
   error::Error,
@@ -39,6 +42,7 @@ pub use {
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
+  quickfix::Quickfix,
   quickfixer::Quickfixer,
   range_ext::RangeExt,
   recipe::Recipe,
@@ -50,6 +54,7 @@ pub use {
   setting_kind::SettingKind,
   str_ext::StrExt,
   text_node::TextNode,
+  unexport::Unexport,
   variable::Variable,
 };
 
@@ -63,6 +68,8 @@ mod builtins;
 mod config;
 mod count;
 mod dependency;
+mod dependency_argument;
+mod dependency_phase;
 mod diagnostic;
 mod document;
 mod error;
@@ -76,6 +83,7 @@ mod node_ext;
 mod parameter;
 mod point_ext;
 mod position_ext;
+mod quickfix;
 mod quickfixer;
 mod range_ext;
 mod recipe;
@@ -87,6 +95,7 @@ mod setting;
 mod setting_kind;
 mod str_ext;
 mod text_node;
+mod unexport;
 mod variable;
 
 type Result<T = ()> = std::result::Result<T, Error>;

@@ -42,6 +42,44 @@ quiet
         (text)))))
 
 ================================================================================
+guard prefixes
+================================================================================
+
+foo:
+  ?guard
+  @?quiet_guard
+  ?@guard_quiet
+  -?guard_infallible
+  @-?quiet_infallible_guard
+  ?-@guard_infallible_quiet
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text))
+      (recipe_line
+        (recipe_line_prefix)
+        (text)))))
+
+================================================================================
 dependencies
 ================================================================================
 
@@ -189,6 +227,143 @@ corge: foo (quux corge + banana)
                 (identifier))
               (value
                 (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+mapped dependency calls
+================================================================================
+
+foo *args: *(bar *args)
+  body
+
+subsequent *args: && *(bar *args)
+  body
+
+unstarred args *args: *(bar args *args)
+  body
+
+outside *args: (bar *args)
+  body
+
+missing *args: *(bar args)
+  body
+
+grouped *args: *(bar *(args + " bob"))
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier)))
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (expression
+              (value
+                (identifier)))))))
+    (recipe_body
+      (recipe_line
+        (text))))
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (variadic_parameter
+          (parameter
+            (identifier))))
+      (dependencies
+        (dependency
+          (dependency_expression
+            (identifier)
+            (starred_dependency_argument
+              (value
+                (expression
+                  (value
+                    (identifier))
+                  (value
+                    (string)))))))))
     (recipe_body
       (recipe_line
         (text)))))
@@ -375,6 +550,86 @@ deploy env:
     (recipe_body
       (recipe_line
         (text)))))
+
+================================================================================
+attribute shorthand with expression argument
+================================================================================
+
+[confirm: "Deploy to " + env + "?"]
+[working-directory: "foo" / bar]
+deploy env:
+  echo foo
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (expression
+        (value
+          (string))
+        (value
+          (identifier))
+        (value
+          (string))))
+    (attribute
+      (identifier)
+      (expression
+        (value
+          (string))
+        (value
+          (identifier))))
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+attribute named parameter with expression value
+================================================================================
+
+[arg("bar", long="bar", value=foo + "baz")]
+foo bar:
+  echo {{bar}}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (attribute
+      (identifier)
+      (expression
+        (value
+          (string)))
+      (attribute_named_param
+        (identifier)
+        (expression
+          (value
+            (string))))
+      (attribute_named_param
+        (identifier)
+        (expression
+          (value
+            (identifier))
+          (value
+            (string)))))
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
 
 ================================================================================
 stacked attributes
@@ -736,9 +991,13 @@ bar:
   (recipe
     (attribute
       (identifier)
-      (string)
+      (expression
+        (value
+          (string)))
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body
@@ -751,7 +1010,9 @@ bar:
         (value
           (string)))
       (identifier)
-      (string))
+      (expression
+        (value
+          (string))))
     (recipe_header
       (identifier))
     (recipe_body

@@ -24,25 +24,6 @@ function comma_sep1(rule) {
   return seq(rule, repeat(seq(",", rule)));
 }
 
-/**
- * Creates a rule to match an array-like structure filled with `item`
- *
- * @param {RuleOrLiteral} rule
- *
- * @return {Rule}
- */
-function array(rule) {
-  const item = field("element", rule);
-  return field(
-    "array",
-    seq(
-      "[",
-      optional(field("content", seq(comma_sep1(item), optional(item)))),
-      "]",
-    ),
-  );
-}
-
 module.exports = grammar({
   name: "just",
 
@@ -73,7 +54,7 @@ module.exports = grammar({
   ],
   word: ($) => $.identifier,
 
-  conflicts: ($) => [[$.value, $.attribute_named_param]],
+  conflicts: ($) => [[$.value, $.attribute_named_param], [$._name, $.unexport]],
 
   rules: {
     // justfile      : item* EOF
@@ -134,11 +115,13 @@ module.exports = grammar({
     // module_path   : NAME '::' NAME ('::' NAME)*
     module_path: ($) =>
       seq($.identifier, repeat1(seq("::", $.identifier))),
+    _name: ($) => choice($.identifier, alias("unexport", $.identifier)),
+
     // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) =>
       seq(
         repeat($.attribute),
-        field("left", $.identifier),
+        field("left", $._name),
         ":=",
         field("right", $.expression),
         $._newline,
@@ -150,8 +133,8 @@ module.exports = grammar({
     // export        : attribute* 'export' assignment
     export: ($) => seq(repeat($.attribute), "export", $.assignment),
 
-    // unexport      : attribute* 'unexport' assignment
-    unexport: ($) => seq(repeat($.attribute), "unexport", $.assignment),
+    // unexport      : 'unexport' NAME _eol
+    unexport: ($) => seq("unexport", field("name", $._name), $._newline),
 
     // import        : 'import' '?'? string?
     import: ($) => seq("import", optional("?"), $.string),
@@ -166,41 +149,63 @@ module.exports = grammar({
         optional($.string),
       ),
 
-    // setting       : 'set' identifier (':=' (boolean | string | string-array | expression))?
-    //               | 'set' 'shell' ':=' '[' string (',' string)* ','? ']'
+    // setting       : 'set' identifier (':=' (boolean | string | expression))?
     setting: ($) =>
-      choice(
-        seq(
-          "set",
-          field("left", $.identifier),
-          field(
-            "right",
-            optional(
-              seq(
-                ":=",
-                choice($.boolean, $.string, array($.string), $.expression),
-              ),
+      seq(
+        "set",
+        field("left", $.identifier),
+        field(
+          "right",
+          optional(
+            seq(
+              ":=",
+              choice($.boolean, $.string, $.expression),
             ),
           ),
-          $._newline,
         ),
-        seq("set", "shell", ":=", field("right", array($.string)), $._newline),
+        $._newline,
       ),
 
     // boolean       : ':=' ('true' | 'false')
     boolean: (_) => choice("true", "false"),
 
     // expression    : 'if' condition '{' expression '}' 'else' '{' expression '}'
-    //               | value '/' expression
-    //               | value '+' expression
+    //               | expression '++' expression
+    //               | expression '/' expression
+    //               | expression '+' expression
+    //               | expression '==' expression
+    //               | expression '!=' expression
+    //               | expression '=~' expression
+    //               | expression '!~' expression
+    //               | expression '&&' expression
+    //               | expression '||' expression
     //               | value
     expression: ($) => seq(optional("/"), $._expression_inner),
 
     _expression_inner: ($) =>
       choice(
         $.if_expression,
+        prec.left(4, seq($._expression_recurse, "++", $._expression_recurse)),
+        prec.left(4, seq($._expression_recurse, "/", $._expression_recurse)),
         prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
-        prec.left(3, seq($._expression_recurse, "/", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "==", $._expression_recurse)),
+        prec.left(3, seq($._expression_recurse, "!=", $._expression_recurse)),
+        prec.left(
+          3,
+          seq(
+            $._expression_recurse,
+            "=~",
+            choice($.regex_literal, $._expression_recurse),
+          ),
+        ),
+        prec.left(
+          3,
+          seq(
+            $._expression_recurse,
+            "!~",
+            choice($.regex_literal, $._expression_recurse),
+          ),
+        ),
         prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
         prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
@@ -225,17 +230,8 @@ module.exports = grammar({
 
     _braced_expr: ($) => seq("{", field("body", $.expression), "}"),
 
-    // condition     : expression '==' expression
-    //               | expression '!=' expression
-    //               | expression '=~' expression
-    condition: ($) =>
-      choice(
-        seq($.expression, "==", $.expression),
-        seq($.expression, "!=", $.expression),
-        seq($.expression, "=~", choice($.regex_literal, $.expression)),
-        // verify whether this is valid
-        $.expression,
-      ),
+    // condition     : expression
+    condition: ($) => $.expression,
 
     // Capture this special for injections
     regex_literal: ($) => prec(1, $.string),
@@ -244,6 +240,7 @@ module.exports = grammar({
     //               | BACKTICK
     //               | INDENTED_BACKTICK
     //               | NAME
+    //               | list
     //               | string
     //               | '(' expression ')'
     value: ($) =>
@@ -252,12 +249,25 @@ module.exports = grammar({
           $.assert_expression,
           $.function_call,
           $.external_command,
+          $.not_expression,
           $.identifier,
+          $.list_literal,
           $.string,
           $.numeric_error,
           seq("(", $.expression, ")"),
         ),
       ),
+
+    not_expression: ($) => prec(1, seq("!", $.value)),
+
+    list_literal: ($) =>
+      prec(
+        -1,
+        seq("[", optional(field("elements", $.list_elements)), "]"),
+      ),
+
+    list_elements: ($) =>
+      prec.left(seq($.expression, repeat(seq(",", $.expression)), optional(","))),
 
     assert_expression: ($) =>
       prec(
@@ -266,9 +276,7 @@ module.exports = grammar({
           field("name", alias("assert", $.identifier)),
           "(",
           field("condition", $.condition),
-          ",",
-          field("message", $.expression),
-          optional(","),
+          optional(seq(",", field("message", $.expression), optional(","))),
           ")",
         ),
       ),
@@ -286,7 +294,7 @@ module.exports = grammar({
 
     // sequence      : expression ',' sequence
     //               | expression ','?
-    sequence: ($) => comma_sep1($.expression),
+    sequence: ($) => prec.left(seq(comma_sep1($.expression), optional(","))),
 
     attribute: ($) =>
       seq(
@@ -303,7 +311,7 @@ module.exports = grammar({
               ),
               ")",
             ),
-            seq($.identifier, ":", field("argument", $.string)),
+            seq($.identifier, ":", field("argument", $.expression)),
           ),
         ),
         "]",
@@ -313,7 +321,7 @@ module.exports = grammar({
     attribute_named_param: ($) =>
       seq(
         field("name", $.identifier),
-        optional(seq("=", field("value", $.string))),
+        optional(seq("=", field("value", $.expression))),
       ),
 
     // A complete recipe
@@ -329,7 +337,10 @@ module.exports = grammar({
     recipe_header: ($) =>
       seq(
         optional("@"),
-        field("name", choice($.identifier, alias("import", $.identifier))),
+        field(
+          "name",
+          choice($._name, alias("import", $.identifier)),
+        ),
         optional($.parameters),
         ":",
         optional($.dependencies),
@@ -355,10 +366,6 @@ module.exports = grammar({
 
     dependencies: ($) => repeat1(seq(optional("&&"), $.dependency)),
 
-    // dependency    : NAME
-    //               | module_path
-    //               | '(' NAME expression* ')'
-    //               | '(' module_path expression* ')'
     dependency: ($) =>
       choice(
         field("name", $.module_path),
@@ -366,14 +373,17 @@ module.exports = grammar({
         $.dependency_expression,
       ),
 
-    // contents of `(recipe expression)`
     dependency_expression: ($) =>
       seq(
+        optional(field("map", "*")),
         "(",
         field("name", choice($.module_path, $.identifier)),
-        repeat($.expression),
+        repeat(choice($.expression, $.starred_dependency_argument)),
         ")",
       ),
+
+    starred_dependency_argument: ($) =>
+      seq(field("star", "*"), field("argument", $.value)),
 
     // body          : INDENT line+ DEDENT
     recipe_body: ($) =>
@@ -390,7 +400,24 @@ module.exports = grammar({
         repeat1(choice($.text, $.interpolation)),
       ),
 
-    recipe_line_prefix: (_) => choice("@-", "-@", "@", "-"),
+    recipe_line_prefix: (_) =>
+      choice(
+        "@-?",
+        "@?-",
+        "-@?",
+        "-?@",
+        "?@-",
+        "?-@",
+        "@-",
+        "@?",
+        "-@",
+        "-?",
+        "?@",
+        "?-",
+        "@",
+        "-",
+        "?",
+      ),
 
     // Any shebang. Needs a named field to apply injection queries correctly.
     shebang: ($) =>

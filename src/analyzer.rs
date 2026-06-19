@@ -75,7 +75,11 @@ impl<'a> Analyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[derive(Debug)]
   struct Test {
@@ -167,15 +171,30 @@ mod tests {
   }
 
   #[test]
-  fn accepts_logical_operators() {
+  fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "
+      set lists
+
       foo := '' || 'bar'
       bar := 'foo' && 'bar'
 
       baz:
         echo {{ foo }}
         echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn accepts_unary_negation_with_lists() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo bar:
+        echo {{ !bar }}
       "
     })
     .run();
@@ -377,7 +396,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
+      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern, flag",
     lsp::Range::at(0, 13, 0, 22))
     .run();
   }
@@ -411,6 +430,53 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_duplicate_parameter() {
+    Test::new(indoc! {
+      "
+      [arg('foo', help='bar')]
+      [arg('foo', long='foo')]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`[arg]` attribute for parameter `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [arg('foo', flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag_requires_lists() {
+    Test::new(indoc! {
+      "
+      [arg('foo', flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`flag` arguments require `set lists`",
+      lsp::Range::at(0, 12, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
   fn arg_attribute_value_requires_long_or_short() {
     Test::new(indoc! {
       "
@@ -436,6 +502,50 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_accepts_expression() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+
+      [arg('bar', long='bar', value=foo / 'baz')]
+      bar bar:
+        echo {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_string_kwargs_reject_expressions() {
+    #[track_caller]
+    fn case(keyword: &'static str) {
+      let content = formatdoc! {
+        "
+        foo := 'foo'
+
+        [arg('bar', {keyword}=foo)]
+        bar bar:
+          echo {{{{bar}}}}
+        "
+      };
+
+      let start = u32::try_from(13 + keyword.len()).unwrap();
+
+      Test::new(&content)
+        .error(
+          "Attribute `arg` arguments must be string literals",
+          lsp::Range::at(2, start, 2, start + 3),
+        )
+        .run();
+    }
+
+    case("help");
+    case("long");
+    case("pattern");
+    case("short");
   }
 
   #[test]
@@ -491,9 +601,11 @@ mod tests {
     Test::new(indoc! {
       "
       foo name:
+        {{ assert(name == \"bar\") }}
         {{ assert(name == \"bar\", \"msg\") }}
         {{ assert(name != \"bar\", \"msg\") }}
         {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+        {{ assert(name !~ \"^[a-z]+$\", \"msg\") }}
       "
     })
     .run();
@@ -504,20 +616,26 @@ mod tests {
     Test::new(indoc! {
       "
       foo := 'foo'
+      bar := 'bar'
 
       [group(foo)]
-      [group(f'bar')]
+      [group: bar]
+      [group(f'baz')]
       foo:
         echo \"foo\"
       "
     })
     .error(
       "Attribute `group` arguments must be string literals",
-      lsp::Range::at(2, 7, 2, 10),
+      lsp::Range::at(3, 7, 3, 10),
     )
     .error(
       "Attribute `group` arguments must be string literals",
-      lsp::Range::at(3, 7, 3, 13),
+      lsp::Range::at(4, 8, 4, 11),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(5, 7, 5, 13),
     )
     .run();
   }
@@ -558,6 +676,18 @@ mod tests {
   }
 
   #[test]
+  fn attributes_shell_recognized() {
+    Test::new(indoc! {
+      "
+      [shell]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_duplicate_default_between_recipes() {
     Test::new(indoc! {
       "
@@ -591,7 +721,7 @@ mod tests {
   }
 
   #[test]
-  fn attributes_duplicate_group_attribute() {
+  fn attributes_duplicate_group_attribute_allowed() {
     Test::new(indoc! {
       "
       [group('dev')]
@@ -600,10 +730,6 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(
-      "Recipe attribute `group` is duplicated",
-      lsp::Range::at(1, 0, 2, 0),
-    )
     .run();
   }
 
@@ -619,6 +745,71 @@ mod tests {
     })
     .error(
       "Recipe attribute `script` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_non_repeatable_outside_recipes() {
+    #[track_caller]
+    fn case(content: &'static str, message: &'static str) {
+      Test::new(content)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        alias f := foo
+
+        foo:
+        "
+      },
+      "Alias attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        foo := 'bar'
+
+        bar:
+          echo {{foo}}
+        "
+      },
+      "Assignment attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [doc('foo')]
+        [doc('bar')]
+        mod foo
+        "
+      },
+      "Module attribute `doc` is duplicated",
+    );
+  }
+
+  #[test]
+  fn attributes_duplicate_shell_attribute() {
+    Test::new(indoc! {
+      "
+      [shell]
+      [shell]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `shell` is duplicated",
       lsp::Range::at(1, 0, 2, 0),
     )
     .run();
@@ -1218,6 +1409,50 @@ mod tests {
   }
 
   #[test]
+  fn dotenv_filename_without_path_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_and_filename_conflict() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "`dotenv-path` overrides `dotenv-filename`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_without_filename_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn duplicate_dragonfly_attribute() {
     Test::new(indoc! {
       "
@@ -1353,7 +1588,7 @@ mod tests {
   }
 
   #[test]
-  fn env_attribute_duplicate_var_name() {
+  fn env_attribute_duplicate_var_name_allowed() {
     Test::new(indoc! {
       "
       [env('FOO', 'bar')]
@@ -1362,10 +1597,6 @@ mod tests {
         echo \"$FOO\"
       "
     })
-    .error(
-      "Recipe attribute `env` is duplicated",
-      lsp::Range::at(1, 0, 2, 0),
-    )
     .run();
   }
 
@@ -1482,8 +1713,31 @@ mod tests {
       [working-directory('foo' / bar)]
       foo:
         echo \"foo\"
+
+      [confirm: 'foo' / bar]
+      [working-directory: 'foo' / bar]
+      baz:
+        echo \"foo\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_shorthand_reports_argument_count() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+
+      [env: foo]
+      recipe:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `env` got 1 argument but takes 2 arguments",
+      lsp::Range::at(2, 0, 3, 0),
+    )
     .run();
   }
 
@@ -1545,11 +1799,13 @@ mod tests {
   #[test]
   fn format_strings_with_function_calls() {
     Test::new(indoc! {
-      r"
+      r#"
       info := f'arch: {{arch()}}'
+      more := f'upper: {{uppercase("foo",)}}'
       foo:
         echo {{info}}
-      "
+        echo {{more}}
+      "#
     })
     .run();
   }
@@ -1590,6 +1846,107 @@ mod tests {
       foo:
         echo {{ arch() }}
         echo {{ join(\"a\", \"b\", \"c\") }}
+        echo {{ uppercase(\"foo\",) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_accepts_optional_separator() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_rejects_extra_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',', ';') }}
+      "
+    })
+    .error(
+      "Function `join_list` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(3, 10, 3, 45),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split() {
+    #[track_caller]
+    fn case(expression: &str) {
+      Test::new(&formatdoc! {
+        "
+        set lists
+
+        foo := {expression}
+
+        bar:
+          echo {{{{ foo }}}}
+        "
+      })
+      .run();
+    }
+
+    case("split(\"foo bar\")");
+    case("split(\"foo,bar\", \",\")");
+  }
+
+  #[test]
+  fn function_calls_split_rejects_missing_argument() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(2, 7, 2, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split_too_many_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split(\"foo,bar\", \",\", \"bar\")
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(2, 7, 2, 35),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_recipe_name_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ recipe_name() }}
       "
     })
     .run();
@@ -1695,6 +2052,267 @@ mod tests {
       import x'nonexistent.just'
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn list_features_allow_shadowed_functions_without_lists() {
+    Test::new(indoc! {
+      "
+      bool(value) := value
+      join_list(value) := value
+      show(value) := value
+      split(value) := value
+      which(value) := value
+
+      foo := bool('foo')
+      bar := join_list('bar')
+      baz := show('baz')
+      qux := split('qux')
+      quux := which('quux')
+
+      recipe:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+        echo {{ qux }}
+        echo {{ quux }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_features_bool_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := bool('true')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `bool()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_comparison_as_value_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' == 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "comparison operators require `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_if_without_else_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' == 'b' { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` without `else` requires `set lists`",
+      lsp::Range::at(0, 7, 0, 9),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_join_list_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := join_list('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `join_list()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_concatenation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' ++ 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list concatenation operator `++` requires `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_literals_require_lists() {
+    Test::new(indoc! {
+      "
+      foo := ['bar']
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list literals require `set lists`",
+      lsp::Range::at(0, 7, 0, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_and_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'foo' && 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 13, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_or_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := '' || 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 10, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_negation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .error(
+      "negation operator requires `set lists`",
+      lsp::Range::at(1, 10, 1, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_assert_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar') }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(1, 17, 1, 22),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_if_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' { 'b' } else { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_show_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := show('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `show()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_split_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := split('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `split()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_which_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := which('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `which()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
     .run();
   }
 
@@ -1875,6 +2493,40 @@ mod tests {
       "
       foo:
         echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_guard_prefixes() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?guard
+        @?quiet_guard
+        ?@guard_quiet
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_list_expressions() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := ['foo'] ++ ['bar']
+      bar := 'foo' == 'foo'
+      baz := 'foo' =~ '^f'
+
+      qux:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
       "
     })
     .run();
@@ -2078,6 +2730,37 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_duplicate_subsequents_warns() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 16, 3, 19))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_prior_and_subsequent_not_duplicate() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_dependencies_duplicate_with_arguments_warns() {
     Test::new(indoc! {
       "
@@ -2164,6 +2847,116 @@ mod tests {
         echo \"recipe-b called with {{param}}\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg:
+        echo {{arg}}
+
+      bar *args: (foo args) *(foo *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_lists() {
+    Test::new(indoc! {
+      "
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies require `set lists`",
+      lsp::Range::at(3, 11, 3, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_starred_argument() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo args: *(bar args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies must include a starred argument",
+      lsp::Range::at(5, 10, 5, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_reject_multiple_starred_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg other:
+        echo {{arg}} {{other}}
+
+      foo *args: *(bar *args *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies may not include multiple starred arguments",
+      lsp::Range::at(5, 23, 5, 24),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: (bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Starred dependency arguments require mapped dependencies",
+      lsp::Range::at(5, 16, 5, 17),
+    )
     .run();
   }
 
@@ -2303,6 +3096,26 @@ mod tests {
         echo \"bar\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_variadic_params_reject_extra_arguments_with_lists() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` accepts 2 arguments, but 3 provided",
+      lsp::Range::at(5, 5, 5, 37),
+    )
     .run();
   }
 
@@ -2689,6 +3502,32 @@ mod tests {
   }
 
   #[test]
+  fn settings_default_list_recognized() {
+    Test::new(indoc! {
+      "
+      set default-list
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_default_script_recognized() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_guards_recognized() {
     Test::new(indoc! {
       "
@@ -2706,6 +3545,19 @@ mod tests {
     Test::new(indoc! {
       "
       set lazy
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_lists_recognized() {
+    Test::new(indoc! {
+      "
+      set lists
 
       foo:
         echo \"foo\"
@@ -2749,6 +3601,36 @@ mod tests {
   }
 
   #[test]
+  fn settings_array_type_error() {
+    Test::new(indoc! {
+      "
+      set windows-shell := \"bash\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `windows-shell` expects an array value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_array_correct() {
+    Test::new(indoc! {
+      "
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_string_type_correct() {
     Test::new(indoc! {
       "
@@ -2786,6 +3668,46 @@ mod tests {
       "#
     })
     .run();
+  }
+
+  #[test]
+  fn settings_dotenv_lists_type_correct() {
+    #[track_caller]
+    fn case(setting: &str) {
+      Test::new(&formatdoc! {
+        r#"
+        set lists
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .run();
+    }
+
+    case("dotenv-filename");
+    case("dotenv-path");
+  }
+
+  #[test]
+  fn settings_dotenv_lists_require_lists() {
+    #[track_caller]
+    fn case(setting: &str, range: lsp::Range) {
+      Test::new(&formatdoc! {
+        r#"
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .error("list literals require `set lists`", range)
+      .run();
+    }
+
+    case("dotenv-filename", lsp::Range::at(0, 23, 0, 37));
+    case("dotenv-path", lsp::Range::at(0, 19, 0, 33));
   }
 
   #[test]
@@ -2882,11 +3804,11 @@ mod tests {
   }
 
   #[test]
-  fn unexported_variables_warned() {
+  fn unexported_names_are_not_variables() {
     Test::new(indoc! {
       "
       foo := \"unused value\"
-      unexport BAR := \"unexported but unused\"
+      unexport BAR
       baz := \"used value\"
 
       recipe:
@@ -2894,7 +3816,36 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
-    .warning("Variable `BAR` appears unused", lsp::Range::at(1, 9, 1, 12))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_unexports_are_rejected() {
+    Test::new(indoc! {
+      "
+      unexport FOO
+      unexport FOO
+      "
+    })
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(1, 9, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_conflict_is_rejected() {
+    Test::new(indoc! {
+      "
+      unexport FOO
+      export FOO := \"bar\"
+      "
+    })
+    .error(
+      "Variable FOO is both exported and unexported",
+      lsp::Range::at(1, 7, 1, 10),
+    )
     .run();
   }
 
@@ -3176,6 +4127,29 @@ mod tests {
     .warning(
       "Variable `unused_var` appears unused",
       lsp::Range::at(1, 0, 1, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_starred_dependency_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      used := \"value\"
+      unused := \"not used\"
+
+      recipe: *(another *used)
+        echo \"foo\"
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning(
+      "Variable `unused` appears unused",
+      lsp::Range::at(3, 0, 3, 6),
     )
     .run();
   }

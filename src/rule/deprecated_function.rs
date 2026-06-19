@@ -26,6 +26,26 @@ define_rule! {
       }
 
       diagnostics
+    },
+    quickfixes(context) {
+      let mut quickfixes = Vec::new();
+
+      for function_call in context.function_calls() {
+        let function_name = &function_call.name.value;
+
+        if let Some(Builtin::Function {
+          deprecated: Some(replacement),
+          ..
+        }) = context.builtin_function(function_name.as_str())
+        {
+          quickfixes.push(Quickfix::replacement(
+            &function_call.name,
+            replacement.to_string(),
+          ));
+        }
+      }
+
+      quickfixes
     }
   }
 }

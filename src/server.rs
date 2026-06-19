@@ -247,47 +247,50 @@ impl Inner {
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    fn json<T: Serialize>(value: T) -> Result<Value, jsonrpc::Error> {
+      serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
+    }
+
+    let config = self.config.read().await;
 
     let documents = self.documents.read().await;
 
-    if let Some(document) = documents.get(uri) {
-      let mut actions = Vec::new();
+    let Some(document) = documents.get(&params.text_document.uri) else {
+      return Ok(None);
+    };
 
-      for recipe in document.recipes() {
-        let parameters = recipe
-          .parameters
-          .into_iter()
-          .map(ParameterJson::from)
-          .collect::<Vec<ParameterJson>>();
+    let mut actions = Vec::new();
 
-        let recipe_name = serde_json::to_value(&recipe.name.value)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
+    for recipe in document.recipes() {
+      let title = recipe.name.value.clone();
 
-        let uri = serde_json::to_value(uri)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
+      let parameters = recipe
+        .parameters
+        .into_iter()
+        .map(ParameterJson::from)
+        .collect::<Vec<_>>();
 
-        let parameters = serde_json::to_value(parameters)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
-
-        actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-          title: recipe.name.value.clone(),
-          kind: Some(lsp::CodeActionKind::SOURCE),
-          command: Some(lsp::Command {
-            title: recipe.name.value.clone(),
-            command: Command::RunRecipe.to_string(),
-            arguments: Some(vec![recipe_name, uri, parameters]),
-          }),
-          ..Default::default()
-        }));
-      }
-
-      actions.extend(Quickfixer::new(document, &params).collect());
-
-      return Ok(Some(actions));
+      actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+        title: title.clone(),
+        kind: Some(lsp::CodeActionKind::SOURCE),
+        command: Some(lsp::Command {
+          title,
+          command: Command::RunRecipe.to_string(),
+          arguments: Some(vec![
+            json(&recipe.name.value)?,
+            json(&params.text_document.uri)?,
+            json(parameters)?,
+          ]),
+        }),
+        ..Default::default()
+      }));
     }
 
-    Ok(None)
+    let quickfixer = Quickfixer::new(document, &params);
+
+    actions.extend(quickfixer.config(&config).collect());
+
+    Ok(Some(actions))
   }
 
   async fn code_lens(
@@ -739,6 +742,8 @@ impl Inner {
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
+    let config = self.config.read().await;
+
     let documents = self.documents.read().await;
 
     let Some(document) = documents.get(&params.text_document.uri) else {
@@ -747,7 +752,7 @@ impl Inner {
 
     let content = document.content.to_string();
 
-    match document.format() {
+    match document.format(&config.formatting) {
       Ok(formatted) if formatted == content => Ok(Some(vec![])),
       Ok(formatted) => {
         let end = document

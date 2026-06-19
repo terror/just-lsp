@@ -39,6 +39,23 @@ foo := "abc" + 'def'
         (string)))))
 
 ================================================================================
+unary negation
+================================================================================
+
+foo := !bar
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (not_expression
+          (value
+            (identifier)))))))
+
+================================================================================
 logical operators
 ================================================================================
 
@@ -84,6 +101,44 @@ qux := 'foo' || 'bar' + 'baz'
         (string)))))
 
 ================================================================================
+assert expression
+================================================================================
+
+foo := assert('foo' == 'foo')
+bar := assert('foo' == 'bar', 'baz')
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (assert_expression
+          (identifier)
+          (condition
+            (expression
+              (value
+                (string))
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (assert_expression
+          (identifier)
+          (condition
+            (expression
+              (value
+                (string))
+              (value
+                (string))))
+          (expression
+            (value
+              (string))))))))
+
+================================================================================
 paths
 ================================================================================
 
@@ -118,6 +173,89 @@ combined := "foo" / bar() / baz
         (identifier)))))
 
 ================================================================================
+list expressions
+================================================================================
+
+concat := ['foo'] ++ ['bar']
+comparison := 'foo' == 'foo'
+regex := 'foo' =~ '^f'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string))))))
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (regex_literal
+        (string)))))
+
+================================================================================
+list literals
+================================================================================
+
+empty := []
+strings := ['foo', 'bar']
+trailing := [foo(), bar,]
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (function_call
+                  (identifier))))
+            (expression
+              (value
+                (identifier)))))))))
+
+================================================================================
 if
 ================================================================================
 
@@ -133,8 +271,7 @@ foo := if bar == baz { qux } else { quux }
         (condition
           (expression
             (value
-              (identifier)))
-          (expression
+              (identifier))
             (value
               (identifier))))
         (expression
@@ -167,8 +304,7 @@ foo := if a == "x" {
         (condition
           (expression
             (value
-              (identifier)))
-          (expression
+              (identifier))
             (value
               (string))))
         (expression
@@ -178,8 +314,7 @@ foo := if a == "x" {
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))
           (expression
@@ -194,8 +329,7 @@ foo := if a == "x" {
           (condition
             (expression
               (value
-                (string)))
-            (expression
+                (string))
               (value
                 (string))))
           (expression
@@ -217,6 +351,7 @@ function
 ================================================================================
 
 foo := some_fn("param1", param2)
+bar := env_var("foo",)
 
 --------------------------------------------------------------------------------
 
@@ -233,7 +368,17 @@ foo := some_fn("param1", param2)
                 (string)))
             (expression
               (value
-                (identifier)))))))))
+                (identifier))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (function_call
+          (identifier)
+          (sequence
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 export
@@ -255,17 +400,52 @@ export foo := "abc"
 unexport
 ================================================================================
 
-unexport FOO := "bar"
+unexport FOO
 
 --------------------------------------------------------------------------------
 
 (source_file
   (unexport
+    (identifier)))
+
+================================================================================
+unexport assignment fallback
+================================================================================
+
+unexport := "bar"
+
+--------------------------------------------------------------------------------
+
+(source_file
     (assignment
       (identifier)
       (expression
         (value
-          (string))))))
+          (string)))))
+
+================================================================================
+unexport recipe fallback
+================================================================================
+
+unexport foo:
+  echo {{foo}}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
 
 ================================================================================
 import
@@ -349,8 +529,17 @@ set shell := ["powershell.exe", "-c"]
       (value
         (string))))
   (setting
-    (string)
-    (string)))
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))))))))
 
 ================================================================================
 comment
@@ -428,9 +617,36 @@ foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch"
         (condition
           (expression
             (value
-              (string)))
-          (regex_literal
+              (string))
+            (regex_literal
+              (string))))
+        (expression
+          (value
             (string)))
+        (else_clause
+          (expression
+            (value
+              (string))))))))
+
+================================================================================
+regex mismatch literal
+================================================================================
+
+foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (string))
+            (regex_literal
+              (string))))
         (expression
           (value
             (string)))

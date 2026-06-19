@@ -179,7 +179,7 @@ impl Document {
   /// # Errors
   ///
   /// Returns an [`Error`] if formatting fails.
-  pub fn format(&self) -> Result<String> {
+  pub fn format(&self, config: &FormattingConfig) -> Result<String> {
     let file = if let Ok(path) = self.uri.to_file_path() {
       tempfile::Builder::new()
         .prefix(".justfile-fmt-")
@@ -198,13 +198,15 @@ impl Document {
 
     fs::write(&file, content.as_bytes())?;
 
-    let output = std::process::Command::new("just")
-      .arg("--fmt")
-      .arg("--unstable")
-      .arg("--quiet")
-      .arg("--justfile")
-      .arg(file.path())
-      .output()?;
+    let mut command = process::Command::new("just");
+
+    command.arg("--fmt").arg("--unstable").arg("--quiet");
+
+    if let Some(indentation) = &config.indentation {
+      command.arg("--indentation").arg(indentation);
+    }
+
+    let output = command.arg("--justfile").arg(file.path()).output()?;
 
     if !output.status.success() {
       return Err(Error::Format(format!(
@@ -465,40 +467,91 @@ impl Document {
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
             .map(|dependencies_node| {
-              dependencies_node
-                .find_all("dependency")
-                .into_iter()
-                .filter_map(|dependency_node| {
-                  let dependency_name = dependency_node
-                    .child_by_field_name("name")
-                    .or_else(|| {
-                      dependency_node
-                        .find("dependency_expression")
-                        .and_then(|node| node.child_by_field_name("name"))
-                    })
-                    .map(|node| self.get_node_text(&node))?;
+              let mut dependencies = Vec::new();
+              let mut phase = DependencyPhase::Prior;
 
-                  let arguments = dependency_node
-                    .find("dependency_expression")
-                    .map(|dependency_expression_node| {
-                      dependency_expression_node
-                        .find_all("^expression")
-                        .iter()
-                        .map(|argument_node| TextNode {
-                          value: self.get_node_text(argument_node),
-                          range: argument_node.get_range(self),
-                        })
-                        .collect()
-                    })
-                    .unwrap_or_default();
+              for index in 0..dependencies_node.child_count() {
+                let Ok(index) = index.try_into() else {
+                  continue;
+                };
 
-                  Some(Dependency {
-                    name: dependency_name,
-                    arguments,
-                    range: dependency_node.get_range(self),
-                  })
-                })
-                .collect::<Vec<_>>()
+                let Some(node) = dependencies_node.child(index) else {
+                  continue;
+                };
+
+                match node.kind() {
+                  "&&" => {
+                    phase = DependencyPhase::Subsequent;
+                  }
+                  "dependency" => {
+                    let dependency_node = node;
+
+                    let Some(dependency_name) = dependency_node
+                      .child_by_field_name("name")
+                      .or_else(|| {
+                        dependency_node
+                          .find("dependency_expression")
+                          .and_then(|node| node.child_by_field_name("name"))
+                      })
+                      .map(|node| self.get_node_text(&node))
+                    else {
+                      continue;
+                    };
+
+                    let arguments = dependency_node
+                      .find("dependency_expression")
+                      .map(|dependency_expression_node| {
+                        let mut cursor = dependency_expression_node.walk();
+
+                        dependency_expression_node
+                          .named_children(&mut cursor)
+                          .filter_map(|argument_node| {
+                            match argument_node.kind() {
+                              "expression" => Some(DependencyArgument {
+                                value: self.get_node_text(&argument_node),
+                                range: argument_node.get_range(self),
+                                starred: None,
+                              }),
+                              "starred_dependency_argument" => {
+                                let value_node = argument_node
+                                  .child_by_field_name("argument")?;
+
+                                Some(DependencyArgument {
+                                  value: self.get_node_text(&value_node),
+                                  range: value_node.get_range(self),
+                                  starred: argument_node
+                                    .child_by_field_name("star")
+                                    .map(|node| node.get_range(self)),
+                                })
+                              }
+                              _ => None,
+                            }
+                          })
+                          .collect()
+                      })
+                      .unwrap_or_default();
+
+                    let mapped = dependency_node
+                      .find("dependency_expression")
+                      .and_then(|dependency_expression_node| {
+                        dependency_expression_node
+                          .child_by_field_name("map")
+                          .map(|node| node.get_range(self))
+                      });
+
+                    dependencies.push(Dependency {
+                      name: dependency_name,
+                      arguments,
+                      mapped,
+                      phase,
+                      range: dependency_node.get_range(self),
+                    });
+                  }
+                  _ => {}
+                }
+              }
+
+              dependencies
             })
             .unwrap_or_default();
 
@@ -549,6 +602,28 @@ impl Document {
   }
 
   #[must_use]
+  pub fn unexports(&self) -> Vec<Unexport> {
+    self.tree.as_ref().map_or(Vec::new(), |tree| {
+      tree
+        .root_node()
+        .find_all("unexport")
+        .iter()
+        .filter_map(|unexport_node| {
+          let name_node = unexport_node.child_by_field_name("name")?;
+
+          Some(Unexport {
+            name: TextNode {
+              value: self.get_node_text(&name_node),
+              range: name_node.get_range(self),
+            },
+            range: unexport_node.get_range(self),
+          })
+        })
+        .collect()
+    })
+  }
+
+  #[must_use]
   pub fn variables(&self) -> Vec<Variable> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -564,7 +639,6 @@ impl Document {
               range: identifier_node.get_range(self),
             },
             export: identifier_node.get_parent("export").is_some(),
-            unexport: identifier_node.get_parent("unexport").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
             range: assignment_node.get_range(self),
           })
@@ -990,7 +1064,6 @@ mod tests {
             range: lsp::Range::at(0, 0, 0, 6),
           },
           export: false,
-          unexport: false,
           content: "tmpdir  := `mktemp -d`".into(),
           range: lsp::Range::at(0, 0, 1, 0),
         },
@@ -1000,7 +1073,6 @@ mod tests {
             range: lsp::Range::at(1, 0, 1, 7),
           },
           export: false,
-          unexport: false,
           content: "version := \"0.2.7\"".into(),
           range: lsp::Range::at(1, 0, 2, 0),
         },
@@ -1010,7 +1082,6 @@ mod tests {
             range: lsp::Range::at(2, 0, 2, 6),
           },
           export: false,
-          unexport: false,
           content: "tardir  := tmpdir / \"awesomesauce-\" + version".into(),
           range: lsp::Range::at(2, 0, 3, 0),
         },
@@ -1020,7 +1091,6 @@ mod tests {
             range: lsp::Range::at(3, 0, 3, 7),
           },
           export: false,
-          unexport: false,
           content: "tarball := tardir + \".tar.gz\"".into(),
           range: lsp::Range::at(3, 0, 4, 0),
         },
@@ -1030,7 +1100,6 @@ mod tests {
             range: lsp::Range::at(4, 0, 4, 6),
           },
           export: false,
-          unexport: false,
           content: "config  := quote(config_dir() / \".project-config\")"
             .into(),
           range: lsp::Range::at(4, 0, 5, 0),
@@ -1041,7 +1110,6 @@ mod tests {
             range: lsp::Range::at(5, 7, 5, 13),
           },
           export: true,
-          unexport: false,
           content: "EDITOR := 'nvim'".into(),
           range: lsp::Range::at(5, 7, 6, 0),
         },
@@ -1070,7 +1138,6 @@ mod tests {
           range: lsp::Range::at(1, 7, 1, 11),
         },
         export: true,
-        unexport: false,
         content: "PATH := '/usr/local/bin'".into(),
         range: lsp::Range::at(1, 7, 2, 0),
       }]
@@ -1078,28 +1145,25 @@ mod tests {
   }
 
   #[test]
-  fn unexport_variable_is_marked_unexported() {
+  fn get_unexports() {
     let document = Document::from(indoc! {
       "
-      unexport FOO := 'bar'
+      unexport FOO
       "
     });
 
-    let variables = document.variables();
+    let unexports = document.unexports();
 
-    assert_eq!(variables.len(), 1);
+    assert_eq!(unexports.len(), 1);
 
     assert_eq!(
-      variables,
-      vec![Variable {
+      unexports,
+      vec![Unexport {
         name: TextNode {
           value: "FOO".into(),
           range: lsp::Range::at(0, 9, 0, 12),
         },
-        export: false,
-        unexport: true,
-        content: "FOO := 'bar'".into(),
-        range: lsp::Range::at(0, 9, 1, 0),
+        range: lsp::Range::at(0, 0, 1, 0),
       }]
     );
   }
@@ -1277,6 +1341,8 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![],
+          mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(3, 5, 3, 8),
         }],
         parameters: vec![],
@@ -1313,6 +1379,8 @@ mod tests {
         dependencies: vec![Dependency {
           name: "tools::foo".into(),
           arguments: vec![],
+          mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(6, 5, 6, 15),
         }],
         parameters: vec![],
@@ -1346,19 +1414,75 @@ mod tests {
         dependencies: vec![Dependency {
           name: "foo".into(),
           arguments: vec![
-            TextNode {
+            DependencyArgument {
               value: "'value1'".into(),
               range: lsp::Range::at(3, 10, 3, 18),
+              starred: None,
             },
-            TextNode {
+            DependencyArgument {
               value: "'value2'".into(),
               range: lsp::Range::at(3, 19, 3, 27),
+              starred: None,
             }
           ],
+          mapped: None,
+          phase: DependencyPhase::Prior,
           range: lsp::Range::at(3, 5, 3, 28),
         }],
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
+        range: lsp::Range::at(3, 0, 5, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_mapped_dependency_arguments() {
+    let document = Document::from(indoc! {
+      "
+      bar arg *args:
+        echo \"{{arg}} {{args}}\"
+
+      foo args: *(bar args *args)
+        echo \"foo\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo"),
+      Some(Recipe {
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(3, 0, 3, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: "bar".into(),
+          arguments: vec![
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 16, 3, 20),
+              starred: None,
+            },
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 22, 3, 26),
+              starred: Some(lsp::Range::at(3, 21, 3, 22)),
+            }
+          ],
+          mapped: Some(lsp::Range::at(3, 10, 3, 11)),
+          phase: DependencyPhase::Prior,
+          range: lsp::Range::at(3, 10, 3, 27),
+        }],
+        parameters: vec![Parameter {
+          name: "args".into(),
+          kind: ParameterKind::Normal,
+          default_value: None,
+          content: "args".into(),
+          range: lsp::Range::at(3, 4, 3, 8),
+        }],
+        content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       })
@@ -1413,11 +1537,15 @@ mod tests {
           Dependency {
             name: "foo".into(),
             arguments: vec![],
+            mapped: None,
+            phase: DependencyPhase::Prior,
             range: lsp::Range::at(6, 5, 6, 8),
           },
           Dependency {
             name: "bar".into(),
             arguments: vec![],
+            mapped: None,
+            phase: DependencyPhase::Prior,
             range: lsp::Range::at(6, 9, 6, 12),
           }
         ],
@@ -1426,6 +1554,33 @@ mod tests {
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       })
+    );
+  }
+
+  #[test]
+  fn recipe_with_subsequent_dependency() {
+    let recipe = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: foo && bar
+        echo \"baz\"
+      "
+    })
+    .find_recipe("baz")
+    .unwrap();
+
+    assert_eq!(
+      recipe
+        .dependencies
+        .into_iter()
+        .map(|dependency| dependency.phase)
+        .collect::<Vec<_>>(),
+      vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
     );
   }
 
@@ -1882,6 +2037,7 @@ mod tests {
       foo:
         echo {{arch()}}
         echo {{env_var(\"HOME\", \"fallback\")}}
+        echo {{show(['foo', 'bar'])}}
       "
     });
 
@@ -1914,6 +2070,17 @@ mod tests {
             range: lsp::Range::at(2, 9, 2, 16),
           },
           range: lsp::Range::at(2, 9, 2, 36),
+        },
+        FunctionCall {
+          arguments: vec![TextNode {
+            value: "['foo', 'bar']".into(),
+            range: lsp::Range::at(3, 14, 3, 28),
+          }],
+          name: TextNode {
+            value: "show".into(),
+            range: lsp::Range::at(3, 9, 3, 13),
+          },
+          range: lsp::Range::at(3, 9, 3, 29),
         },
       ],
     );

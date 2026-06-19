@@ -1,6 +1,7 @@
 use super::*;
 
-const VALID_KWARGS: &[&str] = &["help", "long", "short", "value", "pattern"];
+const VALID_KWARGS: &[&str] =
+  &["help", "long", "short", "value", "pattern", "flag"];
 
 define_rule! {
   /// Validates `[arg(NAME, ...)]` attributes: that NAME refers to an existing
@@ -14,19 +15,55 @@ define_rule! {
         return Vec::new();
       };
 
-      tree
-        .root_node()
-        .find_all("attribute")
-        .into_iter()
-        .flat_map(|attribute| {
-          attribute
-            .find_all("^identifier")
-            .into_iter()
-            .filter(|node| context.document().get_node_text(node) == "arg")
-            .flat_map(move |identifier| Self::validate(context, attribute, identifier))
-            .collect::<Vec<_>>()
-        })
-        .collect()
+      let document = context.document();
+
+      let mut diagnostics = Vec::new();
+      let mut seen = HashSet::new();
+
+      for attribute in tree.root_node().find_all("attribute") {
+        for identifier in attribute.find_all("^identifier") {
+          if document.get_node_text(&identifier) != "arg" {
+            continue;
+          }
+
+          diagnostics.extend(Self::validate(context, attribute, identifier));
+
+          let Some(recipe_node) = attribute.get_parent("recipe") else {
+            continue;
+          };
+
+          let Some(name_node) = identifier
+            .siblings()
+            .take_while(|node| node.kind() != "identifier")
+            .find(|node| {
+              node.kind() == "expression"
+                && node.start_byte() != node.end_byte()
+            })
+          else {
+            continue;
+          };
+
+          let parameter_name = document
+            .get_node_text(&name_node)
+            .trim_matches(|c| c == '\'' || c == '"')
+            .to_string();
+
+          if !seen.insert((
+            recipe_node.start_byte(),
+            recipe_node.end_byte(),
+            parameter_name.clone(),
+          )) {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "`[arg]` attribute for parameter `{parameter_name}` is duplicated"
+              ),
+              attribute.get_range(document),
+            ));
+          }
+        }
+      }
+
+      diagnostics
     }
   }
 }
@@ -55,6 +92,23 @@ impl ArgAttributeRule {
       .parameters
       .iter()
       .any(|parameter| parameter.name == parameter_name)
+  }
+
+  fn string_literal_expression(node: Node) -> bool {
+    let Some(value) = node.find("^value") else {
+      return false;
+    };
+
+    let mut cursor = value.walk();
+
+    let children = value.named_children(&mut cursor).collect::<Vec<_>>();
+
+    match children.as_slice() {
+      [child] => {
+        child.kind() == "string" && child.find("format_string").is_none()
+      }
+      _ => false,
+    }
   }
 
   fn validate(
@@ -117,6 +171,23 @@ impl ArgAttributeRule {
         .map(|node| document.get_node_text(&node))
     };
 
+    let invalid_string_kwargs = kwargs.iter().filter_map(|node| {
+      let name = kwarg_name(node)?;
+
+      if !matches!(name.as_str(), "help" | "long" | "pattern" | "short") {
+        return None;
+      }
+
+      let value = node.child_by_field_name("value")?;
+
+      (!Self::string_literal_expression(value)).then(|| {
+        Diagnostic::error(
+          "Attribute `arg` arguments must be string literals".to_string(),
+          value.get_range(document),
+        )
+      })
+    });
+
     let value_without_option = kwargs
       .iter()
       .find(|node| kwarg_name(node).as_deref() == Some("value"))
@@ -135,6 +206,7 @@ impl ArgAttributeRule {
     unknown_parameter
       .into_iter()
       .chain(unknown_kwargs)
+      .chain(invalid_string_kwargs)
       .chain(value_without_option)
       .collect()
   }

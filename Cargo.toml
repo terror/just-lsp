@@ -1,6 +1,6 @@
 [package]
 name = "just-lsp"
-version = "0.4.5"
+version = "0.4.7"
 description = "A language server for just"
 authors = ["Liam <liam@scalzulli.com>"]
 license = "CC0-1.0"
@@ -24,6 +24,9 @@ include = [
 
 [workspace]
 members = [".", "crates/*"]
+
+[workspace.dependencies]
+tower-lsp = "0.20.0"
 
 [workspace.lints.rust]
 unreachable_pub = "deny"
@@ -50,24 +53,24 @@ dirs = "6.0.0"
 env_logger = "0.11.10"
 indoc = "2.0.7"
 inventory = "0.3"
-log = "0.4.29"
+log = "0.4.30"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 target = "2.1.0"
 tempfile = "3.27.0"
 thiserror = "2"
 tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.18", features = ["io-util"] }
-tower-lsp = "0.20.0"
+tower-lsp = { workspace = true }
 tree-sitter = "0.26.9"
-tree-sitter-highlight = "0.26.8"
+tree-sitter-highlight = "0.26.9"
 yansi = "1.0.1"
 
 [dev-dependencies]
 executable-path = "1.0.1"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 tower-test = "0.4.0"
 
 [build-dependencies]

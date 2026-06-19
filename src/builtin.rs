@@ -57,17 +57,25 @@ impl Builtin<'_> {
         .chain(aliases.iter().copied())
         .map(|name| self.function_completion_item(name))
         .collect(),
-      Self::Setting { name, .. } => vec![lsp::CompletionItem {
-        label: name.to_string(),
-        kind: Some(lsp::CompletionItemKind::PROPERTY),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          self.description(),
-        )),
-        insert_text: Some(name.to_string()),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        sort_text: Some(format!("z{name}")),
-        ..Default::default()
-      }],
+      Self::Setting {
+        name, deprecated, ..
+      } => {
+        let deprecated = deprecated.is_some();
+
+        vec![lsp::CompletionItem {
+          label: name.to_string(),
+          kind: Some(lsp::CompletionItemKind::PROPERTY),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            self.description(),
+          )),
+          deprecated: deprecated.then_some(true),
+          insert_text: Some(name.to_string()),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          sort_text: Some(format!("z{name}")),
+          tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
+          ..Default::default()
+        }]
+      }
     }
   }
 
@@ -86,6 +94,14 @@ impl Builtin<'_> {
   }
 
   fn function_completion_item(&self, name: &str) -> lsp::CompletionItem {
+    let deprecated = matches!(
+      self,
+      Self::Function {
+        deprecated: Some(_),
+        ..
+      }
+    );
+
     let snippet = match name {
       "absolute_path" | "blake3_file" | "canonicalize" | "clean"
       | "extension" | "file_name" | "file_stem" | "parent_dir"
@@ -96,11 +112,19 @@ impl Builtin<'_> {
       "append" => {
         format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
       }
+      "assert" => {
+        format!("{name}(${{1:condition}}${{2:, message:string}})")
+      }
+      "bool" | "show" => format!("{name}(${{1:value}})"),
+      "join_list" => {
+        format!("{name}(${{1:value}}${{2:, separator:string}})")
+      }
       "arch"
       | "num_cpus"
       | "os"
       | "os_family"
       | "is_dependency"
+      | "recipe_name"
       | "invocation_directory"
       | "invocation_directory_native"
       | "invocation_dir"
@@ -187,6 +211,9 @@ impl Builtin<'_> {
       "shell" => {
         format!("{name}(${{1:command:string}}${{2:, args:string...}})")
       }
+      "split" => {
+        format!("{name}(${{1:string:string}}${{2:, separator:string}})")
+      }
       "trim_end_match" | "trim_end_matches" | "trim_start_match"
       | "trim_start_matches" => {
         format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
@@ -200,9 +227,11 @@ impl Builtin<'_> {
       documentation: Some(lsp::Documentation::MarkupContent(
         self.description(),
       )),
+      deprecated: deprecated.then_some(true),
       insert_text: Some(snippet),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       sort_text: Some(format!("z{name}")),
+      tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
       ..Default::default()
     }
   }
@@ -211,6 +240,24 @@ impl Builtin<'_> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn deprecated_function_completion_item_is_marked_deprecated() {
+    let item = Builtin::Function {
+      name: "foo",
+      aliases: &[],
+      kind: FunctionKind::Nullary,
+      description: "",
+      deprecated: Some("bar"),
+    }
+    .completion_items()
+    .into_iter()
+    .next()
+    .unwrap();
+
+    assert_eq!(item.deprecated, Some(true));
+    assert_eq!(item.tags, Some(vec![lsp::CompletionItemTag::DEPRECATED]));
+  }
 
   #[test]
   fn fallback_function_completion_snippet() {

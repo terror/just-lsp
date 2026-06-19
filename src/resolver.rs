@@ -236,7 +236,7 @@ impl<'a> Resolver<'a> {
         self.document.find_recipe(&name).map(Symbol::Recipe)
       }
       "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
-      "function_call" => {
+      "function_call" | "assert_expression" => {
         self
           .document
           .find_function(&name)
@@ -537,6 +537,36 @@ mod tests {
       lsp::Location {
         uri: document.uri.clone(),
         range: lsp::Range::at(1, 10, 1, 14),
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_assert_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo name:
+        echo {{ assert(name == 'bar', 'baz') }}
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("assert_expression > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(1, 10, 1, 16),
       }
     );
   }
@@ -930,6 +960,47 @@ mod tests {
           ```just
           system-info:
             @echo This is an {{arch()}} machine.
+          ```
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_assert_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo name:
+        echo {{ assert(name == 'bar', 'baz') }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("assert_expression > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          Abort execution with `message` if `condition` is false, or the
+          condition source if `message` is not provided.
+
+          ```just
+          foo version:
+            echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
           ```
           "
         }

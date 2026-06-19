@@ -16,12 +16,26 @@ define_rule! {
           continue;
         };
 
-        if setting.kind == *kind {
+        let dotenv_array_setting = matches!(
+          setting.name.value.as_str(),
+          "dotenv-filename" | "dotenv-path"
+        ) && setting.kind == SettingKind::Array;
+
+        if setting.kind == *kind || dotenv_array_setting {
           continue;
         }
 
+        let article = if *kind == SettingKind::Array {
+          "an"
+        } else {
+          "a"
+        };
+
         diagnostics.push(Diagnostic::error(
-          format!("Setting `{}` expects a {kind} value", setting.name.value),
+          format!(
+            "Setting `{}` expects {article} {kind} value",
+            setting.name.value
+          ),
           setting.range,
         ));
       }
