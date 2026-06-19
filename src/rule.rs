@@ -23,10 +23,6 @@ macro_rules! define_rule {
         $message
       }
 
-      fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
-        $body
-      }
-
       $(
         fn quickfixes(
           &self,
@@ -35,6 +31,10 @@ macro_rules! define_rule {
           $quickfix_body
         }
       )?
+
+      fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
+        $body
+      }
     }
 
     inventory::submit!(&$name as &dyn Rule);
@@ -94,11 +94,11 @@ pub trait Rule: Sync {
   /// What to show the user in the header of the diagnostics.
   fn message(&self) -> &'static str;
 
-  /// Execute the rule and return diagnostics.
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
-
   /// Return quickfixes that can be applied for diagnostics produced by this rule.
   fn quickfixes(&self, _context: &RuleContext<'_>) -> Vec<Quickfix> {
     Vec::new()
   }
+
+  /// Execute the rule and return diagnostics.
+  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
 }

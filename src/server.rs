@@ -247,13 +247,13 @@ impl Inner {
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    let config = self.config.read().await;
-
-    let documents = self.documents.read().await;
-
     fn json<T: Serialize>(value: T) -> Result<Value, jsonrpc::Error> {
       serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
     }
+
+    let config = self.config.read().await;
+
+    let documents = self.documents.read().await;
 
     let Some(document) = documents.get(&params.text_document.uri) else {
       return Ok(None);
