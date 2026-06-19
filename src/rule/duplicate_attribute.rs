@@ -1,227 +1,79 @@
 use super::*;
 
-#[derive(Clone, Copy, Debug)]
-enum DuplicateScope {
-  /// Attribute must be unique within the entire document.
-  Module,
-  /// Attribute must be unique per recipe.
-  Recipe,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum DuplicateKey {
-  Argument,
-  Name,
-}
-
-#[derive(Debug)]
-struct DuplicateConstraint {
-  key: DuplicateKey,
-  name: &'static str,
-  scope: DuplicateScope,
-}
-
-const DUPLICATE_CONSTRAINTS: &[DuplicateConstraint] = &[
-  DuplicateConstraint {
-    name: "default",
-    scope: DuplicateScope::Module,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "confirm",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "doc",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "exit-message",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "env",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Argument,
-  },
-  DuplicateConstraint {
-    name: "extension",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "group",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Argument,
-  },
-  DuplicateConstraint {
-    name: "dragonfly",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "freebsd",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "linux",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "macos",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "no-cd",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "no-exit-message",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "no-quiet",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "netbsd",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "openbsd",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "parallel",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "positional-arguments",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "private",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "script",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "shell",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "unix",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "windows",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-  DuplicateConstraint {
-    name: "working-directory",
-    scope: DuplicateScope::Recipe,
-    key: DuplicateKey::Name,
-  },
-];
+const REPEATABLE_ATTRIBUTES: &[&str] = &["arg", "env", "group", "metadata"];
 
 define_rule! {
-  /// Reports duplicate usages of attributes that must be unique.
   DuplicateAttributeRule {
     id: "duplicate-attribute",
     message: "duplicate attribute",
     run(context) {
-      let mut diagnostics = Vec::new();
+      let Some(tree) = context.tree() else {
+        return Vec::new();
+      };
 
-      let mut module_seen: HashMap<&'static str, HashSet<String>> =
+      let document = context.document();
+
+      let mut diagnostics = Vec::new();
+      let mut default_recipe = None;
+
+      let mut target_seen: HashMap<(usize, usize), HashSet<String>> =
         HashMap::new();
 
-      for recipe in context.recipes() {
-        let mut recipe_seen: HashMap<&'static str, HashSet<String>> =
-          HashMap::new();
+      for attribute_node in tree.root_node().find_all("attribute") {
+        let Some(parent) = attribute_node.parent() else {
+          continue;
+        };
 
-        for attribute in &recipe.attributes {
-          let attribute_name = attribute.name.value.as_str();
+        let Some(target) = AttributeTarget::try_from_kind(parent.kind()) else {
+          continue;
+        };
 
-          let Some(constraint) = DuplicateAttributeRule::constraint(attribute_name) else {
+        let target_key = (parent.start_byte(), parent.end_byte());
+
+        for identifier in attribute_node.find_all("^identifier") {
+          let attribute_name = document.get_node_text(&identifier);
+
+          if context.builtin_attributes(&attribute_name).is_empty()
+            || REPEATABLE_ATTRIBUTES.contains(&attribute_name.as_str())
+          {
             continue;
-          };
+          }
 
-          let Some(key) = DuplicateAttributeRule::key(constraint, attribute) else {
+          if attribute_name == "default" && target == AttributeTarget::Recipe {
+            let Some(recipe_name) = parent
+              .find("recipe_header > identifier")
+              .map(|node| document.get_node_text(&node))
+            else {
+              continue;
+            };
+
+            if default_recipe.replace(recipe_name.clone()).is_some() {
+              diagnostics.push(Diagnostic::error(
+                format!(
+                  "Recipe `{recipe_name}` has duplicate `[default]` attribute, which may only appear once per module"
+                ),
+                attribute_node.get_range(document),
+              ));
+            }
+
             continue;
-          };
+          }
 
-          let seen = match constraint.scope {
-            DuplicateScope::Module => {
-              module_seen.entry(constraint.name).or_default()
-            }
-            DuplicateScope::Recipe => {
-              recipe_seen.entry(constraint.name).or_default()
-            }
-          };
+          let seen = target_seen.entry(target_key).or_default();
 
-          if !seen.insert(key.clone()) {
+          if !seen.insert(attribute_name.clone()) {
             diagnostics.push(Diagnostic::error(
-              DuplicateAttributeRule::message(constraint, recipe),
-              attribute.range,
+              format!(
+                "{} attribute `{attribute_name}` is duplicated",
+                target.target_name()
+              ),
+              attribute_node.get_range(document),
             ));
           }
         }
       }
 
       diagnostics
-    }
-  }
-}
-
-impl DuplicateAttributeRule {
-  fn constraint(name: &str) -> Option<&'static DuplicateConstraint> {
-    DUPLICATE_CONSTRAINTS
-      .iter()
-      .find(|constraint| constraint.name == name)
-  }
-
-  fn key(
-    constraint: &DuplicateConstraint,
-    attribute: &Attribute,
-  ) -> Option<String> {
-    match constraint.key {
-      DuplicateKey::Name => Some(attribute.name.value.clone()),
-      DuplicateKey::Argument => attribute
-        .arguments
-        .first()
-        .map(|argument| argument.value.clone()),
-    }
-  }
-
-  fn message(constraint: &DuplicateConstraint, recipe: &Recipe) -> String {
-    match constraint.scope {
-      DuplicateScope::Module => format!(
-        "Recipe `{}` has duplicate `[{}]` attribute, which may only appear once per module",
-        recipe.name.value, constraint.name
-      ),
-      DuplicateScope::Recipe => {
-        format!("Recipe attribute `{}` is duplicated", constraint.name)
-      }
     }
   }
 }
