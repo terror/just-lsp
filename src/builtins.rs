@@ -900,8 +900,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the absolute form of `path`, resolved against the current
       working directory. Does not follow symlinks or canonicalize. For
-      that, use `canonicalize()`. With `set lists`, applies to each
-      list element individually.
+      that, use `canonicalize()`.
+
+      With `set lists`, applies to each list element individually.
 
       ```just
       absolute_path(\"./bar.txt\")  # in /foo -> \"/foo/bar.txt\"
@@ -1692,6 +1693,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
+
       With `set lists`, applies to each list element individually.
 
       Replaces every single quote with `'\\''` and surrounds the
