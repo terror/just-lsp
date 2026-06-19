@@ -8,6 +8,8 @@ use {
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
+  serde::Serialize,
+  serde_json::Value,
   server::Server,
   std::{
     backtrace::BacktraceStatus,
