@@ -42,14 +42,15 @@ impl<'a> Quickfixer<'a> {
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
     let context = RuleContext::new(self.document);
 
-    let default = Config::default();
-
-    let config = self.config.unwrap_or(&default);
-
     inventory::iter::<&dyn Rule>
       .into_iter()
       .filter(|rule| {
-        config.rule_config(rule.id()).level() != Some(RuleLevel::Off)
+        self
+          .config
+          .unwrap_or(&Config::default())
+          .rule_config(rule.id())
+          .level()
+          != Some(RuleLevel::Off)
       })
       .flat_map(|rule| {
         rule
