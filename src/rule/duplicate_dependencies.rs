@@ -11,6 +11,7 @@ struct DependencyKey {
   arguments: Vec<DependencyArgumentKey>,
   mapped: bool,
   name: String,
+  phase: DependencyPhase,
 }
 
 define_rule! {
@@ -29,6 +30,7 @@ define_rule! {
           let key = DependencyKey {
             name: dependency.name.clone(),
             mapped: dependency.mapped.is_some(),
+            phase: dependency.phase,
             arguments: dependency
               .arguments
               .iter()

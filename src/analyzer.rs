@@ -2730,6 +2730,37 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_duplicate_subsequents_warns() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 16, 3, 19))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_prior_and_subsequent_not_duplicate() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_dependencies_duplicate_with_arguments_warns() {
     Test::new(indoc! {
       "
@@ -3065,6 +3096,26 @@ mod tests {
         echo \"bar\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_variadic_params_reject_extra_arguments_with_lists() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` accepts 2 arguments, but 3 provided",
+      lsp::Range::at(5, 5, 5, 37),
+    )
     .run();
   }
 

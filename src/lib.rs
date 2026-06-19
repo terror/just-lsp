@@ -28,6 +28,7 @@ pub use {
   count::Count,
   dependency::Dependency,
   dependency_argument::DependencyArgument,
+  dependency_phase::DependencyPhase,
   diagnostic::Diagnostic,
   document::Document,
   error::Error,
@@ -68,6 +69,7 @@ mod config;
 mod count;
 mod dependency;
 mod dependency_argument;
+mod dependency_phase;
 mod diagnostic;
 mod document;
 mod error;
