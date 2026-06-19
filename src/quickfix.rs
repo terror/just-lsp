@@ -9,6 +9,18 @@ pub struct Quickfix {
 
 impl Quickfix {
   #[must_use]
+  pub fn removal(range: lsp::Range, title: impl Into<String>) -> Self {
+    Self {
+      edits: vec![lsp::TextEdit {
+        range,
+        new_text: String::new(),
+      }],
+      range,
+      title: title.into(),
+    }
+  }
+
+  #[must_use]
   pub fn replacement(name: &TextNode, replacement: impl Into<String>) -> Self {
     let replacement = replacement.into();
 
