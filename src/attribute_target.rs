@@ -25,6 +25,16 @@ impl Display for AttributeTarget {
 
 impl AttributeTarget {
   #[must_use]
+  pub fn target_name(self) -> &'static str {
+    match self {
+      Self::Alias => "Alias",
+      Self::Assignment => "Assignment",
+      Self::Module => "Module",
+      Self::Recipe => "Recipe",
+    }
+  }
+
+  #[must_use]
   pub fn try_from_kind(kind: &str) -> Option<Self> {
     match kind {
       "alias" => Some(Self::Alias),

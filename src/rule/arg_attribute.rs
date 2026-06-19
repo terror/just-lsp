@@ -15,19 +15,55 @@ define_rule! {
         return Vec::new();
       };
 
-      tree
-        .root_node()
-        .find_all("attribute")
-        .into_iter()
-        .flat_map(|attribute| {
-          attribute
-            .find_all("^identifier")
-            .into_iter()
-            .filter(|node| context.document().get_node_text(node) == "arg")
-            .flat_map(move |identifier| Self::validate(context, attribute, identifier))
-            .collect::<Vec<_>>()
-        })
-        .collect()
+      let document = context.document();
+
+      let mut diagnostics = Vec::new();
+      let mut seen = HashSet::new();
+
+      for attribute in tree.root_node().find_all("attribute") {
+        for identifier in attribute.find_all("^identifier") {
+          if document.get_node_text(&identifier) != "arg" {
+            continue;
+          }
+
+          diagnostics.extend(Self::validate(context, attribute, identifier));
+
+          let Some(recipe_node) = attribute.get_parent("recipe") else {
+            continue;
+          };
+
+          let Some(name_node) = identifier
+            .siblings()
+            .take_while(|node| node.kind() != "identifier")
+            .find(|node| {
+              node.kind() == "expression"
+                && node.start_byte() != node.end_byte()
+            })
+          else {
+            continue;
+          };
+
+          let parameter_name = document
+            .get_node_text(&name_node)
+            .trim_matches(|c| c == '\'' || c == '"')
+            .to_string();
+
+          if !seen.insert((
+            recipe_node.start_byte(),
+            recipe_node.end_byte(),
+            parameter_name.clone(),
+          )) {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "`[arg]` attribute for parameter `{parameter_name}` is duplicated"
+              ),
+              attribute.get_range(document),
+            ));
+          }
+        }
+      }
+
+      diagnostics
     }
   }
 }

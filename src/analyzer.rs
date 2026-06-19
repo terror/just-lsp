@@ -426,6 +426,23 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_duplicate_parameter() {
+    Test::new(indoc! {
+      "
+      [arg('foo', help='bar')]
+      [arg('foo', long='foo')]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`[arg]` attribute for parameter `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn arg_attribute_with_flag() {
     Test::new(indoc! {
       "
@@ -682,7 +699,7 @@ mod tests {
   }
 
   #[test]
-  fn attributes_duplicate_group_attribute() {
+  fn attributes_duplicate_group_attribute_allowed() {
     Test::new(indoc! {
       "
       [group('dev')]
@@ -691,10 +708,6 @@ mod tests {
         echo \"build\"
       "
     })
-    .error(
-      "Recipe attribute `group` is duplicated",
-      lsp::Range::at(1, 0, 2, 0),
-    )
     .run();
   }
 
@@ -713,6 +726,54 @@ mod tests {
       lsp::Range::at(1, 0, 2, 0),
     )
     .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_non_repeatable_outside_recipes() {
+    #[track_caller]
+    fn case(content: &'static str, message: &'static str) {
+      Test::new(content)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        alias f := foo
+
+        foo:
+        "
+      },
+      "Alias attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        foo := 'bar'
+
+        bar:
+          echo {{foo}}
+        "
+      },
+      "Assignment attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [doc('foo')]
+        [doc('bar')]
+        mod foo
+        "
+      },
+      "Module attribute `doc` is duplicated",
+    );
   }
 
   #[test]
@@ -1505,7 +1566,7 @@ mod tests {
   }
 
   #[test]
-  fn env_attribute_duplicate_var_name() {
+  fn env_attribute_duplicate_var_name_allowed() {
     Test::new(indoc! {
       "
       [env('FOO', 'bar')]
@@ -1514,10 +1575,6 @@ mod tests {
         echo \"$FOO\"
       "
     })
-    .error(
-      "Recipe attribute `env` is duplicated",
-      lsp::Range::at(1, 0, 2, 0),
-    )
     .run();
   }
 
