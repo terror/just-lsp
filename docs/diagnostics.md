@@ -34,6 +34,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `function-arguments`              | Function Arguments              | Builtin function call uses the wrong number of arguments.                                                                     |
 | `duplicate-function`              | Duplicate Function              | User-defined function name is defined more than once.                                                                         |
 | `function-parameters`             | Function Parameters             | User-defined function parameter list has duplicates.                                                                          |
+| `list-features`                   | List Features                   | Syntax and builtins that require `set lists` are used without enabling it.                                                    |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type (bool/string/array).                                                            |
 | `duplicate-setting`               | Duplicate Setting               | Setting key is configured more than once.                                                                                     |
