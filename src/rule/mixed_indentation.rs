@@ -53,7 +53,7 @@ define_rule! {
       context
         .recipes()
         .iter()
-        .filter(|recipe| recipe.shebang.is_none())
+        .filter(|recipe| !context.recipe_runs_as_script(recipe))
         .filter_map(Self::find_mixed_indentation)
         .collect()
     }

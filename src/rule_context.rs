@@ -196,6 +196,14 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  /// returns whether `recipe` runs as a script under the current settings.
+  pub fn recipe_runs_as_script(&self, recipe: &Recipe) -> bool {
+    !recipe.has_attribute("shell")
+      && (recipe.has_attribute("script")
+        || recipe.shebang.is_some()
+        || self.setting_enabled("default-script"))
+  }
+
   pub fn recipes(&self) -> &[Recipe] {
     self
       .recipes
@@ -459,6 +467,41 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(setting_names, ["dotenv-load", "export"]);
+  }
+
+  #[test]
+  fn recipe_runs_as_script_respects_default_script_and_shell_attribute() {
+    let document = Document::from(indoc! {
+      "
+      set default-script
+
+      foo:
+        echo foo
+
+      [shell]
+      bar:
+        echo bar
+
+      [script]
+      baz:
+        echo baz
+      "
+    });
+
+    let context = RuleContext::new(&document);
+
+    assert!(
+      context.recipe_runs_as_script(context.recipe("foo").unwrap()),
+      "default-script makes plain recipes run as scripts"
+    );
+    assert!(
+      !context.recipe_runs_as_script(context.recipe("bar").unwrap()),
+      "shell attribute opts a recipe back into shell mode"
+    );
+    assert!(
+      context.recipe_runs_as_script(context.recipe("baz").unwrap()),
+      "script attribute keeps recipe in script mode"
+    );
   }
 
   #[test]
