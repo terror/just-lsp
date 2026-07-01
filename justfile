@@ -17,9 +17,25 @@ alias t := test
 
 all: build test clippy fmt-check
 
+
+
+
+
 [group: 'dev']
 build:
   cargo build
+
+[group: 'dev']
+with-no-default-params params:
+  echo {{ params }}
+
+with-some-default-params params3 params="Hello World" :
+  echo {{ params }} {{ params3 }}
+
+
+[group: 'dev']
+with-params params="Hello World":
+  echo {{ params }}
 
 [group: 'dev']
 build-wasm:
