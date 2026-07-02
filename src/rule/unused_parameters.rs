@@ -25,7 +25,7 @@ define_rule! {
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
               UnusedParameterRule::positional_argument_indices(recipe),
-              recipe.shebang.is_some()
+              context.recipe_runs_as_script(recipe)
                 || UnusedParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {
