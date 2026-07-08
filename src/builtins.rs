@@ -2290,6 +2290,28 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "dotenv-command",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Run a command and load its output as an environment file.
+
+      `just` runs the command with the configured `shell` and parses
+      its stdout as an environment file. May be set multiple times;
+      variables from commands later in the list take precedence over
+      variables from commands earlier in the list.
+
+      The command-line option `--dotenv-command` can be used to set or
+      override `dotenv-command` at runtime.
+
+      ```just
+      set dotenv-command := \"sops -d .enc.env\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "dotenv-filename",
     kind: SettingKind::String,
     description: indoc! {
