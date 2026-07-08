@@ -1605,6 +1605,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "num_jobs",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      The value of `--jobs` or the empty list, `[]`, if it was not
+      passed.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "os",
     aliases: &[],
     kind: FunctionKind::Nullary,

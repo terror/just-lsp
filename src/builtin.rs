@@ -121,6 +121,7 @@ impl Builtin<'_> {
       }
       "arch"
       | "num_cpus"
+      | "num_jobs"
       | "os"
       | "os_family"
       | "is_dependency"
