@@ -396,8 +396,32 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern, flag",
+      "Unknown `[arg]` keyword `bogus`, expected one of flag, help, long, max, min, multiple, pattern, short, value",
     lsp::Range::at(0, 13, 0, 22))
+    .run();
+  }
+
+  #[test]
+  fn arg_min_max_kwargs_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_multiple_kwarg_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long, multiple)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
     .run();
   }
 

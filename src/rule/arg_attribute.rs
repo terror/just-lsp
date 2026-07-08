@@ -1,7 +1,8 @@
 use super::*;
 
-const VALID_KWARGS: &[&str] =
-  &["help", "long", "short", "value", "pattern", "flag"];
+const VALID_KWARGS: &[&str] = &[
+  "flag", "help", "long", "max", "min", "multiple", "pattern", "short", "value",
+];
 
 define_rule! {
   /// Validates `[arg(NAME, ...)]` attributes: that NAME refers to an existing
