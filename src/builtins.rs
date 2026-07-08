@@ -54,6 +54,29 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "cache",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Skip recipe invocations when a matching entry exists in the
+      cache.
+
+      Currently unstable. The `[cache]` attribute may only be used
+      with script recipes.
+
+      ```just
+      set unstable
+
+      [script]
+      [cache]
+      build:
+        cargo build
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "confirm",
     kind: AttributeKind::Optional,
     description: indoc! {
