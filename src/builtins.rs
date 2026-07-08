@@ -2443,6 +2443,24 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "indentation",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Set recipe body indentation used when formatting with `--fmt` or
+      `--dump`.
+
+      Accepts any string of whitespace characters. The default is four
+      spaces.
+
+      ```just
+      set indentation := \"  \"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "lazy",
     kind: SettingKind::Boolean(false),
     description: indoc! {
