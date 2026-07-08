@@ -2489,6 +2489,25 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "minimum-version",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Error if `just` is older than `minimum-version`.
+
+      Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g.
+      `\"1.55.0\"`. The setting should be placed at the top of the
+      `justfile`, before any other content, so that `just` rejects the
+      file before evaluating anything else.
+
+      ```just
+      set minimum-version := \"1.55.0\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "no-cd",
     kind: SettingKind::Boolean(false),
     description: indoc! {
