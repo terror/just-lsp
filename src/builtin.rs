@@ -141,6 +141,7 @@ impl Builtin<'_> {
       | "source_dir"
       | "just_executable"
       | "just_pid"
+      | "just_version"
       | "uuid"
       | "runtime_directory"
       | "runtime_dir"

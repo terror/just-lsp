@@ -1472,6 +1472,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "just_version",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Version of the `just` executable.
+
+      ```just
+      just-info:
+        @echo The version is: {{ just_version() }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "justfile",
     aliases: &[],
     kind: FunctionKind::Nullary,
