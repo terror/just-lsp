@@ -41,13 +41,26 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       - `pattern=\"PATTERN\"` requires the value to match a regular
         expression. Patterns are full-match; `just` rejects the
         invocation if the supplied value does not match.
+      - `multiple` allows an option or flag to be passed more than
+        once, assigning the list of passed values to the parameter.
+      - `min=MIN` requires at least `MIN` values. Requires `multiple`
+        or a variadic parameter.
+      - `max=MAX` allows at most `MAX` values. Requires `multiple` or
+        a variadic parameter.
 
       Multiple keys may be combined in a single `[arg(...)]`.
 
       ```just
+      set unstable
+      set lists
+
       [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
       greet NAME:
         @echo Hello, {{NAME}}
+
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
       ```
       "
     },
