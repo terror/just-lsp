@@ -85,6 +85,30 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "continue",
+    kind: AttributeKind::Optional,
+    description: indoc! {
+      "
+      Continue execution normally if a command is interrupted by any
+      of `SIGNALS` and exits successfully.
+
+      With no argument, handles `SIGINT` (`ctrl-c`) so that `SIGQUIT`
+      still aborts. Pass a signal name or list of names to customize.
+
+      ```just
+      [continue]
+      test:
+        cargo test
+
+      [continue(\"SIGINT SIGTERM\")]
+      serve:
+        ./serve.sh
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "default",
     kind: AttributeKind::Nullary,
     description: indoc! {
