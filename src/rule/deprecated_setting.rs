@@ -35,6 +35,10 @@ define_rule! {
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
+          if replacement.chars().any(|c| c == ' ' || c == '`') {
+            continue;
+          }
+
           quickfixes.push(Quickfix::replacement(
             &setting.name,
             replacement.to_string(),

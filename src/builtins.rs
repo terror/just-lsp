@@ -2769,6 +2769,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: SettingKind::Array,
     description: indoc! {
       "
+      **Deprecated**: use the `[windows]` attribute on `set shell`
+      instead.
+
       Set the command used to invoke recipes and evaluate backticks
       on Windows.
 
@@ -2783,7 +2786,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    deprecated: None,
+    deprecated: Some("[windows] attribute on `set shell`"),
   },
   Builtin::Setting {
     name: "working-directory",

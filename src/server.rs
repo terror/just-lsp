@@ -3210,6 +3210,29 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn code_action_windows_shell_deprecated_no_quickfix() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 4, 0, 4),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn code_action_deprecated_function_outside_range() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })

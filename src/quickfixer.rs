@@ -227,6 +227,15 @@ mod tests {
   }
 
   #[test]
+  fn skips_non_rename_deprecated_setting() {
+    Test::new(
+      "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
+    )
+    .range(lsp::Range::at(0, 4, 0, 4))
+    .run();
+  }
+
+  #[test]
   fn skips_disabled_rules() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
