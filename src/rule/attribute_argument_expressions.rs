@@ -1,6 +1,7 @@
 use super::*;
 
 const EXPRESSION_ATTRIBUTES: &[&str] = &["confirm", "env", "working-directory"];
+const CONST_EXPRESSION_ATTRIBUTES: &[&str] = &["doc"];
 
 define_rule! {
   AttributeArgumentExpressionsRule {
@@ -45,6 +46,11 @@ impl AttributeArgumentExpressionsRule {
     }
   }
 
+  fn const_expression(node: Node) -> bool {
+    node.find("function_call").is_none()
+      && node.find("external_command").is_none()
+  }
+
   fn validate(context: &RuleContext, identifier: Node) -> Vec<Diagnostic> {
     let document = context.document();
 
@@ -54,6 +60,22 @@ impl AttributeArgumentExpressionsRule {
       [] => return Vec::new(),
       _ if EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
         return Vec::new();
+      }
+      _ if CONST_EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
+        return identifier
+          .siblings()
+          .take_while(|node| node.kind() != "identifier")
+          .filter(|node| node.kind() == "expression")
+          .filter(|node| !Self::const_expression(*node))
+          .map(|node| {
+            Diagnostic::error(
+              format!(
+                "Attribute `{attribute_name}` arguments must be const expressions"
+              ),
+              node.get_range(document),
+            )
+          })
+          .collect();
       }
       _ => {}
     }

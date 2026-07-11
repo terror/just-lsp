@@ -566,10 +566,39 @@ mod tests {
         .run();
     }
 
-    case("help");
     case("long");
-    case("pattern");
     case("short");
+  }
+
+  #[test]
+  fn arg_attribute_const_expression_kwargs() {
+    Test::new(indoc! {
+      "
+      help := 'help'
+      pattern := '[a-z]+'
+
+      [arg('bar', help=help, pattern=pattern)]
+      foo bar:
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn doc_attribute_rejects_non_const_expression() {
+    Test::new(indoc! {
+      "
+      [doc(error('message'))]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `doc` arguments must be const expressions",
+      lsp::Range::at(0, 5, 0, 21),
+    )
+    .run();
   }
 
   #[test]
