@@ -29,6 +29,7 @@ pub use {
   dependency::Dependency,
   dependency_argument::DependencyArgument,
   dependency_phase::DependencyPhase,
+  deprecation::Deprecation,
   diagnostic::Diagnostic,
   document::Document,
   error::Error,
@@ -70,6 +71,7 @@ mod count;
 mod dependency;
 mod dependency_argument;
 mod dependency_phase;
+mod deprecation;
 mod diagnostic;
 mod document;
 mod error;

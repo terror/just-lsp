@@ -9,6 +9,15 @@ pub struct Setting {
 }
 
 impl Setting {
+  pub fn has_attribute(&self, attributes: &[Attribute], name: &str) -> bool {
+    attributes.iter().any(|attribute| {
+      attribute.name.value == name
+        && attribute.target == Some(AttributeTarget::Setting)
+        && self.range.start <= attribute.range.start
+        && attribute.range.end <= self.range.end
+    })
+  }
+
   #[must_use]
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);

@@ -246,6 +246,15 @@ mod tests {
   }
 
   #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    Test::new(
+      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
+    )
+    .range(lsp::Range::at(2, 4, 2, 4))
+    .run();
+  }
+
+  #[test]
   fn skips_disabled_rules() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
