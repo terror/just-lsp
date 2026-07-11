@@ -3210,7 +3210,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn code_action_windows_shell_deprecated_no_quickfix() -> Result {
+  async fn code_action_windows_shell_deprecated() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
@@ -3226,7 +3226,25 @@ mod tests {
       .response(json!({
         "jsonrpc": "2.0",
         "id": 2,
-        "result": []
+        "result": [
+          {
+            "title": "Replace `windows-shell` with `[windows] set shell`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 0 },
+                      "end": { "line": 1, "character": 0 }
+                    },
+                    "newText": "[windows]\nset shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }))
       .run()
       .await

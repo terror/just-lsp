@@ -35,14 +35,17 @@ define_rule! {
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
-          if replacement.chars().any(|c| c == ' ' || c == '`') {
-            continue;
-          }
+          let quickfix = match setting.name.value.as_str() {
+            "windows-shell" => Quickfix::setting_attribute(
+              setting,
+              context.document(),
+              "windows",
+              "shell",
+            ),
+            _ => Quickfix::replacement(&setting.name, replacement.to_string()),
+          };
 
-          quickfixes.push(Quickfix::replacement(
-            &setting.name,
-            replacement.to_string(),
-          ));
+          quickfixes.push(quickfix);
         }
       }
 

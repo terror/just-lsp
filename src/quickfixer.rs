@@ -227,11 +227,21 @@ mod tests {
   }
 
   #[test]
-  fn skips_non_rename_deprecated_setting() {
+  fn replaces_windows_shell_setting() {
     Test::new(
       "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
     )
     .range(lsp::Range::at(0, 4, 0, 4))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(0, 0, 1, 0),
+        new_text:
+          "[windows]\nset shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
+            .to_string(),
+      }],
+      range: lsp::Range::at(0, 4, 0, 17),
+      title: "Replace `windows-shell` with `[windows] set shell`".to_string(),
+    })
     .run();
   }
 
