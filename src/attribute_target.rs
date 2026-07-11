@@ -24,6 +24,9 @@ impl Display for AttributeTarget {
 }
 
 impl AttributeTarget {
+  pub const ALL: &[Self] =
+    &[Self::Alias, Self::Assignment, Self::Module, Self::Recipe];
+
   #[must_use]
   pub fn target_name(self) -> &'static str {
     match self {
