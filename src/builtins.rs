@@ -20,7 +20,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "arg",
@@ -210,7 +210,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "env",
@@ -286,7 +286,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "group",
@@ -337,7 +337,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "macos",
@@ -359,7 +359,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "metadata",
@@ -393,7 +393,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "no-cd",
@@ -474,7 +474,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "parallel",
@@ -623,7 +623,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "windows",
@@ -643,7 +643,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "working-directory",
