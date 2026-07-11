@@ -12,7 +12,7 @@ impl Setting {
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
-    let name_node = node.child(1)?;
+    let name_node = node.child_by_field_name("left")?;
 
     let name = TextNode {
       value: document.get_node_text(&name_node),

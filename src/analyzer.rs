@@ -3654,6 +3654,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_with_platform_attribute() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_array_type_error() {
     Test::new(indoc! {
       "

@@ -152,6 +152,7 @@ module.exports = grammar({
     // setting       : 'set' identifier (':=' (boolean | string | expression))?
     setting: ($) =>
       seq(
+        repeat($.attribute),
         "set",
         field("left", $.identifier),
         field(
