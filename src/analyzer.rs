@@ -354,6 +354,21 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_const_expression_kwargs() {
+    Test::new(indoc! {
+      "
+      help := 'help'
+      pattern := '[a-z]+'
+
+      [arg('bar', help=help, pattern=pattern)]
+      foo bar:
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn arg_attribute_empty_parens() {
     Test::new(indoc! {
       "
@@ -568,37 +583,6 @@ mod tests {
 
     case("long");
     case("short");
-  }
-
-  #[test]
-  fn arg_attribute_const_expression_kwargs() {
-    Test::new(indoc! {
-      "
-      help := 'help'
-      pattern := '[a-z]+'
-
-      [arg('bar', help=help, pattern=pattern)]
-      foo bar:
-        echo {{ bar }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn doc_attribute_rejects_non_const_expression() {
-    Test::new(indoc! {
-      "
-      [doc(error('message'))]
-      foo:
-        echo foo
-      "
-    })
-    .error(
-      "Attribute `doc` arguments must be const expressions",
-      lsp::Range::at(0, 5, 0, 21),
-    )
-    .run();
   }
 
   #[test]
@@ -1458,6 +1442,22 @@ mod tests {
         echo {{ parent_dir('~/.config') }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn doc_attribute_rejects_non_const_expression() {
+    Test::new(indoc! {
+      "
+      [doc(error('message'))]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `doc` arguments must be const expressions",
+      lsp::Range::at(0, 5, 0, 21),
+    )
     .run();
   }
 
