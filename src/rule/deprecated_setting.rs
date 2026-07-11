@@ -14,9 +14,15 @@ define_rule! {
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
+          let replacement = if replacement.contains('`') {
+            replacement.to_string()
+          } else {
+            format!("`{replacement}`")
+          };
+
           diagnostics.push(Diagnostic::warning(
             format!(
-              "`{}` is deprecated, use `{replacement}` instead",
+              "`{}` is deprecated, use {replacement} instead",
               setting.name.value
             ),
             setting.name.range,

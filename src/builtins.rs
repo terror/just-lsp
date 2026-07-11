@@ -2786,7 +2786,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    deprecated: Some("[windows] attribute on `set shell`"),
+    deprecated: Some("`[windows]` attribute on `set shell`"),
   },
   Builtin::Setting {
     name: "working-directory",

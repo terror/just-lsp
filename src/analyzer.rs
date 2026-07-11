@@ -3748,7 +3748,7 @@ mod tests {
       lsp::Range::at(0, 0, 1, 0),
     )
     .warning(
-      "`windows-shell` is deprecated, use `[windows] attribute on `set shell`` instead",
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
       lsp::Range::at(0, 4, 0, 17),
     )
     .run();
@@ -3765,7 +3765,7 @@ mod tests {
       "
     })
     .warning(
-      "`windows-shell` is deprecated, use `[windows] attribute on `set shell`` instead",
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
       lsp::Range::at(0, 4, 0, 17),
     )
     .run();
