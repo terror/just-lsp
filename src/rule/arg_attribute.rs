@@ -70,6 +70,11 @@ define_rule! {
 }
 
 impl ArgAttributeRule {
+  fn const_expression(node: Node) -> bool {
+    node.find("function_call").is_none()
+      && node.find("external_command").is_none()
+  }
+
   fn parameter_unknown(
     context: &RuleContext,
     attribute: Node,
@@ -93,11 +98,6 @@ impl ArgAttributeRule {
       .parameters
       .iter()
       .any(|parameter| parameter.name == parameter_name)
-  }
-
-  fn const_expression(node: Node) -> bool {
-    node.find("function_call").is_none()
-      && node.find("external_command").is_none()
   }
 
   fn string_literal_expression(node: Node) -> bool {
