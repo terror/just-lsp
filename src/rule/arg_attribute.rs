@@ -95,6 +95,11 @@ impl ArgAttributeRule {
       .any(|parameter| parameter.name == parameter_name)
   }
 
+  fn const_expression(node: Node) -> bool {
+    node.find("function_call").is_none()
+      && node.find("external_command").is_none()
+  }
+
   fn string_literal_expression(node: Node) -> bool {
     let Some(value) = node.find("^value") else {
       return false;
@@ -110,11 +115,6 @@ impl ArgAttributeRule {
       }
       _ => false,
     }
-  }
-
-  fn const_expression(node: Node) -> bool {
-    node.find("function_call").is_none()
-      && node.find("external_command").is_none()
   }
 
   fn validate(
