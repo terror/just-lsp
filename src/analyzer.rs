@@ -354,6 +354,21 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_const_expression_kwargs() {
+    Test::new(indoc! {
+      "
+      help := 'help'
+      pattern := '[a-z]+'
+
+      [arg('bar', help=help, pattern=pattern)]
+      foo bar:
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn arg_attribute_empty_parens() {
     Test::new(indoc! {
       "
@@ -396,8 +411,32 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern, flag",
+      "Unknown `[arg]` keyword `bogus`, expected one of flag, help, long, max, min, multiple, pattern, short, value",
     lsp::Range::at(0, 13, 0, 22))
+    .run();
+  }
+
+  #[test]
+  fn arg_min_max_kwargs_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_multiple_kwarg_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long, multiple)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
     .run();
   }
 
@@ -542,9 +581,7 @@ mod tests {
         .run();
     }
 
-    case("help");
     case("long");
-    case("pattern");
     case("short");
   }
 
@@ -1405,6 +1442,22 @@ mod tests {
         echo {{ parent_dir('~/.config') }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn doc_attribute_rejects_non_const_expression() {
+    Test::new(indoc! {
+      "
+      [doc(error('message'))]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `doc` arguments must be const expressions",
+      lsp::Range::at(0, 5, 0, 21),
+    )
     .run();
   }
 
@@ -3596,6 +3649,19 @@ mod tests {
       foo:
         echo "foo"
       "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_with_platform_attribute() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      "
     })
     .run();
   }

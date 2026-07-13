@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.4.8](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-07-09
+
+### Added
+
+- Add support for `min`, `max`, and `multiple` `arg` attribute keyword arguments (#465)
+- Add support for `cache` attribute (#463)
+- Add support for `continue` attribute (#462)
+- Add support for `dotenv-command` setting (#461)
+- Add support for `just_version` builtin function (#460)
+- Add support for `minimum-version` setting (#459)
+- Add support for `indentation` setting (#458)
+- Add quickfix to remove unnecessary `parallel` attributes (#445)
+- Refresh builtin hover documentation for lists (#443)
+- Set completion item deprecation metadata (#442)
+- Track dependency phases for duplicate checks (#441)
+- Add rule for list feature gating (#439)
+- Allow attribute shorthand expressions (#437)
+- Allow trailing function call commas (#436)
+- Add list expression operators (#434)
+- Allow optional `assert` message (#433)
+- Allow optional `split` function separator (#432)
+- Add guard recipe line prefixes (#431)
+- Allow `arg` attribute value expressions (#430)
+- Add support for `split` builtin function (#427)
+- Add support for `arg` flag attribute (#429)
+- Add support for optional `join_list` separator (#428)
+- Allow dotenv list settings (#426)
+
+### Fixed
+
+- Fix attribute duplicate diagnostics (#438)
+- Fix unexport parsing (#435)
+
+### Misc
+
+- Bump tree-sitter from 0.26.9 to 0.26.10 (#456)
+- Bump cc from 1.2.65 to 1.2.66 (#455)
+- Add github sponsors funding configuration (#450)
+- Bump cc from 1.2.64 to 1.2.65 (#449)
+- Bump log from 0.4.32 to 0.4.33 (#448)
+- Refactor quickfix tests with ergonomic builder (#446)
+- Refresh diagnostics documentation (#444)
+- Integrate quickfix generation into lint rules (#440)
+
 ## [0.4.7](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-06-16
 
 ### Fixed

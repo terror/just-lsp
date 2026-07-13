@@ -446,6 +446,13 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
           "type": "STRING",
           "value": "set"
         },
@@ -2520,8 +2527,14 @@
     }
   ],
   "conflicts": [
-    ["value", "attribute_named_param"],
-    ["_name", "unexport"]
+    [
+      "value",
+      "attribute_named_param"
+    ],
+    [
+      "_name",
+      "unexport"
+    ]
   ],
   "precedences": [],
   "externals": [

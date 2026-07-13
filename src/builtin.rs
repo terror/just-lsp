@@ -121,6 +121,7 @@ impl Builtin<'_> {
       }
       "arch"
       | "num_cpus"
+      | "num_jobs"
       | "os"
       | "os_family"
       | "is_dependency"
@@ -141,6 +142,7 @@ impl Builtin<'_> {
       | "source_dir"
       | "just_executable"
       | "just_pid"
+      | "just_version"
       | "uuid"
       | "runtime_directory"
       | "runtime_dir"

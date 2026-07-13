@@ -20,7 +20,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "arg",
@@ -41,13 +41,49 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       - `pattern=\"PATTERN\"` requires the value to match a regular
         expression. Patterns are full-match; `just` rejects the
         invocation if the supplied value does not match.
+      - `multiple` allows an option or flag to be passed more than
+        once, assigning the list of passed values to the parameter.
+      - `min=MIN` requires at least `MIN` values. Requires `multiple`
+        or a variadic parameter.
+      - `max=MAX` allows at most `MAX` values. Requires `multiple` or
+        a variadic parameter.
 
       Multiple keys may be combined in a single `[arg(...)]`.
 
       ```just
+      set unstable
+      set lists
+
       [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
       greet NAME:
         @echo Hello, {{NAME}}
+
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "cache",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Skip recipe invocations when a matching entry exists in the
+      cache.
+
+      Currently unstable. The `[cache]` attribute may only be used
+      with script recipes.
+
+      ```just
+      set unstable
+
+      [script]
+      [cache]
+      build:
+        cargo build
       ```
       "
     },
@@ -79,6 +115,30 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       [confirm(\"Are you sure you want to delete everything?\")]
       delete-everything:
         rm -rf *
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "continue",
+    kind: AttributeKind::Optional,
+    description: indoc! {
+      "
+      Continue execution normally if a command is interrupted by any
+      of `SIGNALS` and exits successfully.
+
+      With no argument, handles `SIGINT` (`ctrl-c`) so that `SIGQUIT`
+      still aborts. Pass a signal name or list of names to customize.
+
+      ```just
+      [continue]
+      test:
+        cargo test
+
+      [continue(\"SIGINT SIGTERM\")]
+      serve:
+        ./serve.sh
       ```
       "
     },
@@ -150,7 +210,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "env",
@@ -226,7 +286,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "group",
@@ -277,7 +337,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "macos",
@@ -299,7 +359,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "metadata",
@@ -333,7 +393,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "no-cd",
@@ -414,7 +474,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "parallel",
@@ -563,7 +623,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "windows",
@@ -583,7 +643,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "working-directory",
@@ -1472,6 +1532,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "just_version",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Version of the `just` executable.
+
+      ```just
+      just-info:
+        @echo The version is: {{ just_version() }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "justfile",
     aliases: &[],
     kind: FunctionKind::Nullary,
@@ -1600,6 +1676,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       build:
         make -j{{num_cpus()}}
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "num_jobs",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the value passed to `just` with `--jobs`, or an empty
+      list if `--jobs` was not passed.
       "
     },
     deprecated: None,
@@ -2290,6 +2378,28 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "dotenv-command",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Run a command and load its output as an environment file.
+
+      `just` runs the command with the configured `shell` and parses
+      its stdout as an environment file. May be set multiple times;
+      variables from commands later in the list take precedence over
+      variables from commands earlier in the list.
+
+      The command-line option `--dotenv-command` can be used to set or
+      override `dotenv-command` at runtime.
+
+      ```just
+      set dotenv-command := \"sops -d .enc.env\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "dotenv-filename",
     kind: SettingKind::String,
     description: indoc! {
@@ -2443,6 +2553,24 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "indentation",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Set recipe body indentation used when formatting with `--fmt` or
+      `--dump`.
+
+      Accepts any string of whitespace characters. The default is four
+      spaces.
+
+      ```just
+      set indentation := \"  \"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "lazy",
     kind: SettingKind::Boolean(false),
     description: indoc! {
@@ -2466,6 +2594,25 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Allow values to be lists of strings instead of only strings.
 
       Currently unstable.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "minimum-version",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Error if `just` is older than `minimum-version`.
+
+      Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g.
+      `\"1.55.0\"`. The setting should be placed at the top of the
+      `justfile`, before any other content, so that `just` rejects the
+      file before evaluating anything else.
+
+      ```just
+      set minimum-version := \"1.55.0\"
+      ```
       "
     },
     deprecated: None,
