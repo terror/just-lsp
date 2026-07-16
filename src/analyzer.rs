@@ -1837,6 +1837,73 @@ mod tests {
   }
 
   #[test]
+  fn cache_attribute_kwargs() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache(inputs='Cargo.lock', outputs='target', extra=arch())]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_attribute_invalid_keyword_and_missing_value() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache(foo='bar', inputs)]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Unknown `[cache]` keyword `foo`, expected one of extra, inputs, outputs",
+      lsp::Range::at(1, 7, 1, 16),
+    )
+    .error(
+      "`[cache]` keyword `inputs` requires a value",
+      lsp::Range::at(1, 18, 1, 24),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_attribute_rejects_positional_arguments() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache('foo')]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Attribute `cache` only accepts keyword arguments",
+      lsp::Range::at(1, 7, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_without_script() {
+    Test::new(indoc! {
+      "
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without `[script]`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn format_strings_mark_variables_as_used() {
     Test::new(indoc! {
       r#"

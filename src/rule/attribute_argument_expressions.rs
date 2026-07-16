@@ -1,6 +1,7 @@
 use super::*;
 
-const EXPRESSION_ATTRIBUTES: &[&str] = &["confirm", "env", "working-directory"];
+const EXPRESSION_ATTRIBUTES: &[&str] =
+  &["cache", "confirm", "env", "working-directory"];
 const CONST_EXPRESSION_ATTRIBUTES: &[&str] = &["doc"];
 
 define_rule! {
