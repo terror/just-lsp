@@ -46,8 +46,7 @@ define_rule! {
             } => {
               if context.settings().iter().any(|replacement_setting| {
                 replacement_setting.name.value == replacement
-                  && replacement_setting
-                    .has_attribute(context.attributes(), attribute)
+                  && replacement_setting.has_attribute(attribute)
               }) {
                 continue;
               }

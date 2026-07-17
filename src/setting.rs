@@ -9,13 +9,11 @@ pub struct Setting {
 }
 
 impl Setting {
-  pub fn has_attribute(&self, attributes: &[Attribute], name: &str) -> bool {
-    attributes.iter().any(|attribute| {
-      attribute.name.value == name
-        && attribute.target == Some(AttributeTarget::Setting)
-        && self.range.start <= attribute.range.start
-        && attribute.range.end <= self.range.end
-    })
+  pub fn has_attribute(&self, name: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .any(|attribute| attribute.name.value == name)
   }
 
   #[must_use]
