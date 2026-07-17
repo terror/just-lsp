@@ -3747,6 +3747,10 @@ mod tests {
       "Setting `windows-shell` expects an array value",
       lsp::Range::at(0, 0, 1, 0),
     )
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(0, 4, 0, 17),
+    )
     .run();
   }
 
@@ -3760,6 +3764,28 @@ mod tests {
         echo \"foo\"
       "
     })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(0, 4, 0, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_replacement() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      "
+    })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(4, 4, 4, 17),
+    )
     .run();
   }
 

@@ -10,13 +10,13 @@ define_rule! {
 
       for setting in context.settings() {
         if let Some(Builtin::Setting {
-          deprecated: Some(replacement),
+          deprecated: Some(deprecation),
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
           diagnostics.push(Diagnostic::warning(
             format!(
-              "`{}` is deprecated, use `{replacement}` instead",
+              "`{}` is deprecated, use {deprecation} instead",
               setting.name.value
             ),
             setting.name.range,
@@ -28,17 +28,39 @@ define_rule! {
     },
     quickfixes(context) {
       let mut quickfixes = Vec::new();
-
       for setting in context.settings() {
         if let Some(Builtin::Setting {
-          deprecated: Some(replacement),
+          deprecated: Some(deprecation),
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
-          quickfixes.push(Quickfix::replacement(
-            &setting.name,
-            replacement.to_string(),
-          ));
+          let deprecation = *deprecation;
+
+          let quickfix = match deprecation {
+            Deprecation::Replacement(replacement) => {
+              Quickfix::replacement(&setting.name, replacement)
+            }
+            Deprecation::SettingAttribute {
+              attribute,
+              setting: replacement,
+            } => {
+              if context.settings().iter().any(|replacement_setting| {
+                replacement_setting.name.value == replacement
+                  && replacement_setting.has_attribute(attribute)
+              }) {
+                continue;
+              }
+
+              Quickfix::setting_attribute(
+                setting,
+                context.document(),
+                attribute,
+                replacement,
+              )
+            }
+          };
+
+          quickfixes.push(quickfix);
         }
       }
 

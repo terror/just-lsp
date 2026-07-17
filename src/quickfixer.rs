@@ -227,6 +227,34 @@ mod tests {
   }
 
   #[test]
+  fn replaces_windows_shell_setting() {
+    Test::new(
+      "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
+    )
+    .range(lsp::Range::at(0, 4, 0, 4))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(0, 0, 1, 0),
+        new_text:
+          "[windows]\nset shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
+            .to_string(),
+      }],
+      range: lsp::Range::at(0, 4, 0, 17),
+      title: "Replace `windows-shell` with `[windows] set shell`".to_string(),
+    })
+    .run();
+  }
+
+  #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    Test::new(
+      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
+    )
+    .range(lsp::Range::at(2, 4, 2, 4))
+    .run();
+  }
+
+  #[test]
   fn skips_disabled_rules() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {

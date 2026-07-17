@@ -631,11 +631,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: AttributeKind::Nullary,
     description: indoc! {
       "
-      Enable the recipe on Windows.
+      Enable a recipe or setting on Windows.
 
       Part of the platform-gating family of attributes. When any
       platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      one of the active platforms matches. It can also specialize
+      `set shell` for Windows.
 
       ```just
       [windows]
@@ -1307,7 +1308,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "env_var_or_default",
@@ -1321,7 +1322,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       `default` when the variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "error",
@@ -2762,13 +2763,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       for a more flexible, version-agnostic alternative.
       "
     },
-    deprecated: Some("windows-shell"),
+    deprecated: Some(Deprecation::Replacement("windows-shell")),
   },
   Builtin::Setting {
     name: "windows-shell",
     kind: SettingKind::Array,
     description: indoc! {
       "
+      **Deprecated**: use the `[windows]` attribute on `set shell`
+      instead.
+
       Set the command used to invoke recipes and evaluate backticks
       on Windows.
 
@@ -2783,7 +2787,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    deprecated: None,
+    deprecated: Some(Deprecation::SettingAttribute {
+      attribute: "windows",
+      setting: "shell",
+    }),
   },
   Builtin::Setting {
     name: "working-directory",

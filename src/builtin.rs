@@ -17,13 +17,13 @@ pub enum Builtin<'a> {
     aliases: &'a [&'a str],
     kind: FunctionKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
   Setting {
     name: &'a str,
     kind: SettingKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
 }
 
@@ -250,7 +250,7 @@ mod tests {
       aliases: &[],
       kind: FunctionKind::Nullary,
       description: "",
-      deprecated: Some("bar"),
+      deprecated: Some(Deprecation::Replacement("bar")),
     }
     .completion_items()
     .into_iter()

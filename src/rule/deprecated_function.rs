@@ -12,13 +12,13 @@ define_rule! {
         let function_name = &function_call.name.value;
 
         if let Some(Builtin::Function {
-          deprecated: Some(replacement),
+          deprecated: Some(deprecation),
           ..
         }) = context.builtin_function(function_name.as_str())
         {
           diagnostics.push(Diagnostic::warning(
             format!(
-              "`{function_name}` is deprecated, use `{replacement}` instead"
+              "`{function_name}` is deprecated, use {deprecation} instead"
             ),
             function_call.name.range,
           ));
@@ -34,13 +34,13 @@ define_rule! {
         let function_name = &function_call.name.value;
 
         if let Some(Builtin::Function {
-          deprecated: Some(replacement),
+          deprecated: Some(Deprecation::Replacement(replacement)),
           ..
         }) = context.builtin_function(function_name.as_str())
         {
           quickfixes.push(Quickfix::replacement(
             &function_call.name,
-            replacement.to_string(),
+            *replacement,
           ));
         }
       }
