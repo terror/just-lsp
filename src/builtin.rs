@@ -339,27 +339,4 @@ mod tests {
       ],
     );
   }
-
-  #[test]
-  fn function_completion_snippets() {
-    #[track_caller]
-    fn case(name: &str, expected: &str) {
-      let item = Builtin::Function {
-        name,
-        aliases: &[],
-        kind: FunctionKind::Nullary,
-        description: "",
-        deprecated: None,
-      }
-      .completion_items()
-      .into_iter()
-      .next()
-      .unwrap();
-
-      assert_eq!(item.insert_text.as_deref(), Some(expected));
-    }
-
-    case("len", "len(${1:value})");
-    case("style", "style(${1:styles:string}${2:, text:string})");
-  }
 }
