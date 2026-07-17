@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Setting {
+  pub attributes: Vec<Attribute>,
   pub kind: SettingKind,
   pub name: TextNode,
   pub range: lsp::Range,
@@ -48,7 +49,50 @@ impl Setting {
       return None;
     };
 
-    Some(Setting { kind, name, range })
+    let attributes = node
+      .find_all("attribute")
+      .into_iter()
+      .flat_map(|attribute_node| {
+        attribute_node
+          .find_all("^identifier")
+          .into_iter()
+          .map(|identifier_node| {
+            let arguments = identifier_node
+              .siblings()
+              .take_while(|sibling| sibling.kind() != "identifier")
+              .filter(|sibling| {
+                sibling.start_byte() != sibling.end_byte()
+                  && matches!(
+                    sibling.kind(),
+                    "string" | "expression" | "attribute_named_param"
+                  )
+              })
+              .map(|argument_node| TextNode {
+                value: document.get_node_text(&argument_node),
+                range: argument_node.get_range(document),
+              })
+              .collect::<Vec<_>>();
+
+            Attribute {
+              name: TextNode {
+                value: document.get_node_text(&identifier_node),
+                range: identifier_node.get_range(document),
+              },
+              arguments,
+              target: Some(AttributeTarget::Setting),
+              range: attribute_node.get_range(document),
+            }
+          })
+          .collect::<Vec<_>>()
+      })
+      .collect::<Vec<_>>();
+
+    Some(Setting {
+      attributes,
+      kind,
+      name,
+      range,
+    })
   }
 }
 
@@ -61,6 +105,7 @@ mod tests {
     assert_eq!(
       Document::from("set foo := true\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -76,6 +121,7 @@ mod tests {
     assert_eq!(
       Document::from("set foo := false\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -91,6 +137,7 @@ mod tests {
     assert_eq!(
       Document::from("set export\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "export".into(),
           range: lsp::Range::at(0, 4, 0, 10),
@@ -106,6 +153,7 @@ mod tests {
     assert_eq!(
       Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "shell".into(),
           range: lsp::Range::at(0, 4, 0, 9),
@@ -124,6 +172,7 @@ mod tests {
       )
       .settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "windows-shell".into(),
           range: lsp::Range::at(0, 4, 0, 17),
@@ -139,6 +188,7 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar\"\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -154,6 +204,7 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar := baz\"\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -169,6 +220,7 @@ mod tests {
     assert_eq!(
       Document::from("set foo := \"bar\" / baz\n").settings(),
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -190,6 +242,7 @@ mod tests {
       .settings(),
       vec![
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(0, 4, 0, 7),
@@ -198,6 +251,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(1, 4, 1, 7),
@@ -206,6 +260,7 @@ mod tests {
           range: lsp::Range::at(1, 0, 2, 0),
         },
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "shell".into(),
             range: lsp::Range::at(2, 4, 2, 9),
@@ -214,6 +269,33 @@ mod tests {
           range: lsp::Range::at(2, 0, 3, 0),
         },
       ],
+    );
+  }
+
+  #[test]
+  fn parse_attributes() {
+    assert_eq!(
+      Document::from("[group(\"foo\")]\nset bar := true\n").settings(),
+      vec![Setting {
+        attributes: vec![Attribute {
+          name: TextNode {
+            value: "group".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          arguments: vec![TextNode {
+            value: "\"foo\"".into(),
+            range: lsp::Range::at(0, 7, 0, 12),
+          }],
+          target: Some(AttributeTarget::Setting),
+          range: lsp::Range::at(0, 0, 1, 0),
+        }],
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 4, 1, 7),
+        },
+        kind: SettingKind::Boolean(true),
+        range: lsp::Range::at(0, 0, 2, 0),
+      }],
     );
   }
 }
