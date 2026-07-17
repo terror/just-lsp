@@ -12,6 +12,7 @@ define_rule! {
       };
 
       let document = context.document();
+
       let mut diagnostics = Vec::new();
 
       for attribute in tree.root_node().find_all("attribute") {
