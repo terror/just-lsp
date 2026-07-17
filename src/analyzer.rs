@@ -2003,6 +2003,19 @@ mod tests {
   }
 
   #[test]
+  fn function_calls_len() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ len(['foo', 'bar']) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn function_calls_split() {
     #[track_caller]
     fn case(expression: &str) {
@@ -2058,6 +2071,18 @@ mod tests {
       "Function `split` accepts at most 2 arguments, but 3 provided",
       lsp::Range::at(2, 7, 2, 35),
     )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_style_accepts_optional_text() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ style('error') }}
+        echo {{ style('warning', 'careful') }}
+      "
+    })
     .run();
   }
 
@@ -2181,15 +2206,17 @@ mod tests {
       "
       bool(value) := value
       join_list(value) := value
+      len(value) := value
       show(value) := value
       split(value) := value
       which(value) := value
 
       foo := bool('foo')
       bar := join_list('bar')
-      baz := show('baz')
-      qux := split('qux')
-      quux := which('quux')
+      baz := len('baz')
+      qux := show('qux')
+      quux := split('quux')
+      corge := which('corge')
 
       recipe:
         echo {{ foo }}
@@ -2197,6 +2224,7 @@ mod tests {
         echo {{ baz }}
         echo {{ qux }}
         echo {{ quux }}
+        echo {{ corge }}
       "
     })
     .run();
@@ -2266,6 +2294,23 @@ mod tests {
     .error(
       "the `join_list()` function requires `set lists`",
       lsp::Range::at(0, 7, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_len_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := len('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `len()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 10),
     )
     .run();
   }

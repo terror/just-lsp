@@ -67,6 +67,7 @@ impl ListFeaturesRule {
     match name {
       "bool" => Some("the `bool()` function requires `set lists`"),
       "join_list" => Some("the `join_list()` function requires `set lists`"),
+      "len" => Some("the `len()` function requires `set lists`"),
       "show" => Some("the `show()` function requires `set lists`"),
       "split" => Some("the `split()` function requires `set lists`"),
       "which" => Some("the `which()` function requires `set lists`"),
