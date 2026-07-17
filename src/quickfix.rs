@@ -45,6 +45,7 @@ impl Quickfix {
       .content
       .line(setting.range.start.line as usize)
       .to_string();
+
     let line = line.replacen(&setting.name.value, replacement, 1);
 
     Self {
