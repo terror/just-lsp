@@ -68,20 +68,21 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "cache",
-    kind: AttributeKind::Nullary,
+    kind: AttributeKind::Variadic,
     description: indoc! {
       "
       Skip recipe invocations when a matching entry exists in the
       cache.
 
       Currently unstable. The `[cache]` attribute may only be used
-      with script recipes.
+      with script recipes. `inputs`, `outputs`, and `extra` keyword
+      arguments customize the cache key.
 
       ```just
       set unstable
 
       [script]
-      [cache]
+      [cache(inputs='Cargo.lock', outputs='target', extra=arch())]
       build:
         cargo build
       ```
