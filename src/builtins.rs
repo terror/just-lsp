@@ -1596,6 +1596,19 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "len",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Return the number of elements in `value`.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "lowercamelcase",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -2066,21 +2079,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "style",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
-      `just` itself for styled output.
+      `just` itself for styled output. With `text`, return the styled
+      text followed by a reset sequence.
 
-      Unlike the plain color constants, `style(name)` produces the
-      exact sequence `just` uses, so recipe output can match
-      `just`'s own styling.
+      Unlike the plain color constants, `style(styles)` produces the
+      exact sequence `just` uses, so recipe output can match `just`'s
+      own styling.
 
-      Recognized values of `name`: `'command'` (echoed recipe lines),
-      `'error'`, and `'warning'`.
+      The `'command'`, `'error'`, and `'warning'` styles match `just`'s
+      echoed recipe lines and messages.
 
       ```just
       scary:
+        @echo '{{ style(\"warning\", \"careful!\") }}'
         @echo '{{ style(\"error\") }}OH NO{{ NORMAL }}'
       ```
       "
