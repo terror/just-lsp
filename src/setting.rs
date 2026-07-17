@@ -9,13 +9,6 @@ pub struct Setting {
 }
 
 impl Setting {
-  pub fn has_attribute(&self, name: &str) -> bool {
-    self
-      .attributes
-      .iter()
-      .any(|attribute| attribute.name.value == name)
-  }
-
   #[must_use]
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
@@ -100,6 +93,14 @@ impl Setting {
       name,
       range,
     })
+  }
+
+  #[must_use]
+  pub fn has_attribute(&self, name: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .any(|attribute| attribute.name.value == name)
   }
 }
 
