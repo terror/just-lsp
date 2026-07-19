@@ -17,7 +17,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                                                        |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind.                                                                              |
 | `cache-attribute`                 | Cache Attribute                 | `[cache]` uses an unknown keyword, a keyword without a value, or a positional argument.                                      |
-| `cache-without-script`            | Cache Without Script            | Recipe uses `[cache]` without `[script]`.                                                                                     |
+| `cache-without-script`            | Cache Without Script Mode       | Recipe uses `[cache]` without script mode.                                                                                    |
 | `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique appear more than once on a target, or `[default]` appears more than once in a module.          |
 | `script-shebang-conflict`         | Script Shebang Conflict         | Recipe combines a shebang line with the `[script]` attribute.                                                                 |
 | `exit-message-conflict`           | Exit Message Conflict           | Recipe combines mutually exclusive `[exit-message]` and `[no-exit-message]` attributes.                                       |

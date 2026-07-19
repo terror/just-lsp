@@ -3,7 +3,7 @@ use super::*;
 define_rule! {
   CacheWithoutScriptRule {
     id: "cache-without-script",
-    message: "cache without script",
+    message: "cache without script mode",
     run(context) {
       let mut diagnostics = Vec::new();
 
@@ -12,13 +12,17 @@ define_rule! {
           continue;
         };
 
-        if recipe.has_attribute("script") {
+        if recipe.has_attribute("script")
+          || (!recipe.has_attribute("shell")
+            && (recipe.shebang.is_some()
+              || context.setting_enabled("default-script")))
+        {
           continue;
         }
 
         diagnostics.push(Diagnostic::error(
           format!(
-            "Recipe `{}` uses `[cache]` without `[script]`",
+            "Recipe `{}` uses `[cache]` without script mode",
             recipe.name.value
           ),
           cache_attribute.range,
