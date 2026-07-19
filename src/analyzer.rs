@@ -1214,7 +1214,67 @@ mod tests {
   }
 
   #[test]
-  fn cache_without_script() {
+  fn cache_with_explicit_script() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_script_and_shell() {
+    Test::new(indoc! {
+      "
+      [script]
+      [shell]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_default_script() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_default_script_and_shell() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      [shell]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without script mode",
+      lsp::Range::at(3, 0, 4, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shell() {
     Test::new(indoc! {
       "
       [cache]
@@ -1223,8 +1283,39 @@ mod tests {
       "
     })
     .error(
-      "Recipe `build` uses `[cache]` without `[script]`",
+      "Recipe `build` uses `[cache]` without script mode",
       lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shebang() {
+    Test::new(indoc! {
+      "
+      [cache]
+      build:
+        #!/usr/bin/env sh
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shebang_and_shell() {
+    Test::new(indoc! {
+      "
+      [shell]
+      [cache]
+      build:
+        #!/usr/bin/env sh
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without script mode",
+      lsp::Range::at(1, 0, 2, 0),
     )
     .run();
   }
