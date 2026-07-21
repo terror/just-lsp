@@ -48,10 +48,6 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
-  pub fn analyze(&mut self, config: &Config) {
-    self.diagnostics = Analyzer::from(&*self).config(config).analyze();
-  }
-
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
@@ -77,6 +73,10 @@ impl Document {
         })
         .collect()
     })
+  }
+
+  pub fn analyze(&mut self, config: &Config) {
+    self.diagnostics = Analyzer::from(&*self).config(config).analyze();
   }
 
   /// Applies incremental edits from the client and reparses the syntax tree.
