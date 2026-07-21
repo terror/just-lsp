@@ -133,6 +133,10 @@ impl LanguageServer for Server {
     }
   }
 
+  async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+    self.0.did_save(params).await;
+  }
+
   async fn document_highlight(
     &self,
     params: lsp::DocumentHighlightParams,
@@ -420,21 +424,25 @@ impl Inner {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let should_publish = {
+    let uris = {
       let config = self.config.read().await;
 
       let mut documents = self.documents.write().await;
 
-      if let Some(document) = documents.get_mut(&uri) {
-        document.apply_change(params)?;
+      let Some(document) = documents.get_mut(&uri) else {
+        return Ok(());
+      };
+
+      document.apply_change(params)?;
+
+      for document in documents.values_mut() {
         document.analyze(&config);
-        true
-      } else {
-        false
       }
+
+      documents.keys().cloned().collect::<Vec<_>>()
     };
 
-    if should_publish {
+    for uri in uris {
       self.publish_diagnostics(&uri).await;
     }
 
@@ -472,6 +480,30 @@ impl Inner {
     self.publish_diagnostics(&uri).await;
 
     Ok(())
+  }
+
+  async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+    let uri = params.text_document.uri;
+
+    let uris = {
+      let config = self.config.read().await;
+
+      let mut documents = self.documents.write().await;
+
+      if !documents.contains_key(&uri) {
+        return;
+      }
+
+      for document in documents.values_mut() {
+        document.analyze(&config);
+      }
+
+      documents.keys().cloned().collect::<Vec<_>>()
+    };
+
+    for uri in uris {
+      self.publish_diagnostics(&uri).await;
+    }
   }
 
   async fn document_highlight(
