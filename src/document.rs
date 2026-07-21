@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub struct Document {
   pub content: Rope,
+  pub diagnostics: Vec<Diagnostic>,
   pub tree: Option<Tree>,
   pub uri: lsp::Url,
   pub version: i32,
@@ -12,6 +13,7 @@ impl From<&str> for Document {
   fn from(value: &str) -> Self {
     let mut document = Self {
       content: value.into(),
+      diagnostics: Vec::new(),
       tree: None,
       uri: lsp::Url::parse("file:///test.just").unwrap(),
       version: 1,
@@ -33,6 +35,7 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 
     let mut document = Self {
       content: Rope::from_str(&text),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version,
@@ -45,6 +48,10 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
 }
 
 impl Document {
+  pub fn analyze(&mut self, config: &Config) {
+    self.diagnostics = Analyzer::from(&*self).config(config).analyze();
+  }
+
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
@@ -374,6 +381,7 @@ impl Document {
   pub fn new(source: &str, uri: lsp::Url) -> Result<Self> {
     let mut document = Self {
       content: Rope::from_str(source),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 0,

@@ -1,36 +1,39 @@
 use super::*;
 
 pub struct Quickfixer<'a> {
-  config: Option<&'a Config>,
-  document: &'a Document,
+  diagnostics: &'a [Diagnostic],
   parameters: &'a lsp::CodeActionParams,
 }
 
 impl<'a> Quickfixer<'a> {
-  fn action(&self, code: &str, quickfix: Quickfix) -> lsp::CodeActionOrCommand {
+  fn action(
+    &self,
+    source: &Diagnostic,
+    quickfix: &Quickfix,
+  ) -> lsp::CodeActionOrCommand {
     let diagnostics = self
       .parameters
       .context
       .diagnostics
       .iter()
       .filter(|diagnostic| {
-        diagnostic.range == quickfix.range
+        diagnostic.range == source.range
           && matches!(
             &diagnostic.code,
-            Some(lsp::NumberOrString::String(c)) if c == code
+            Some(lsp::NumberOrString::String(value)) if value == &source.id
           )
       })
       .cloned()
       .collect::<Vec<_>>();
 
     lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: quickfix.title,
+      title: quickfix.title.clone(),
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
       edit: Some(lsp::WorkspaceEdit {
         changes: Some(HashMap::from([(
           self.parameters.text_document.uri.clone(),
-          quickfix.edits,
+          quickfix.edits.clone(),
         )])),
         ..Default::default()
       }),
@@ -40,44 +43,26 @@ impl<'a> Quickfixer<'a> {
 
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let context = RuleContext::new(self.document);
-
-    inventory::iter::<&dyn Rule>
-      .into_iter()
-      .filter(|rule| {
-        self
-          .config
-          .unwrap_or(&Config::default())
-          .rule_config(rule.id())
-          .level()
-          != Some(RuleLevel::Off)
-      })
-      .flat_map(|rule| {
-        rule
-          .quickfixes(&context)
-          .into_iter()
-          .filter(|quickfix| quickfix.range.overlaps(self.parameters.range))
-          .map(|quickfix| self.action(rule.id(), quickfix))
+    self
+      .diagnostics
+      .iter()
+      .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
+      .filter_map(|diagnostic| {
+        diagnostic
+          .quickfix
+          .as_ref()
+          .map(|quickfix| self.action(diagnostic, quickfix))
       })
       .collect()
   }
 
   #[must_use]
-  pub fn config(self, config: &'a Config) -> Self {
-    Self {
-      config: Some(config),
-      ..self
-    }
-  }
-
-  #[must_use]
   pub fn new(
-    document: &'a Document,
     parameters: &'a lsp::CodeActionParams,
+    diagnostics: &'a [Diagnostic],
   ) -> Self {
     Self {
-      config: None,
-      document,
+      diagnostics,
       parameters,
     }
   }
@@ -123,7 +108,7 @@ mod tests {
     fn run(self) {
       let Test {
         config,
-        document,
+        mut document,
         quickfixes,
         range,
       } = self;
@@ -141,9 +126,10 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let actions = Quickfixer::new(&document, &parameters)
-        .config(&config)
-        .collect();
+      document.analyze(&config);
+
+      let actions =
+        Quickfixer::new(&parameters, &document.diagnostics).collect();
 
       assert_eq!(actions.len(), quickfixes.len());
 
