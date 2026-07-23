@@ -366,6 +366,17 @@ mod tests {
       .collect()
   }
 
+  fn token_positions(
+    source: &str,
+    token_type: &str,
+  ) -> Vec<(u32, u32, u32, u32)> {
+    tokenize(source)
+      .into_iter()
+      .filter(|token| token.token_type == token_type)
+      .map(|token| (token.line, token.start, token.length, token.modifiers))
+      .collect()
+  }
+
   #[test]
   fn alias() {
     assert_eq!(
@@ -492,6 +503,23 @@ mod tests {
           token_type: "operator",
         },
       ]
+    );
+  }
+
+  #[test]
+  fn attributes_added_to_builtin_catalog() {
+    assert_eq!(
+      token_positions(
+        indoc! {
+        "
+        [cache]
+        [continue]
+        foo:
+        "
+        },
+        "decorator",
+      ),
+      [(0, 1, 5, 0), (1, 1, 8, 0)]
     );
   }
 
@@ -1004,6 +1032,53 @@ mod tests {
   }
 
   #[test]
+  fn new_expression_operators() {
+    assert_eq!(
+      token_positions("foo := \"bar\" ++ \"baz\" || \"qux\"\n", "operator"),
+      [(0, 4, 2, 0), (0, 13, 2, 0), (0, 22, 2, 0)]
+    );
+  }
+
+  #[test]
+  fn question_recipe_line_prefixes() {
+    assert_eq!(
+      token_positions(
+        indoc! {
+        "
+        foo:
+          @-? echo
+          @?- echo
+          -@? echo
+          -?@ echo
+          ?@- echo
+          ?-@ echo
+          @? echo
+          -? echo
+          ?@ echo
+          ?- echo
+        "
+        },
+        "operator",
+      )
+      .into_iter()
+      .filter(|(line, _, _, _)| *line > 0)
+      .collect::<Vec<_>>(),
+      [
+        (1, 2, 3, 0),
+        (2, 2, 3, 0),
+        (3, 2, 3, 0),
+        (4, 2, 3, 0),
+        (5, 2, 3, 0),
+        (6, 2, 3, 0),
+        (7, 2, 2, 0),
+        (8, 2, 2, 0),
+        (9, 2, 2, 0),
+        (10, 2, 2, 0),
+      ]
+    );
+  }
+
+  #[test]
   fn multibyte_comment() {
     #[track_caller]
     fn case(source: &str) {
@@ -1105,6 +1180,30 @@ mod tests {
           modifiers: 0,
           token_type: "operator",
         },
+      ]
+    );
+  }
+
+  #[test]
+  fn settings_added_to_builtin_catalog() {
+    assert_eq!(
+      token_positions(
+        indoc! {
+        "
+        set dotenv-command := \"foo\"
+        set indentation := \"foo\"
+        set minimum-version := \"foo\"
+        "
+        },
+        "keyword",
+      ),
+      [
+        (0, 0, 3, 0),
+        (0, 4, 14, 0),
+        (1, 0, 3, 0),
+        (1, 4, 11, 0),
+        (2, 0, 3, 0),
+        (2, 4, 15, 0),
       ]
     );
   }
