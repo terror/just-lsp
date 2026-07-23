@@ -1546,6 +1546,60 @@ mod tests {
   }
 
   #[test]
+  fn continue_attribute_accepts_zero_arguments() {
+    Test::new(indoc! {
+      "
+      [continue]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_accepts_one_argument() {
+    Test::new(indoc! {
+      "
+      [continue(\"SIGINT\")]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_accepts_multiple_arguments() {
+    Test::new(indoc! {
+      "
+      [continue(\"SIGHUP\", \"SIGINT\")]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unsupported_target() {
+    Test::new(indoc! {
+      "
+      [continue]
+      alias bar := foo
+
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `continue` cannot be applied to alias target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn cross_parameter_default_references_preceding_parameter() {
     Test::new(indoc! {
       "
