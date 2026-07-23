@@ -3993,6 +3993,19 @@ mod tests {
   }
 
   #[test]
+  fn settings_dotenv_command_string_type_correct() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := \"sops -d .enc.env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_string_type_correct_with_expression() {
     Test::new(indoc! {
       "
@@ -4037,6 +4050,7 @@ mod tests {
 
     case("dotenv-filename");
     case("dotenv-path");
+    case("dotenv-command");
   }
 
   #[test]
@@ -4057,6 +4071,22 @@ mod tests {
 
     case("dotenv-filename", lsp::Range::at(0, 23, 0, 37));
     case("dotenv-path", lsp::Range::at(0, 19, 0, 33));
+    case("dotenv-command", lsp::Range::at(0, 22, 0, 36));
+  }
+
+  #[test]
+  fn settings_dotenv_command_duplicate() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := \"foo\"
+      set dotenv-command := \"bar\"
+      "
+    })
+    .error(
+      "Duplicate setting `dotenv-command`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
   }
 
   #[test]
@@ -4070,7 +4100,7 @@ mod tests {
       "
     })
     .error(
-      "Setting `dotenv-path` expects a string value",
+      "Setting `dotenv-path` expects a string or array value",
       lsp::Range::at(0, 0, 1, 0),
     )
     .run();

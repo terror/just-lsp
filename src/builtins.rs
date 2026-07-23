@@ -2397,21 +2397,25 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Setting {
     name: "dotenv-command",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
-      Run a command and load its output as an environment file.
+      Run one or more commands and load their output as environment files.
 
       `just` runs the command with the configured `shell` and parses
-      its stdout as an environment file. May be set multiple times;
-      variables from commands later in the list take precedence over
-      variables from commands earlier in the list.
+      its stdout as an environment file. With `set lists`, the value
+      may be a list of commands. Commands run in list order, and
+      variables from later commands take precedence over variables from
+      earlier commands.
 
-      The command-line option `--dotenv-command` can be used to set or
-      override `dotenv-command` at runtime.
+      Unlike `set dotenv-command`, the `--dotenv-command` command-line
+      option may be passed multiple times to set or override the
+      setting at runtime. Its values run in option order with the same
+      precedence rules.
 
       ```just
-      set dotenv-command := \"sops -d .enc.env\"
+      set lists
+      set dotenv-command := [\"sops -d .enc.env\", \"vault dotenv\"]
       ```
       "
     },
@@ -2419,7 +2423,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Setting {
     name: "dotenv-filename",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file with a custom name.
@@ -2474,7 +2478,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Setting {
     name: "dotenv-path",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file from a specific path. Errors if the file is
