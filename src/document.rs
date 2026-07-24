@@ -778,7 +778,11 @@ mod tests {
           range: lsp::Range::at(0, 4, 0, 9),
         },
         kind: SettingKind::Array,
-        range: lsp::Range::at(0, 0, 1, 0)
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "['foo']".into(),
+          range: lsp::Range::at(0, 13, 0, 20),
+        },
       }]
     );
   }
@@ -860,7 +864,11 @@ mod tests {
           range: lsp::Range::at(0, 4, 0, 10),
         },
         kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0)
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: String::new(),
+          range: lsp::Range::at(0, 10, 0, 10),
+        },
       }]
     );
   }
@@ -886,7 +894,11 @@ mod tests {
           range: lsp::Range::at(0, 4, 0, 10),
         },
         kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0)
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(0, 14, 0, 18),
+        },
       }]
     );
   }
@@ -1000,6 +1012,10 @@ mod tests {
           },
           kind: SettingKind::Boolean(true),
           range: lsp::Range::at(0, 0, 1, 0),
+          value: TextNode {
+            value: "true".into(),
+            range: lsp::Range::at(0, 14, 0, 18),
+          },
         },
         Setting {
           attributes: vec![],
@@ -1009,6 +1025,10 @@ mod tests {
           },
           kind: SettingKind::Array,
           range: lsp::Range::at(1, 0, 2, 0),
+          value: TextNode {
+            value: "['foo']".into(),
+            range: lsp::Range::at(1, 13, 1, 20),
+          },
         },
         Setting {
           attributes: vec![],
@@ -1018,6 +1038,10 @@ mod tests {
           },
           kind: SettingKind::String,
           range: lsp::Range::at(2, 0, 3, 0),
+          value: TextNode {
+            value: "'wow!'".into(),
+            range: lsp::Range::at(2, 11, 2, 17),
+          },
         }
       ]
     );
@@ -1057,6 +1081,10 @@ mod tests {
         },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 2, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(1, 11, 1, 15),
+        },
       }]
     );
   }
@@ -1083,6 +1111,10 @@ mod tests {
         },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "'wow!'".into(),
+          range: lsp::Range::at(0, 11, 0, 17),
+        },
       }]
     );
   }
