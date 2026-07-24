@@ -32,6 +32,7 @@ impl Module {
       base_dir.join(format!("{name}.just")),
       base_dir.join(name).join("mod.just"),
       base_dir.join(name).join("justfile"),
+      base_dir.join(name).join(".justfile"),
     ]
     .into_iter()
     .find(|path| path.is_file())
@@ -134,12 +135,29 @@ mod tests {
   }
 
   #[test]
+  fn implicit_dot_justfile() {
+    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    std::fs::create_dir(directory.path().join("foo")).unwrap();
+    std::fs::write(directory.path().join("foo/.justfile"), "").unwrap();
+
+    let base =
+      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+
+    assert_eq!(
+      module("foo", None).resolve(&base).unwrap(),
+      directory.path().join("foo/.justfile"),
+    );
+  }
+
+  #[test]
   fn implicit_prefers_name_dot_just() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
     std::fs::write(directory.path().join("foo.just"), "").unwrap();
     std::fs::create_dir(directory.path().join("foo")).unwrap();
     std::fs::write(directory.path().join("foo/mod.just"), "").unwrap();
+    std::fs::write(directory.path().join("foo/.justfile"), "").unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
