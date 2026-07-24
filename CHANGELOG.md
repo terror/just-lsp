@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.5.0](https://github.com/terror/just-lsp/releases/tag/0.5.0) - 2026-07-24
+
+### Added
+
+- Validate `minimum-version` setting values (#499)
+- Add `invalid-setting-value` rule (#498)
+- Add support for `len` and `style` builtin functions (#479)
+- Mark `windows-shell` setting as deprecated (#464)
+- Allow `dotenv-command` list setting (#489)
+- Support multiple `continue` attribute signals (#488)
+- Recognize current syntax in semantic highlighting (#487)
+- Add support for `cache` attribute arguments (#477)
+- Allow attributes on settings (#471)
+- Allow const expressions in attributes (#470)
+- Allow platform attributes on all items (#469)
+- Add support for `num_jobs` builtin function (#468)
+
+### Fixed
+
+- Match `just` module resolution (#491)
+- Recognize implicit `.justfile` modules (#490)
+- Recognize effective script mode for cache (#480)
+
+### Misc
+
+- Retain parsed setting values (#497)
+- Bump cc from 1.2.67 to 1.3.0 (#485)
+- Bump serde from 1.0.228 to 1.0.229 (#482)
+- Bump serde_json from 1.0.150 to 1.0.151 (#486)
+- Bump anyhow from 1.0.102 to 1.0.104 (#484)
+- Bump regex from 1.13.0 to 1.13.1 (#483)
+- Parse attributes on settings (#478)
+- Bump tree-sitter-highlight from 0.26.9 to 0.26.10 (#475)
+- Bump regex from 1.12.4 to 1.13.0 (#474)
+- Bump cc from 1.2.66 to 1.2.67 (#473)
+- Bump tree-sitter from 0.26.10 to 0.26.11 (#472)
+- Add diagnostic type to web playground (#334)
+
 ## [0.4.8](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-07-09
 
 ### Added
