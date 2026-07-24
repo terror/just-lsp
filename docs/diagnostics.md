@@ -41,6 +41,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `list-features`                   | List Features                   | Syntax and builtins that require `set lists` are used without enabling it.                                                    |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type.                                                                                |
+| `invalid-setting-value`           | Invalid Setting Value           | Setting is assigned a value that violates its setting-specific constraints.                                                  |
 | `deprecated-setting`              | Deprecated Setting              | Warning: setting uses a deprecated builtin setting with a replacement.                                                        |
 | `duplicate-setting`               | Duplicate Setting               | Setting key is configured more than once.                                                                                     |
 | `duplicate-variable`              | Duplicate Variable              | Variable assignment reuses a name without allowing duplicates.                                                                |

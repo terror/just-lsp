@@ -3796,6 +3796,36 @@ mod tests {
   }
 
   #[test]
+  fn settings_indentation_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set indentation := {value}\n");
+
+      let test = Test::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `indentation` must be a non-empty whitespace string literal",
+          lsp::Range::at(0, 19, 0, 19 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""  ""#, true);
+    case(r#""\t""#, true);
+    case(r#""\n""#, true);
+    case(r#""\u{2003}""#, true);
+    case("'  '", true);
+    case(r#""""#, false);
+    case(r#""foo""#, false);
+    case(r#"" " + " ""#, false);
+  }
+
+  #[test]
   fn settings_duplicate() {
     Test::new(indoc! {
       "
