@@ -106,8 +106,8 @@ mod tests {
   fn implicit_mod_just() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    std::fs::create_dir(directory.path().join("foo")).unwrap();
-    std::fs::write(directory.path().join("foo/mod.just"), "").unwrap();
+    fs::create_dir(directory.path().join("foo")).unwrap();
+    fs::write(directory.path().join("foo/mod.just"), "").unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
@@ -122,8 +122,8 @@ mod tests {
   fn implicit_justfile() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    std::fs::create_dir(directory.path().join("foo")).unwrap();
-    std::fs::write(directory.path().join("foo/justfile"), "").unwrap();
+    fs::create_dir(directory.path().join("foo")).unwrap();
+    fs::write(directory.path().join("foo/justfile"), "").unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
@@ -138,8 +138,8 @@ mod tests {
   fn implicit_dot_justfile() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    std::fs::create_dir(directory.path().join("foo")).unwrap();
-    std::fs::write(directory.path().join("foo/.justfile"), "").unwrap();
+    fs::create_dir(directory.path().join("foo")).unwrap();
+    fs::write(directory.path().join("foo/.justfile"), "").unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
@@ -154,10 +154,10 @@ mod tests {
   fn implicit_prefers_name_dot_just() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    std::fs::write(directory.path().join("foo.just"), "").unwrap();
-    std::fs::create_dir(directory.path().join("foo")).unwrap();
-    std::fs::write(directory.path().join("foo/mod.just"), "").unwrap();
-    std::fs::write(directory.path().join("foo/.justfile"), "").unwrap();
+    fs::write(directory.path().join("foo.just"), "").unwrap();
+    fs::create_dir(directory.path().join("foo")).unwrap();
+    fs::write(directory.path().join("foo/mod.just"), "").unwrap();
+    fs::write(directory.path().join("foo/.justfile"), "").unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
