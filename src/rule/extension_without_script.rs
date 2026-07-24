@@ -13,7 +13,7 @@ define_rule! {
           continue;
         };
 
-        if recipe.has_attribute("script") || recipe.shebang.is_some() {
+        if context.recipe_runs_as_script(recipe) {
           continue;
         }
 

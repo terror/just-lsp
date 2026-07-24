@@ -218,6 +218,26 @@ fn analyze_accepts_clean_justfile() -> Result {
 }
 
 #[test]
+fn analyze_accepts_default_script_recipe_indentation() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        "
+        set default-script
+
+        build-docs:
+          if true; then
+            echo docs
+          fi
+        "
+      },
+    )
+    .argument("justfile")
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
