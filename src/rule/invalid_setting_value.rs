@@ -6,11 +6,39 @@ struct SettingValidation {
   validate: fn(&str) -> bool,
 }
 
-const SETTING_VALIDATIONS: &[SettingValidation] = &[SettingValidation {
-  expected: "a non-empty whitespace string literal",
-  name: "indentation",
-  validate: |value| !value.is_empty() && value.chars().all(char::is_whitespace),
-}];
+const SETTING_VALIDATIONS: &[SettingValidation] = &[
+  SettingValidation {
+    expected: "a non-empty whitespace string literal",
+    name: "indentation",
+    validate: |value| {
+      !value.is_empty() && value.chars().all(char::is_whitespace)
+    },
+  },
+  SettingValidation {
+    expected: "a valid `MAJOR.MINOR.PATCH` version",
+    name: "minimum-version",
+    validate: |value| {
+      fn valid_component(component: &str) -> bool {
+        match component.as_bytes() {
+          [b'0'] => true,
+          [first, rest @ ..] => {
+            component.len() <= 9
+              && first.is_ascii_digit()
+              && *first != b'0'
+              && rest.iter().all(u8::is_ascii_digit)
+          }
+          [] => false,
+        }
+      }
+
+      let mut components = value.split('.');
+
+      components.by_ref().take(3).all(valid_component)
+        && components.next().is_none()
+        && value.bytes().filter(|byte| *byte == b'.').count() == 2
+    },
+  },
+];
 
 define_rule! {
   /// Ensures settings with constrained values use a supported literal value.
