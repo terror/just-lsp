@@ -3826,6 +3826,40 @@ mod tests {
   }
 
   #[test]
+  fn settings_minimum_version_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set minimum-version := {value}\n");
+
+      let test = Test::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `minimum-version` must be a valid `MAJOR.MINOR.PATCH` version",
+          lsp::Range::at(0, 23, 0, 23 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""0.0.0""#, true);
+    case(r#""1.55.0""#, true);
+    case(r#""999999999.0.0""#, true);
+    case("'1.2.3'", true);
+    case(r#""""#, false);
+    case(r#""01.2.3""#, false);
+    case(r#""1.2""#, false);
+    case(r#""1.2.3.4""#, false);
+    case(r#""1000000000.0.0""#, false);
+    case(r#""1.2.3-pre""#, false);
+    case(r#""1.2.3+build""#, false);
+    case(r#""1" + ".2.3""#, false);
+  }
+
+  #[test]
   fn settings_duplicate() {
     Test::new(indoc! {
       "
