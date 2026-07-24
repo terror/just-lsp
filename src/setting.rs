@@ -6,6 +6,7 @@ pub struct Setting {
   pub kind: SettingKind,
   pub name: TextNode,
   pub range: lsp::Range,
+  pub value: TextNode,
 }
 
 impl Setting {
@@ -30,12 +31,29 @@ impl Setting {
       .iter()
       .find(|child| child.kind() == "boolean");
 
-    let string_child =
-      right_children.iter().find(|child| child.kind() == "string");
-
     let expression_child = right_children
       .iter()
       .find(|child| child.kind() == "expression");
+
+    let string_child =
+      right_children.iter().find(|child| child.kind() == "string");
+
+    let value = boolean_child
+      .or(expression_child)
+      .or(string_child)
+      .map_or_else(
+        || TextNode {
+          range: lsp::Range {
+            start: name.range.end,
+            end: name.range.end,
+          },
+          value: String::new(),
+        },
+        |value| TextNode {
+          value: document.get_node_text(value),
+          range: value.get_range(document),
+        },
+      );
 
     let kind = if node.find("list_literal").is_some() {
       SettingKind::Array
@@ -92,6 +110,7 @@ impl Setting {
       kind,
       name,
       range,
+      value,
     })
   }
 
@@ -120,6 +139,10 @@ mod tests {
         },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(0, 11, 0, 15),
+        },
       }],
     );
   }
@@ -136,6 +159,10 @@ mod tests {
         },
         kind: SettingKind::Boolean(false),
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "false".into(),
+          range: lsp::Range::at(0, 11, 0, 16),
+        },
       }],
     );
   }
@@ -152,6 +179,10 @@ mod tests {
         },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: String::new(),
+          range: lsp::Range::at(0, 10, 0, 10),
+        },
       }],
     );
   }
@@ -168,6 +199,10 @@ mod tests {
         },
         kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "[\"zsh\", \"-cu\"]".into(),
+          range: lsp::Range::at(0, 13, 0, 27),
+        },
       }],
     );
   }
@@ -187,6 +222,10 @@ mod tests {
         },
         kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]".into(),
+          range: lsp::Range::at(0, 21, 0, 62),
+        },
       }],
     );
   }
@@ -203,6 +242,10 @@ mod tests {
         },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar\"".into(),
+          range: lsp::Range::at(0, 11, 0, 16),
+        },
       }],
     );
   }
@@ -219,6 +262,10 @@ mod tests {
         },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar := baz\"".into(),
+          range: lsp::Range::at(0, 11, 0, 23),
+        },
       }],
     );
   }
@@ -235,6 +282,10 @@ mod tests {
         },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar\" / baz".into(),
+          range: lsp::Range::at(0, 11, 0, 22),
+        },
       }],
     );
   }
@@ -257,6 +308,10 @@ mod tests {
           },
           kind: SettingKind::Boolean(true),
           range: lsp::Range::at(0, 0, 1, 0),
+          value: TextNode {
+            value: "true".into(),
+            range: lsp::Range::at(0, 11, 0, 15),
+          },
         },
         Setting {
           attributes: vec![],
@@ -266,6 +321,10 @@ mod tests {
           },
           kind: SettingKind::String,
           range: lsp::Range::at(1, 0, 2, 0),
+          value: TextNode {
+            value: "\"baz\"".into(),
+            range: lsp::Range::at(1, 11, 1, 16),
+          },
         },
         Setting {
           attributes: vec![],
@@ -275,6 +334,10 @@ mod tests {
           },
           kind: SettingKind::Array,
           range: lsp::Range::at(2, 0, 3, 0),
+          value: TextNode {
+            value: "[\"zsh\", \"-cu\"]".into(),
+            range: lsp::Range::at(2, 13, 2, 27),
+          },
         },
       ],
     );
@@ -303,6 +366,10 @@ mod tests {
         },
         kind: SettingKind::Boolean(true),
         range: lsp::Range::at(0, 0, 2, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(1, 11, 1, 15),
+        },
       }],
     );
   }
