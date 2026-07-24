@@ -8,6 +8,7 @@ pub struct Diagnostic {
   pub id: String,
   /// A detailed message describing the diagnostic.
   pub message: String,
+  pub quickfix: Option<Quickfix>,
   /// The range in the source code where the diagnostic applies.
   pub range: lsp::Range,
   /// The severity level of the diagnostic.
@@ -16,9 +17,15 @@ pub struct Diagnostic {
 
 impl From<Diagnostic> for lsp::Diagnostic {
   fn from(value: Diagnostic) -> lsp::Diagnostic {
+    (&value).into()
+  }
+}
+
+impl From<&Diagnostic> for lsp::Diagnostic {
+  fn from(value: &Diagnostic) -> lsp::Diagnostic {
     lsp::Diagnostic {
-      code: Some(lsp::NumberOrString::String(value.id)),
-      message: value.message,
+      code: Some(lsp::NumberOrString::String(value.id.clone())),
+      message: value.message.clone(),
       range: value.range,
       severity: Some(value.severity),
       source: Some("just-lsp".to_string()),
@@ -41,8 +48,17 @@ impl Diagnostic {
       display: String::new(),
       id: String::new(),
       message: message.into(),
+      quickfix: None,
       range,
       severity,
+    }
+  }
+
+  #[must_use]
+  pub fn quickfix(self, quickfix: Quickfix) -> Self {
+    Self {
+      quickfix: Some(quickfix),
+      ..self
     }
   }
 

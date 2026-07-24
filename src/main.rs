@@ -19,7 +19,10 @@ use {
     fs, io,
     path::PathBuf,
     process,
-    sync::{Arc, LazyLock, atomic::AtomicBool},
+    sync::{
+      Arc, LazyLock,
+      atomic::{AtomicBool, Ordering},
+    },
     time::Instant,
   },
   subcommand::Subcommand,

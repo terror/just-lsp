@@ -244,6 +244,7 @@ impl<'a> RuleContext<'a> {
 
       let mut imported = Document {
         content: Rope::from_str(&content),
+        diagnostics: Vec::new(),
         tree: None,
         uri,
         version: 0,
@@ -359,6 +360,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,
@@ -401,6 +403,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,
@@ -443,6 +446,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,
@@ -484,6 +488,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,
@@ -549,6 +554,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,
@@ -603,6 +609,7 @@ mod tests {
       content: Rope::from_str(
         &fs::read_to_string(dir.path().join("justfile")).unwrap(),
       ),
+      diagnostics: Vec::new(),
       tree: None,
       uri,
       version: 1,

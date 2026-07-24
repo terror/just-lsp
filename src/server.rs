@@ -133,6 +133,10 @@ impl LanguageServer for Server {
     }
   }
 
+  async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+    self.0.did_save(params).await;
+  }
+
   async fn document_highlight(
     &self,
     params: lsp::DocumentHighlightParams,
@@ -251,8 +255,6 @@ impl Inner {
       serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
     }
 
-    let config = self.config.read().await;
-
     let documents = self.documents.read().await;
 
     let Some(document) = documents.get(&params.text_document.uri) else {
@@ -286,9 +288,7 @@ impl Inner {
       }));
     }
 
-    let quickfixer = Quickfixer::new(document, &params);
-
-    actions.extend(quickfixer.config(&config).collect());
+    actions.extend(Quickfixer::new(&params, &document.diagnostics).collect());
 
     Ok(Some(actions))
   }
@@ -424,18 +424,25 @@ impl Inner {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let mut should_publish = false;
+    let uris = {
+      let config = self.config.read().await;
 
-    {
       let mut documents = self.documents.write().await;
 
-      if let Some(document) = documents.get_mut(&uri) {
-        document.apply_change(params)?;
-        should_publish = true;
-      }
-    }
+      let Some(document) = documents.get_mut(&uri) else {
+        return Ok(());
+      };
 
-    if should_publish {
+      document.apply_change(params)?;
+
+      for document in documents.values_mut() {
+        document.analyze(&config);
+      }
+
+      documents.keys().cloned().collect::<Vec<_>>()
+    };
+
+    for uri in uris {
       self.publish_diagnostics(&uri).await;
     }
 
@@ -458,7 +465,12 @@ impl Inner {
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let document = Document::try_from(params)?;
+    let mut document = Document::try_from(params)?;
+
+    {
+      let config = self.config.read().await;
+      document.analyze(&config);
+    }
 
     {
       let mut documents = self.documents.write().await;
@@ -468,6 +480,30 @@ impl Inner {
     self.publish_diagnostics(&uri).await;
 
     Ok(())
+  }
+
+  async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+    let uri = params.text_document.uri;
+
+    let uris = {
+      let config = self.config.read().await;
+
+      let mut documents = self.documents.write().await;
+
+      if !documents.contains_key(&uri) {
+        return;
+      }
+
+      for document in documents.values_mut() {
+        document.analyze(&config);
+      }
+
+      documents.keys().cloned().collect::<Vec<_>>()
+    };
+
+    for uri in uris {
+      self.publish_diagnostics(&uri).await;
+    }
   }
 
   async fn document_highlight(
@@ -895,27 +931,22 @@ impl Inner {
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
+    if !self.initialized.load(Ordering::Relaxed) {
       return;
     }
 
     let (diagnostics, version) = {
       let documents = self.documents.read().await;
-      let config = self.config.read().await;
 
       match documents.get(uri) {
-        Some(document) => {
-          let analyzer = Analyzer::from(document).config(&config);
-
-          (
-            analyzer
-              .analyze()
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            document.version,
-          )
-        }
+        Some(document) => (
+          document
+            .diagnostics
+            .iter()
+            .map(lsp::Diagnostic::from)
+            .collect(),
+          document.version,
+        ),
         None => return,
       }
     };
@@ -3134,8 +3165,25 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
+        text: "foo := env(\"BAR\")\n",
       })
+      .notification(json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didChange",
+        "params": {
+          "textDocument": {
+            "uri": "file:///test.just",
+            "version": 2
+          },
+          "contentChanges": [{
+            "range": {
+              "start": { "line": 0, "character": 7 },
+              "end": { "line": 0, "character": 10 }
+            },
+            "text": "env_var"
+          }]
+        }
+      }))
       .request(CodeActionRequest {
         id: 2,
         uri: "file:///test.just",
