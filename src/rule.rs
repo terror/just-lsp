@@ -91,6 +91,11 @@ mod unused_variables;
 mod working_directory_conflict;
 
 pub trait Rule: Sync {
+  /// Whether the rule is enabled by its configuration.
+  fn enabled(&self, config: &RuleConfig) -> bool {
+    config.level() != Some(RuleLevel::Off)
+  }
+
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
 

@@ -32,12 +32,16 @@ impl<'a> Analyzer<'a> {
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
       .flat_map(|rule| {
+        let rule_config = config.rule_config(rule.id());
+
+        if !rule.enabled(&rule_config) {
+          return Vec::new();
+        }
+
         rule
           .run(&context)
           .into_iter()
           .filter_map(move |diagnostic| {
-            let rule_config = config.rule_config(rule.id());
-
             Some(Diagnostic {
               id: rule.id().to_string(),
               display: rule.message().to_string(),
@@ -45,6 +49,7 @@ impl<'a> Analyzer<'a> {
               ..diagnostic
             })
           })
+          .collect()
       })
       .collect::<Vec<_>>();
 
