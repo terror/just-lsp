@@ -28,6 +28,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
+  tracing::{Level, info, warn},
   tree_sitter::Node,
   tree_sitter_highlight::{
     Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
@@ -56,7 +57,7 @@ async fn main() {
     .with_writer(stderr)
     .with_env_filter(
       tracing_subscriber::EnvFilter::builder()
-        .with_default_directive(tracing::Level::INFO.into())
+        .with_default_directive(Level::INFO.into())
         .from_env_lossy(),
     )
     .init();

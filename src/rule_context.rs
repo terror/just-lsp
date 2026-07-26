@@ -232,7 +232,7 @@ impl<'a> RuleContext<'a> {
 
       let Ok(content) = fs::read_to_string(&path) else {
         if !import.optional {
-          tracing::warn!(path = %path.display(), "failed to read import");
+          warn!(path = %path.display(), "failed to read import");
         }
 
         continue;

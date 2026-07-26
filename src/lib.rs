@@ -13,6 +13,7 @@ use {
     sync::OnceLock,
   },
   tower_lsp::lsp_types as lsp,
+  tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
 };
 
