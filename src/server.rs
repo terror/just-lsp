@@ -830,13 +830,13 @@ impl Inner {
     &self,
     params: lsp::InitializeParams,
   ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    log::info!("Starting just language server...");
+    info!("Starting just language server...");
 
     if let Some(options) = params.initialization_options {
       match serde_json::from_value::<Config>(options) {
         Ok(config) => *self.config.write().await = config,
         Err(error) => {
-          log::warn!("failed to parse initialization options: {error}");
+          warn!(%error, "failed to parse initialization options");
         }
       }
     }

@@ -50,10 +50,8 @@ anyhow = "1.0.102"
 ariadne = "0.6.0"
 clap = { version = "4.6.1", features = ["derive"] }
 dirs = "6.0.0"
-env_logger = "0.11.10"
 indoc = "2.0.7"
 inventory = "0.3"
-log = "0.4.30"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
@@ -63,6 +61,8 @@ thiserror = "2"
 tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.18", features = ["io-util"] }
 tower-lsp = { workspace = true }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tree-sitter = "0.26.9"
 tree-sitter-highlight = "0.26.9"
 yansi = "1.0.1"
