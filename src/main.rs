@@ -4,7 +4,6 @@ use {
   ariadne::{Color, Label, Report, ReportKind, sources},
   clap::{Parser, builder::styling},
   command::Command,
-  env_logger::Env,
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
@@ -52,9 +51,13 @@ async fn main() {
     yansi::disable();
   }
 
-  let env = Env::default().default_filter_or("info");
-
-  env_logger::Builder::from_env(env).init();
+  tracing_subscriber::fmt()
+    .with_env_filter(
+      tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing::Level::INFO.into())
+        .from_env_lossy(),
+    )
+    .init();
 
   if let Err(error) = Arguments::parse().run().await {
     eprintln!("{} {error}", "error:".red().bold());
