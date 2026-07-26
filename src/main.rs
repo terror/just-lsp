@@ -15,7 +15,8 @@ use {
     collections::{BTreeMap, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs, io,
+    fs,
+    io::{self, stderr},
     path::PathBuf,
     process,
     sync::{Arc, LazyLock, atomic::AtomicBool},
@@ -52,6 +53,7 @@ async fn main() {
   }
 
   tracing_subscriber::fmt()
+    .with_writer(stderr)
     .with_env_filter(
       tracing_subscriber::EnvFilter::builder()
         .with_default_directive(tracing::Level::INFO.into())
