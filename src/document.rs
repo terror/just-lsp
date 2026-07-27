@@ -57,8 +57,7 @@ impl Document {
           let right_node = alias_node.child_by_field_name("right")?;
 
           Some(Alias {
-            attributes: self
-              .attributes_for_node(alias_node, AttributeTarget::Alias),
+            attributes: self.attributes_for_node(alias_node),
             name: TextNode {
               value: self.get_node_text(&left_node),
               range: left_node.get_range(self),
@@ -109,67 +108,56 @@ impl Document {
   #[must_use]
   pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("attribute")
-        .into_iter()
-        .flat_map(|attribute_node| {
-          let target = attribute_node
-            .parent()
-            .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
+      let root = tree.root_node();
+      let mut cursor = root.walk();
 
-          self.attributes_from_node(&attribute_node, target)
-        })
+      root
+        .named_children(&mut cursor)
+        .flat_map(|node| self.attributes_for_node(&node))
         .collect()
     })
   }
 
-  fn attributes_for_node(
-    &self,
-    node: &Node,
-    target: AttributeTarget,
-  ) -> Vec<Attribute> {
+  fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
+    let Some(target) = AttributeTarget::try_from_kind(node.kind()) else {
+      return Vec::new();
+    };
+
     node
       .find_all("attribute")
       .into_iter()
-      .flat_map(|attribute| self.attributes_from_node(&attribute, Some(target)))
-      .collect()
-  }
+      .flat_map(|attribute| {
+        attribute
+          .find_all("^identifier")
+          .into_iter()
+          .map(move |identifier| {
+            let arguments = identifier
+              .siblings()
+              .take_while(|sibling| sibling.kind() != "identifier")
+              .filter(|sibling| {
+                sibling.start_byte() != sibling.end_byte()
+                  && matches!(
+                    sibling.kind(),
+                    "string" | "expression" | "attribute_named_param"
+                  )
+              })
+              .map(|argument| TextNode {
+                value: self.get_node_text(&argument),
+                range: argument.get_range(self),
+              })
+              .collect::<Vec<_>>();
 
-  fn attributes_from_node(
-    &self,
-    attribute: &Node,
-    target: Option<AttributeTarget>,
-  ) -> Vec<Attribute> {
-    attribute
-      .find_all("^identifier")
-      .into_iter()
-      .map(|identifier| {
-        let arguments = identifier
-          .siblings()
-          .take_while(|sibling| sibling.kind() != "identifier")
-          .filter(|sibling| {
-            sibling.start_byte() != sibling.end_byte()
-              && matches!(
-                sibling.kind(),
-                "string" | "expression" | "attribute_named_param"
-              )
+            Attribute {
+              name: TextNode {
+                value: self.get_node_text(&identifier),
+                range: identifier.get_range(self),
+              },
+              arguments,
+              target: Some(target),
+              range: attribute.get_range(self),
+            }
           })
-          .map(|argument| TextNode {
-            value: self.get_node_text(&argument),
-            range: argument.get_range(self),
-          })
-          .collect::<Vec<_>>();
-
-        Attribute {
-          name: TextNode {
-            value: self.get_node_text(&identifier),
-            range: identifier.get_range(self),
-          },
-          arguments,
-          target,
-          range: attribute.get_range(self),
-        }
+          .collect::<Vec<_>>()
       })
       .collect()
   }
@@ -307,8 +295,7 @@ impl Document {
             .unwrap_or_default();
 
           Some(Function {
-            attributes: self
-              .attributes_for_node(function_node, AttributeTarget::Function),
+            attributes: self.attributes_for_node(function_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -663,10 +650,7 @@ impl Document {
             .unwrap_or(*assignment_node);
 
           Some(Variable {
-            attributes: self.attributes_for_node(
-              &attribute_node,
-              AttributeTarget::Assignment,
-            ),
+            attributes: self.attributes_for_node(&attribute_node),
             name: TextNode {
               value: self.get_node_text(&identifier_node),
               range: identifier_node.get_range(self),
