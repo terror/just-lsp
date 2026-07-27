@@ -864,6 +864,44 @@ mod tests {
   }
 
   #[test]
+  fn get_alias_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [linux]
+      alias foo := bar
+      "
+    });
+
+    let aliases = document.aliases();
+
+    assert_eq!(aliases.len(), 1);
+
+    assert_eq!(
+      aliases,
+      vec![Alias {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Alias),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 6, 1, 9),
+        },
+        range: lsp::Range::at(0, 0, 1, 16),
+        value: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 13, 1, 16),
+        },
+      }]
+    );
+  }
+
+  #[test]
   fn get_boolean_flag_setting() {
     let document = Document::from(indoc! {
       "
@@ -1221,6 +1259,42 @@ mod tests {
           range: lsp::Range::at(5, 7, 6, 0),
         },
       ]
+    );
+  }
+
+  #[test]
+  fn get_variable_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [windows]
+      foo := 'bar'
+      "
+    });
+
+    let variables = document.variables();
+
+    assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        content: "[windows]\nfoo := 'bar'".into(),
+        export: false,
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        range: lsp::Range::at(0, 0, 2, 0),
+      }]
     );
   }
 
@@ -1873,51 +1947,6 @@ mod tests {
   }
 
   #[test]
-  fn declaration_attributes() {
-    #[track_caller]
-    fn case(
-      attributes: &[Attribute],
-      expected_name: &str,
-      expected_target: AttributeTarget,
-    ) {
-      assert_eq!(attributes.len(), 1);
-      assert_eq!(attributes[0].name.value, expected_name);
-      assert_eq!(attributes[0].target, Some(expected_target));
-    }
-
-    let document = Document::from(indoc! {
-      "
-      [linux]
-      alias baz := foo
-
-      [windows]
-      foo := 'bar'
-
-      [macos]
-      bar() := 'baz'
-      "
-    });
-
-    case(
-      &document.aliases()[0].attributes,
-      "linux",
-      AttributeTarget::Alias,
-    );
-
-    case(
-      &document.variables()[0].attributes,
-      "windows",
-      AttributeTarget::Assignment,
-    );
-
-    case(
-      &document.functions()[0].attributes,
-      "macos",
-      AttributeTarget::Function,
-    );
-  }
-
-  #[test]
   fn list_document_attributes() {
     let document = Document::from(indoc! {
       "
@@ -2366,6 +2395,39 @@ mod tests {
         body: "\"bar\"".into(),
         content: "foo() := \"bar\"".into(),
         range: lsp::Range::at(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn function_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [macos]
+      foo() := 'bar'
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![Function {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "macos".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Function),
+        }],
+        body: "'bar'".into(),
+        content: "[macos]\nfoo() := 'bar'".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        parameters: vec![],
+        range: lsp::Range::at(0, 0, 2, 0),
       }],
     );
   }
