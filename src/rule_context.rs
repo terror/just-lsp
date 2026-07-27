@@ -273,6 +273,7 @@ impl<'a> RuleContext<'a> {
   fn resolve_imports(document: &Document) -> Vec<ImportedDocument> {
     let mut documents = Vec::new();
     let mut seen = HashMap::new();
+
     let groups = GroupSet::from([Group::Any]);
 
     if let Ok(path) = document.uri.to_file_path() {
