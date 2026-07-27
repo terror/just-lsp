@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Module {
+  pub attributes: Vec<Attribute>,
   pub name: TextNode,
   pub optional: bool,
   pub path: Option<TextNode>,
@@ -88,6 +89,7 @@ mod tests {
 
   fn module(name: &str, path: Option<&str>) -> Module {
     Module {
+      attributes: Vec::new(),
       name: TextNode {
         value: name.to_owned(),
         range: lsp::Range::default(),

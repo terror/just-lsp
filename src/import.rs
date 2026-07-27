@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Import {
+  pub attributes: Vec<Attribute>,
   pub optional: bool,
   pub path: TextNode,
   pub range: lsp::Range,
@@ -32,6 +33,7 @@ mod tests {
 
   fn import(path: &str) -> Import {
     Import {
+      attributes: Vec::new(),
       optional: false,
       path: TextNode {
         value: path.to_owned(),

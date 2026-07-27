@@ -342,6 +342,7 @@ impl Document {
           let content = self.get_node_text(import_node);
 
           Some(Import {
+            attributes: self.attributes_for_node(import_node),
             optional: content.contains('?'),
             path: TextNode {
               value: self.get_node_text(&path_node),
@@ -373,6 +374,7 @@ impl Document {
           });
 
           Some(Module {
+            attributes: self.attributes_for_node(module_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -631,6 +633,7 @@ impl Document {
           let name_node = unexport_node.child_by_field_name("name")?;
 
           Some(Unexport {
+            attributes: self.attributes_for_node(unexport_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -1345,6 +1348,7 @@ mod tests {
   fn get_unexports() {
     let document = Document::from(indoc! {
       "
+      [windows]
       unexport FOO
       "
     });
@@ -1356,11 +1360,20 @@ mod tests {
     assert_eq!(
       unexports,
       vec![Unexport {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Unexport),
+        }],
         name: TextNode {
           value: "FOO".into(),
-          range: lsp::Range::at(0, 9, 0, 12),
+          range: lsp::Range::at(1, 9, 1, 12),
         },
-        range: lsp::Range::at(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 2, 0),
       }]
     );
   }
@@ -2106,6 +2119,7 @@ mod tests {
   fn imports() {
     let document = Document::from(indoc! {
       "
+      [linux]
       import 'foo/bar.just'
 
       a: b
@@ -2116,12 +2130,21 @@ mod tests {
     assert_eq!(
       document.imports(),
       vec![Import {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Import),
+        }],
         optional: false,
         path: TextNode {
           value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 7, 0, 21),
+          range: lsp::Range::at(1, 7, 1, 21),
         },
-        range: lsp::Range::at(0, 0, 0, 21),
+        range: lsp::Range::at(0, 0, 1, 21),
       }]
     );
   }
@@ -2137,6 +2160,7 @@ mod tests {
     assert_eq!(
       document.imports(),
       vec![Import {
+        attributes: vec![],
         optional: true,
         path: TextNode {
           value: "'foo/bar.just'".into(),
@@ -2160,6 +2184,7 @@ mod tests {
       document.imports(),
       vec![
         Import {
+          attributes: vec![],
           optional: false,
           path: TextNode {
             value: "'foo.just'".into(),
@@ -2168,6 +2193,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 17),
         },
         Import {
+          attributes: vec![],
           optional: true,
           path: TextNode {
             value: "'bar.just'".into(),
@@ -2190,6 +2216,7 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -2205,6 +2232,7 @@ mod tests {
   fn module_with_path() {
     let document = Document::from(indoc! {
       r#"
+      [private]
       mod foo "./utils.just"
       "#
     });
@@ -2212,16 +2240,25 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Module),
+        }],
         name: TextNode {
           value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
+          range: lsp::Range::at(1, 4, 1, 7),
         },
         optional: false,
         path: Some(TextNode {
           value: "\"./utils.just\"".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
+          range: lsp::Range::at(1, 8, 1, 22),
         }),
-        range: lsp::Range::at(0, 0, 0, 22),
+        range: lsp::Range::at(0, 0, 1, 22),
       }]
     );
   }
@@ -2237,6 +2274,7 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 5, 0, 8),
@@ -2261,6 +2299,7 @@ mod tests {
       document.modules(),
       vec![
         Module {
+          attributes: vec![],
           name: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(0, 4, 0, 7),
@@ -2270,6 +2309,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 7),
         },
         Module {
+          attributes: vec![],
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(1, 5, 1, 8),
