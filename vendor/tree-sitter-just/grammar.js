@@ -119,9 +119,10 @@ module.exports = grammar({
     _name: ($) => choice($.identifier, alias("unexport", $.identifier)),
 
     // assignment    : attribute* NAME ':=' expression _eol
-    assignment: ($) =>
+    assignment: ($) => seq(repeat($.attribute), $._assignment),
+
+    _assignment: ($) =>
       seq(
-        repeat($.attribute),
         field("left", $._name),
         ":=",
         field("right", $.expression),
@@ -129,10 +130,12 @@ module.exports = grammar({
       ),
 
     // eager         : attribute* 'eager' assignment
-    eager: ($) => seq(repeat($.attribute), "eager", $.assignment),
+    eager: ($) =>
+      seq(repeat($.attribute), "eager", alias($._assignment, $.assignment)),
 
     // export        : attribute* 'export' assignment
-    export: ($) => seq(repeat($.attribute), "export", $.assignment),
+    export: ($) =>
+      seq(repeat($.attribute), "export", alias($._assignment, $.assignment)),
 
     // unexport      : 'unexport' NAME _eol
     unexport: ($) =>

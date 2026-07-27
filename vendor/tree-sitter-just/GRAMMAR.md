@@ -75,9 +75,9 @@ module_path     : NAME ('::' NAME)+
 
 assignment      : attribute* NAME ':=' expression NEWLINE
 
-eager           : attribute* 'eager' assignment
+eager           : attribute* 'eager' NAME ':=' expression NEWLINE
 
-export          : attribute* 'export' assignment
+export          : attribute* 'export' NAME ':=' expression NEWLINE
 
 unexport        : 'unexport' NAME _eol
 

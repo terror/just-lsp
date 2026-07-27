@@ -397,6 +397,36 @@ export foo := "abc"
           (string))))))
 
 ================================================================================
+wrapped assignments with attributes
+================================================================================
+
+[private]
+eager foo := "abc"
+
+[private]
+export bar := "def"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (eager
+    (attribute
+      (identifier))
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string)))))
+  (export
+    (attribute
+      (identifier))
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string))))))
+
+================================================================================
 unexport
 ================================================================================
 

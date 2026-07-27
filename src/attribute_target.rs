@@ -61,7 +61,7 @@ impl AttributeTarget {
   pub fn try_from_kind(kind: &str) -> Option<Self> {
     match kind {
       "alias" => Some(Self::Alias),
-      "assignment" | "export" => Some(Self::Assignment),
+      "assignment" | "eager" | "export" => Some(Self::Assignment),
       "function_definition" => Some(Self::Function),
       "import" => Some(Self::Import),
       "module" => Some(Self::Module),

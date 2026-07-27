@@ -57,6 +57,7 @@ impl Document {
           let right_node = alias_node.child_by_field_name("right")?;
 
           Some(Alias {
+            attributes: self.attributes_for_node(alias_node),
             name: TextNode {
               value: self.get_node_text(&left_node),
               range: left_node.get_range(self),
@@ -111,45 +112,62 @@ impl Document {
         .root_node()
         .find_all("attribute")
         .into_iter()
-        .flat_map(|attribute_node| {
-          let target = attribute_node
-            .parent()
-            .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
-
-          attribute_node
-            .find_all("^identifier")
-            .into_iter()
-            .map(move |identifier_node| {
-              let arguments = identifier_node
-                .siblings()
-                .take_while(|sibling| sibling.kind() != "identifier")
-                .filter(|sibling| {
-                  sibling.start_byte() != sibling.end_byte()
-                    && matches!(
-                      sibling.kind(),
-                      "string" | "expression" | "attribute_named_param"
-                    )
-                })
-                .map(|argument_node| TextNode {
-                  value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(self),
-                })
-                .collect::<Vec<_>>();
-
-              Attribute {
-                name: TextNode {
-                  value: self.get_node_text(&identifier_node),
-                  range: identifier_node.get_range(self),
-                },
-                arguments,
-                target,
-                range: attribute_node.get_range(self),
-              }
-            })
-            .collect::<Vec<_>>()
-        })
+        .flat_map(|node| self.attributes_for_node(&node))
         .collect()
     })
+  }
+
+  fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
+    let (attributes, target) = if node.kind() == "attribute" {
+      (
+        vec![*node],
+        node
+          .parent()
+          .and_then(|parent| AttributeTarget::try_from_kind(parent.kind())),
+      )
+    } else {
+      (
+        node.find_all("attribute"),
+        AttributeTarget::try_from_kind(node.kind()),
+      )
+    };
+
+    attributes
+      .into_iter()
+      .flat_map(|attribute| {
+        attribute
+          .find_all("^identifier")
+          .into_iter()
+          .map(move |identifier| {
+            let arguments = identifier
+              .siblings()
+              .take_while(|sibling| sibling.kind() != "identifier")
+              .filter(|sibling| {
+                sibling.start_byte() != sibling.end_byte()
+                  && matches!(
+                    sibling.kind(),
+                    "string" | "expression" | "attribute_named_param"
+                  )
+              })
+              .map(|argument| TextNode {
+                value: self.get_node_text(&argument),
+                range: argument.get_range(self),
+              })
+              .collect::<Vec<_>>();
+
+            Attribute {
+              name: TextNode {
+                value: self.get_node_text(&identifier),
+                range: identifier.get_range(self),
+              },
+              arguments,
+              target,
+              range: attribute.get_range(self),
+            }
+          })
+          .collect::<Vec<_>>()
+      })
+      .collect()
   }
 
   #[must_use]
@@ -285,6 +303,7 @@ impl Document {
             .unwrap_or_default();
 
           Some(Function {
+            attributes: self.attributes_for_node(function_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -323,6 +342,7 @@ impl Document {
           let content = self.get_node_text(import_node);
 
           Some(Import {
+            attributes: self.attributes_for_node(import_node),
             optional: content.contains('?'),
             path: TextNode {
               value: self.get_node_text(&path_node),
@@ -354,6 +374,7 @@ impl Document {
           });
 
           Some(Module {
+            attributes: self.attributes_for_node(module_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -612,6 +633,7 @@ impl Document {
           let name_node = unexport_node.child_by_field_name("name")?;
 
           Some(Unexport {
+            attributes: self.attributes_for_node(unexport_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -633,7 +655,13 @@ impl Document {
         .filter_map(|assignment_node| {
           let identifier_node = assignment_node.child_by_field_name("left")?;
 
+          let attribute_node = assignment_node
+            .parent()
+            .filter(|parent| matches!(parent.kind(), "eager" | "export"))
+            .unwrap_or(*assignment_node);
+
           Some(Variable {
+            attributes: self.attributes_for_node(&attribute_node),
             name: TextNode {
               value: self.get_node_text(&identifier_node),
               range: identifier_node.get_range(self),
@@ -802,6 +830,7 @@ mod tests {
     assert_eq!(
       aliases,
       vec![Alias {
+        attributes: vec![],
         name: TextNode {
           value: "a1".into(),
           range: lsp::Range::at(0, 6, 0, 8)
@@ -811,6 +840,44 @@ mod tests {
           range: lsp::Range::at(0, 12, 0, 15)
         },
         range: lsp::Range::at(0, 0, 0, 15)
+      }]
+    );
+  }
+
+  #[test]
+  fn get_alias_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [linux]
+      alias foo := bar
+      "
+    });
+
+    let aliases = document.aliases();
+
+    assert_eq!(aliases.len(), 1);
+
+    assert_eq!(
+      aliases,
+      vec![Alias {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Alias),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 6, 1, 9),
+        },
+        range: lsp::Range::at(0, 0, 1, 16),
+        value: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 13, 1, 16),
+        },
       }]
     );
   }
@@ -830,6 +897,7 @@ mod tests {
     assert_eq!(
       aliases,
       vec![Alias {
+        attributes: vec![],
         name: TextNode {
           value: "a1".into(),
           range: lsp::Range::at(0, 6, 0, 8)
@@ -920,6 +988,7 @@ mod tests {
       aliases,
       vec![
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "duplicate".into(),
             range: lsp::Range::at(0, 6, 0, 15)
@@ -931,6 +1000,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 22)
         },
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "duplicate".into(),
             range: lsp::Range::at(1, 6, 1, 15)
@@ -962,6 +1032,7 @@ mod tests {
       aliases,
       vec![
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "a1".into(),
             range: lsp::Range::at(0, 6, 0, 8),
@@ -973,6 +1044,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 15),
         },
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "a2".into(),
             range: lsp::Range::at(1, 6, 1, 8),
@@ -1120,6 +1192,42 @@ mod tests {
   }
 
   #[test]
+  fn get_variable_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [windows]
+      foo := 'bar'
+      "
+    });
+
+    let variables = document.variables();
+
+    assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        content: "[windows]\nfoo := 'bar'".into(),
+        export: false,
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        range: lsp::Range::at(0, 0, 2, 0),
+      }]
+    );
+  }
+
+  #[test]
   fn get_variables() {
     let document = Document::from(indoc! {
       "
@@ -1136,6 +1244,7 @@ mod tests {
       document.variables(),
       vec![
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tmpdir".into(),
             range: lsp::Range::at(0, 0, 0, 6),
@@ -1145,6 +1254,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "version".into(),
             range: lsp::Range::at(1, 0, 1, 7),
@@ -1154,6 +1264,7 @@ mod tests {
           range: lsp::Range::at(1, 0, 2, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tardir".into(),
             range: lsp::Range::at(2, 0, 2, 6),
@@ -1163,6 +1274,7 @@ mod tests {
           range: lsp::Range::at(2, 0, 3, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tarball".into(),
             range: lsp::Range::at(3, 0, 3, 7),
@@ -1172,6 +1284,7 @@ mod tests {
           range: lsp::Range::at(3, 0, 4, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "config".into(),
             range: lsp::Range::at(4, 0, 4, 6),
@@ -1182,6 +1295,7 @@ mod tests {
           range: lsp::Range::at(4, 0, 5, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "EDITOR".into(),
             range: lsp::Range::at(5, 7, 5, 13),
@@ -1210,6 +1324,15 @@ mod tests {
     assert_eq!(
       variables,
       vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
         name: TextNode {
           value: "PATH".into(),
           range: lsp::Range::at(1, 7, 1, 11),
@@ -1225,6 +1348,7 @@ mod tests {
   fn get_unexports() {
     let document = Document::from(indoc! {
       "
+      [windows]
       unexport FOO
       "
     });
@@ -1236,24 +1360,54 @@ mod tests {
     assert_eq!(
       unexports,
       vec![Unexport {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Unexport),
+        }],
         name: TextNode {
           value: "FOO".into(),
-          range: lsp::Range::at(0, 9, 0, 12),
+          range: lsp::Range::at(1, 9, 1, 12),
         },
-        range: lsp::Range::at(0, 0, 1, 0),
+        range: lsp::Range::at(0, 0, 2, 0),
       }]
     );
   }
 
   #[test]
-  fn eager_variable_is_parsed() {
+  fn eager_variable_with_attributes() {
     let document = Document::from(indoc! {
       "
+      [private]
       eager foo := 'bar'
       "
     });
 
-    assert_eq!(document.variables().len(), 1);
+    assert_eq!(
+      document.variables(),
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 6, 1, 9),
+        },
+        export: false,
+        content: "foo := 'bar'".into(),
+        range: lsp::Range::at(1, 6, 2, 0),
+      }]
+    );
   }
 
   #[test]
@@ -1961,9 +2115,32 @@ mod tests {
   }
 
   #[test]
+  fn list_document_attributes_without_target() {
+    let document = Document::from(indoc! {
+      "
+      [private]
+      "
+    });
+
+    assert_eq!(
+      document.attributes(),
+      vec![Attribute {
+        arguments: vec![],
+        name: TextNode {
+          value: "private".into(),
+          range: lsp::Range::at(0, 1, 0, 8),
+        },
+        range: lsp::Range::at(0, 0, 1, 0),
+        target: None,
+      }]
+    );
+  }
+
+  #[test]
   fn imports() {
     let document = Document::from(indoc! {
       "
+      [linux]
       import 'foo/bar.just'
 
       a: b
@@ -1974,12 +2151,21 @@ mod tests {
     assert_eq!(
       document.imports(),
       vec![Import {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Import),
+        }],
         optional: false,
         path: TextNode {
           value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 7, 0, 21),
+          range: lsp::Range::at(1, 7, 1, 21),
         },
-        range: lsp::Range::at(0, 0, 0, 21),
+        range: lsp::Range::at(0, 0, 1, 21),
       }]
     );
   }
@@ -1995,6 +2181,7 @@ mod tests {
     assert_eq!(
       document.imports(),
       vec![Import {
+        attributes: vec![],
         optional: true,
         path: TextNode {
           value: "'foo/bar.just'".into(),
@@ -2018,6 +2205,7 @@ mod tests {
       document.imports(),
       vec![
         Import {
+          attributes: vec![],
           optional: false,
           path: TextNode {
             value: "'foo.just'".into(),
@@ -2026,6 +2214,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 17),
         },
         Import {
+          attributes: vec![],
           optional: true,
           path: TextNode {
             value: "'bar.just'".into(),
@@ -2048,6 +2237,7 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -2063,6 +2253,7 @@ mod tests {
   fn module_with_path() {
     let document = Document::from(indoc! {
       r#"
+      [private]
       mod foo "./utils.just"
       "#
     });
@@ -2070,16 +2261,25 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Module),
+        }],
         name: TextNode {
           value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
+          range: lsp::Range::at(1, 4, 1, 7),
         },
         optional: false,
         path: Some(TextNode {
           value: "\"./utils.just\"".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
+          range: lsp::Range::at(1, 8, 1, 22),
         }),
-        range: lsp::Range::at(0, 0, 0, 22),
+        range: lsp::Range::at(0, 0, 1, 22),
       }]
     );
   }
@@ -2095,6 +2295,7 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![Module {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 5, 0, 8),
@@ -2119,6 +2320,7 @@ mod tests {
       document.modules(),
       vec![
         Module {
+          attributes: vec![],
           name: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(0, 4, 0, 7),
@@ -2128,6 +2330,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 7),
         },
         Module {
+          attributes: vec![],
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(1, 5, 1, 8),
@@ -2213,6 +2416,7 @@ mod tests {
       document.functions(),
       vec![
         Function {
+          attributes: vec![],
           name: TextNode {
             value: "hello".into(),
             range: lsp::Range::at(0, 0, 0, 5),
@@ -2226,6 +2430,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Function {
+          attributes: vec![],
           name: TextNode {
             value: "greet".into(),
             range: lsp::Range::at(2, 0, 2, 5),
@@ -2271,6 +2476,7 @@ mod tests {
     assert_eq!(
       document.functions(),
       vec![Function {
+        attributes: vec![],
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 0, 0, 3),
@@ -2279,6 +2485,39 @@ mod tests {
         body: "\"bar\"".into(),
         content: "foo() := \"bar\"".into(),
         range: lsp::Range::at(0, 0, 1, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn function_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [macos]
+      foo() := 'bar'
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![Function {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "macos".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Function),
+        }],
+        body: "'bar'".into(),
+        content: "[macos]\nfoo() := 'bar'".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        parameters: vec![],
+        range: lsp::Range::at(0, 0, 2, 0),
       }],
     );
   }

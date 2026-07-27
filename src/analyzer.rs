@@ -929,6 +929,21 @@ mod tests {
   }
 
   #[test]
+  fn attributes_invalid_target() {
+    Test::new(indoc! {
+      "
+      [private]
+      "
+    })
+    .error(
+      "Attribute `private` applied to invalid target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
+    .run();
+  }
+
+  #[test]
   fn attributes_metadata_multiple_arguments() {
     Test::new(indoc! {
       "
@@ -2799,6 +2814,33 @@ mod tests {
       "Syntax error near `foo echo \"foo\"`",
       lsp::Range::at(0, 0, 2, 0),
     )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_attribute_on_wrapped_assignment() {
+    Test::new(indoc! {
+      "
+      export [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `export`", lsp::Range::at(0, 0, 0, 6))
+    .run();
+
+    Test::new(indoc! {
+      "
+      eager [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `eager`", lsp::Range::at(0, 0, 0, 5))
     .run();
   }
 
