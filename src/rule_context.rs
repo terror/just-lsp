@@ -12,7 +12,7 @@ pub struct RuleContext<'a> {
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   functions: OnceLock<Vec<Function>>,
-  imported_documents: Vec<Document>,
+  imported_documents: Vec<ImportedDocument>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
@@ -28,8 +28,50 @@ impl<'a> RuleContext<'a> {
   pub fn aliases(&self) -> &[Alias] {
     self
       .aliases
-      .get_or_init(|| self.documents().flat_map(Document::aliases).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(document.aliases(), groups, |alias| {
+              &mut alias.attributes
+            })
+          })
+          .collect()
+      })
       .as_slice()
+  }
+
+  fn apply_inherited_groups(
+    attributes: &mut Vec<Attribute>,
+    inherited: Option<&GroupSet>,
+  ) -> bool {
+    let Some(inherited) = inherited else {
+      return true;
+    };
+
+    let groups = inherited.intersection(&GroupSet::from_attributes(attributes));
+
+    if groups.is_empty() {
+      return false;
+    }
+
+    attributes.retain(|attribute| {
+      !GroupSet::is_platform_attribute(&attribute.name.value)
+    });
+
+    attributes.extend(groups.platform_attribute_names().map(|name| {
+      Attribute {
+        arguments: Vec::new(),
+        name: TextNode {
+          range: lsp::Range::default(),
+          value: name.to_owned(),
+        },
+        range: lsp::Range::default(),
+        target: None,
+      }
+    }));
+
+    true
   }
 
   pub fn attributes(&self) -> &[Attribute] {
@@ -126,8 +168,13 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  fn documents(&self) -> impl Iterator<Item = &Document> {
-    once(self.document).chain(self.imported_documents.iter())
+  fn documents(&self) -> impl Iterator<Item = (&Document, Option<&GroupSet>)> {
+    once((self.document, None)).chain(
+      self
+        .imported_documents
+        .iter()
+        .map(|imported| (&imported.document, Some(&imported.groups))),
+    )
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
@@ -140,7 +187,18 @@ impl<'a> RuleContext<'a> {
   pub fn functions(&self) -> &[Function] {
     self
       .functions
-      .get_or_init(|| self.documents().flat_map(Document::functions).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(
+              document.functions(),
+              groups,
+              |function| &mut function.attributes,
+            )
+          })
+          .collect()
+      })
       .as_slice()
   }
 
@@ -199,34 +257,60 @@ impl<'a> RuleContext<'a> {
   pub fn recipes(&self) -> &[Recipe] {
     self
       .recipes
-      .get_or_init(|| self.documents().flat_map(Document::recipes).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(document.recipes(), groups, |recipe| {
+              &mut recipe.attributes
+            })
+          })
+          .collect()
+      })
       .as_slice()
   }
 
-  fn resolve_imports(document: &Document) -> Vec<Document> {
+  fn resolve_imports(document: &Document) -> Vec<ImportedDocument> {
     let mut documents = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen = HashMap::new();
+    let groups = GroupSet::from([Group::Any]);
 
     if let Ok(path) = document.uri.to_file_path() {
-      seen.insert(path);
+      seen.insert(path, groups.clone());
     }
 
-    Self::resolve_imports_recursive(document, &mut documents, &mut seen);
+    Self::resolve_imports_recursive(
+      document,
+      &groups,
+      &mut documents,
+      &mut seen,
+    );
 
     documents
   }
 
   fn resolve_imports_recursive(
     document: &Document,
-    documents: &mut Vec<Document>,
-    seen: &mut HashSet<PathBuf>,
+    inherited: &GroupSet,
+    documents: &mut Vec<ImportedDocument>,
+    seen: &mut HashMap<PathBuf, GroupSet>,
   ) {
     for import in document.imports() {
+      let groups =
+        inherited.intersection(&GroupSet::from_attributes(&import.attributes));
+
+      if groups.is_empty() {
+        continue;
+      }
+
       let Some(path) = import.resolve(&document.uri) else {
         continue;
       };
 
-      if !seen.insert(path.clone()) {
+      if seen
+        .get(&path)
+        .is_some_and(|previous| previous.covers(&groups))
+      {
         continue;
       }
 
@@ -253,9 +337,24 @@ impl<'a> RuleContext<'a> {
         continue;
       }
 
-      Self::resolve_imports_recursive(&imported, documents, seen);
+      seen.entry(path).or_default().union_with(groups.clone());
 
-      documents.push(imported);
+      let document_index = documents
+        .iter()
+        .position(|candidate| candidate.document.uri == imported.uri);
+
+      if let Some(index) = document_index {
+        documents[index].groups.union_with(groups.clone());
+      }
+
+      Self::resolve_imports_recursive(&imported, &groups, documents, seen);
+
+      if document_index.is_none() {
+        documents.push(ImportedDocument {
+          document: imported,
+          groups,
+        });
+      }
     }
   }
 
@@ -273,7 +372,18 @@ impl<'a> RuleContext<'a> {
   pub fn settings(&self) -> &[Setting] {
     self
       .settings
-      .get_or_init(|| self.documents().flat_map(Document::settings).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(
+              document.settings(),
+              groups,
+              |setting| &mut setting.attributes,
+            )
+          })
+          .collect()
+      })
       .as_slice()
   }
 
@@ -284,7 +394,18 @@ impl<'a> RuleContext<'a> {
   pub fn unexports(&self) -> &[Unexport] {
     self
       .unexports
-      .get_or_init(|| self.documents().flat_map(Document::unexports).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(
+              document.unexports(),
+              groups,
+              |unexport| &mut unexport.attributes,
+            )
+          })
+          .collect()
+      })
       .as_slice()
   }
 
@@ -314,8 +435,31 @@ impl<'a> RuleContext<'a> {
   pub fn variables(&self) -> &[Variable] {
     self
       .variables
-      .get_or_init(|| self.documents().flat_map(Document::variables).collect())
+      .get_or_init(|| {
+        self
+          .documents()
+          .flat_map(|(document, groups)| {
+            Self::with_inherited_groups(
+              document.variables(),
+              groups,
+              |variable| &mut variable.attributes,
+            )
+          })
+          .collect()
+      })
       .as_slice()
+  }
+
+  fn with_inherited_groups<T>(
+    mut items: Vec<T>,
+    inherited: Option<&GroupSet>,
+    attributes: impl Fn(&mut T) -> &mut Vec<Attribute>,
+  ) -> Vec<T> {
+    items.retain_mut(|item| {
+      Self::apply_inherited_groups(attributes(item), inherited)
+    });
+
+    items
   }
 }
 
@@ -500,6 +644,95 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(recipe_names, ["foo"]);
+  }
+
+  #[test]
+  fn platform_gated_imports_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar:\n  echo bar\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [linux]
+        import 'bar.just'
+        [windows]
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context.recipes()[0].groups(),
+      GroupSet::from([Group::Linux, Group::Windows])
+    );
+  }
+
+  #[test]
+  fn platform_gated_imports_intersect() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("baz.just"), "baz:\n  echo baz\n").unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        [linux]
+        import 'baz.just'
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [unix]
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context.recipes()[0].groups(),
+      GroupSet::from([Group::Linux])
+    );
   }
 
   #[test]

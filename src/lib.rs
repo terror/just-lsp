@@ -40,6 +40,7 @@ pub use {
   group::Group,
   group_set::GroupSet,
   import::Import,
+  imported_document::ImportedDocument,
   module::Module,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
@@ -83,6 +84,7 @@ mod function_kind;
 mod group;
 mod group_set;
 mod import;
+mod imported_document;
 mod module;
 mod node_ext;
 mod parameter;

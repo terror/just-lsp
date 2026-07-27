@@ -12,6 +12,14 @@ impl GroupSet {
       .any(|a| other.0.iter().any(|b| a.conflicts_with(*b)))
   }
 
+  #[must_use]
+  pub fn covers(&self, other: &Self) -> bool {
+    other.0.iter().all(|other| match other {
+      Group::Any => self.0.contains(&Group::Any),
+      group => self.0.contains(&Group::Any) || self.0.contains(group),
+    })
+  }
+
   fn from_attribute(attribute: &str) -> Option<Self> {
     match attribute {
       "android" => Some(Self::from([Group::Android])),
@@ -58,8 +66,44 @@ impl GroupSet {
   }
 
   #[must_use]
+  pub fn intersection(&self, other: &Self) -> Self {
+    self
+      .0
+      .iter()
+      .flat_map(|a| {
+        other.0.iter().filter_map(move |b| match (*a, *b) {
+          (Group::Any, Group::Any) => Some(Group::Any),
+          (Group::Any, group) | (group, Group::Any) => Some(group),
+          (a, b) if a == b => Some(a),
+          _ => None,
+        })
+      })
+      .collect()
+  }
+
+  #[must_use]
   pub fn is_empty(&self) -> bool {
     self.0.is_empty()
+  }
+
+  pub(crate) fn is_platform_attribute(attribute: &str) -> bool {
+    Self::from_attribute(attribute).is_some()
+  }
+
+  pub(crate) fn platform_attribute_names(
+    &self,
+  ) -> impl Iterator<Item = &'static str> {
+    self.0.iter().filter_map(|group| match group {
+      Group::Android => Some("android"),
+      Group::Any => None,
+      Group::Dragonfly => Some("dragonfly"),
+      Group::Freebsd => Some("freebsd"),
+      Group::Linux => Some("linux"),
+      Group::Macos => Some("macos"),
+      Group::Netbsd => Some("netbsd"),
+      Group::Openbsd => Some("openbsd"),
+      Group::Windows => Some("windows"),
+    })
   }
 
   pub fn union_with(&mut self, other: Self) {
@@ -98,6 +142,23 @@ mod tests {
     assert!(
       GroupSet::from([Group::Any])
         .conflicts_with(&GroupSet::from([Group::Windows]))
+    );
+  }
+
+  #[test]
+  fn covers() {
+    assert!(
+      GroupSet::from([Group::Any]).covers(&GroupSet::from([Group::Linux]))
+    );
+
+    assert!(
+      GroupSet::from_attribute("unix")
+        .unwrap()
+        .covers(&GroupSet::from([Group::Linux]))
+    );
+
+    assert!(
+      !GroupSet::from([Group::Linux]).covers(&GroupSet::from([Group::Any]))
     );
   }
 
@@ -180,6 +241,28 @@ mod tests {
     assert!(!groups.insert(Group::Linux));
 
     assert_eq!(groups, GroupSet::from([Group::Linux]));
+  }
+
+  #[test]
+  fn intersection() {
+    assert_eq!(
+      GroupSet::from([Group::Any])
+        .intersection(&GroupSet::from([Group::Linux])),
+      GroupSet::from([Group::Linux])
+    );
+
+    assert_eq!(
+      GroupSet::from_attribute("unix")
+        .unwrap()
+        .intersection(&GroupSet::from([Group::Linux])),
+      GroupSet::from([Group::Linux])
+    );
+
+    assert!(
+      GroupSet::from([Group::Linux])
+        .intersection(&GroupSet::from([Group::Windows]))
+        .is_empty()
+    );
   }
 
   #[test]
