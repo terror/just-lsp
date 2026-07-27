@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/terror/just-lsp/releases/tag/0.5.1) - 2026-07-27
+
+### Fixed
+
+- Avoid analyzing disabled rules (#503)
+
+### Misc
+
+- Migrate logging to tracing (#502)
+- Document package manager installations (#501)
+
 ## [0.5.0](https://github.com/terror/just-lsp/releases/tag/0.5.0) - 2026-07-24
 
 ### Added
