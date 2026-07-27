@@ -13,14 +13,15 @@ define_rule! {
         return Vec::new();
       }
 
-      let mut diagnostics = Vec::new();
-      let mut groups = HashMap::<String, GroupSet>::new();
+      let (mut diagnostics, mut groups) = (Vec::new(), HashMap::<String, GroupSet>::new());
 
       for variable in context.variables() {
         let current = GroupSet::from_attributes(&variable.attributes);
+
         let previous = groups
           .entry(variable.name.value.clone())
           .or_default();
+
         let duplicate = previous.conflicts_with(&current);
 
         previous.union_with(current);
