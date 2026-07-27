@@ -12,9 +12,11 @@ define_rule! {
 
       for setting in context.settings() {
         let current = GroupSet::from_attributes(&setting.attributes);
+
         let previous = groups
           .entry(setting.name.value.clone())
           .or_default();
+
         let duplicate = previous.conflicts_with(&current);
 
         previous.union_with(current);
