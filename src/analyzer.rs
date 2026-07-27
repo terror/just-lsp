@@ -3997,7 +3997,7 @@ mod tests {
   }
 
   #[test]
-  fn settings_with_platform_attributes_do_not_require_lists() {
+  fn settings_with_platform_attributes() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
         "duplicate-setting": "off"
