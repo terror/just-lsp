@@ -13,9 +13,11 @@ define_rule! {
         .iter()
         .filter(|function| {
           let current = GroupSet::from_attributes(&function.attributes);
+
           let previous = groups
             .entry(function.name.value.clone())
             .or_default();
+
           let duplicate = previous.conflicts_with(&current);
 
           previous.union_with(current);
