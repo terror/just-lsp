@@ -109,6 +109,7 @@ impl Document {
   pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       let root = tree.root_node();
+
       let mut cursor = root.walk();
 
       root
