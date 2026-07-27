@@ -4395,6 +4395,25 @@ mod tests {
   }
 
   #[test]
+  fn duplicate_unexports_only_conflict_on_overlapping_platforms() {
+    Test::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      unexport FOO
+      [windows]
+      unexport FOO
+      "
+    })
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(5, 9, 5, 12),
+    )
+    .run();
+  }
+
+  #[test]
   fn export_unexport_conflict_is_rejected() {
     Test::new(indoc! {
       "
@@ -4406,6 +4425,19 @@ mod tests {
       "Variable FOO is both exported and unexported",
       lsp::Range::at(1, 7, 1, 10),
     )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_do_not_conflict_across_platforms() {
+    Test::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      export FOO := \"bar\"
+      "
+    })
     .run();
   }
 
