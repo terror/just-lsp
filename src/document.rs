@@ -108,24 +108,31 @@ impl Document {
   #[must_use]
   pub fn attributes(&self) -> Vec<Attribute> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
-      let root = tree.root_node();
-
-      let mut cursor = root.walk();
-
-      root
-        .named_children(&mut cursor)
+      tree
+        .root_node()
+        .find_all("attribute")
+        .into_iter()
         .flat_map(|node| self.attributes_for_node(&node))
         .collect()
     })
   }
 
   fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
-    let Some(target) = AttributeTarget::try_from_kind(node.kind()) else {
-      return Vec::new();
+    let (attributes, target) = if node.kind() == "attribute" {
+      (
+        vec![*node],
+        node
+          .parent()
+          .and_then(|parent| AttributeTarget::try_from_kind(parent.kind())),
+      )
+    } else {
+      (
+        node.find_all("attribute"),
+        AttributeTarget::try_from_kind(node.kind()),
+      )
     };
 
-    node
-      .find_all("attribute")
+    attributes
       .into_iter()
       .flat_map(|attribute| {
         attribute
@@ -154,7 +161,7 @@ impl Document {
                 range: identifier.get_range(self),
               },
               arguments,
-              target: Some(target),
+              target,
               range: attribute.get_range(self),
             }
           })
@@ -2070,6 +2077,28 @@ mod tests {
           target: Some(AttributeTarget::Unexport),
         },
       ],
+    );
+  }
+
+  #[test]
+  fn list_document_attributes_without_target() {
+    let document = Document::from(indoc! {
+      "
+      [private]
+      "
+    });
+
+    assert_eq!(
+      document.attributes(),
+      vec![Attribute {
+        arguments: vec![],
+        name: TextNode {
+          value: "private".into(),
+          range: lsp::Range::at(0, 1, 0, 8),
+        },
+        range: lsp::Range::at(0, 0, 1, 0),
+        target: None,
+      }]
     );
   }
 

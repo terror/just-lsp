@@ -929,6 +929,21 @@ mod tests {
   }
 
   #[test]
+  fn attributes_invalid_target() {
+    Test::new(indoc! {
+      "
+      [private]
+      "
+    })
+    .error(
+      "Attribute `private` applied to invalid target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
+    .run();
+  }
+
+  #[test]
   fn attributes_metadata_multiple_arguments() {
     Test::new(indoc! {
       "
