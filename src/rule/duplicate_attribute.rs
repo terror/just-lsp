@@ -13,8 +13,7 @@ define_rule! {
 
       let document = context.document();
 
-      let mut diagnostics = Vec::new();
-      let mut default_groups = GroupSet::default();
+      let (mut diagnostics, mut default_groups) = (Vec::new(), GroupSet::default());
 
       for recipe in context.document().recipes() {
         for attribute in recipe
@@ -23,6 +22,7 @@ define_rule! {
           .filter(|attribute| attribute.name.value == "default")
         {
           let current = GroupSet::from_attributes(&recipe.attributes);
+
           let duplicate = default_groups.conflicts_with(&current);
 
           default_groups.union_with(current);
@@ -56,9 +56,11 @@ define_rule! {
         for identifier in attribute_node.find_all("^identifier") {
           let attribute_name = document.get_node_text(&identifier);
 
-          if context.builtin_attributes(&attribute_name).is_empty()
-            || REPEATABLE_ATTRIBUTES.contains(&attribute_name.as_str())
-          {
+          if REPEATABLE_ATTRIBUTES.contains(&attribute_name.as_str()) {
+            continue;
+          }
+
+          if context.builtin_attributes(&attribute_name).is_empty() {
             continue;
           }
 
