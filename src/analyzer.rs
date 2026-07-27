@@ -875,6 +875,38 @@ mod tests {
   }
 
   #[test]
+  fn attributes_duplicate_wrapper_assignment_attribute() {
+    Test::new(indoc! {
+      "
+      [private]
+      eager [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "Assignment attribute `private` is duplicated",
+      lsp::Range::at(1, 6, 2, 0),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [private]
+      export [private]
+      foo := 'bar'
+      "
+    })
+    .error(
+      "Assignment attribute `private` is duplicated",
+      lsp::Range::at(1, 7, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn attributes_extra_arguments() {
     Test::new(indoc! {
       "

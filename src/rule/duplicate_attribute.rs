@@ -24,11 +24,21 @@ define_rule! {
           continue;
         };
 
-        let Some(target) = AttributeTarget::try_from_kind(parent.kind()) else {
+        let target_node = if parent.kind() == "assignment" {
+          parent
+            .parent()
+            .filter(|parent| matches!(parent.kind(), "eager" | "export"))
+            .unwrap_or(parent)
+        } else {
+          parent
+        };
+
+        let Some(target) = AttributeTarget::try_from_kind(target_node.kind())
+        else {
           continue;
         };
 
-        let target_key = (parent.start_byte(), parent.end_byte());
+        let target_key = (target_node.start_byte(), target_node.end_byte());
 
         for identifier in attribute_node.find_all("^identifier") {
           let attribute_name = document.get_node_text(&identifier);
@@ -40,7 +50,7 @@ define_rule! {
           }
 
           if attribute_name == "default" && target == AttributeTarget::Recipe {
-            let Some(recipe_name) = parent
+            let Some(recipe_name) = target_node
               .find("recipe_header > identifier")
               .map(|node| document.get_node_text(&node))
             else {
