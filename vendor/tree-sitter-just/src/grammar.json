@@ -290,6 +290,15 @@
           }
         },
         {
+          "type": "SYMBOL",
+          "name": "_assignment"
+        }
+      ]
+    },
+    "_assignment": {
+      "type": "SEQ",
+      "members": [
+        {
           "type": "FIELD",
           "name": "left",
           "content": {
@@ -330,8 +339,13 @@
           "value": "eager"
         },
         {
-          "type": "SYMBOL",
-          "name": "assignment"
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment"
+          },
+          "named": true,
+          "value": "assignment"
         }
       ]
     },
@@ -350,8 +364,13 @@
           "value": "export"
         },
         {
-          "type": "SYMBOL",
-          "name": "assignment"
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_assignment"
+          },
+          "named": true,
+          "value": "assignment"
         }
       ]
     },
@@ -2548,8 +2567,14 @@
     }
   ],
   "conflicts": [
-    ["value", "attribute_named_param"],
-    ["_name", "unexport"]
+    [
+      "value",
+      "attribute_named_param"
+    ],
+    [
+      "_name",
+      "unexport"
+    ]
   ],
   "precedences": [],
   "externals": [

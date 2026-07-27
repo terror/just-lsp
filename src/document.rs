@@ -1379,14 +1379,35 @@ mod tests {
   }
 
   #[test]
-  fn eager_variable_is_parsed() {
+  fn eager_variable_with_attributes() {
     let document = Document::from(indoc! {
       "
+      [private]
       eager foo := 'bar'
       "
     });
 
-    assert_eq!(document.variables().len(), 1);
+    assert_eq!(
+      document.variables(),
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 6, 1, 9),
+        },
+        export: false,
+        content: "foo := 'bar'".into(),
+        range: lsp::Range::at(1, 6, 2, 0),
+      }]
+    );
   }
 
   #[test]
