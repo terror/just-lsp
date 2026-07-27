@@ -12,23 +12,6 @@ impl GroupSet {
       .any(|a| other.0.iter().any(|b| a.conflicts_with(*b)))
   }
 
-  #[must_use]
-  pub fn from_attributes(attributes: &[Attribute]) -> Self {
-    let mut groups = Self::default();
-
-    for attribute in attributes {
-      if let Some(targets) = Self::from_attribute(&attribute.name.value) {
-        groups.union_with(targets);
-      }
-    }
-
-    if groups.is_empty() {
-      Self::from([Group::Any])
-    } else {
-      groups
-    }
-  }
-
   fn from_attribute(attribute: &str) -> Option<Self> {
     match attribute {
       "android" => Some(Self::from([Group::Android])),
@@ -49,6 +32,23 @@ impl GroupSet {
       ])),
       "windows" => Some(Self::from([Group::Windows])),
       _ => None,
+    }
+  }
+
+  #[must_use]
+  pub fn from_attributes(attributes: &[Attribute]) -> Self {
+    let mut groups = Self::default();
+
+    for attribute in attributes {
+      if let Some(targets) = Self::from_attribute(&attribute.name.value) {
+        groups.union_with(targets);
+      }
+    }
+
+    if groups.is_empty() {
+      Self::from([Group::Any])
+    } else {
+      groups
     }
   }
 
