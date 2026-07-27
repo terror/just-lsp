@@ -19,9 +19,11 @@ define_rule! {
 
       for recipe in context.recipes() {
         let current = GroupSet::from_attributes(&recipe.attributes);
+
         let previous = groups
           .entry(recipe.name.value.clone())
           .or_default();
+
         let duplicate = previous.conflicts_with(&current);
 
         previous.union_with(current);
