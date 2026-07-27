@@ -49,10 +49,16 @@ impl<'a> RuleContext<'a> {
       return true;
     };
 
-    let groups = inherited.intersection(&GroupSet::from_attributes(attributes));
+    let item_groups = GroupSet::from_attributes(attributes);
+
+    let groups = inherited.intersection(&item_groups);
 
     if groups.is_empty() {
       return false;
+    }
+
+    if groups == item_groups {
+      return true;
     }
 
     attributes.retain(|attribute| {
@@ -478,6 +484,7 @@ mod tests {
       dir.path().join("bar.just"),
       indoc! {
         "
+        [linux]
         bar:
           echo bar
         "
@@ -520,6 +527,19 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(recipe_names, ["foo", "bar"]);
+
+    assert_eq!(
+      context.recipes()[1].attributes,
+      vec![Attribute {
+        arguments: Vec::new(),
+        name: TextNode {
+          range: lsp::Range::at(0, 1, 0, 6),
+          value: "linux".into(),
+        },
+        range: lsp::Range::at(0, 0, 1, 0),
+        target: Some(AttributeTarget::Recipe),
+      }]
+    );
   }
 
   #[test]
@@ -734,6 +754,42 @@ mod tests {
       context.recipes()[0].groups(),
       GroupSet::from([Group::Linux])
     );
+  }
+
+  #[test]
+  fn unconditional_import_overrides_platform_gate() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar:\n  echo bar\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [linux]
+        import 'bar.just'
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(context.recipes()[0].groups(), GroupSet::from([Group::Any]));
   }
 
   #[test]

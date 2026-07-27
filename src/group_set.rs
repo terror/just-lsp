@@ -107,7 +107,16 @@ impl GroupSet {
   }
 
   pub fn union_with(&mut self, other: Self) {
-    self.0.extend(other.0);
+    if self.0.contains(&Group::Any) {
+      return;
+    }
+
+    if other.0.contains(&Group::Any) {
+      self.0.clear();
+      self.0.insert(Group::Any);
+    } else {
+      self.0.extend(other.0);
+    }
   }
 }
 
@@ -278,5 +287,13 @@ mod tests {
     groups.union_with(GroupSet::from([Group::Linux, Group::Windows]));
 
     assert_eq!(groups, GroupSet::from([Group::Linux, Group::Windows]));
+
+    groups.union_with(GroupSet::from([Group::Any]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+
+    groups.union_with(GroupSet::from([Group::Linux]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
   }
 }
