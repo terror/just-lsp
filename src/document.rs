@@ -1852,6 +1852,15 @@ mod tests {
 
       [module_attr]
       mod utils \"./utils.just\"
+
+      [function_attr]
+      function() := \"function\"
+
+      [import_attr]
+      import \"foo.just\"
+
+      [unexport_attr]
+      unexport FOO
       "
     });
 
@@ -1919,6 +1928,33 @@ mod tests {
           },
           range: lsp::Range::at(13, 0, 14, 0),
           target: Some(AttributeTarget::Module),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "function_attr".into(),
+            range: lsp::Range::at(16, 1, 16, 14),
+          },
+          range: lsp::Range::at(16, 0, 17, 0),
+          target: Some(AttributeTarget::Function),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "import_attr".into(),
+            range: lsp::Range::at(19, 1, 19, 12),
+          },
+          range: lsp::Range::at(19, 0, 20, 0),
+          target: Some(AttributeTarget::Import),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "unexport_attr".into(),
+            range: lsp::Range::at(22, 1, 22, 14),
+          },
+          range: lsp::Range::at(22, 0, 23, 0),
+          target: Some(AttributeTarget::Unexport),
         },
       ],
     );

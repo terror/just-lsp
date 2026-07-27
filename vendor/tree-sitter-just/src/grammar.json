@@ -85,6 +85,13 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
           "type": "FIELD",
           "name": "name",
           "content": {
@@ -352,6 +359,13 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
+        {
           "type": "STRING",
           "value": "unexport"
         },
@@ -372,6 +386,13 @@
     "import": {
       "type": "SEQ",
       "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "attribute"
+          }
+        },
         {
           "type": "STRING",
           "value": "import"
@@ -2527,14 +2548,8 @@
     }
   ],
   "conflicts": [
-    [
-      "value",
-      "attribute_named_param"
-    ],
-    [
-      "_name",
-      "unexport"
-    ]
+    ["value", "attribute_named_param"],
+    ["_name", "unexport"]
   ],
   "precedences": [],
   "externals": [

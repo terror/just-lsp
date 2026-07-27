@@ -86,6 +86,7 @@ module.exports = grammar({
     // function      : NAME '(' parameters? ')' ':=' expression
     function_definition: ($) =>
       seq(
+        repeat($.attribute),
         field("name", $.identifier),
         "(",
         optional(field("parameters", $.function_parameters)),
@@ -134,10 +135,11 @@ module.exports = grammar({
     export: ($) => seq(repeat($.attribute), "export", $.assignment),
 
     // unexport      : 'unexport' NAME _eol
-    unexport: ($) => seq("unexport", field("name", $._name), $._newline),
+    unexport: ($) =>
+      seq(repeat($.attribute), "unexport", field("name", $._name), $._newline),
 
     // import        : 'import' '?'? string?
-    import: ($) => seq("import", optional("?"), $.string),
+    import: ($) => seq(repeat($.attribute), "import", optional("?"), $.string),
 
     // module        : attribute* 'mod' '?'? string?
     module: ($) =>
