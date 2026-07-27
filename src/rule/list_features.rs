@@ -90,7 +90,7 @@ impl ListFeaturesRule {
       return false;
     };
 
-    let Some(name) = setting.child(1) else {
+    let Some(name) = setting.child_by_field_name("left") else {
       return false;
     };
 
