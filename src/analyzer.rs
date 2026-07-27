@@ -3997,15 +3997,24 @@ mod tests {
   }
 
   #[test]
-  fn settings_with_platform_attribute() {
+  fn settings_with_platform_attributes() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "duplicate-setting": "off"
+      }
+    }))
+    .unwrap();
+
     Test::new(indoc! {
       "
-      set lists
+      [unix]
+      set shell := ['sh', '-cu']
 
       [windows]
-      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      set shell := ['cmd', '/c']
       "
     })
+    .config(config)
     .run();
   }
 
