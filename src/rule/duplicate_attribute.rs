@@ -14,7 +14,30 @@ define_rule! {
       let document = context.document();
 
       let mut diagnostics = Vec::new();
-      let mut default_recipe = None;
+      let mut default_groups = GroupSet::default();
+
+      for recipe in context.document().recipes() {
+        for attribute in recipe
+          .attributes
+          .iter()
+          .filter(|attribute| attribute.name.value == "default")
+        {
+          let current = GroupSet::from_attributes(&recipe.attributes);
+          let duplicate = default_groups.conflicts_with(&current);
+
+          default_groups.union_with(current);
+
+          if duplicate {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
+                recipe.name.value
+              ),
+              attribute.range,
+            ));
+          }
+        }
+      }
 
       let mut target_seen: HashMap<(usize, usize), HashSet<String>> =
         HashMap::new();
@@ -40,22 +63,6 @@ define_rule! {
           }
 
           if attribute_name == "default" && target == AttributeTarget::Recipe {
-            let Some(recipe_name) = parent
-              .find("recipe_header > identifier")
-              .map(|node| document.get_node_text(&node))
-            else {
-              continue;
-            };
-
-            if default_recipe.replace(recipe_name.clone()).is_some() {
-              diagnostics.push(Diagnostic::error(
-                format!(
-                  "Recipe `{recipe_name}` has duplicate `[default]` attribute, which may only appear once per module"
-                ),
-                attribute_node.get_range(document),
-              ));
-            }
-
             continue;
           }
 

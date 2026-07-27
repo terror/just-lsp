@@ -38,6 +38,7 @@ pub use {
   function_call::FunctionCall,
   function_kind::FunctionKind,
   group::Group,
+  group_set::GroupSet,
   import::Import,
   module::Module,
   node_ext::NodeExt,
@@ -80,6 +81,7 @@ mod function;
 mod function_call;
 mod function_kind;
 mod group;
+mod group_set;
 mod import;
 mod module;
 mod node_ext;

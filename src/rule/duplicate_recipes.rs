@@ -15,35 +15,22 @@ define_rule! {
 
       let mut diagnostics = Vec::new();
 
-      let mut recipe_groups: HashMap<String, Vec<(lsp::Range, HashSet<Group>)>> =
-        HashMap::new();
+      let mut groups = HashMap::<String, GroupSet>::new();
 
       for recipe in context.recipes() {
-        recipe_groups
+        let current = GroupSet::from_attributes(&recipe.attributes);
+        let previous = groups
           .entry(recipe.name.value.clone())
-          .or_default()
-          .push((recipe.range, recipe.groups()));
-      }
+          .or_default();
+        let duplicate = previous.conflicts_with(&current);
 
-      for (recipe_name, group) in &recipe_groups {
-        if group.len() <= 1 {
-          continue;
-        }
+        previous.union_with(current);
 
-        for (i, (range, a)) in group.iter().enumerate() {
-          for (_, (_, b)) in group.iter().enumerate().take(i) {
-            let has_conflict =
-              a.iter().any(|a| b.iter().any(|b| a.conflicts_with(*b)));
-
-            if has_conflict {
-              diagnostics.push(Diagnostic::error(
-                format!("Duplicate recipe name `{recipe_name}`"),
-                *range,
-              ));
-
-              break;
-            }
-          }
+        if duplicate {
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate recipe name `{}`", recipe.name.value),
+            recipe.range,
+          ));
         }
       }
 

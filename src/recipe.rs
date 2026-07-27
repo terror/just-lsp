@@ -21,22 +21,8 @@ impl Recipe {
   }
 
   #[must_use]
-  pub fn groups(&self) -> HashSet<Group> {
-    let mut groups = HashSet::new();
-
-    for attribute in &self.attributes {
-      let attribute_name = attribute.name.value.as_str();
-
-      if let Some(targets) = Group::targets(attribute_name) {
-        groups.extend(targets);
-      }
-    }
-
-    if groups.is_empty() {
-      groups.insert(Group::Any);
-    }
-
-    groups
+  pub fn groups(&self) -> GroupSet {
+    GroupSet::from_attributes(&self.attributes)
   }
 
   #[must_use]
@@ -67,7 +53,7 @@ mod tests {
       range: lsp::Range::at(0, 0, 2, 0),
     };
 
-    assert_eq!(recipe.groups(), HashSet::from([Group::Any]));
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
   }
 
   #[test]
@@ -93,7 +79,7 @@ mod tests {
       range: lsp::Range::at(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.groups(), HashSet::from([Group::Linux]));
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
   }
 
   #[test]
@@ -132,7 +118,7 @@ mod tests {
 
     assert_eq!(
       recipe.groups(),
-      HashSet::from([Group::Linux, Group::Windows])
+      GroupSet::from([Group::Linux, Group::Windows])
     );
   }
 
@@ -228,7 +214,7 @@ mod tests {
 
     assert_eq!(
       recipe.groups(),
-      HashSet::from([
+      GroupSet::from([
         Group::Android,
         Group::Dragonfly,
         Group::Freebsd,
@@ -264,6 +250,6 @@ mod tests {
       range: lsp::Range::at(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.groups(), HashSet::from([Group::Any]));
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
   }
 }
