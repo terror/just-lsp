@@ -276,6 +276,23 @@ mod tests {
   }
 
   #[test]
+  fn aliases_platform_specific() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      [unix]
+      alias bar := foo
+
+      [windows]
+      alias bar := foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn aliases_missing_recipe() {
     Test::new(indoc! {
       "
@@ -744,6 +761,24 @@ mod tests {
     })
     .error(
       "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(4, 0, 5, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_platform_specific_defaults() {
+    Test::new(indoc! {
+      "
+      [unix]
+      [default]
+      foo:
+        echo \"foo\"
+
+      [windows]
+      [default]
+      bar:
+        echo \"bar\"
+      "
+    })
     .run();
   }
 
@@ -1853,6 +1888,23 @@ mod tests {
       "
     })
     .error("Duplicate variable `foo`", lsp::Range::at(1, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_platform_specific() {
+    Test::new(indoc! {
+      "
+      [unix]
+      foo := \"foo\"
+
+      [windows]
+      foo := \"bar\"
+
+      bar:
+        echo {{ foo }}
+      "
+    })
     .run();
   }
 
@@ -4040,13 +4092,6 @@ mod tests {
 
   #[test]
   fn settings_with_platform_attributes() {
-    let config = serde_json::from_value::<Config>(serde_json::json!({
-      "rules": {
-        "duplicate-setting": "off"
-      }
-    }))
-    .unwrap();
-
     Test::new(indoc! {
       "
       [unix]
@@ -4056,7 +4101,6 @@ mod tests {
       set shell := ['cmd', '/c']
       "
     })
-    .config(config)
     .run();
   }
 
@@ -4351,6 +4395,25 @@ mod tests {
   }
 
   #[test]
+  fn duplicate_unexports_only_conflict_on_overlapping_platforms() {
+    Test::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      unexport FOO
+      [windows]
+      unexport FOO
+      "
+    })
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(5, 9, 5, 12),
+    )
+    .run();
+  }
+
+  #[test]
   fn export_unexport_conflict_is_rejected() {
     Test::new(indoc! {
       "
@@ -4362,6 +4425,19 @@ mod tests {
       "Variable FOO is both exported and unexported",
       lsp::Range::at(1, 7, 1, 10),
     )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_do_not_conflict_across_platforms() {
+    Test::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      export FOO := \"bar\"
+      "
+    })
     .run();
   }
 
@@ -4519,6 +4595,20 @@ mod tests {
     })
     .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
     .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicates_platform_specific() {
+    Test::new(indoc! {
+      "
+      [unix]
+      foo() := \"foo\"
+
+      [windows]
+      foo() := \"bar\"
+      "
+    })
     .run();
   }
 

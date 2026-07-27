@@ -16,28 +16,4 @@ impl Group {
   pub fn conflicts_with(self, other: Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
-
-  #[must_use]
-  pub fn targets(attribute: &str) -> Option<Vec<Self>> {
-    match attribute {
-      "android" => Some(vec![Group::Android]),
-      "dragonfly" => Some(vec![Group::Dragonfly]),
-      "freebsd" => Some(vec![Group::Freebsd]),
-      "linux" => Some(vec![Group::Linux]),
-      "macos" => Some(vec![Group::Macos]),
-      "netbsd" => Some(vec![Group::Netbsd]),
-      "openbsd" => Some(vec![Group::Openbsd]),
-      "unix" => Some(vec![
-        Group::Android,
-        Group::Dragonfly,
-        Group::Freebsd,
-        Group::Linux,
-        Group::Macos,
-        Group::Netbsd,
-        Group::Openbsd,
-      ]),
-      "windows" => Some(vec![Group::Windows]),
-      _ => None,
-    }
-  }
 }

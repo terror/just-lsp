@@ -8,10 +8,20 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut seen = HashSet::new();
+      let mut groups = HashMap::<String, GroupSet>::new();
 
       for setting in context.settings() {
-        if !seen.insert(setting.name.value.clone()) {
+        let current = GroupSet::from_attributes(&setting.attributes);
+
+        let previous = groups
+          .entry(setting.name.value.clone())
+          .or_default();
+
+        let duplicate = previous.conflicts_with(&current);
+
+        previous.union_with(current);
+
+        if duplicate {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate setting `{}`", setting.name.value),
             setting.range,
