@@ -504,6 +504,38 @@ mod foo
     (identifier)))
 
 ================================================================================
+functions, imports, and unexports with attributes
+================================================================================
+
+[windows]
+foo() := 'bar'
+
+[unix]
+import 'foo.just'
+
+[windows]
+unexport FOO
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_definition
+    (attribute
+      (identifier))
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (import
+    (attribute
+      (identifier))
+    (string))
+  (unexport
+    (attribute
+      (identifier))
+    (identifier)))
+
+================================================================================
 set
 ================================================================================
 

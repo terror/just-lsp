@@ -3588,6 +3588,23 @@ mod tests {
   }
 
   #[test]
+  fn conditional_attributes_on_all_top_level_items() {
+    Test::new(indoc! {
+      "
+      [windows]
+      foo() := 'bar'
+
+      [unix]
+      import? 'foo.just'
+
+      [windows]
+      unexport FOO
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_with_conflicting_multiple_os_attributes() {
     Test::new(indoc! {
       "
