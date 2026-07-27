@@ -835,35 +835,6 @@ mod tests {
   }
 
   #[test]
-  fn get_alias_with_module_path() {
-    let document = Document::from(indoc! {
-      "
-      alias a1 := tools::build
-      "
-    });
-
-    let aliases = document.aliases();
-
-    assert_eq!(aliases.len(), 1);
-
-    assert_eq!(
-      aliases,
-      vec![Alias {
-        attributes: vec![],
-        name: TextNode {
-          value: "a1".into(),
-          range: lsp::Range::at(0, 6, 0, 8)
-        },
-        value: TextNode {
-          value: "tools::build".into(),
-          range: lsp::Range::at(0, 12, 0, 24)
-        },
-        range: lsp::Range::at(0, 0, 0, 24)
-      }]
-    );
-  }
-
-  #[test]
   fn get_alias_with_attributes() {
     let document = Document::from(indoc! {
       "
@@ -897,6 +868,35 @@ mod tests {
           value: "bar".into(),
           range: lsp::Range::at(1, 13, 1, 16),
         },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_alias_with_module_path() {
+    let document = Document::from(indoc! {
+      "
+      alias a1 := tools::build
+      "
+    });
+
+    let aliases = document.aliases();
+
+    assert_eq!(aliases.len(), 1);
+
+    assert_eq!(
+      aliases,
+      vec![Alias {
+        attributes: vec![],
+        name: TextNode {
+          value: "a1".into(),
+          range: lsp::Range::at(0, 6, 0, 8)
+        },
+        value: TextNode {
+          value: "tools::build".into(),
+          range: lsp::Range::at(0, 12, 0, 24)
+        },
+        range: lsp::Range::at(0, 0, 0, 24)
       }]
     );
   }
@@ -1182,6 +1182,42 @@ mod tests {
   }
 
   #[test]
+  fn get_variable_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [windows]
+      foo := 'bar'
+      "
+    });
+
+    let variables = document.variables();
+
+    assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        content: "[windows]\nfoo := 'bar'".into(),
+        export: false,
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        range: lsp::Range::at(0, 0, 2, 0),
+      }]
+    );
+  }
+
+  #[test]
   fn get_variables() {
     let document = Document::from(indoc! {
       "
@@ -1259,42 +1295,6 @@ mod tests {
           range: lsp::Range::at(5, 7, 6, 0),
         },
       ]
-    );
-  }
-
-  #[test]
-  fn get_variable_with_attributes() {
-    let document = Document::from(indoc! {
-      "
-      [windows]
-      foo := 'bar'
-      "
-    });
-
-    let variables = document.variables();
-
-    assert_eq!(variables.len(), 1);
-
-    assert_eq!(
-      variables,
-      vec![Variable {
-        attributes: vec![Attribute {
-          arguments: vec![],
-          name: TextNode {
-            value: "windows".into(),
-            range: lsp::Range::at(0, 1, 0, 8),
-          },
-          range: lsp::Range::at(0, 0, 1, 0),
-          target: Some(AttributeTarget::Assignment),
-        }],
-        content: "[windows]\nfoo := 'bar'".into(),
-        export: false,
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(1, 0, 1, 3),
-        },
-        range: lsp::Range::at(0, 0, 2, 0),
-      }]
     );
   }
 
