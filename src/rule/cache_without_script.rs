@@ -7,7 +7,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in context.recipes() {
+      for (recipe, groups) in context.recipes_with_groups() {
         let Some(cache_attribute) = recipe.find_attribute("cache") else {
           continue;
         };
@@ -15,7 +15,7 @@ define_rule! {
         if recipe.has_attribute("script")
           || (!recipe.has_attribute("shell")
             && (recipe.shebang.is_some()
-              || context.setting_enabled("default-script")))
+              || context.setting_enabled_for("default-script", groups)))
         {
           continue;
         }

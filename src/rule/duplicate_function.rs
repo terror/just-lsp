@@ -9,22 +9,19 @@ define_rule! {
       let mut groups = HashMap::<String, GroupSet>::new();
 
       context
-        .functions()
-        .iter()
-        .filter(|function| {
-          let current = GroupSet::from_attributes(&function.attributes);
-
+        .functions_with_groups()
+        .filter(|(function, current)| {
           let previous = groups
             .entry(function.name.value.clone())
             .or_default();
 
-          let duplicate = previous.conflicts_with(&current);
+          let duplicate = previous.conflicts_with(current);
 
-          previous.union_with(current);
+          previous.union_with((*current).clone());
 
           duplicate
         })
-        .map(|function| {
+        .map(|(function, _)| {
           Diagnostic::error(
             format!("Duplicate function `{}`", function.name.value),
             function.range,

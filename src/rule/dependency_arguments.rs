@@ -9,11 +9,11 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let lists = context.setting_enabled("lists");
-
       let recipe_parameters = context.recipe_parameters();
 
-      for recipe in context.recipes() {
+      for (recipe, groups) in context.recipes_with_groups() {
+        let lists = context.setting_enabled_in("lists", groups);
+
         for dependency in &recipe.dependencies {
           if let Some(parameters) = recipe_parameters.get(&dependency.name) {
             let required_parameters = parameters

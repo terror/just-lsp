@@ -10,10 +10,6 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      if context.setting_enabled("lists") {
-        return diagnostics;
-      }
-
       let Some(tree) = context.tree() else {
         return diagnostics;
       };
@@ -22,6 +18,7 @@ define_rule! {
         context,
         context.document(),
         tree.root_node(),
+        &GroupSet::from([Group::Any]),
         &mut diagnostics,
       );
 
@@ -119,8 +116,13 @@ impl ListFeaturesRule {
     context: &RuleContext<'_>,
     document: &Document,
     node: Node<'_>,
+    groups: &GroupSet,
     diagnostics: &mut Vec<Diagnostic>,
   ) {
+    if context.setting_enabled_for("lists", groups) {
+      return;
+    }
+
     match node.kind() {
       "attribute_named_param" => {
         if let Some(range) = Self::arg_flag_range(document, node) {
@@ -207,7 +209,13 @@ impl ListFeaturesRule {
       if let Ok(index) = index.try_into()
         && let Some(child) = node.child(index)
       {
-        Self::validate_node(context, document, child, diagnostics);
+        let groups = if node.parent().is_none() {
+          GroupSet::from_attributes(&document.attributes_for_node(&child))
+        } else {
+          groups.clone()
+        };
+
+        Self::validate_node(context, document, child, &groups, diagnostics);
       }
     }
   }

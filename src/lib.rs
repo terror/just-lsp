@@ -8,7 +8,7 @@ use {
     fs,
     iter::{once, successors},
     ops::{ControlFlow, RangeInclusive},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process,
     sync::OnceLock,
   },

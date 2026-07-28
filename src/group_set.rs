@@ -1,5 +1,7 @@
 use super::*;
 
+const PLATFORM_COUNT: usize = 8;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GroupSet(HashSet<Group>);
 
@@ -62,7 +64,25 @@ impl GroupSet {
 
   #[must_use]
   pub fn insert(&mut self, group: Group) -> bool {
-    self.0.insert(group)
+    if group == Group::Any {
+      let changed = self.0.len() != 1 || !self.0.contains(&Group::Any);
+
+      self.0.clear();
+      self.0.insert(Group::Any);
+
+      changed
+    } else if self.0.contains(&Group::Any) {
+      false
+    } else {
+      let inserted = self.0.insert(group);
+
+      if self.0.len() == PLATFORM_COUNT {
+        self.0.clear();
+        self.0.insert(Group::Any);
+      }
+
+      inserted
+    }
   }
 
   #[must_use]
@@ -86,49 +106,28 @@ impl GroupSet {
     self.0.is_empty()
   }
 
-  pub(crate) fn is_platform_attribute(attribute: &str) -> bool {
-    Self::from_attribute(attribute).is_some()
-  }
-
-  pub(crate) fn platform_attribute_names(
-    &self,
-  ) -> impl Iterator<Item = &'static str> {
-    self.0.iter().filter_map(|group| match group {
-      Group::Android => Some("android"),
-      Group::Any => None,
-      Group::Dragonfly => Some("dragonfly"),
-      Group::Freebsd => Some("freebsd"),
-      Group::Linux => Some("linux"),
-      Group::Macos => Some("macos"),
-      Group::Netbsd => Some("netbsd"),
-      Group::Openbsd => Some("openbsd"),
-      Group::Windows => Some("windows"),
-    })
-  }
-
   pub fn union_with(&mut self, other: Self) {
-    if self.0.contains(&Group::Any) {
-      return;
-    }
-
-    if other.0.contains(&Group::Any) {
-      self.0.clear();
-      self.0.insert(Group::Any);
-    } else {
-      self.0.extend(other.0);
+    for group in other.0 {
+      let _ = self.insert(group);
     }
   }
 }
 
 impl<const N: usize> From<[Group; N]> for GroupSet {
   fn from(groups: [Group; N]) -> Self {
-    Self(HashSet::from(groups))
+    groups.into_iter().collect()
   }
 }
 
 impl FromIterator<Group> for GroupSet {
   fn from_iter<T: IntoIterator<Item = Group>>(iter: T) -> Self {
-    Self(iter.into_iter().collect())
+    let mut groups = Self::default();
+
+    for group in iter {
+      let _ = groups.insert(group);
+    }
+
+    groups
   }
 }
 
@@ -240,6 +239,13 @@ mod tests {
         .collect::<GroupSet>(),
       GroupSet::from([Group::Linux, Group::Windows])
     );
+
+    assert_eq!(
+      [Group::Linux, Group::Any, Group::Windows]
+        .into_iter()
+        .collect::<GroupSet>(),
+      GroupSet::from([Group::Any])
+    );
   }
 
   #[test]
@@ -250,6 +256,10 @@ mod tests {
     assert!(!groups.insert(Group::Linux));
 
     assert_eq!(groups, GroupSet::from([Group::Linux]));
+
+    assert!(groups.insert(Group::Any));
+    assert!(!groups.insert(Group::Linux));
+    assert_eq!(groups, GroupSet::from([Group::Any]));
   }
 
   #[test]
@@ -295,5 +305,12 @@ mod tests {
     groups.union_with(GroupSet::from([Group::Linux]));
 
     assert_eq!(groups, GroupSet::from([Group::Any]));
+
+    let mut groups = GroupSet::from_attribute("unix").unwrap();
+
+    groups.union_with(GroupSet::from([Group::Windows]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+    assert!(groups.covers(&GroupSet::from([Group::Any])));
   }
 }

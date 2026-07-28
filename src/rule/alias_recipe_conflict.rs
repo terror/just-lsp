@@ -1,36 +1,35 @@
 use super::*;
 
 enum Item<'a> {
-  Alias(&'a Alias),
-  Recipe(&'a Recipe),
+  Alias(&'a Alias, &'a GroupSet),
+  Recipe(&'a Recipe, &'a GroupSet),
 }
 
 impl Item<'_> {
   fn conflict_message(&self, name: &str) -> String {
     match self {
-      Item::Alias(_) => format!("Alias `{name}` is redefined as a recipe"),
-      Item::Recipe(_) => format!("Recipe `{name}` is redefined as an alias"),
+      Item::Alias(..) => format!("Recipe `{name}` is redefined as an alias"),
+      Item::Recipe(..) => format!("Alias `{name}` is redefined as a recipe"),
     }
   }
 
-  fn is_same_kind(&self, other: &Self) -> bool {
-    matches!(
-      (self, other),
-      (Item::Alias(_), Item::Alias(_)) | (Item::Recipe(_), Item::Recipe(_))
-    )
+  fn groups(&self) -> &GroupSet {
+    match self {
+      Item::Alias(_, groups) | Item::Recipe(_, groups) => groups,
+    }
   }
 
   fn name(&self) -> &str {
     match self {
-      Item::Alias(alias) => &alias.name.value,
-      Item::Recipe(recipe) => &recipe.name.value,
+      Item::Alias(alias, _) => &alias.name.value,
+      Item::Recipe(recipe, _) => &recipe.name.value,
     }
   }
 
   fn range(&self) -> lsp::Range {
     match self {
-      Item::Alias(alias) => alias.name.range,
-      Item::Recipe(recipe) => recipe.name.range,
+      Item::Alias(alias, _) => alias.name.range,
+      Item::Recipe(recipe, _) => recipe.name.range,
     }
   }
 }
@@ -42,16 +41,14 @@ define_rule! {
     id: "alias-recipe-conflict",
     message: "name conflict",
     run(context) {
-      let (aliases, recipes) = (context.aliases(), context.recipes());
-
-      if aliases.is_empty() || recipes.is_empty() {
-        return Vec::new();
-      }
+      let (aliases, recipes) = (
+        context.aliases_with_groups(),
+        context.recipes_with_groups(),
+      );
 
       let mut items = aliases
-        .iter()
-        .map(Item::Alias)
-        .chain(recipes.iter().map(Item::Recipe))
+        .map(|(alias, groups)| Item::Alias(alias, groups))
+        .chain(recipes.map(|(recipe, groups)| Item::Recipe(recipe, groups)))
         .collect::<Vec<_>>();
 
       items.sort_by_key(|item| {
@@ -59,26 +56,41 @@ define_rule! {
         (range.start.line, range.start.character)
       });
 
-      items
-        .iter()
-        .fold(
-          (HashMap::<&str, &Item>::new(), Vec::new()),
-          |(mut seen, mut diagnostics), item| {
-            let name = item.name();
+      let mut aliases = HashMap::<&str, GroupSet>::new();
+      let mut recipes = HashMap::<&str, GroupSet>::new();
+      let mut diagnostics = Vec::new();
 
-            match seen.get(name) {
-              Some(first) if !first.is_same_kind(item) => {
-                diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
-              }
-              None => {
-                seen.insert(name, item);
-              }
-              _ => {}
-            }
-            (seen, diagnostics)
-          },
-        )
-        .1
+      for item in &items {
+        let name = item.name();
+
+        let opposite = match item {
+          Item::Alias(..) => &recipes,
+          Item::Recipe(..) => &aliases,
+        };
+
+        if opposite
+          .get(name)
+          .is_some_and(|groups| groups.conflicts_with(item.groups()))
+        {
+          diagnostics.push(Diagnostic::error(
+            item.conflict_message(name),
+            item.range(),
+          ));
+        }
+
+        match item {
+          Item::Alias(..) => aliases
+            .entry(name)
+            .or_default()
+            .union_with(item.groups().clone()),
+          Item::Recipe(..) => recipes
+            .entry(name)
+            .or_default()
+            .union_with(item.groups().clone()),
+        }
+      }
+
+      diagnostics
     }
   }
 }

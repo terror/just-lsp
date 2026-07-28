@@ -9,16 +9,14 @@ define_rule! {
 
       let mut groups = HashMap::<String, GroupSet>::new();
 
-      for unexport in context.unexports() {
-        let current = GroupSet::from_attributes(&unexport.attributes);
-
+      for (unexport, current) in context.unexports_with_groups() {
         let previous = groups
           .entry(unexport.name.value.clone())
           .or_default();
 
-        let duplicate = previous.conflicts_with(&current);
+        let duplicate = previous.conflicts_with(current);
 
-        previous.union_with(current);
+        previous.union_with(current.clone());
 
         if duplicate {
           diagnostics.push(Diagnostic::error(
