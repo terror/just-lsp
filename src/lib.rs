@@ -1,9 +1,10 @@
 use {
+  document_entry::DocumentEntry,
   indoc::indoc,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, hash_map::Entry},
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
@@ -33,6 +34,7 @@ pub use {
   deprecation::Deprecation,
   diagnostic::Diagnostic,
   document::Document,
+  document_store::DocumentStore,
   error::Error,
   function::Function,
   function_call::FunctionCall,
@@ -59,6 +61,7 @@ pub use {
   text_node::TextNode,
   unexport::Unexport,
   variable::Variable,
+  workspace::Workspace,
 };
 
 mod alias;
@@ -76,6 +79,8 @@ mod dependency_phase;
 mod deprecation;
 mod diagnostic;
 mod document;
+mod document_entry;
+mod document_store;
 mod error;
 mod function;
 mod function_call;
@@ -102,6 +107,7 @@ mod str_ext;
 mod text_node;
 mod unexport;
 mod variable;
+mod workspace;
 
 type Result<T = ()> = std::result::Result<T, Error>;
 

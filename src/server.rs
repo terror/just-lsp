@@ -238,8 +238,8 @@ impl LanguageServer for Server {
 pub(crate) struct Inner {
   client: Client,
   config: RwLock<Config>,
-  documents: RwLock<BTreeMap<lsp::Url, Document>>,
   initialized: AtomicBool,
+  workspace: RwLock<Workspace>,
 }
 
 impl Inner {
@@ -253,9 +253,11 @@ impl Inner {
 
     let config = self.config.read().await;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    let Some(document) = documents.get(&params.text_document.uri) else {
+    let Some(document) =
+      workspace.documents.get_open(&params.text_document.uri)
+    else {
       return Ok(None);
     };
 
@@ -299,9 +301,9 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = workspace.documents.get_open(uri) {
       let mut lenses = Vec::new();
 
       for recipe in document.recipes() {
@@ -343,9 +345,9 @@ impl Inner {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    if let Some(document) = documents.get(&uri) {
+    if let Some(document) = workspace.documents.get_open(&uri) {
       let mut completion_items = Vec::new();
 
       let recipes = document.recipes();
@@ -427,10 +429,10 @@ impl Inner {
     let mut should_publish = false;
 
     {
-      let mut documents = self.documents.write().await;
+      let mut workspace = self.workspace.write().await;
 
-      if let Some(document) = documents.get_mut(&uri) {
-        document.apply_change(params)?;
+      if workspace.documents.is_open(&uri) {
+        workspace.documents.change(params)?;
         should_publish = true;
       }
     }
@@ -445,12 +447,12 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let removed = {
-      let mut documents = self.documents.write().await;
-      documents.remove(&uri).is_some()
+    let closed = {
+      let mut workspace = self.workspace.write().await;
+      workspace.documents.close(&params)
     };
 
-    if removed {
+    if closed {
       self.client.publish_diagnostics(uri, vec![], None).await;
     }
   }
@@ -458,11 +460,9 @@ impl Inner {
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let document = Document::try_from(params)?;
-
     {
-      let mut documents = self.documents.write().await;
-      documents.insert(uri.clone(), document);
+      let mut workspace = self.workspace.write().await;
+      workspace.documents.open(params)?;
     }
 
     self.publish_diagnostics(&uri).await;
@@ -478,9 +478,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(workspace.documents.get_open(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -505,9 +505,9 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    let Some(document) = documents.get(uri) else {
+    let Some(document) = workspace.documents.get_open(uri) else {
       return Ok(None);
     };
 
@@ -550,9 +550,9 @@ impl Inner {
   ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = workspace.documents.get_open(uri) {
       let mut symbols = Vec::new();
 
       for recipe in document.recipes() {
@@ -702,9 +702,9 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    if let Some(document) = documents.get(uri) {
+    if let Some(document) = workspace.documents.get_open(uri) {
       let recipes = document.recipes();
 
       let folding_ranges = recipes
@@ -744,9 +744,11 @@ impl Inner {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let config = self.config.read().await;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    let Some(document) = documents.get(&params.text_document.uri) else {
+    let Some(document) =
+      workspace.documents.get_open(&params.text_document.uri)
+    else {
       return Ok(None);
     };
 
@@ -789,9 +791,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(workspace.documents.get_open(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -813,9 +815,9 @@ impl Inner {
 
     let position = params.text_document_position_params.position;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(workspace.documents.get_open(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -868,8 +870,8 @@ impl Inner {
     Self {
       client,
       config: RwLock::new(Config::default()),
-      documents: RwLock::new(BTreeMap::new()),
       initialized: AtomicBool::new(false),
+      workspace: RwLock::new(Workspace::default()),
     }
   }
 
@@ -879,9 +881,9 @@ impl Inner {
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(uri).and_then(|document| {
+    Ok(workspace.documents.get_open(uri).and_then(|document| {
       document
         .node_at_position(params.position)
         .filter(|node| node.kind() == "identifier")
@@ -900,10 +902,10 @@ impl Inner {
     }
 
     let (diagnostics, version) = {
-      let documents = self.documents.read().await;
+      let workspace = self.workspace.read().await;
       let config = self.config.read().await;
 
-      match documents.get(uri) {
+      match workspace.documents.get_open(uri) {
         Some(document) => {
           let analyzer = Analyzer::from(document).config(&config);
 
@@ -934,9 +936,9 @@ impl Inner {
 
     let position = params.text_document_position.position;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(workspace.documents.get_open(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -956,9 +958,9 @@ impl Inner {
 
     let new_name = params.new_name;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    Ok(documents.get(&uri).and_then(|document| {
+    Ok(workspace.documents.get_open(&uri).and_then(|document| {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
@@ -1164,9 +1166,9 @@ impl Inner {
   ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
     let uri = params.text_document.uri;
 
-    let documents = self.documents.read().await;
+    let workspace = self.workspace.read().await;
 
-    if let Some(document) = documents.get(&uri) {
+    if let Some(document) = workspace.documents.get_open(&uri) {
       let tokenizer = Tokenizer::new(document);
 
       match tokenizer.tokenize() {
