@@ -68,20 +68,15 @@ impl<'a> From<&'a Document> for ProjectView<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn document(name: &str, content: &str) -> Document {
-    Document::new(
-      content,
-      lsp::Url::parse(&format!("file:///{name}.just")).unwrap(),
-    )
-    .unwrap()
-  }
-
   #[test]
   fn finds_imported_declarations() {
-    let root = document("foo", "import 'bar.just'");
+    let root = Document::new(
+      "import 'bar.just'",
+      lsp::Url::parse("file:///foo.just").unwrap(),
+    )
+    .unwrap();
 
-    let imported = document(
-      "bar",
+    let imported = Document::new(
       indoc! {
         "
         foo:
@@ -91,7 +86,9 @@ mod tests {
         qux() := 'quux'
         "
       },
-    );
+      lsp::Url::parse("file:///bar.just").unwrap(),
+    )
+    .unwrap();
 
     let view = ProjectView::new(&root, [&imported]);
 
@@ -102,9 +99,13 @@ mod tests {
 
   #[test]
   fn prefers_current_document() {
-    let root = document("foo", "foo:");
+    let root =
+      Document::new("foo:", lsp::Url::parse("file:///foo.just").unwrap())
+        .unwrap();
 
-    let imported = document("bar", "foo:");
+    let imported =
+      Document::new("foo:", lsp::Url::parse("file:///bar.just").unwrap())
+        .unwrap();
 
     assert_eq!(
       ProjectView::new(&root, [&imported])
