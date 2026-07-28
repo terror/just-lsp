@@ -43,6 +43,8 @@ pub use {
   group::Group,
   group_set::GroupSet,
   import::Import,
+  import_scope::ImportScope,
+  import_scope_document::ImportScopeDocument,
   located::Located,
   module::Module,
   node_ext::NodeExt,
@@ -96,6 +98,8 @@ mod function_kind;
 mod group;
 mod group_set;
 mod import;
+mod import_scope;
+mod import_scope_document;
 mod located;
 mod module;
 mod node_ext;

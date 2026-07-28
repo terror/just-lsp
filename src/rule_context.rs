@@ -458,7 +458,7 @@ mod tests {
         .map(|recipe| recipe.name.value.as_str())
         .collect::<Vec<_>>();
 
-      assert_eq!(recipe_names, ["foo", "baz", "bar"]);
+      assert_eq!(recipe_names, ["foo", "bar", "baz"]);
     });
   }
 

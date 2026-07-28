@@ -4,7 +4,7 @@ use super::*;
 pub struct Project {
   pub dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   pub dependents: HashMap<lsp::Url, HashSet<lsp::Url>>,
-  pub(super) imported: Vec<lsp::Url>,
+  pub import_scope: ImportScope,
   pub root: lsp::Url,
 }
 
@@ -31,6 +31,10 @@ impl Project {
       .entry(dependency.clone())
       .or_default()
       .insert(source.clone());
+  }
+
+  pub(super) fn build_import_scope(&mut self) {
+    self.import_scope = ImportScope::from(&*self);
   }
 
   #[must_use]
@@ -62,15 +66,22 @@ impl Project {
     &'a self,
     documents: &'a DocumentStore,
   ) -> impl Iterator<Item = &'a Document> {
-    self.imported.iter().filter_map(|uri| documents.get(uri))
+    self
+      .import_scope
+      .documents()
+      .iter()
+      .skip(1)
+      .filter_map(|document| documents.get(&document.uri))
   }
 
   #[must_use]
   pub fn new(root: lsp::Url) -> Self {
+    let import_scope = ImportScope::new(root.clone());
+
     Self {
       dependencies: HashMap::new(),
       dependents: HashMap::new(),
-      imported: Vec::new(),
+      import_scope,
       root,
     }
   }
