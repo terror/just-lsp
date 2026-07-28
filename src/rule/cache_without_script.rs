@@ -4,6 +4,7 @@ define_rule! {
   CacheWithoutScriptRule {
     id: "cache-without-script",
     message: "cache without script mode",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

@@ -6,6 +6,7 @@ define_rule! {
   AttributeInvalidTargetRule {
     id: "attribute-invalid-target",
     message: "invalid attribute target",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

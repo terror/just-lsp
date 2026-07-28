@@ -5,6 +5,7 @@ define_rule! {
   DeprecatedFunctionRule {
     id: "deprecated-function",
     message: "deprecated function",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

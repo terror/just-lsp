@@ -4,6 +4,7 @@ define_rule! {
   ExitMessageConflictRule {
     id: "exit-message-conflict",
     message: "conflicting exit message attributes",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

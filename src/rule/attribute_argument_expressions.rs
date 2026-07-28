@@ -8,6 +8,7 @@ define_rule! {
   AttributeArgumentExpressionsRule {
     id: "attribute-argument-expressions",
     message: "invalid attribute argument expression",
+    phase: RulePhase::Document,
     run(context) {
       let Some(tree) = context.tree() else {
         return Vec::new();

@@ -6,6 +6,7 @@ macro_rules! define_rule {
     $name:ident {
       id: $id:literal,
       message: $message:literal,
+      phase: $phase:expr,
       run($context:ident) $body:block
       $(, quickfixes($quickfix_context:ident) $quickfix_body:block)?
       $(,)?
@@ -21,6 +22,10 @@ macro_rules! define_rule {
 
       fn message(&self) -> &'static str {
         $message
+      }
+
+      fn phase(&self) -> RulePhase {
+        $phase
       }
 
       $(
@@ -101,6 +106,9 @@ pub trait Rule: Sync {
 
   /// What to show the user in the header of the diagnostics.
   fn message(&self) -> &'static str;
+
+  /// The scope in which the rule should execute exactly once.
+  fn phase(&self) -> RulePhase;
 
   /// Return quickfixes that can be applied for diagnostics produced by this rule.
   fn quickfixes(&self, _context: &RuleContext<'_>) -> Vec<Quickfix> {

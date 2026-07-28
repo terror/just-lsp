@@ -15,6 +15,15 @@ impl Analyzer<'_> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
+    self.analyze_rules(None)
+  }
+
+  #[must_use]
+  pub fn analyze_phase(&self, phase: RulePhase) -> Vec<Diagnostic> {
+    self.analyze_rules(Some(phase))
+  }
+
+  fn analyze_rules(&self, phase: Option<RulePhase>) -> Vec<Diagnostic> {
     let context =
       RuleContext::new(self.document, self.imported_documents.iter().copied());
 
@@ -25,6 +34,10 @@ impl Analyzer<'_> {
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
       .flat_map(|rule| {
+        if phase.is_some_and(|phase| rule.phase() != phase) {
+          return Vec::new();
+        }
+
         let rule_config = config.rule_config(rule.id());
 
         if !rule.enabled(&rule_config) {
@@ -358,6 +371,80 @@ mod tests {
       lsp::Range::at(6, 13, 6, 24),
     )
     .run();
+  }
+
+  #[test]
+  fn analyze_phase_selects_rules_and_preserves_configuration() {
+    let document = Test::new(indoc! {
+      "
+      [unknown]
+      [linux('foo')]
+      bar: baz
+
+      bar:
+      "
+    })
+    .document;
+
+    let config = Config {
+      rules: HashMap::from([
+        (
+          "attribute-arguments".to_string(),
+          RuleConfig::Level(RuleLevel::Warning),
+        ),
+        (
+          "duplicate-recipes".to_string(),
+          RuleConfig::Level(RuleLevel::Off),
+        ),
+        (
+          "missing-dependencies".to_string(),
+          RuleConfig::Level(RuleLevel::Information),
+        ),
+        (
+          "unknown-attribute".to_string(),
+          RuleConfig::Level(RuleLevel::Off),
+        ),
+      ]),
+      ..Config::default()
+    };
+
+    let analyzer = Analyzer {
+      config: Some(&config),
+      document: &document,
+      imported_documents: Vec::new(),
+    };
+
+    let document_diagnostics = analyzer.analyze_phase(RulePhase::Document);
+
+    assert_eq!(
+      document_diagnostics
+        .iter()
+        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
+        .collect::<Vec<_>>(),
+      [("attribute-arguments", lsp::DiagnosticSeverity::WARNING)],
+    );
+
+    let project_diagnostics = analyzer.analyze_phase(RulePhase::Project);
+
+    assert_eq!(
+      project_diagnostics
+        .iter()
+        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
+        .collect::<Vec<_>>(),
+      [("missing-dependencies", lsp::DiagnosticSeverity::INFORMATION)],
+    );
+
+    assert_eq!(
+      analyzer
+        .analyze()
+        .iter()
+        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
+        .collect::<Vec<_>>(),
+      [
+        ("attribute-arguments", lsp::DiagnosticSeverity::WARNING),
+        ("missing-dependencies", lsp::DiagnosticSeverity::INFORMATION),
+      ],
+    );
   }
 
   #[test]

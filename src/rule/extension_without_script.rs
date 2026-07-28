@@ -5,6 +5,7 @@ define_rule! {
   ExtensionWithoutScriptRule {
     id: "extension-without-script",
     message: "extension without script",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

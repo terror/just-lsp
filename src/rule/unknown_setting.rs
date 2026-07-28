@@ -6,6 +6,7 @@ define_rule! {
   UnknownSettingRule {
     id: "unknown-setting",
     message: "unknown setting",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

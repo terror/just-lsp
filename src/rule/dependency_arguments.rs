@@ -6,6 +6,7 @@ define_rule! {
   DependencyArgumentRule {
     id: "dependency-arguments",
     message: "invalid dependency arguments",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

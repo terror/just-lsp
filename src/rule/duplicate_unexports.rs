@@ -4,6 +4,7 @@ define_rule! {
   DuplicateUnexportRule {
     id: "duplicate-unexport",
     message: "duplicate unexport",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

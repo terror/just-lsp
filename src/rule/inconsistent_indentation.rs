@@ -83,6 +83,7 @@ define_rule! {
   InconsistentIndentationRule {
     id: "inconsistent-recipe-indentation",
     message: "inconsistent indentation",
+    phase: RulePhase::Document,
     run(context) {
       context
         .recipes()

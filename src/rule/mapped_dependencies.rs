@@ -4,6 +4,7 @@ define_rule! {
   MappedDependenciesRule {
     id: "mapped-dependencies",
     message: "invalid mapped dependency",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

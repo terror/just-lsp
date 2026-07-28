@@ -5,6 +5,7 @@ define_rule! {
   ScriptShebangConflictRule {
     id: "script-shebang-conflict",
     message: "shebang conflict",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

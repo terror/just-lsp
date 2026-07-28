@@ -6,6 +6,7 @@ define_rule! {
   InvalidSettingKindRule {
     id: "invalid-setting-kind",
     message: "invalid setting kind",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

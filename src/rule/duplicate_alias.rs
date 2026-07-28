@@ -5,6 +5,7 @@ define_rule! {
   DuplicateAliasRule {
     id: "duplicate-alias",
     message: "duplicate alias",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

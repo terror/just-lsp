@@ -5,6 +5,7 @@ define_rule! {
   DuplicateSettingRule {
     id: "duplicate-setting",
     message: "duplicate setting",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

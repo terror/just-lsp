@@ -6,6 +6,7 @@ define_rule! {
   DuplicateVariableRule {
     id: "duplicate-variable",
     message: "duplicate variable",
+    phase: RulePhase::Project,
     run(context) {
       let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
 

@@ -5,6 +5,7 @@ define_rule! {
   DuplicateFunctionRule {
     id: "duplicate-function",
     message: "duplicate function",
+    phase: RulePhase::Project,
     run(context) {
       let mut groups = HashMap::<String, GroupSet>::new();
 

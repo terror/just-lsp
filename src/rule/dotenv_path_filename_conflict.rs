@@ -4,6 +4,7 @@ define_rule! {
   DotenvPathFilenameConflictRule {
     id: "dotenv-path-filename-conflict",
     message: "conflicting dotenv settings",
+    phase: RulePhase::Project,
     run(context) {
       let dotenv_path = context
         .settings()

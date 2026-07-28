@@ -11,6 +11,7 @@ define_rule! {
   ArgAttributeRule {
     id: "arg-attribute",
     message: "invalid arg attribute",
+    phase: RulePhase::Document,
     run(context) {
       let Some(tree) = context.tree() else {
         return Vec::new();

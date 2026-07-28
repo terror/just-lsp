@@ -5,6 +5,7 @@ define_rule! {
   FunctionParametersRule {
     id: "function-parameters",
     message: "invalid function parameters",
+    phase: RulePhase::Document,
     run(context) {
       context
         .functions()

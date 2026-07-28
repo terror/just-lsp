@@ -6,6 +6,7 @@ define_rule! {
   AttributeArgumentsRule {
     id: "attribute-arguments",
     message: "invalid attribute arguments",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

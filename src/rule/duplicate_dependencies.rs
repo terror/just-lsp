@@ -20,6 +20,7 @@ define_rule! {
   DuplicateDependenciesRule {
     id: "duplicate-dependencies",
     message: "duplicate dependencies",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

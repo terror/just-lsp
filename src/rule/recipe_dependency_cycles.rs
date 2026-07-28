@@ -6,6 +6,7 @@ define_rule! {
   RecipeDependencyCycleRule {
     id: "recipe-dependency-cycles",
     message: "circular dependency",
+    phase: RulePhase::Project,
     run(context) {
       let mut dependency_graph = HashMap::new();
       let mut diagnostics = Vec::new();

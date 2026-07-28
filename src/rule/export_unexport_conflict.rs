@@ -4,6 +4,7 @@ define_rule! {
   ExportUnexportConflictRule {
     id: "export-unexport-conflict",
     message: "export/unexport conflict",
+    phase: RulePhase::Project,
     run(context) {
       let mut unexports = HashMap::<String, GroupSet>::new();
 

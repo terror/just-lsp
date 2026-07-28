@@ -6,6 +6,7 @@ define_rule! {
   UnusedParameterRule {
     id: "unused-parameters",
     message: "unused parameter",
+    phase: RulePhase::Project,
     run(context) {
       let exported = context.setting_enabled("export");
 

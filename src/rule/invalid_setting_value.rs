@@ -45,6 +45,7 @@ define_rule! {
   InvalidSettingValueRule {
     id: "invalid-setting-value",
     message: "invalid setting value",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

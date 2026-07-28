@@ -6,6 +6,7 @@ define_rule! {
   UnknownFunctionRule {
     id: "unknown-function",
     message: "unknown function",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

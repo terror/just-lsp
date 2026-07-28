@@ -6,6 +6,7 @@ define_rule! {
   SyntaxRule {
     id: "syntax-errors",
     message: "syntax errors",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

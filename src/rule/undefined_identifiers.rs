@@ -6,6 +6,7 @@ define_rule! {
   UndefinedIdentifierRule {
     id: "undefined-identifiers",
     message: "undefined identifier",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 
