@@ -8,58 +8,25 @@ pub struct ProjectLoader<'a> {
 }
 
 impl<'a> ProjectLoader<'a> {
+  fn add_dependent(&mut self, dependency: &lsp::Url, source: &lsp::Url) {
+    self
+      .project
+      .dependents
+      .entry(dependency.clone())
+      .or_default()
+      .insert(source.clone());
+  }
+
   fn dependency(&mut self, source: &lsp::Url, import: Import) -> Result {
-    let dynamic =
-      import.path.value.starts_with('f') || import.path.value.starts_with('x');
+    let target = self.resolve_dependency_target(source, &import)?;
 
-    let path = import.resolve(source);
-
-    let kind = ProjectDependencyKind::Import {
-      attributes: import.attributes,
-      optional: import.optional,
-    };
-
-    let target = if dynamic {
-      ProjectDependencyTarget::Dynamic
-    } else if let Some(path) = path {
-      let path = path.as_path().lexiclean();
-
-      if let Ok(uri) = lsp::Url::from_file_path(&path) {
-        if self.active.contains(&uri) {
-          self
-            .project
-            .dependents
-            .entry(uri)
-            .or_default()
-            .insert(source.clone());
-
-          ProjectDependencyTarget::Cycle
-        } else if self.documents.load(&uri).is_ok() {
-          self
-            .project
-            .dependents
-            .entry(uri.clone())
-            .or_default()
-            .insert(source.clone());
-
-          if !self.visited.contains(&uri) {
-            self.visit(&uri)?;
-            self.project.imported.push(uri.clone());
-          }
-
-          ProjectDependencyTarget::Resolved(uri)
-        } else {
-          if !import.optional {
-            warn!(path = %path.display(), "failed to read import");
-          }
-
-          ProjectDependencyTarget::Missing
-        }
-      } else {
-        ProjectDependencyTarget::Missing
-      }
-    } else {
-      ProjectDependencyTarget::Missing
+    let dependency = ProjectDependency {
+      kind: ProjectDependencyKind::Import {
+        attributes: import.attributes,
+        optional: import.optional,
+      },
+      location: import.path.range,
+      target,
     };
 
     self
@@ -67,11 +34,7 @@ impl<'a> ProjectLoader<'a> {
       .dependencies
       .entry(source.clone())
       .or_default()
-      .push(ProjectDependency {
-        kind,
-        location: import.path.range,
-        target,
-      });
+      .push(dependency);
 
     Ok(())
   }
@@ -100,6 +63,48 @@ impl<'a> ProjectLoader<'a> {
     loader.visit(root)?;
 
     Ok(loader.project)
+  }
+
+  fn resolve_dependency_target(
+    &mut self,
+    source: &lsp::Url,
+    import: &Import,
+  ) -> Result<ProjectDependencyTarget> {
+    if import.path.value.starts_with(['f', 'x']) {
+      return Ok(ProjectDependencyTarget::Dynamic);
+    }
+
+    let Some(path) = import.resolve(source) else {
+      return Ok(ProjectDependencyTarget::Missing);
+    };
+
+    let path = path.as_path().lexiclean();
+
+    let Ok(uri) = lsp::Url::from_file_path(&path) else {
+      return Ok(ProjectDependencyTarget::Missing);
+    };
+
+    if self.active.contains(&uri) {
+      self.add_dependent(&uri, source);
+      return Ok(ProjectDependencyTarget::Cycle);
+    }
+
+    if self.documents.load(&uri).is_err() {
+      if !import.optional {
+        warn!(path = %path.display(), "failed to read import");
+      }
+
+      return Ok(ProjectDependencyTarget::Missing);
+    }
+
+    self.add_dependent(&uri, source);
+
+    if !self.visited.contains(&uri) {
+      self.visit(&uri)?;
+      self.project.imported.push(uri.clone());
+    }
+
+    Ok(ProjectDependencyTarget::Resolved(uri))
   }
 
   fn visit(&mut self, uri: &lsp::Url) -> Result {
