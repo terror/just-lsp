@@ -46,12 +46,11 @@ impl Workspace {
   pub fn project_view(&self, uri: &lsp::Url) -> Option<ProjectView<'_>> {
     let document = self.documents.get_open(uri)?;
 
-    let imported_documents = self
-      .projects
-      .get(uri)
-      .into_iter()
-      .flat_map(|project| project.imported_documents(&self.documents));
-
-    Some(ProjectView::new(document, imported_documents))
+    Some(self.projects.get(uri).map_or_else(
+      || ProjectView::from(document),
+      |project| {
+        ProjectView::new(document, &project.import_scope, &self.documents)
+      },
+    ))
   }
 }
