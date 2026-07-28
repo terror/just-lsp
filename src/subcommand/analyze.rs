@@ -61,8 +61,11 @@ impl Analyze {
       .into_iter()
       .flat_map(|project| project.imported_documents(&workspace.documents));
 
-    let analyzer =
-      Analyzer::from(document).imported_documents(imported_documents);
+    let analyzer = Analyzer {
+      config: None,
+      document,
+      imported_documents: imported_documents.collect(),
+    };
 
     let diagnostics = analyzer.analyze();
 

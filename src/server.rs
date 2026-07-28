@@ -925,9 +925,11 @@ impl Inner {
               project.imported_documents(&workspace.documents)
             });
 
-          let analyzer = Analyzer::from(document)
-            .imported_documents(imported_documents)
-            .config(&config);
+          let analyzer = Analyzer {
+            config: Some(&config),
+            document,
+            imported_documents: imported_documents.collect(),
+          };
 
           (
             analyzer

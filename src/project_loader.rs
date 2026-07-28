@@ -140,10 +140,13 @@ mod tests {
     let document = documents.get(&root).unwrap();
 
     assert!(
-      Analyzer::from(document)
-        .imported_documents(project.imported_documents(&documents))
-        .analyze()
-        .is_empty()
+      Analyzer {
+        config: None,
+        document,
+        imported_documents: project.imported_documents(&documents).collect(),
+      }
+      .analyze()
+      .is_empty()
     );
   }
 
