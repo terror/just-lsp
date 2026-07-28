@@ -828,17 +828,15 @@ impl Inner {
       )));
     }
 
-    Ok(workspace.documents.get_open(&uri).and_then(|document| {
-      document
+    Ok(workspace.project_view(&uri).and_then(|view| {
+      let identifier = view
+        .document()
         .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| {
-          let resolver = Resolver::new(document);
+        .filter(|node| node.kind() == "identifier")?;
 
-          resolver
-            .resolve_identifier_definition(&identifier)
-            .map(lsp::GotoDefinitionResponse::Scalar)
-        })
+      Resolver::new(view)
+        .resolve_identifier_definition(&identifier)
+        .map(lsp::GotoDefinitionResponse::Scalar)
     }))
   }
 
@@ -852,13 +850,13 @@ impl Inner {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.documents.get_open(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
-
-      document
+    Ok(workspace.project_view(&uri).and_then(|view| {
+      let identifier = view
+        .document()
         .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| resolver.resolve_identifier_hover(&identifier))
+        .filter(|node| node.kind() == "identifier")?;
+
+      Resolver::new(view).resolve_identifier_hover(&identifier)
     }))
   }
 
@@ -2211,6 +2209,210 @@ mod tests {
         start_char: 0,
         end_line: 0,
         end_char: 0,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn imported_symbol_navigation() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("foo.just");
+
+    std::fs::write(
+      &target,
+      indoc! {
+        "
+        qux:
+          echo foo
+
+        bar := 'baz'
+
+        qux() := 'quux'
+        "
+      },
+    )?;
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+    let target = lsp::Url::from_file_path(target).unwrap();
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: indoc! {
+          "
+          import 'foo.just'
+
+          foo bar='local': qux
+            echo {{ bar }}
+            echo {{ qux() }}
+
+          baz:
+            echo {{ bar }}
+          "
+        },
+      })
+      .request(GotoDefinitionRequest {
+        id: 2,
+        uri: root.as_str(),
+        line: 2,
+        character: 18,
+      })
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: target.as_str(),
+        start_line: 0,
+        start_char: 0,
+        end_line: 3,
+        end_char: 0,
+      })
+      .request(GotoDefinitionRequest {
+        id: 3,
+        uri: root.as_str(),
+        line: 4,
+        character: 11,
+      })
+      .response(GotoDefinitionResponse {
+        id: 3,
+        uri: target.as_str(),
+        start_line: 5,
+        start_char: 0,
+        end_line: 5,
+        end_char: 3,
+      })
+      .request(GotoDefinitionRequest {
+        id: 4,
+        uri: root.as_str(),
+        line: 7,
+        character: 11,
+      })
+      .response(GotoDefinitionResponse {
+        id: 4,
+        uri: target.as_str(),
+        start_line: 3,
+        start_char: 0,
+        end_line: 4,
+        end_char: 0,
+      })
+      .request(HoverRequest {
+        id: 5,
+        uri: root.as_str(),
+        line: 2,
+        character: 18,
+      })
+      .response(HoverResponse {
+        id: 5,
+        content: "qux:\n  echo foo",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 17,
+        end_line: 2,
+        end_char: 20,
+      })
+      .request(HoverRequest {
+        id: 6,
+        uri: root.as_str(),
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 6,
+        content: "qux() := 'quux'",
+        kind: "plaintext",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
+        end_char: 13,
+      })
+      .request(HoverRequest {
+        id: 7,
+        uri: root.as_str(),
+        line: 7,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 7,
+        content: "bar := 'baz'",
+        kind: "plaintext",
+        start_line: 7,
+        start_char: 10,
+        end_line: 7,
+        end_char: 13,
+      })
+      .request(HoverRequest {
+        id: 8,
+        uri: root.as_str(),
+        line: 3,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 8,
+        content: "bar='local'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 10,
+        end_line: 3,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn imported_symbol_navigation_uses_open_buffer() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("foo.just");
+
+    std::fs::write(&target, "foo:\n  echo disk")?;
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+    let target = lsp::Url::from_file_path(target).unwrap();
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'\n\nbar: foo",
+      })
+      .notification(DidOpenNotification {
+        uri: target.as_str(),
+        text: "\nfoo:\n  echo buffer",
+      })
+      .request(GotoDefinitionRequest {
+        id: 2,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: target.as_str(),
+        start_line: 1,
+        start_char: 0,
+        end_line: 2,
+        end_char: 13,
+      })
+      .request(HoverRequest {
+        id: 3,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 3,
+        content: "foo:\n  echo buffer",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 5,
+        end_line: 2,
+        end_char: 8,
       })
       .run()
       .await

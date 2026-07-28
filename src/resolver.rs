@@ -2,14 +2,14 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Resolver<'a> {
-  document: &'a Document,
+  view: ProjectView<'a>,
 }
 
 impl<'a> Resolver<'a> {
-  /// Creates a new `Resolver` bound to the given `Document`.
+  /// Creates a new `Resolver` bound to the given `ProjectView`.
   #[must_use]
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
+  pub(crate) fn new(view: impl Into<ProjectView<'a>>) -> Self {
+    Self { view: view.into() }
   }
 
   /// Returns the definition site of the symbol that `identifier` refers
@@ -21,17 +21,23 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
-    Some(lsp::Location {
-      range: match self.resolve_symbol(identifier)? {
-        Symbol::Builtin(_) => identifier.get_range(self.document),
-        Symbol::Function(function) => function.name.range,
-        Symbol::FunctionParameter(parameter) => parameter.range,
-        Symbol::Parameter(parameter) => parameter.range,
-        Symbol::Recipe(recipe) => recipe.range,
-        Symbol::Variable(variable) => variable.range,
-      },
-      uri: self.document.uri.clone(),
-    })
+    let (uri, range) = match self.resolve_symbol(identifier)? {
+      Symbol::Builtin(_) => (
+        self.view.document().uri.clone(),
+        identifier.get_range(self.view.document()),
+      ),
+      Symbol::Function(function) => (function.uri, function.value.name.range),
+      Symbol::FunctionParameter(parameter) => {
+        (self.view.document().uri.clone(), parameter.range)
+      }
+      Symbol::Parameter(parameter) => {
+        (self.view.document().uri.clone(), parameter.range)
+      }
+      Symbol::Recipe(recipe) => (recipe.uri, recipe.value.range),
+      Symbol::Variable(variable) => (variable.uri, variable.value.range),
+    };
+
+    Some(lsp::Location { uri, range })
   }
 
   /// Builds hover content for the symbol at `identifier`. User-defined
@@ -48,7 +54,7 @@ impl<'a> Resolver<'a> {
           Symbol::Builtin(builtin) => builtin.description(),
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: function.content,
+            value: function.value.content,
           },
           Symbol::FunctionParameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
@@ -60,15 +66,15 @@ impl<'a> Resolver<'a> {
           },
           Symbol::Recipe(recipe) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
+            value: recipe.value.content,
           },
           Symbol::Variable(variable) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: variable.content,
+            value: variable.value.content,
           },
         },
       ),
-      range: Some(identifier.get_range(self.document)),
+      range: Some(identifier.get_range(self.view.document())),
     })
   }
 
@@ -85,13 +91,13 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
-    let name = self.document.get_node_text(identifier);
+    let name = self.view.document().get_node_text(identifier);
 
     let Some(symbol) = self.resolve_symbol(identifier) else {
       return Vec::new();
     };
 
-    let root = match &self.document.tree {
+    let root = match &self.view.document().tree {
       Some(tree) => tree.root_node(),
       None => return Vec::new(),
     };
@@ -104,7 +110,7 @@ impl<'a> Resolver<'a> {
           return true;
         }
 
-        if self.document.get_node_text(candidate) != name {
+        if self.view.document().get_node_text(candidate) != name {
           return false;
         }
 
@@ -164,12 +170,14 @@ impl<'a> Resolver<'a> {
               .or_else(|| candidate.get_parent("variadic_parameter"));
 
             if let Some(containing_parameter) = containing_parameter {
-              let containing_parameter_name = self.document.get_node_text(
-                &containing_parameter.find("identifier").unwrap(),
-              );
+              let containing_parameter_name =
+                self.view.document().get_node_text(
+                  &containing_parameter.find("identifier").unwrap(),
+                );
 
-              let shadowed_by_preceding_parameter =
-                candidate.get_recipe(self.document).is_some_and(|recipe| {
+              let shadowed_by_preceding_parameter = candidate
+                .get_recipe(self.view.document())
+                .is_some_and(|recipe| {
                   recipe
                     .parameters
                     .iter()
@@ -182,14 +190,15 @@ impl<'a> Resolver<'a> {
               return !shadowed_by_preceding_parameter;
             }
 
-            if let Some(recipe) = candidate.get_recipe(self.document) {
+            if let Some(recipe) = candidate.get_recipe(self.view.document()) {
               return !recipe
                 .parameters
                 .iter()
                 .any(|parameter| parameter.name == name);
             }
 
-            if let Some(function) = candidate.get_function(self.document) {
+            if let Some(function) = candidate.get_function(self.view.document())
+            {
               return !function
                 .parameters
                 .iter()
@@ -201,8 +210,8 @@ impl<'a> Resolver<'a> {
         }
       })
       .map(|found| lsp::Location {
-        uri: self.document.uri.clone(),
-        range: found.get_range(self.document),
+        uri: self.view.document().uri.clone(),
+        range: found.get_range(self.view.document()),
       })
       .collect()
   }
@@ -217,7 +226,7 @@ impl<'a> Resolver<'a> {
   /// through the document so that callers receive a fully-populated
   /// [`Symbol`] rather than a raw range.
   fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
-    let name = self.document.get_node_text(identifier);
+    let name = self.view.document().get_node_text(identifier);
 
     let parent_kind = identifier.parent()?.kind();
 
@@ -233,12 +242,12 @@ impl<'a> Resolver<'a> {
 
     match parent_kind {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        self.document.find_recipe(&name).map(Symbol::Recipe)
+        self.view.find_recipe(&name).map(Symbol::Recipe)
       }
-      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "assignment" => self.view.find_variable(&name).map(Symbol::Variable),
       "function_call" | "assert_expression" => {
         self
-          .document
+          .view
           .find_function(&name)
           .map(Symbol::Function)
           .or_else(|| {
@@ -253,28 +262,28 @@ impl<'a> Resolver<'a> {
           })
       }
       "function_definition" => {
-        self.document.find_function(&name).map(Symbol::Function)
+        self.view.find_function(&name).map(Symbol::Function)
       }
-      "function_parameters" => {
-        identifier.get_function(self.document).and_then(|function| {
+      "function_parameters" => identifier
+        .get_function(self.view.document())
+        .and_then(|function| {
           function
             .parameters
             .iter()
             .find(|parameter| parameter.value == name)
             .cloned()
             .map(Symbol::FunctionParameter)
-        })
-      }
-      "parameter" | "variadic_parameter" => {
-        identifier.get_recipe(self.document).and_then(|recipe| {
+        }),
+      "parameter" | "variadic_parameter" => identifier
+        .get_recipe(self.view.document())
+        .and_then(|recipe| {
           recipe
             .parameters
             .iter()
             .find(|parameter| parameter.name == name)
             .cloned()
             .map(Symbol::Parameter)
-        })
-      }
+        }),
       "value" => {
         let containing_parameter = identifier
           .get_parent("parameter")
@@ -282,7 +291,7 @@ impl<'a> Resolver<'a> {
 
         match containing_parameter {
           None => identifier
-            .get_recipe(self.document)
+            .get_recipe(self.view.document())
             .and_then(|recipe| {
               recipe
                 .parameters
@@ -292,26 +301,27 @@ impl<'a> Resolver<'a> {
                 .map(Symbol::Parameter)
             })
             .or_else(|| {
-              identifier.get_function(self.document).and_then(|function| {
-                function
-                  .parameters
-                  .iter()
-                  .find(|parameter| parameter.value == name)
-                  .cloned()
-                  .map(Symbol::FunctionParameter)
-              })
+              identifier.get_function(self.view.document()).and_then(
+                |function| {
+                  function
+                    .parameters
+                    .iter()
+                    .find(|parameter| parameter.value == name)
+                    .cloned()
+                    .map(Symbol::FunctionParameter)
+                },
+              )
             })
-            .or_else(|| {
-              self.document.find_variable(&name).map(Symbol::Variable)
-            })
+            .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
             .or_else(|| builtin_constant(&name)),
           Some(containing_parameter) => {
             let containing_parameter_name = self
-              .document
+              .view
+              .document()
               .get_node_text(&containing_parameter.find("identifier")?);
 
             identifier
-              .get_recipe(self.document)
+              .get_recipe(self.view.document())
               .and_then(|recipe| {
                 recipe
                   .parameters
@@ -323,9 +333,7 @@ impl<'a> Resolver<'a> {
                   .cloned()
                   .map(Symbol::Parameter)
               })
-              .or_else(|| {
-                self.document.find_variable(&name).map(Symbol::Variable)
-              })
+              .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
               .or_else(|| builtin_constant(&name))
           }
         }
