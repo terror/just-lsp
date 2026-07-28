@@ -218,6 +218,15 @@ fn analyze_accepts_clean_justfile() -> Result {
 }
 
 #[test]
+fn analyze_accepts_imported_recipe() -> Result {
+  Test::new()?
+    .file("foo.just", "foo:\n")
+    .file("justfile", "import 'foo.just'\n\nbar: foo\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")

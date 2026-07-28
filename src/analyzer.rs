@@ -2,20 +2,12 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Analyzer<'a> {
-  config: Option<&'a Config>,
-  document: &'a Document,
+  pub config: Option<&'a Config>,
+  pub document: &'a Document,
+  pub imported_documents: Vec<&'a Document>,
 }
 
-impl<'a> From<&'a Document> for Analyzer<'a> {
-  fn from(document: &'a Document) -> Self {
-    Self {
-      config: None,
-      document,
-    }
-  }
-}
-
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
   /// Run all registered rules against the document.
   ///
   /// Rules that return `None` from `severity()` are filtered out, so
@@ -23,7 +15,8 @@ impl<'a> Analyzer<'a> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    let context = RuleContext::new(self.document);
+    let context =
+      RuleContext::new(self.document, self.imported_documents.iter().copied());
 
     let default = Config::default();
 
@@ -63,18 +56,6 @@ impl<'a> Analyzer<'a> {
     });
 
     diagnostics
-  }
-
-  /// Set the config for rule severity overrides.
-  ///
-  /// When no config is set, `Config::default()` is used, which leaves
-  /// all rule severities at their built-in defaults.
-  #[must_use]
-  pub fn config(self, config: &'a Config) -> Self {
-    Self {
-      config: Some(config),
-      ..self
-    }
   }
 }
 
@@ -138,7 +119,11 @@ mod tests {
         messages,
       } = self;
 
-      let analyzer = Analyzer::from(&document).config(&config);
+      let analyzer = Analyzer {
+        config: Some(&config),
+        document: &document,
+        imported_documents: Vec::new(),
+      };
 
       let diagnostics = analyzer
         .analyze()

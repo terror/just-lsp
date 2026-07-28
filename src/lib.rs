@@ -1,6 +1,7 @@
 use {
   document_entry::DocumentEntry,
   indoc::indoc,
+  lexiclean::Lexiclean,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
@@ -47,6 +48,11 @@ pub use {
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
+  project::Project,
+  project_dependency::ProjectDependency,
+  project_dependency_kind::ProjectDependencyKind,
+  project_dependency_target::ProjectDependencyTarget,
+  project_loader::ProjectLoader,
   quickfix::Quickfix,
   quickfixer::Quickfixer,
   range_ext::RangeExt,
@@ -93,6 +99,11 @@ mod node_ext;
 mod parameter;
 mod point_ext;
 mod position_ext;
+mod project;
+mod project_dependency;
+mod project_dependency_kind;
+mod project_dependency_target;
+mod project_loader;
 mod quickfix;
 mod quickfixer;
 mod range_ext;

@@ -15,7 +15,6 @@ use {
     collections::HashMap,
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs,
     io::{self, stderr},
     path::PathBuf,
     process,
