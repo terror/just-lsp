@@ -1,5 +1,5 @@
 use {
-  just_lsp::{Analyzer, Document},
+  just_lsp::{Analyzer, AnalyzerSource, Document},
   serde::Serialize,
   tower_lsp::lsp_types::DiagnosticSeverity,
   typeshare::typeshare,
@@ -26,27 +26,33 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
   let document = Document::from(source);
 
   serde_wasm_bindgen::to_value(
-    &Analyzer {
-      config: None,
-      document: &document,
-      imported_documents: Vec::new(),
-    }
+    &Analyzer::new(
+      None,
+      AnalyzerSource::Document {
+        document: &document,
+        imported_documents: Vec::new(),
+      },
+    )
     .analyze()
     .into_iter()
-    .map(|diagnostic| Diagnostic {
-      end_character: diagnostic.range.end.character,
-      end_line: diagnostic.range.end.line,
-      id: diagnostic.id,
-      message: diagnostic.message,
-      severity: match diagnostic.severity {
-        DiagnosticSeverity::ERROR => "error",
-        DiagnosticSeverity::HINT => "hint",
-        DiagnosticSeverity::INFORMATION => "information",
-        DiagnosticSeverity::WARNING => "warning",
-        _ => "unknown",
-      },
-      start_character: diagnostic.range.start.character,
-      start_line: diagnostic.range.start.line,
+    .map(|diagnostic| {
+      let diagnostic = diagnostic.value;
+
+      Diagnostic {
+        end_character: diagnostic.range.end.character,
+        end_line: diagnostic.range.end.line,
+        id: diagnostic.id,
+        message: diagnostic.message,
+        severity: match diagnostic.severity {
+          DiagnosticSeverity::ERROR => "error",
+          DiagnosticSeverity::HINT => "hint",
+          DiagnosticSeverity::INFORMATION => "information",
+          DiagnosticSeverity::WARNING => "warning",
+          _ => "unknown",
+        },
+        start_character: diagnostic.range.start.character,
+        start_line: diagnostic.range.start.line,
+      }
     })
     .collect::<Vec<_>>(),
   )

@@ -35,9 +35,9 @@ impl Analyzer<'_> {
           .collect()
       }
       AnalyzerSource::Project { documents, project } => {
-        let root_document = documents
-          .get(&project.root)
-          .expect("project root document must be loaded");
+        let Some(root_document) = documents.get(&project.root) else {
+          return Vec::new();
+        };
 
         let scope_documents = project
           .import_scope
