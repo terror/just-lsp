@@ -969,13 +969,13 @@ impl Inner {
               project.imported_documents(&workspace.documents)
             });
 
-          let analyzer = Analyzer::new(
-            Some(&config),
-            AnalyzerSource::Document {
+          let analyzer = Analyzer {
+            config: Some(&config),
+            source: AnalyzerSource::Document {
               document,
               imported_documents: imported_documents.collect(),
             },
-          );
+          };
 
           (
             analyzer

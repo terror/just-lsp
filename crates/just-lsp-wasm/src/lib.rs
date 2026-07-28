@@ -26,13 +26,13 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
   let document = Document::from(source);
 
   serde_wasm_bindgen::to_value(
-    &Analyzer::new(
-      None,
-      AnalyzerSource::Document {
+    &Analyzer {
+      config: None,
+      source: AnalyzerSource::Document {
         document: &document,
         imported_documents: Vec::new(),
       },
-    )
+    }
     .analyze()
     .into_iter()
     .map(|diagnostic| {

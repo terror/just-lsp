@@ -2,8 +2,8 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Analyzer<'a> {
-  config: Option<&'a Config>,
-  source: AnalyzerSource<'a>,
+  pub config: Option<&'a Config>,
+  pub source: AnalyzerSource<'a>,
 }
 
 impl Analyzer<'_> {
@@ -85,14 +85,6 @@ impl Analyzer<'_> {
         diagnostics
       }
     }
-  }
-
-  #[must_use]
-  pub fn new<'a>(
-    config: Option<&'a Config>,
-    source: AnalyzerSource<'a>,
-  ) -> Analyzer<'a> {
-    Analyzer { config, source }
   }
 
   fn run(
@@ -205,13 +197,13 @@ mod tests {
         messages,
       } = self;
 
-      let analyzer = Analyzer::new(
-        Some(&config),
-        AnalyzerSource::Document {
+      let analyzer = Analyzer {
+        config: Some(&config),
+        source: AnalyzerSource::Document {
           document: &document,
           imported_documents: Vec::new(),
         },
-      );
+      };
 
       let diagnostics = analyzer
         .analyze()
@@ -483,13 +475,13 @@ mod tests {
       ..Config::default()
     };
 
-    let analyzer = Analyzer::new(
-      Some(&config),
-      AnalyzerSource::Document {
+    let analyzer = Analyzer {
+      config: Some(&config),
+      source: AnalyzerSource::Document {
         document: &document,
         imported_documents: Vec::new(),
       },
-    );
+    };
 
     assert_eq!(
       analyzer

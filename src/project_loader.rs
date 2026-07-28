@@ -170,15 +170,15 @@ mod tests {
     let project = test.load();
 
     assert!(
-      Analyzer::new(
-        None,
-        AnalyzerSource::Document {
+      Analyzer {
+        config: None,
+        source: AnalyzerSource::Document {
           document: test.documents.get(&test.root).unwrap(),
           imported_documents: project
             .imported_documents(&test.documents)
             .collect(),
         },
-      )
+      }
       .analyze()
       .is_empty()
     );
