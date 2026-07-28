@@ -131,9 +131,17 @@ impl RopeExt for Rope {
     let row_char = self.line_to_char(row);
     let row_byte = self.line_to_byte(row);
 
-    let col_char = self.utf16_cu_to_char(
-      self.char_to_utf16_cu(row_char) + position.character as usize,
-    );
+    // Clamp the target UTF-16 code unit to the rope's total so a
+    // position beyond end-of-document (observed when an editor sends a
+    // didChange with a range that extends past the current buffer, see
+    // ropey#728) becomes "end of rope" rather than a panic inside
+    // ropey::utf16_cu_to_char (#343).
+    let target_utf16_cu = self
+      .char_to_utf16_cu(row_char)
+      .saturating_add(position.character as usize)
+      .min(self.len_utf16_cu());
+
+    let col_char = self.utf16_cu_to_char(target_utf16_cu);
 
     let col_byte = self.char_to_byte(col_char);
 
@@ -293,6 +301,24 @@ mod tests {
       Position {
         byte: 5,
         char: 2,
+        point: Point::new(0, 5),
+      }
+    );
+  }
+
+  #[test]
+  fn lsp_position_past_end_clamps_instead_of_panicking() {
+    // #343: an LSP client sending a position whose column exceeds the
+    // actual UTF-16 length of the buffer must not take down the server.
+    let rope = Rope::from_str("hello");
+
+    let end = rope.lsp_position_to_position(lsp::Position::new(0, 5000));
+
+    assert_eq!(
+      end,
+      Position {
+        byte: 5,
+        char: 5,
         point: Point::new(0, 5),
       }
     );
