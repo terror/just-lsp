@@ -1,13 +1,13 @@
 use super::*;
 
 pub struct Quickfixer<'a> {
-  config: Option<&'a Config>,
-  document: &'a Document,
-  imported_documents: Vec<&'a Document>,
-  parameters: &'a lsp::CodeActionParams,
+  pub config: Option<&'a Config>,
+  pub document: &'a Document,
+  pub imported_documents: Vec<&'a Document>,
+  pub parameters: &'a lsp::CodeActionParams,
 }
 
-impl<'a> Quickfixer<'a> {
+impl Quickfixer<'_> {
   fn action(&self, code: &str, quickfix: Quickfix) -> lsp::CodeActionOrCommand {
     let diagnostics = self
       .parameters
@@ -62,38 +62,6 @@ impl<'a> Quickfixer<'a> {
           .map(|quickfix| self.action(rule.id(), quickfix))
       })
       .collect()
-  }
-
-  #[must_use]
-  pub fn config(self, config: &'a Config) -> Self {
-    Self {
-      config: Some(config),
-      ..self
-    }
-  }
-
-  #[must_use]
-  pub fn imported_documents(
-    self,
-    imported_documents: impl IntoIterator<Item = &'a Document>,
-  ) -> Self {
-    Self {
-      imported_documents: imported_documents.into_iter().collect(),
-      ..self
-    }
-  }
-
-  #[must_use]
-  pub fn new(
-    document: &'a Document,
-    parameters: &'a lsp::CodeActionParams,
-  ) -> Self {
-    Self {
-      config: None,
-      document,
-      imported_documents: Vec::new(),
-      parameters,
-    }
   }
 }
 
@@ -155,9 +123,13 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let actions = Quickfixer::new(&document, &parameters)
-        .config(&config)
-        .collect();
+      let actions = Quickfixer {
+        config: Some(&config),
+        document: &document,
+        imported_documents: Vec::new(),
+        parameters: &parameters,
+      }
+      .collect();
 
       assert_eq!(actions.len(), quickfixes.len());
 

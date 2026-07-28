@@ -294,10 +294,15 @@ impl Inner {
       .into_iter()
       .flat_map(|project| project.imported_documents(&workspace.documents));
 
-    let quickfixer =
-      Quickfixer::new(document, &params).imported_documents(imported_documents);
-
-    actions.extend(quickfixer.config(&config).collect());
+    actions.extend(
+      Quickfixer {
+        config: Some(&config),
+        document,
+        imported_documents: imported_documents.collect(),
+        parameters: &params,
+      }
+      .collect(),
+    );
 
     Ok(Some(actions))
   }
