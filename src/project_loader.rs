@@ -43,6 +43,8 @@ impl<'a> ProjectLoader<'a> {
 
     loader.visit(root)?;
 
+    loader.project.build_import_scope();
+
     Ok(loader.project)
   }
 
@@ -81,7 +83,6 @@ impl<'a> ProjectLoader<'a> {
 
     if !self.expanded.contains(&uri) {
       self.visit(&uri)?;
-      self.project.imported.push(uri.clone());
     }
 
     Ok(ProjectDependencyTarget::Resolved(uri))
@@ -182,6 +183,110 @@ mod tests {
   }
 
   #[test]
+  fn import_scope_deduplicates_diamond_imports() {
+    let mut test = Test::new("import 'left.just'\nimport 'right.just'")
+      .file("left.just", "import 'shared.just'")
+      .file("right.just", "import 'shared.just'")
+      .file("shared.just", "");
+
+    let left = test.uri("left.just");
+    let right = test.uri("right.just");
+    let root = test.root.clone();
+    let shared = test.uri("shared.just");
+
+    assert_eq!(
+      test.load().import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          traversal_order: 0,
+          uri: root,
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 1,
+          uri: right,
+        },
+        ImportScopeDocument {
+          load_depth: 2,
+          traversal_order: 2,
+          uri: shared,
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 3,
+          uri: left,
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn import_scope_deduplicates_repeated_imports() {
+    let mut test =
+      Test::new("import 'foo.just'\nimport 'foo.just'").file("foo.just", "");
+
+    let foo = test.uri("foo.just");
+    let root = test.root.clone();
+
+    assert_eq!(
+      test.load().import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          traversal_order: 0,
+          uri: root,
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 1,
+          uri: foo,
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn import_scope_uses_lifo_order_and_first_load_depth() {
+    let mut test =
+      Test::new("import 'baz.just'\nimport 'foo.just'\nimport 'bar.just'")
+        .file("foo.just", "")
+        .file("bar.just", "import 'baz.just'")
+        .file("baz.just", "");
+
+    let bar = test.uri("bar.just");
+    let baz = test.uri("baz.just");
+    let foo = test.uri("foo.just");
+    let root = test.root.clone();
+
+    assert_eq!(
+      test.load().import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          traversal_order: 0,
+          uri: root,
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 1,
+          uri: bar,
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 2,
+          uri: foo,
+        },
+        ImportScopeDocument {
+          load_depth: 2,
+          traversal_order: 3,
+          uri: baz,
+        },
+      ]
+    );
+  }
+
+  #[test]
   fn loads_import_graph() {
     let mut test = Test::new(indoc! {
       "
@@ -250,11 +355,32 @@ mod tests {
     );
 
     assert_eq!(
+      project.import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          traversal_order: 0,
+          uri: test.root.clone(),
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          traversal_order: 1,
+          uri: bar.clone(),
+        },
+        ImportScopeDocument {
+          load_depth: 2,
+          traversal_order: 2,
+          uri: baz.clone(),
+        },
+      ]
+    );
+
+    assert_eq!(
       project
         .imported_documents(&test.documents)
         .map(|document| document.uri.clone())
         .collect::<Vec<_>>(),
-      [baz, bar.clone()]
+      [bar.clone(), baz]
     );
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
