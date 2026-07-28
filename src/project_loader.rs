@@ -122,28 +122,72 @@ impl<'a> ProjectLoader<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn uri(path: &Path) -> lsp::Url {
-    lsp::Url::from_file_path(path).unwrap()
+  struct Test {
+    documents: DocumentStore,
+    root: lsp::Url,
+    tempdir: tempfile::TempDir,
+  }
+
+  impl Test {
+    fn file(self, path: &str, content: &str) -> Self {
+      let path = self.tempdir.path().join(path);
+
+      fs::create_dir_all(path.parent().unwrap()).unwrap();
+      fs::write(path, content).unwrap();
+
+      self
+    }
+
+    fn load(&mut self) -> Project {
+      ProjectLoader::load(&mut self.documents, &self.root).unwrap()
+    }
+
+    fn new(content: &str) -> Self {
+      let tempdir = tempfile::tempdir().unwrap();
+      let root = tempdir.path().join("justfile");
+
+      fs::write(&root, content).unwrap();
+
+      Self {
+        documents: DocumentStore::default(),
+        root: lsp::Url::from_file_path(root).unwrap(),
+        tempdir,
+      }
+    }
+
+    fn open(&mut self, path: &str, content: &str) {
+      self
+        .documents
+        .open(lsp::DidOpenTextDocumentParams {
+          text_document: lsp::TextDocumentItem {
+            uri: self.uri(path),
+            language_id: "just".into(),
+            version: 1,
+            text: content.into(),
+          },
+        })
+        .unwrap();
+    }
+
+    fn uri(&self, path: &str) -> lsp::Url {
+      lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
+    }
   }
 
   #[test]
   fn analyzer_uses_imported_declarations() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let root = tempdir.path().join("justfile");
+    let mut test =
+      Test::new("import 'foo.just'\n\nbar: foo").file("foo.just", "foo:");
 
-    fs::write(&root, "import 'foo.just'\n\nbar: foo").unwrap();
-    fs::write(tempdir.path().join("foo.just"), "foo:").unwrap();
-
-    let root = uri(&root);
-    let mut documents = DocumentStore::default();
-    let project = ProjectLoader::load(&mut documents, &root).unwrap();
-    let document = documents.get(&root).unwrap();
+    let project = test.load();
 
     assert!(
       Analyzer {
         config: None,
-        document,
-        imported_documents: project.imported_documents(&documents).collect(),
+        document: test.documents.get(&test.root).unwrap(),
+        imported_documents: project
+          .imported_documents(&test.documents)
+          .collect(),
       }
       .analyze()
       .is_empty()
@@ -152,15 +196,19 @@ mod tests {
 
   #[test]
   fn loads_import_graph() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let root = tempdir.path().join("justfile");
-    let bar = tempdir.path().join("bar.just");
-    let baz = tempdir.path().join("nested/baz.just");
+    let mut test = Test::new(indoc! {
+      "
+      import 'nested/../bar.just'
+      import? 'missing.just'
+      import 'required-missing.just'
+      import 'bar.just'
+      import x'dynamic.just'
 
-    fs::create_dir(tempdir.path().join("nested")).unwrap();
-    fs::write(&baz, "baz:").unwrap();
-    fs::write(
-      &bar,
+      foo:
+      "
+    })
+    .file(
+      "bar.just",
       indoc! {
         "
         import 'nested/baz.just'
@@ -170,67 +218,37 @@ mod tests {
         "
       },
     )
-    .unwrap();
-    fs::write(
-      &root,
-      indoc! {
-        "
-        import 'nested/../bar.just'
-        import? 'missing.just'
-        import 'required-missing.just'
-        import 'bar.just'
-        import x'dynamic.just'
+    .file("nested/baz.just", "baz:");
 
-        foo:
-        "
-      },
-    )
-    .unwrap();
+    let bar = test.uri("bar.just");
+    let baz = test.uri("nested/baz.just");
 
-    let root = uri(&root);
-    let bar = uri(&bar);
-    let baz = uri(&baz);
-    let mut documents = DocumentStore::default();
-    let project = ProjectLoader::load(&mut documents, &root).unwrap();
+    let project = test.load();
 
-    assert_eq!(project.root, root);
+    assert_eq!(project.root, test.root);
 
-    let root_dependencies = &project.dependencies[&root];
+    assert_eq!(
+      project.dependencies[&test.root]
+        .iter()
+        .map(|dependency| dependency.target.clone())
+        .collect::<Vec<_>>(),
+      [
+        ProjectDependencyTarget::Resolved(bar.clone()),
+        ProjectDependencyTarget::Missing,
+        ProjectDependencyTarget::Missing,
+        ProjectDependencyTarget::Resolved(bar.clone()),
+        ProjectDependencyTarget::Dynamic,
+      ]
+    );
 
-    assert_eq!(root_dependencies.len(), 5);
     assert_eq!(
-      root_dependencies[0].target,
-      ProjectDependencyTarget::Resolved(bar.clone())
-    );
-    assert_eq!(
-      root_dependencies[1].target,
-      ProjectDependencyTarget::Missing
-    );
-    assert_eq!(
-      root_dependencies[1].kind,
-      ProjectDependencyKind::Import {
-        attributes: Vec::new(),
-        optional: true,
-      }
-    );
-    assert_eq!(
-      root_dependencies[2].target,
-      ProjectDependencyTarget::Missing
-    );
-    assert_eq!(
-      root_dependencies[2].kind,
-      ProjectDependencyKind::Import {
-        attributes: Vec::new(),
-        optional: false,
-      }
-    );
-    assert_eq!(
-      root_dependencies[3].target,
-      ProjectDependencyTarget::Resolved(bar.clone())
-    );
-    assert_eq!(
-      root_dependencies[4].target,
-      ProjectDependencyTarget::Dynamic
+      project.dependencies[&test.root]
+        .iter()
+        .map(|dependency| match &dependency.kind {
+          ProjectDependencyKind::Import { optional, .. } => *optional,
+        })
+        .collect::<Vec<_>>(),
+      [false, true, false, false, false]
     );
 
     assert_eq!(
@@ -240,50 +258,33 @@ mod tests {
         .collect::<Vec<_>>(),
       [
         ProjectDependencyTarget::Resolved(baz.clone()),
-        ProjectDependencyTarget::Cycle
+        ProjectDependencyTarget::Cycle,
       ]
     );
 
     assert_eq!(
       project
-        .imported_documents(&documents)
+        .imported_documents(&test.documents)
         .map(|document| document.uri.clone())
         .collect::<Vec<_>>(),
       [baz, bar.clone()]
     );
 
-    assert_eq!(project.dependents[&bar], HashSet::from([root.clone()]));
-    assert_eq!(project.dependents[&root], HashSet::from([bar]));
+    assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
+    assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
   }
 
   #[test]
   fn loading_prefers_open_import() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let root = tempdir.path().join("justfile");
-    let imported = tempdir.path().join("foo.just");
+    let mut test = Test::new("import 'foo.just'").file("foo.just", "disk:");
 
-    fs::write(&root, "import 'foo.just'").unwrap();
-    fs::write(&imported, "disk:").unwrap();
+    test.open("foo.just", "buffer:");
 
-    let imported = uri(&imported);
-    let mut documents = DocumentStore::default();
-
-    documents
-      .open(lsp::DidOpenTextDocumentParams {
-        text_document: lsp::TextDocumentItem {
-          uri: imported,
-          language_id: "just".into(),
-          version: 1,
-          text: "buffer:".into(),
-        },
-      })
-      .unwrap();
-
-    let project = ProjectLoader::load(&mut documents, &uri(&root)).unwrap();
+    let project = test.load();
 
     assert_eq!(
       project
-        .imported_documents(&documents)
+        .imported_documents(&test.documents)
         .flat_map(Document::recipes)
         .map(|recipe| recipe.name.value)
         .collect::<Vec<_>>(),
