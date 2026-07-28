@@ -2,9 +2,11 @@ use {
   document_entry::DocumentEntry,
   indoc::indoc,
   lexiclean::Lexiclean,
+  project_view_document::ProjectViewDocument,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
+    cmp::Reverse,
     collections::{HashMap, HashSet, hash_map::Entry},
     fmt::{self, Debug, Display, Formatter},
     fs,
@@ -112,6 +114,7 @@ mod project_dependency_kind;
 mod project_dependency_target;
 mod project_loader;
 mod project_view;
+mod project_view_document;
 mod quickfix;
 mod quickfixer;
 mod range_ext;
