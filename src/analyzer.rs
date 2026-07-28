@@ -164,6 +164,7 @@ mod tests {
   fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := '' || 'bar'
@@ -181,6 +182,7 @@ mod tests {
   fn accepts_unary_negation_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo bar:
@@ -496,6 +498,7 @@ mod tests {
   fn arg_attribute_with_flag() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       [arg('foo', flag)]
@@ -2178,6 +2181,7 @@ mod tests {
   fn function_calls_join_list_accepts_optional_separator() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -2191,6 +2195,7 @@ mod tests {
   fn function_calls_join_list_rejects_extra_arguments() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -2199,7 +2204,7 @@ mod tests {
     })
     .error(
       "Function `join_list` accepts at most 2 arguments, but 3 provided",
-      lsp::Range::at(3, 10, 3, 45),
+      lsp::Range::at(4, 10, 4, 45),
     )
     .run();
   }
@@ -2223,6 +2228,7 @@ mod tests {
     fn case(expression: &str) {
       Test::new(&formatdoc! {
         "
+        set unstable
         set lists
 
         foo := {expression}
@@ -2242,6 +2248,7 @@ mod tests {
   fn function_calls_split_rejects_missing_argument() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := split()
@@ -2252,7 +2259,7 @@ mod tests {
     })
     .error(
       "Function `split` requires at least 1 argument, but 0 provided",
-      lsp::Range::at(2, 7, 2, 14),
+      lsp::Range::at(3, 7, 3, 14),
     )
     .run();
   }
@@ -2261,6 +2268,7 @@ mod tests {
   fn function_calls_split_too_many_args() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := split(\"foo,bar\", \",\", \"bar\")
@@ -2271,7 +2279,7 @@ mod tests {
     })
     .error(
       "Function `split` accepts at most 2 arguments, but 3 provided",
-      lsp::Range::at(2, 7, 2, 35),
+      lsp::Range::at(3, 7, 3, 35),
     )
     .run();
   }
@@ -2406,6 +2414,8 @@ mod tests {
   fn list_features_allow_shadowed_functions_without_lists() {
     Test::new(indoc! {
       "
+      set unstable
+
       bool(value) := value
       join_list(value) := value
       len(value) := value
@@ -2911,6 +2921,7 @@ mod tests {
   fn parser_errors_valid_with_list_expressions() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := ['foo'] ++ ['bar']
@@ -3248,6 +3259,7 @@ mod tests {
   fn recipe_dependencies_mapped() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3264,6 +3276,7 @@ mod tests {
   fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo arg:
@@ -3298,6 +3311,7 @@ mod tests {
   fn recipe_dependencies_mapped_require_starred_argument() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3309,7 +3323,7 @@ mod tests {
     })
     .error(
       "Mapped dependencies must include a starred argument",
-      lsp::Range::at(5, 10, 5, 11),
+      lsp::Range::at(6, 10, 6, 11),
     )
     .run();
   }
@@ -3318,6 +3332,7 @@ mod tests {
   fn recipe_dependencies_mapped_reject_multiple_starred_arguments() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg other:
@@ -3329,7 +3344,7 @@ mod tests {
     })
     .error(
       "Mapped dependencies may not include multiple starred arguments",
-      lsp::Range::at(5, 23, 5, 24),
+      lsp::Range::at(6, 23, 6, 24),
     )
     .run();
   }
@@ -3338,6 +3353,7 @@ mod tests {
   fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3349,7 +3365,7 @@ mod tests {
     })
     .error(
       "Starred dependency arguments require mapped dependencies",
-      lsp::Range::at(5, 16, 5, 17),
+      lsp::Range::at(6, 16, 6, 17),
     )
     .run();
   }
@@ -3497,6 +3513,7 @@ mod tests {
   fn recipe_invocation_variadic_params_reject_extra_arguments_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo arg1 +args:
@@ -3508,7 +3525,7 @@ mod tests {
     })
     .error(
       "Dependency `foo` accepts 2 arguments, but 3 provided",
-      lsp::Range::at(5, 5, 5, 37),
+      lsp::Range::at(6, 5, 6, 37),
     )
     .run();
   }
@@ -4032,12 +4049,57 @@ mod tests {
   fn settings_lists_recognized() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
         echo \"foo\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_lists_requires_unstable() {
+    Test::new(indoc! {
+      "
+      set lists
+      "
+    })
+    .warning(
+      "`set lists` is unstable without `set unstable`",
+      lsp::Range::at(0, 4, 0, 9),
+    )
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_set_unstable_suppresses_warnings() {
+    Test::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo(x) := x
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_user_defined_function_requires_unstable() {
+    Test::new(indoc! {
+      "
+      foo(x) := x
+
+      bar:
+        echo {{ foo('bar') }}
+      "
+    })
+    .warning(
+      "User-defined function `foo` is unstable without `set unstable`",
+      lsp::Range::at(0, 0, 0, 3),
+    )
     .run();
   }
 
@@ -4204,6 +4266,7 @@ mod tests {
     fn case(setting: &str) {
       Test::new(&formatdoc! {
         r#"
+        set unstable
         set lists
         set {setting} := ["foo", "bar"]
 
@@ -4539,6 +4602,8 @@ mod tests {
   fn user_defined_function_body_references_variable() {
     Test::new(indoc! {
       "
+      set unstable
+
       base := \"hello\"
 
       foo(x) := base + x
@@ -4551,10 +4616,12 @@ mod tests {
   fn user_defined_function_body_unknown_identifier() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + unknown
       "
     })
-    .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
+    .error("Variable `unknown` not found", lsp::Range::at(2, 14, 2, 21))
     .run();
   }
 
@@ -4562,10 +4629,12 @@ mod tests {
   fn user_defined_function_duplicate_parameters() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(bar, bar) := bar
       "
     })
-    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
+    .error("Duplicate parameter `bar`", lsp::Range::at(2, 9, 2, 12))
     .run();
   }
 
@@ -4573,13 +4642,15 @@ mod tests {
   fn user_defined_function_duplicates() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo() := \"bar\"
       foo() := \"baz\"
       foo() := \"bat\"
       "
     })
-    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
-    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(3, 0, 4, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(4, 0, 5, 0))
     .run();
   }
 
@@ -4601,6 +4672,8 @@ mod tests {
   fn user_defined_function_no_params() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo() := \"bar\"
 
       baz:
@@ -4614,6 +4687,8 @@ mod tests {
   fn user_defined_function_not_flagged_as_unknown() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
 
       bar:
@@ -4627,6 +4702,8 @@ mod tests {
   fn user_defined_function_parameters_not_unresolved() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
       "
     })
@@ -4637,6 +4714,8 @@ mod tests {
   fn user_defined_function_too_few_args() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(a, b) := a + b
 
       bar:
@@ -4645,7 +4724,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 2 arguments, but 1 provided",
-      lsp::Range::at(3, 10, 3, 18),
+      lsp::Range::at(5, 10, 5, 18),
     )
     .run();
   }
@@ -4654,6 +4733,8 @@ mod tests {
   fn user_defined_function_wrong_arity() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
 
       bar:
@@ -4662,7 +4743,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 1 argument, but 2 provided",
-      lsp::Range::at(3, 10, 3, 23),
+      lsp::Range::at(5, 10, 5, 23),
     )
     .run();
   }
@@ -4726,6 +4807,7 @@ mod tests {
   fn variables_used_in_starred_dependency_args() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       used := \"value\"
@@ -4740,7 +4822,7 @@ mod tests {
     })
     .warning(
       "Variable `unused` appears unused",
-      lsp::Range::at(3, 0, 3, 6),
+      lsp::Range::at(4, 0, 4, 6),
     )
     .run();
   }
