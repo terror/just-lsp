@@ -117,7 +117,7 @@ impl Document {
     })
   }
 
-  fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
+  pub(super) fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
     let (attributes, target) = if node.kind() == "attribute" {
       (
         vec![*node],
