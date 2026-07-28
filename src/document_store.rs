@@ -24,15 +24,28 @@ impl DocumentStore {
   }
 
   pub fn close(&mut self, params: &lsp::DidCloseTextDocumentParams) -> bool {
-    let Some(entry) = self.documents.get_mut(&params.text_document.uri) else {
+    let uri = &params.text_document.uri;
+
+    if !self.is_open(uri) {
       return false;
-    };
+    }
 
-    let open = entry.open;
+    match Self::read(uri) {
+      Ok(document) => {
+        self.documents.insert(
+          uri.clone(),
+          DocumentEntry {
+            document,
+            open: false,
+          },
+        );
+      }
+      Err(_) => {
+        self.documents.remove(uri);
+      }
+    }
 
-    entry.open = false;
-
-    open
+    true
   }
 
   #[must_use]
@@ -61,20 +74,14 @@ impl DocumentStore {
   pub fn load(&mut self, uri: &lsp::Url) -> Result<&Document> {
     match self.documents.entry(uri.clone()) {
       Entry::Occupied(entry) => Ok(&entry.into_mut().document),
-      Entry::Vacant(entry) => {
-        let path = uri
-          .to_file_path()
-          .map_err(|()| Error::InvalidDocumentUri(uri.clone()))?;
-
-        Ok(
-          &entry
-            .insert(DocumentEntry {
-              document: Document::new(&fs::read_to_string(path)?, uri.clone())?,
-              open: false,
-            })
-            .document,
-        )
-      }
+      Entry::Vacant(entry) => Ok(
+        &entry
+          .insert(DocumentEntry {
+            document: Self::read(uri)?,
+            open: false,
+          })
+          .document,
+      ),
     }
   }
 
@@ -93,6 +100,14 @@ impl DocumentStore {
     );
 
     Ok(())
+  }
+
+  fn read(uri: &lsp::Url) -> Result<Document> {
+    let path = uri
+      .to_file_path()
+      .map_err(|()| Error::InvalidDocumentUri(uri.clone()))?;
+
+    Document::new(&fs::read_to_string(path)?, uri.clone())
   }
 }
 
@@ -156,16 +171,21 @@ mod tests {
   }
 
   #[test]
-  fn close_keeps_document_cached() {
-    let uri = lsp::Url::parse("file:///foo.just").unwrap();
+  fn close_reloads_disk_document() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let path = tempdir.path().join("foo.just");
+    let uri = uri(&path);
+
+    fs::write(path, "foo:").unwrap();
 
     let mut store = DocumentStore::default();
 
-    store.open(open(uri.clone(), 1, "foo:")).unwrap();
+    store.open(open(uri.clone(), 1, "bar:")).unwrap();
 
     assert!(store.close(&close(uri.clone())));
     assert!(!store.is_open(&uri));
-    assert!(store.get(&uri).is_some());
+    assert_eq!(store.get(&uri).unwrap().content.to_string(), "foo:");
     assert!(store.get_open(&uri).is_none());
   }
 
