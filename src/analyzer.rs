@@ -2,9 +2,8 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Analyzer<'a> {
-  pub config: Option<&'a Config>,
-  pub document: &'a Document,
-  pub imported_documents: Vec<&'a Document>,
+  config: Option<&'a Config>,
+  source: AnalyzerSource<'a>,
 }
 
 impl Analyzer<'_> {
@@ -14,19 +13,93 @@ impl Analyzer<'_> {
   /// config can suppress individual rules entirely. Diagnostics are
   /// sorted by position then message for deterministic output.
   #[must_use]
-  pub fn analyze(&self) -> Vec<Diagnostic> {
-    self.analyze_rules(None)
+  pub fn analyze(&self) -> Vec<Located<Diagnostic>> {
+    match &self.source {
+      AnalyzerSource::Document {
+        document,
+        imported_documents,
+      } => {
+        let context = RuleContext::new(
+          document,
+          once(*document).chain(imported_documents.iter().copied()),
+          ProjectView::from(*document),
+        );
+
+        self
+          .run(&context, None)
+          .into_iter()
+          .map(|value| Located {
+            uri: document.uri.clone(),
+            value,
+          })
+          .collect()
+      }
+      AnalyzerSource::Project { documents, project } => {
+        let root_document = documents
+          .get(&project.root)
+          .expect("project root document must be loaded");
+
+        let scope_documents = project
+          .import_scope
+          .documents()
+          .iter()
+          .filter_map(|document| documents.get(&document.uri))
+          .collect::<Vec<_>>();
+
+        let mut diagnostics = Vec::new();
+
+        for document in &scope_documents {
+          let context = RuleContext::new(
+            document,
+            vec![*document],
+            ProjectView::new(document, &project.import_scope, documents),
+          );
+
+          diagnostics.extend(
+            self
+              .run(&context, Some(RulePhase::Document))
+              .into_iter()
+              .map(|value| Located {
+                uri: document.uri.clone(),
+                value,
+              }),
+          );
+        }
+
+        let context = RuleContext::new(
+          root_document,
+          scope_documents,
+          ProjectView::new(root_document, &project.import_scope, documents),
+        );
+
+        diagnostics.extend(
+          self
+            .run(&context, Some(RulePhase::Project))
+            .into_iter()
+            .map(|value| Located {
+              uri: root_document.uri.clone(),
+              value,
+            }),
+        );
+
+        diagnostics
+      }
+    }
   }
 
   #[must_use]
-  pub fn analyze_phase(&self, phase: RulePhase) -> Vec<Diagnostic> {
-    self.analyze_rules(Some(phase))
+  pub fn new<'a>(
+    config: Option<&'a Config>,
+    source: AnalyzerSource<'a>,
+  ) -> Analyzer<'a> {
+    Analyzer { config, source }
   }
 
-  fn analyze_rules(&self, phase: Option<RulePhase>) -> Vec<Diagnostic> {
-    let context =
-      RuleContext::new(self.document, self.imported_documents.iter().copied());
-
+  fn run(
+    &self,
+    context: &RuleContext<'_>,
+    phase: Option<RulePhase>,
+  ) -> Vec<Diagnostic> {
     let default = Config::default();
 
     let config = self.config.unwrap_or(&default);
@@ -45,7 +118,7 @@ impl Analyzer<'_> {
         }
 
         rule
-          .run(&context)
+          .run(context)
           .into_iter()
           .filter_map(move |diagnostic| {
             Some(Diagnostic {
@@ -132,16 +205,18 @@ mod tests {
         messages,
       } = self;
 
-      let analyzer = Analyzer {
-        config: Some(&config),
-        document: &document,
-        imported_documents: Vec::new(),
-      };
+      let analyzer = Analyzer::new(
+        Some(&config),
+        AnalyzerSource::Document {
+          document: &document,
+          imported_documents: Vec::new(),
+        },
+      );
 
       let diagnostics = analyzer
         .analyze()
         .into_iter()
-        .map(lsp::Diagnostic::from)
+        .map(|diagnostic| lsp::Diagnostic::from(diagnostic.value))
         .collect::<Vec<lsp::Diagnostic>>();
 
       assert_eq!(
@@ -374,7 +449,7 @@ mod tests {
   }
 
   #[test]
-  fn analyze_phase_selects_rules_and_preserves_configuration() {
+  fn analyze_preserves_phase_configuration() {
     let document = Test::new(indoc! {
       "
       [unknown]
@@ -408,37 +483,22 @@ mod tests {
       ..Config::default()
     };
 
-    let analyzer = Analyzer {
-      config: Some(&config),
-      document: &document,
-      imported_documents: Vec::new(),
-    };
-
-    let document_diagnostics = analyzer.analyze_phase(RulePhase::Document);
-
-    assert_eq!(
-      document_diagnostics
-        .iter()
-        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
-        .collect::<Vec<_>>(),
-      [("attribute-arguments", lsp::DiagnosticSeverity::WARNING)],
-    );
-
-    let project_diagnostics = analyzer.analyze_phase(RulePhase::Project);
-
-    assert_eq!(
-      project_diagnostics
-        .iter()
-        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
-        .collect::<Vec<_>>(),
-      [("missing-dependencies", lsp::DiagnosticSeverity::INFORMATION)],
+    let analyzer = Analyzer::new(
+      Some(&config),
+      AnalyzerSource::Document {
+        document: &document,
+        imported_documents: Vec::new(),
+      },
     );
 
     assert_eq!(
       analyzer
         .analyze()
         .iter()
-        .map(|diagnostic| (diagnostic.id.as_str(), diagnostic.severity))
+        .map(|diagnostic| (
+          diagnostic.value.id.as_str(),
+          diagnostic.value.severity,
+        ))
         .collect::<Vec<_>>(),
       [
         ("attribute-arguments", lsp::DiagnosticSeverity::WARNING),

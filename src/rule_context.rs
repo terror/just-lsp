@@ -9,10 +9,11 @@ pub struct RuleContext<'a> {
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document: &'a Document,
+  documents: Vec<&'a Document>,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   functions: OnceLock<Vec<Function>>,
-  imported_documents: Vec<&'a Document>,
+  project_view: ProjectView<'a>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
@@ -127,7 +128,7 @@ impl<'a> RuleContext<'a> {
   }
 
   fn documents(&self) -> impl Iterator<Item = &Document> {
-    once(self.document).chain(self.imported_documents.iter().copied())
+    self.documents.iter().copied()
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
@@ -147,7 +148,8 @@ impl<'a> RuleContext<'a> {
   #[must_use]
   pub fn new(
     document: &'a Document,
-    imported_documents: impl IntoIterator<Item = &'a Document>,
+    documents: impl IntoIterator<Item = &'a Document>,
+    project_view: ProjectView<'a>,
   ) -> Self {
     Self {
       aliases: OnceLock::new(),
@@ -156,10 +158,11 @@ impl<'a> RuleContext<'a> {
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
       document,
+      documents: documents.into_iter().collect(),
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       functions: OnceLock::new(),
-      imported_documents: imported_documents.into_iter().collect(),
+      project_view,
       recipe_names: OnceLock::new(),
       recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
@@ -170,6 +173,10 @@ impl<'a> RuleContext<'a> {
       variable_and_builtin_names: OnceLock::new(),
       variables: OnceLock::new(),
     }
+  }
+
+  pub fn project_view(&self) -> &ProjectView<'a> {
+    &self.project_view
   }
 
   pub fn recipe(&self, name: &str) -> Option<&Recipe> {
@@ -279,9 +286,12 @@ mod tests {
 
     let project = ProjectLoader::load(&mut documents, &uri).unwrap();
 
+    let document = documents.get(&uri).unwrap();
+
     test(&RuleContext::new(
-      documents.get(&uri).unwrap(),
-      project.imported_documents(&documents),
+      document,
+      once(document).chain(project.imported_documents(&documents)),
+      ProjectView::new(document, &project.import_scope, &documents),
     ));
   }
 
@@ -322,6 +332,39 @@ mod tests {
 
       assert_eq!(recipe_names, ["foo", "bar"]);
     });
+  }
+
+  #[test]
+  fn project_context_distinguishes_active_document_and_root_scope() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    let imported_path = dir.path().join("foo.just");
+    let root_path = dir.path().join("justfile");
+
+    fs::write(&imported_path, "foo:").unwrap();
+    fs::write(&root_path, "import 'foo.just'\n\nbar:").unwrap();
+
+    let imported_uri = lsp::Url::from_file_path(imported_path).unwrap();
+    let root_uri = lsp::Url::from_file_path(root_path).unwrap();
+
+    let mut documents = DocumentStore::default();
+
+    let project = ProjectLoader::load(&mut documents, &root_uri).unwrap();
+
+    let imported = documents.get(&imported_uri).unwrap();
+
+    let context = RuleContext::new(
+      imported,
+      vec![imported],
+      ProjectView::new(imported, &project.import_scope, &documents),
+    );
+
+    assert_eq!(context.document().uri, imported_uri);
+
+    assert_eq!(
+      context.project_view().find_recipe("bar").unwrap().uri,
+      root_uri,
+    );
   }
 
   #[test]

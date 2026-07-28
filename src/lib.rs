@@ -24,6 +24,7 @@ use {
 pub use {
   alias::Alias,
   analyzer::Analyzer,
+  analyzer_source::AnalyzerSource,
   attribute::Attribute,
   attribute_kind::AttributeKind,
   attribute_target::AttributeTarget,
@@ -79,6 +80,7 @@ pub use {
 
 mod alias;
 mod analyzer;
+mod analyzer_source;
 mod attribute;
 mod attribute_kind;
 mod attribute_target;

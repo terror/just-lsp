@@ -41,8 +41,11 @@ impl Quickfixer<'_> {
 
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let context =
-      RuleContext::new(self.document, self.imported_documents.iter().copied());
+    let context = RuleContext::new(
+      self.document,
+      once(self.document).chain(self.imported_documents.iter().copied()),
+      ProjectView::from(self.document),
+    );
 
     inventory::iter::<&dyn Rule>
       .into_iter()

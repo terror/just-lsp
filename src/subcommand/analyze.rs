@@ -61,11 +61,13 @@ impl Analyze {
       .into_iter()
       .flat_map(|project| project.imported_documents(&workspace.documents));
 
-    let analyzer = Analyzer {
-      config: None,
-      document,
-      imported_documents: imported_documents.collect(),
-    };
+    let analyzer = Analyzer::new(
+      None,
+      AnalyzerSource::Document {
+        document,
+        imported_documents: imported_documents.collect(),
+      },
+    );
 
     let diagnostics = analyzer.analyze();
 
@@ -74,7 +76,7 @@ impl Analyze {
     }
 
     let any_error = diagnostics.iter().any(|diagnostic| {
-      matches!(diagnostic.severity, lsp::DiagnosticSeverity::ERROR)
+      matches!(diagnostic.value.severity, lsp::DiagnosticSeverity::ERROR)
     });
 
     let source_id = path.to_string_lossy().to_string();
@@ -84,6 +86,8 @@ impl Analyze {
     let source_len = document.content.len_chars();
 
     for diagnostic in diagnostics {
+      let diagnostic = diagnostic.value;
+
       let (severity_label, color) =
         Self::severity_to_style(diagnostic.severity)?;
 

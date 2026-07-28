@@ -969,17 +969,19 @@ impl Inner {
               project.imported_documents(&workspace.documents)
             });
 
-          let analyzer = Analyzer {
-            config: Some(&config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
+          let analyzer = Analyzer::new(
+            Some(&config),
+            AnalyzerSource::Document {
+              document,
+              imported_documents: imported_documents.collect(),
+            },
+          );
 
           (
             analyzer
               .analyze()
               .into_iter()
-              .map(lsp::Diagnostic::from)
+              .map(|diagnostic| lsp::Diagnostic::from(diagnostic.value))
               .collect(),
             document.version,
           )
