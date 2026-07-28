@@ -7,26 +7,20 @@ define_rule! {
     id: "duplicate-variable",
     message: "duplicate variable",
     run(context) {
-      let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
-
-      if allow_duplicates {
-        return Vec::new();
-      }
-
       let (mut diagnostics, mut groups) = (Vec::new(), HashMap::<String, GroupSet>::new());
 
-      for variable in context.variables() {
-        let current = GroupSet::from_attributes(&variable.attributes);
-
+      for (variable, current) in context.variables_with_groups() {
         let previous = groups
           .entry(variable.name.value.clone())
           .or_default();
 
-        let duplicate = previous.conflicts_with(&current);
+        let overlap = previous.intersection(current);
 
-        previous.union_with(current);
+        previous.union_with(current.clone());
 
-        if duplicate {
+        if !overlap.is_empty()
+          && !context.setting_enabled_for("allow-duplicate-variables", &overlap)
+        {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate variable `{}`", variable.name.value),
             variable.range,

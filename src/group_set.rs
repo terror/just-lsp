@@ -1,5 +1,7 @@
 use super::*;
 
+const PLATFORM_COUNT: usize = 8;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GroupSet(HashSet<Group>);
 
@@ -10,6 +12,14 @@ impl GroupSet {
       .0
       .iter()
       .any(|a| other.0.iter().any(|b| a.conflicts_with(*b)))
+  }
+
+  #[must_use]
+  pub fn covers(&self, other: &Self) -> bool {
+    other.0.iter().all(|other| match other {
+      Group::Any => self.0.contains(&Group::Any),
+      group => self.0.contains(&Group::Any) || self.0.contains(group),
+    })
   }
 
   fn from_attribute(attribute: &str) -> Option<Self> {
@@ -54,7 +64,41 @@ impl GroupSet {
 
   #[must_use]
   pub fn insert(&mut self, group: Group) -> bool {
-    self.0.insert(group)
+    if group == Group::Any {
+      let changed = self.0.len() != 1 || !self.0.contains(&Group::Any);
+
+      self.0.clear();
+      self.0.insert(Group::Any);
+
+      changed
+    } else if self.0.contains(&Group::Any) {
+      false
+    } else {
+      let inserted = self.0.insert(group);
+
+      if self.0.len() == PLATFORM_COUNT {
+        self.0.clear();
+        self.0.insert(Group::Any);
+      }
+
+      inserted
+    }
+  }
+
+  #[must_use]
+  pub fn intersection(&self, other: &Self) -> Self {
+    self
+      .0
+      .iter()
+      .flat_map(|a| {
+        other.0.iter().filter_map(move |b| match (*a, *b) {
+          (Group::Any, Group::Any) => Some(Group::Any),
+          (Group::Any, group) | (group, Group::Any) => Some(group),
+          (a, b) if a == b => Some(a),
+          _ => None,
+        })
+      })
+      .collect()
   }
 
   #[must_use]
@@ -63,19 +107,27 @@ impl GroupSet {
   }
 
   pub fn union_with(&mut self, other: Self) {
-    self.0.extend(other.0);
+    for group in other.0 {
+      let _ = self.insert(group);
+    }
   }
 }
 
 impl<const N: usize> From<[Group; N]> for GroupSet {
   fn from(groups: [Group; N]) -> Self {
-    Self(HashSet::from(groups))
+    groups.into_iter().collect()
   }
 }
 
 impl FromIterator<Group> for GroupSet {
   fn from_iter<T: IntoIterator<Item = Group>>(iter: T) -> Self {
-    Self(iter.into_iter().collect())
+    let mut groups = Self::default();
+
+    for group in iter {
+      let _ = groups.insert(group);
+    }
+
+    groups
   }
 }
 
@@ -98,6 +150,23 @@ mod tests {
     assert!(
       GroupSet::from([Group::Any])
         .conflicts_with(&GroupSet::from([Group::Windows]))
+    );
+  }
+
+  #[test]
+  fn covers() {
+    assert!(
+      GroupSet::from([Group::Any]).covers(&GroupSet::from([Group::Linux]))
+    );
+
+    assert!(
+      GroupSet::from_attribute("unix")
+        .unwrap()
+        .covers(&GroupSet::from([Group::Linux]))
+    );
+
+    assert!(
+      !GroupSet::from([Group::Linux]).covers(&GroupSet::from([Group::Any]))
     );
   }
 
@@ -170,6 +239,13 @@ mod tests {
         .collect::<GroupSet>(),
       GroupSet::from([Group::Linux, Group::Windows])
     );
+
+    assert_eq!(
+      [Group::Linux, Group::Any, Group::Windows]
+        .into_iter()
+        .collect::<GroupSet>(),
+      GroupSet::from([Group::Any])
+    );
   }
 
   #[test]
@@ -180,6 +256,32 @@ mod tests {
     assert!(!groups.insert(Group::Linux));
 
     assert_eq!(groups, GroupSet::from([Group::Linux]));
+
+    assert!(groups.insert(Group::Any));
+    assert!(!groups.insert(Group::Linux));
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+  }
+
+  #[test]
+  fn intersection() {
+    assert_eq!(
+      GroupSet::from([Group::Any])
+        .intersection(&GroupSet::from([Group::Linux])),
+      GroupSet::from([Group::Linux])
+    );
+
+    assert_eq!(
+      GroupSet::from_attribute("unix")
+        .unwrap()
+        .intersection(&GroupSet::from([Group::Linux])),
+      GroupSet::from([Group::Linux])
+    );
+
+    assert!(
+      GroupSet::from([Group::Linux])
+        .intersection(&GroupSet::from([Group::Windows]))
+        .is_empty()
+    );
   }
 
   #[test]
@@ -195,5 +297,20 @@ mod tests {
     groups.union_with(GroupSet::from([Group::Linux, Group::Windows]));
 
     assert_eq!(groups, GroupSet::from([Group::Linux, Group::Windows]));
+
+    groups.union_with(GroupSet::from([Group::Any]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+
+    groups.union_with(GroupSet::from([Group::Linux]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+
+    let mut groups = GroupSet::from_attribute("unix").unwrap();
+
+    groups.union_with(GroupSet::from([Group::Windows]));
+
+    assert_eq!(groups, GroupSet::from([Group::Any]));
+    assert!(groups.covers(&GroupSet::from([Group::Any])));
   }
 }

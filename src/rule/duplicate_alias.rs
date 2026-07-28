@@ -10,16 +10,14 @@ define_rule! {
 
       let mut groups = HashMap::<String, GroupSet>::new();
 
-      for alias in context.aliases() {
-        let current = GroupSet::from_attributes(&alias.attributes);
-
+      for (alias, current) in context.aliases_with_groups() {
         let previous = groups
           .entry(alias.name.value.clone())
           .or_default();
 
-        let duplicate = previous.conflicts_with(&current);
+        let duplicate = previous.conflicts_with(current);
 
-        previous.union_with(current);
+        previous.union_with(current.clone());
 
         if duplicate {
           diagnostics.push(Diagnostic::error(

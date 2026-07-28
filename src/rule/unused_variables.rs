@@ -13,8 +13,6 @@ define_rule! {
         return diagnostics;
       }
 
-      let exported = context.setting_enabled("export");
-
       for (variable_name, is_used) in &context.scope().variable_usage {
         if *is_used {
           continue;
@@ -25,7 +23,9 @@ define_rule! {
           continue;
         };
 
-        if variable.export || exported {
+        let groups = GroupSet::from_attributes(&variable.attributes);
+
+        if variable.export || context.setting_enabled_in("export", &groups) {
           continue;
         }
 

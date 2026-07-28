@@ -7,9 +7,9 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let lists = context.setting_enabled("lists");
+      for (recipe, groups) in context.recipes_with_groups() {
+        let lists = context.setting_enabled_for("lists", groups);
 
-      for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
           let starred = dependency
             .arguments

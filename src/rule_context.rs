@@ -2,8 +2,19 @@ use super::*;
 
 type BuiltinRef = &'static Builtin<'static>;
 
+struct Items<T> {
+  groups: Vec<GroupSet>,
+  values: Vec<T>,
+}
+
+impl<T> Items<T> {
+  fn iter(&self) -> impl Iterator<Item = (&T, &GroupSet)> {
+    self.values.iter().zip(&self.groups)
+  }
+}
+
 pub struct RuleContext<'a> {
-  aliases: OnceLock<Vec<Alias>>,
+  aliases: OnceLock<Items<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
   builtin_attributes_map: OnceLock<HashMap<&'static str, Vec<BuiltinRef>>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
@@ -11,25 +22,34 @@ pub struct RuleContext<'a> {
   document: &'a Document,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  functions: OnceLock<Vec<Function>>,
-  imported_documents: Vec<Document>,
+  functions: OnceLock<Items<Function>>,
+  imported_documents: Vec<ImportedDocument>,
   recipe_names: OnceLock<HashSet<String>>,
   recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
-  recipes: OnceLock<Vec<Recipe>>,
+  recipes: OnceLock<Items<Recipe>>,
   scope: OnceLock<Scope<'a>>,
-  settings: OnceLock<Vec<Setting>>,
-  unexports: OnceLock<Vec<Unexport>>,
+  settings: OnceLock<Items<Setting>>,
+  unexports: OnceLock<Items<Unexport>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
-  variables: OnceLock<Vec<Variable>>,
+  variables: OnceLock<Items<Variable>>,
 }
 
 impl<'a> RuleContext<'a> {
+  fn alias_items(&self) -> &Items<Alias> {
+    self.aliases.get_or_init(|| {
+      self.collect_items(Document::aliases, |alias| &alias.attributes)
+    })
+  }
+
   pub fn aliases(&self) -> &[Alias] {
-    self
-      .aliases
-      .get_or_init(|| self.documents().flat_map(Document::aliases).collect())
-      .as_slice()
+    &self.alias_items().values
+  }
+
+  pub fn aliases_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Alias, &GroupSet)> {
+    self.alias_items().iter()
   }
 
   pub fn attributes(&self) -> &[Attribute] {
@@ -112,6 +132,32 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  fn collect_items<T>(
+    &self,
+    extract: impl Fn(&Document) -> Vec<T>,
+    attributes: impl Fn(&T) -> &[Attribute],
+  ) -> Items<T> {
+    let mut groups = Vec::new();
+    let mut values = Vec::new();
+
+    for (document, inherited) in self.documents() {
+      for value in extract(document) {
+        let item_groups = GroupSet::from_attributes(attributes(&value));
+        let item_groups = inherited.map_or_else(
+          || item_groups.clone(),
+          |inherited| inherited.intersection(&item_groups),
+        );
+
+        if !item_groups.is_empty() {
+          groups.push(item_groups);
+          values.push(value);
+        }
+      }
+    }
+
+    Items { groups, values }
+  }
+
   pub fn document(&self) -> &'a Document {
     self.document
   }
@@ -126,8 +172,13 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  fn documents(&self) -> impl Iterator<Item = &Document> {
-    once(self.document).chain(self.imported_documents.iter())
+  fn documents(&self) -> impl Iterator<Item = (&Document, Option<&GroupSet>)> {
+    once((self.document, None)).chain(
+      self
+        .imported_documents
+        .iter()
+        .map(|imported| (&imported.document, Some(&imported.groups))),
+    )
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
@@ -137,11 +188,38 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
+  fn function_items(&self) -> &Items<Function> {
+    self.functions.get_or_init(|| {
+      self.collect_items(Document::functions, |function| &function.attributes)
+    })
+  }
+
   pub fn functions(&self) -> &[Function] {
-    self
-      .functions
-      .get_or_init(|| self.documents().flat_map(Document::functions).collect())
-      .as_slice()
+    &self.function_items().values
+  }
+
+  pub fn functions_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Function, &GroupSet)> {
+    self.function_items().iter()
+  }
+
+  fn lexical_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+      match component {
+        Component::CurDir => {}
+        Component::ParentDir => {
+          if !normalized.pop() && !normalized.has_root() {
+            normalized.push(component);
+          }
+        }
+        _ => normalized.push(component),
+      }
+    }
+
+    normalized
   }
 
   #[must_use]
@@ -170,10 +248,13 @@ impl<'a> RuleContext<'a> {
   }
 
   pub fn recipe(&self, name: &str) -> Option<&Recipe> {
-    self
-      .recipes()
-      .iter()
-      .find(|recipe| recipe.name.value == name)
+    self.recipe_with_groups(name).map(|(recipe, _)| recipe)
+  }
+
+  fn recipe_items(&self) -> &Items<Recipe> {
+    self.recipes.get_or_init(|| {
+      self.collect_items(Document::recipes, |recipe| &recipe.attributes)
+    })
   }
 
   pub fn recipe_names(&self) -> &HashSet<String> {
@@ -196,37 +277,80 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub fn recipes(&self) -> &[Recipe] {
+  pub fn recipe_with_groups(&self, name: &str) -> Option<(&Recipe, &GroupSet)> {
     self
-      .recipes
-      .get_or_init(|| self.documents().flat_map(Document::recipes).collect())
-      .as_slice()
+      .recipes_with_groups()
+      .find(|(recipe, _)| recipe.name.value == name)
   }
 
-  fn resolve_imports(document: &Document) -> Vec<Document> {
-    let mut documents = Vec::new();
-    let mut seen = HashSet::new();
+  pub fn recipes(&self) -> &[Recipe] {
+    &self.recipe_items().values
+  }
 
-    if let Ok(path) = document.uri.to_file_path() {
-      seen.insert(path);
+  pub fn recipes_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Recipe, &GroupSet)> {
+    self.recipe_items().iter()
+  }
+
+  fn resolve_imports(document: &Document) -> Vec<ImportedDocument> {
+    let mut documents = Vec::new();
+    let mut active = HashSet::new();
+    let mut expanded = HashMap::new();
+
+    let groups = GroupSet::from([Group::Any]);
+
+    if let Ok(path) = document.uri.to_file_path()
+      && let Ok(path) = path.canonicalize()
+    {
+      active.insert(path);
     }
 
-    Self::resolve_imports_recursive(document, &mut documents, &mut seen);
+    Self::resolve_imports_recursive(
+      document,
+      &groups,
+      &mut documents,
+      &mut active,
+      &mut expanded,
+    );
 
     documents
   }
 
   fn resolve_imports_recursive(
     document: &Document,
-    documents: &mut Vec<Document>,
-    seen: &mut HashSet<PathBuf>,
+    inherited: &GroupSet,
+    documents: &mut Vec<ImportedDocument>,
+    active: &mut HashSet<PathBuf>,
+    expanded: &mut HashMap<PathBuf, GroupSet>,
   ) {
     for import in document.imports() {
+      let groups =
+        inherited.intersection(&GroupSet::from_attributes(&import.attributes));
+
+      if groups.is_empty() {
+        continue;
+      }
+
       let Some(path) = import.resolve(&document.uri) else {
         continue;
       };
 
-      if !seen.insert(path.clone()) {
+      let path = Self::lexical_path(&path);
+
+      let Ok(identity) = path.canonicalize() else {
+        if !import.optional {
+          warn!(path = %path.display(), "failed to read import");
+        }
+
+        continue;
+      };
+
+      if active.contains(&identity)
+        || expanded
+          .get(&path)
+          .is_some_and(|previous| previous.covers(&groups))
+      {
         continue;
       }
 
@@ -253,9 +377,36 @@ impl<'a> RuleContext<'a> {
         continue;
       }
 
-      Self::resolve_imports_recursive(&imported, documents, seen);
+      expanded.entry(path).or_default().union_with(groups.clone());
 
-      documents.push(imported);
+      let document_index = documents.iter().position(|candidate| {
+        candidate
+          .document
+          .uri
+          .to_file_path()
+          .ok()
+          .and_then(|path| path.canonicalize().ok())
+          .is_some_and(|path| path == identity)
+      });
+
+      if let Some(index) = document_index {
+        documents[index].groups.union_with(groups.clone());
+      }
+
+      active.insert(identity.clone());
+
+      Self::resolve_imports_recursive(
+        &imported, &groups, documents, active, expanded,
+      );
+
+      active.remove(&identity);
+
+      if document_index.is_none() {
+        documents.push(ImportedDocument {
+          document: imported,
+          groups,
+        });
+      }
     }
   }
 
@@ -270,22 +421,64 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub fn settings(&self) -> &[Setting] {
+  pub fn setting_enabled_for(&self, name: &str, groups: &GroupSet) -> bool {
+    let mut enabled = GroupSet::default();
+
+    for (setting, setting_groups) in self.settings_with_groups() {
+      if setting.name.value == name
+        && matches!(setting.kind, SettingKind::Boolean(true))
+      {
+        enabled.union_with(setting_groups.clone());
+      }
+    }
+
+    enabled.covers(groups)
+  }
+
+  pub fn setting_enabled_in(&self, name: &str, groups: &GroupSet) -> bool {
     self
-      .settings
-      .get_or_init(|| self.documents().flat_map(Document::settings).collect())
-      .as_slice()
+      .settings_with_groups()
+      .any(|(setting, setting_groups)| {
+        setting.name.value == name
+          && matches!(setting.kind, SettingKind::Boolean(true))
+          && setting_groups.conflicts_with(groups)
+      })
+  }
+
+  fn setting_items(&self) -> &Items<Setting> {
+    self.settings.get_or_init(|| {
+      self.collect_items(Document::settings, |setting| &setting.attributes)
+    })
+  }
+
+  pub fn settings(&self) -> &[Setting] {
+    &self.setting_items().values
+  }
+
+  pub fn settings_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Setting, &GroupSet)> {
+    self.setting_items().iter()
   }
 
   pub fn tree(&self) -> Option<&Tree> {
     self.document.tree.as_ref()
   }
 
+  fn unexport_items(&self) -> &Items<Unexport> {
+    self.unexports.get_or_init(|| {
+      self.collect_items(Document::unexports, |unexport| &unexport.attributes)
+    })
+  }
+
   pub fn unexports(&self) -> &[Unexport] {
-    self
-      .unexports
-      .get_or_init(|| self.documents().flat_map(Document::unexports).collect())
-      .as_slice()
+    &self.unexport_items().values
+  }
+
+  pub fn unexports_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Unexport, &GroupSet)> {
+    self.unexport_items().iter()
   }
 
   pub fn user_function_names(&self) -> &HashSet<String> {
@@ -311,11 +504,20 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  fn variable_items(&self) -> &Items<Variable> {
+    self.variables.get_or_init(|| {
+      self.collect_items(Document::variables, |variable| &variable.attributes)
+    })
+  }
+
   pub fn variables(&self) -> &[Variable] {
-    self
-      .variables
-      .get_or_init(|| self.documents().flat_map(Document::variables).collect())
-      .as_slice()
+    &self.variable_items().values
+  }
+
+  pub fn variables_with_groups(
+    &self,
+  ) -> impl Iterator<Item = (&Variable, &GroupSet)> {
+    self.variable_items().iter()
   }
 }
 
@@ -333,6 +535,7 @@ mod tests {
       dir.path().join("bar.just"),
       indoc! {
         "
+        [linux]
         bar:
           echo bar
         "
@@ -375,6 +578,19 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(recipe_names, ["foo", "bar"]);
+
+    assert_eq!(
+      context.recipes()[1].attributes,
+      vec![Attribute {
+        arguments: Vec::new(),
+        name: TextNode {
+          range: lsp::Range::at(0, 1, 0, 6),
+          value: "linux".into(),
+        },
+        range: lsp::Range::at(0, 0, 1, 0),
+        target: Some(AttributeTarget::Recipe),
+      }]
+    );
   }
 
   #[test]
@@ -429,6 +645,7 @@ mod tests {
       dir.path().join("justfile"),
       indoc! {
         "
+        [linux]
         import 'bar.just'
 
         set dotenv-load
@@ -459,6 +676,16 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(setting_names, ["dotenv-load", "export"]);
+    assert!(
+      context.setting_enabled_for("export", &GroupSet::from([Group::Linux]))
+    );
+    assert!(
+      !context.setting_enabled_for("export", &GroupSet::from([Group::Windows]))
+    );
+    assert!(context.setting_enabled("export"));
+    assert!(
+      !context.setting_enabled_for("export", &GroupSet::from([Group::Any]))
+    );
   }
 
   #[test]
@@ -500,6 +727,135 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(recipe_names, ["foo"]);
+  }
+
+  #[test]
+  fn platform_gated_imports_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar:\n  echo bar\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [linux]
+        import 'bar.just'
+        [windows]
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context.recipes_with_groups().next().unwrap().1,
+      &GroupSet::from([Group::Linux, Group::Windows])
+    );
+  }
+
+  #[test]
+  fn platform_gated_imports_intersect() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("baz.just"), "baz:\n  echo baz\n").unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        [linux]
+        import 'baz.just'
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [unix]
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context.recipes_with_groups().next().unwrap().1,
+      &GroupSet::from([Group::Linux])
+    );
+    assert!(context.recipes()[0].attributes.is_empty());
+  }
+
+  #[test]
+  fn unconditional_import_overrides_platform_gate() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar:\n  echo bar\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        [linux]
+        import 'bar.just'
+        import 'bar.just'
+        "
+      },
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    assert_eq!(
+      context.recipes_with_groups().next().unwrap().1,
+      &GroupSet::from([Group::Any])
+    );
   }
 
   #[test]
@@ -567,15 +923,133 @@ mod tests {
     assert_eq!(recipe_names, ["foo", "baz", "bar"]);
   }
 
+  #[cfg(unix)]
+  #[test]
+  fn relative_imports_from_symlinks_use_lexical_parent() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::create_dir(dir.path().join("alias")).unwrap();
+    fs::create_dir(dir.path().join("shared")).unwrap();
+
+    fs::write(
+      dir.path().join("shared/bar.just"),
+      indoc! {
+        "
+        import 'baz.just'
+
+        bar:
+          echo bar
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(dir.path().join("alias/baz.just"), "baz:\n  echo baz\n").unwrap();
+
+    std::os::unix::fs::symlink(
+      dir.path().join("shared/bar.just"),
+      dir.path().join("alias/bar.just"),
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      "import 'alias/bar.just'\n\nfoo:\n  echo foo\n",
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo", "baz", "bar"]);
+  }
+
+  #[cfg(unix)]
+  #[test]
+  fn symlink_import_contexts_are_expanded_independently() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::create_dir(dir.path().join("one")).unwrap();
+    fs::create_dir(dir.path().join("shared")).unwrap();
+    fs::create_dir(dir.path().join("two")).unwrap();
+
+    fs::write(
+      dir.path().join("shared/bar.just"),
+      "import 'baz.just'\n\nbar:\n  echo bar\n",
+    )
+    .unwrap();
+
+    fs::write(dir.path().join("one/baz.just"), "one:\n  echo one\n").unwrap();
+
+    fs::write(dir.path().join("two/baz.just"), "two:\n  echo two\n").unwrap();
+
+    for directory in ["one", "two"] {
+      std::os::unix::fs::symlink(
+        dir.path().join("shared/bar.just"),
+        dir.path().join(directory).join("bar.just"),
+      )
+      .unwrap();
+    }
+
+    fs::write(
+      dir.path().join("justfile"),
+      "import 'one/bar.just'\nimport 'two/bar.just'\n\nfoo:\n  echo foo\n",
+    )
+    .unwrap();
+
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    let mut document = Document {
+      content: Rope::from_str(
+        &fs::read_to_string(dir.path().join("justfile")).unwrap(),
+      ),
+      tree: None,
+      uri,
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    let context = RuleContext::new(&document);
+
+    let recipe_names = context
+      .recipes()
+      .iter()
+      .map(|recipe| recipe.name.value.as_str())
+      .collect::<Vec<_>>();
+
+    assert_eq!(recipe_names, ["foo", "one", "bar", "two"]);
+  }
+
   #[test]
   fn circular_imports_are_handled() {
     let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
+    fs::create_dir(dir.path().join("sub")).unwrap();
+
     fs::write(
-      dir.path().join("bar.just"),
+      dir.path().join("sub/bar.just"),
       indoc! {
         "
-        import 'justfile'
+        import '../justfile'
 
         bar:
           echo bar
@@ -588,7 +1062,7 @@ mod tests {
       dir.path().join("justfile"),
       indoc! {
         "
-        import 'bar.just'
+        import 'sub/bar.just'
 
         foo:
           echo foo

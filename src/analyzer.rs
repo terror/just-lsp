@@ -293,6 +293,24 @@ mod tests {
   }
 
   #[test]
+  fn alias_recipe_conflicts_respect_platforms() {
+    Test::new(indoc! {
+      "
+      bar:
+        echo bar
+
+      [linux]
+      alias foo := bar
+
+      [windows]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn aliases_missing_recipe() {
     Test::new(indoc! {
       "
@@ -1860,6 +1878,33 @@ mod tests {
   }
 
   #[test]
+  fn duplicate_recipe_setting_respects_platforms() {
+    let document = Document::from(indoc! {
+      "
+      [linux]
+      set allow-duplicate-recipes
+
+      [windows]
+      foo:
+        echo foo
+
+      [windows]
+      foo:
+        echo foo
+      "
+    });
+
+    let diagnostics = Analyzer::from(&document)
+      .analyze()
+      .into_iter()
+      .filter(|diagnostic| diagnostic.id == "duplicate-recipes")
+      .collect::<Vec<_>>();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Duplicate recipe name `foo`");
+  }
+
+  #[test]
   fn duplicate_recipes_with_same_os_attribute() {
     Test::new(indoc! {
       "
@@ -2567,6 +2612,50 @@ mod tests {
   }
 
   #[test]
+  fn list_features_respect_platform_settings() {
+    let document = Document::from(indoc! {
+      "
+      [linux]
+      set lists
+
+      [linux]
+      foo:
+        echo {{ ['foo'] }}
+
+      [windows]
+      bar:
+        echo {{ ['bar'] }}
+      "
+    });
+
+    let diagnostics = Analyzer::from(&document)
+      .analyze()
+      .into_iter()
+      .filter(|diagnostic| diagnostic.id == "list-features")
+      .collect::<Vec<_>>();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "list literals require `set lists`");
+  }
+
+  #[test]
+  fn list_features_treat_complete_platform_settings_as_universal() {
+    Test::new(indoc! {
+      "
+      [unix]
+      set lists
+
+      [windows]
+      set lists
+
+      foo:
+        echo {{ ['bar'] }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn list_features_logical_and_requires_lists() {
     Test::new(indoc! {
       "
@@ -3090,6 +3179,20 @@ mod tests {
   }
 
   #[test]
+  fn platform_positional_arguments_setting_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set positional-arguments
+
+      graph arg:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_shebang_marks_all_as_used() {
     Test::new(indoc! {
       r"
@@ -3529,6 +3632,28 @@ mod tests {
   }
 
   #[test]
+  fn recipe_invocation_variadic_params_reject_extra_arguments_with_partial_lists()
+   {
+    Test::new(indoc! {
+      "
+      [linux]
+      set lists
+
+      foo arg1 +args:
+        echo {{arg1}} {{args}}
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo bar
+      "
+    })
+    .error(
+      "Dependency `foo` accepts 2 arguments, but 3 provided",
+      lsp::Range::at(6, 5, 6, 37),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_invocation_zero_or_more_variadic_accepts_no_arguments() {
     Test::new(indoc! {
       "
@@ -3844,6 +3969,22 @@ mod tests {
 
       recipe:
         echo $foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn platform_export_suppresses_unused_warnings() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set export
+
+      foo := 'bar'
+
+      build arg:
+        echo ok
       "
     })
     .run();

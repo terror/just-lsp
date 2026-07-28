@@ -7,28 +7,22 @@ define_rule! {
     id: "duplicate-recipes",
     message: "duplicate recipes",
     run(context) {
-      let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
-
-      if allow_duplicates {
-        return Vec::new();
-      }
-
       let mut diagnostics = Vec::new();
 
       let mut groups = HashMap::<String, GroupSet>::new();
 
-      for recipe in context.recipes() {
-        let current = GroupSet::from_attributes(&recipe.attributes);
-
+      for (recipe, current) in context.recipes_with_groups() {
         let previous = groups
           .entry(recipe.name.value.clone())
           .or_default();
 
-        let duplicate = previous.conflicts_with(&current);
+        let overlap = previous.intersection(current);
 
-        previous.union_with(current);
+        previous.union_with(current.clone());
 
-        if duplicate {
+        if !overlap.is_empty()
+          && !context.setting_enabled_for("allow-duplicate-recipes", &overlap)
+        {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate recipe name `{}`", recipe.name.value),
             recipe.range,

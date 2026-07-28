@@ -7,20 +7,21 @@ define_rule! {
     id: "unused-parameters",
     message: "unused parameter",
     run(context) {
-      let exported = context.setting_enabled("export");
-
-      let positional_arguments_enabled = context.setting_enabled("positional-arguments");
-
       context
         .scope()
         .recipe_identifier_usage
         .iter()
         .filter_map(|(recipe_name, identifiers)| {
-          context.recipe(recipe_name).map(|recipe| (recipe, identifiers))
+          context
+            .recipe_with_groups(recipe_name)
+            .map(|(recipe, groups)| (recipe, groups, identifiers))
         })
-        .flat_map(|(recipe, identifiers): (&Recipe, _)| {
+        .flat_map(|(recipe, groups, identifiers): (&Recipe, _, _)| {
+          let exported = context.setting_enabled_in("export", groups);
+
           let recipe_enables_positional_arguments =
-            positional_arguments_enabled || recipe.has_attribute("positional-arguments");
+            context.setting_enabled_in("positional-arguments", groups)
+              || recipe.has_attribute("positional-arguments");
 
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
