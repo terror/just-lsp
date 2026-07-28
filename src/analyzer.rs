@@ -4,6 +4,7 @@ use super::*;
 pub struct Analyzer<'a> {
   config: Option<&'a Config>,
   document: &'a Document,
+  imported_documents: Vec<&'a Document>,
 }
 
 impl<'a> From<&'a Document> for Analyzer<'a> {
@@ -11,6 +12,7 @@ impl<'a> From<&'a Document> for Analyzer<'a> {
     Self {
       config: None,
       document,
+      imported_documents: Vec::new(),
     }
   }
 }
@@ -23,7 +25,8 @@ impl<'a> Analyzer<'a> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    let context = RuleContext::new(self.document);
+    let context =
+      RuleContext::new(self.document, self.imported_documents.iter().copied());
 
     let default = Config::default();
 
@@ -73,6 +76,17 @@ impl<'a> Analyzer<'a> {
   pub fn config(self, config: &'a Config) -> Self {
     Self {
       config: Some(config),
+      ..self
+    }
+  }
+
+  #[must_use]
+  pub fn imported_documents(
+    self,
+    imported_documents: impl IntoIterator<Item = &'a Document>,
+  ) -> Self {
+    Self {
+      imported_documents: imported_documents.into_iter().collect(),
       ..self
     }
   }

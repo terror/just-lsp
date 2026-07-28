@@ -223,7 +223,7 @@ mod tests {
     }
 
     fn run(self) {
-      let scope = Scope::analyze(&RuleContext::new(&self.document));
+      let scope = Scope::analyze(&RuleContext::new(&self.document, []));
 
       let mut actual_unresolved = scope
         .unresolved_identifiers

@@ -288,7 +288,14 @@ impl Inner {
       }));
     }
 
-    let quickfixer = Quickfixer::new(document, &params);
+    let imported_documents = workspace
+      .projects
+      .get(&params.text_document.uri)
+      .into_iter()
+      .flat_map(|project| project.imported_documents(&workspace.documents));
+
+    let quickfixer =
+      Quickfixer::new(document, &params).imported_documents(imported_documents);
 
     actions.extend(quickfixer.config(&config).collect());
 
@@ -433,6 +440,7 @@ impl Inner {
 
       if workspace.documents.is_open(&uri) {
         workspace.documents.change(params)?;
+        workspace.load_project(uri.clone())?;
         should_publish = true;
       }
     }
@@ -449,7 +457,11 @@ impl Inner {
 
     let closed = {
       let mut workspace = self.workspace.write().await;
-      workspace.documents.close(&params)
+      let closed = workspace.documents.close(&params);
+
+      workspace.projects.remove(&uri);
+
+      closed
     };
 
     if closed {
@@ -463,6 +475,7 @@ impl Inner {
     {
       let mut workspace = self.workspace.write().await;
       workspace.documents.open(params)?;
+      workspace.load_project(uri.clone())?;
     }
 
     self.publish_diagnostics(&uri).await;
@@ -907,7 +920,14 @@ impl Inner {
 
       match workspace.documents.get_open(uri) {
         Some(document) => {
-          let analyzer = Analyzer::from(document).config(&config);
+          let imported_documents =
+            workspace.projects.get(uri).into_iter().flat_map(|project| {
+              project.imported_documents(&workspace.documents)
+            });
+
+          let analyzer = Analyzer::from(document)
+            .imported_documents(imported_documents)
+            .config(&config);
 
           (
             analyzer

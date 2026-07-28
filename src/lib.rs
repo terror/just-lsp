@@ -1,6 +1,7 @@
 use {
   document_entry::DocumentEntry,
   indoc::indoc,
+  lexiclean::Lexiclean,
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
@@ -30,7 +31,9 @@ pub use {
   count::Count,
   dependency::Dependency,
   dependency_argument::DependencyArgument,
+  dependency_kind::DependencyKind,
   dependency_phase::DependencyPhase,
+  dependency_target::DependencyTarget,
   deprecation::Deprecation,
   diagnostic::Diagnostic,
   document::Document,
@@ -47,6 +50,9 @@ pub use {
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
   position_ext::PositionExt,
+  project::Project,
+  project_dependency::ProjectDependency,
+  project_loader::ProjectLoader,
   quickfix::Quickfix,
   quickfixer::Quickfixer,
   range_ext::RangeExt,
@@ -75,7 +81,9 @@ mod config;
 mod count;
 mod dependency;
 mod dependency_argument;
+mod dependency_kind;
 mod dependency_phase;
+mod dependency_target;
 mod deprecation;
 mod diagnostic;
 mod document;
@@ -93,6 +101,9 @@ mod node_ext;
 mod parameter;
 mod point_ext;
 mod position_ext;
+mod project;
+mod project_dependency;
+mod project_loader;
 mod quickfix;
 mod quickfixer;
 mod range_ext;

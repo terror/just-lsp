@@ -3,6 +3,7 @@ use super::*;
 pub struct Quickfixer<'a> {
   config: Option<&'a Config>,
   document: &'a Document,
+  imported_documents: Vec<&'a Document>,
   parameters: &'a lsp::CodeActionParams,
 }
 
@@ -40,7 +41,8 @@ impl<'a> Quickfixer<'a> {
 
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let context = RuleContext::new(self.document);
+    let context =
+      RuleContext::new(self.document, self.imported_documents.iter().copied());
 
     inventory::iter::<&dyn Rule>
       .into_iter()
@@ -71,6 +73,17 @@ impl<'a> Quickfixer<'a> {
   }
 
   #[must_use]
+  pub fn imported_documents(
+    self,
+    imported_documents: impl IntoIterator<Item = &'a Document>,
+  ) -> Self {
+    Self {
+      imported_documents: imported_documents.into_iter().collect(),
+      ..self
+    }
+  }
+
+  #[must_use]
   pub fn new(
     document: &'a Document,
     parameters: &'a lsp::CodeActionParams,
@@ -78,6 +91,7 @@ impl<'a> Quickfixer<'a> {
     Self {
       config: None,
       document,
+      imported_documents: Vec::new(),
       parameters,
     }
   }
