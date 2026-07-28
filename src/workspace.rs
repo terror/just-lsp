@@ -7,7 +7,9 @@ pub struct Workspace {
 }
 
 impl Workspace {
-  #[allow(clippy::missing_errors_doc)]
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the project root cannot be loaded.
   pub fn load_project(&mut self, root: lsp::Url) -> Result {
     let project = ProjectLoader::load(&mut self.documents, &root)?;
 

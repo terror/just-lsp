@@ -76,7 +76,9 @@ impl<'a> ProjectLoader<'a> {
     Ok(())
   }
 
-  #[allow(clippy::missing_errors_doc)]
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the root document cannot be loaded.
   pub fn load(
     documents: &'a mut DocumentStore,
     root: &lsp::Url,
