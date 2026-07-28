@@ -33,6 +33,11 @@ impl Project {
       .insert(source.clone());
   }
 
+  #[must_use]
+  pub fn contains(&self, uri: &lsp::Url) -> bool {
+    self.root == *uri || self.dependents.contains_key(uri)
+  }
+
   pub fn dependencies(
     &self,
     source: &lsp::Url,

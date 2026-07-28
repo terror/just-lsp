@@ -65,8 +65,9 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Missing);
     };
 
+    self.project.add_dependent(&uri, source);
+
     if self.active.contains(&uri) {
-      self.project.add_dependent(&uri, source);
       return Ok(ProjectDependencyTarget::Cycle);
     }
 
@@ -77,8 +78,6 @@ impl<'a> ProjectLoader<'a> {
 
       return Ok(ProjectDependencyTarget::Missing);
     }
-
-    self.project.add_dependent(&uri, source);
 
     if !self.expanded.contains(&uri) {
       self.visit(&uri)?;

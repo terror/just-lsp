@@ -438,20 +438,23 @@ impl Inner {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let mut should_publish = false;
-
-    {
+    let roots = {
       let mut workspace = self.workspace.write().await;
 
-      if workspace.documents.is_open(&uri) {
-        workspace.documents.change(params)?;
-        workspace.load_project(uri.clone())?;
-        should_publish = true;
+      if !workspace.documents.is_open(&uri) {
+        return Ok(());
       }
-    }
 
-    if should_publish {
-      self.publish_diagnostics(&uri).await;
+      let roots = workspace.affected_roots(&uri);
+
+      workspace.documents.change(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
     }
 
     Ok(())
@@ -460,30 +463,51 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let closed = {
+    let roots = {
       let mut workspace = self.workspace.write().await;
+      let mut roots = workspace.affected_roots(&uri);
+
       let closed = workspace.documents.close(&params);
 
       workspace.projects.remove(&uri);
+      roots.remove(&uri);
 
-      closed
+      if !closed {
+        return;
+      }
+
+      if let Err(error) = workspace.load_projects(roots.iter().cloned()) {
+        warn!(%error, "failed to rebuild affected projects");
+      }
+
+      roots
     };
 
-    if closed {
-      self.client.publish_diagnostics(uri, vec![], None).await;
+    self.client.publish_diagnostics(uri, vec![], None).await;
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
     }
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    {
+    let roots = {
       let mut workspace = self.workspace.write().await;
-      workspace.documents.open(params)?;
-      workspace.load_project(uri.clone())?;
-    }
+      let mut roots = workspace.affected_roots(&uri);
 
-    self.publish_diagnostics(&uri).await;
+      roots.insert(uri.clone());
+
+      workspace.documents.open(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
 
     Ok(())
   }
@@ -1408,6 +1432,25 @@ mod tests {
   }
 
   #[derive(Debug)]
+  struct DidCloseNotification<'a> {
+    uri: &'a str,
+  }
+
+  impl IntoValue for DidCloseNotification<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "method": "textDocument/didClose",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[derive(Debug)]
   struct GotoDefinitionRequest<'a> {
     character: u32,
     id: i64,
@@ -2179,6 +2222,92 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn dependency_open_republishes_root_diagnostics() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    std::fs::write(imported.to_file_path().unwrap(), "")?;
+
+    let (service, mut socket) = LspService::new(Server::new);
+
+    let mut service = Spawn::new(service);
+
+    service
+      .call(serde_json::from_value(
+        InitializeRequest { id: 1 }.into_value(),
+      )?)
+      .await?;
+
+    let initialized = service.call(serde_json::from_value(json!({
+      "jsonrpc": "2.0",
+      "method": "initialized",
+      "params": {}
+    }))?);
+
+    let (response, _) = tokio::join!(initialized, socket.next());
+
+    response?;
+
+    let open = service.call(serde_json::from_value(
+      DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'\n\nbar: foo",
+      }
+      .into_value(),
+    )?);
+
+    let (response, diagnostics) = tokio::join!(open, socket.next());
+
+    response?;
+
+    let diagnostics = serde_json::to_value(diagnostics.unwrap())?;
+
+    assert_eq!(diagnostics["method"], "textDocument/publishDiagnostics");
+    assert_eq!(diagnostics["params"]["uri"], root.as_str());
+
+    assert!(
+      !diagnostics["params"]["diagnostics"]
+        .as_array()
+        .unwrap()
+        .is_empty()
+    );
+
+    let open = service.call(serde_json::from_value(
+      DidOpenNotification {
+        uri: imported.as_str(),
+        text: "foo:",
+      }
+      .into_value(),
+    )?);
+
+    let diagnostics =
+      async { [socket.next().await.unwrap(), socket.next().await.unwrap()] };
+
+    let (response, diagnostics) = tokio::join!(open, diagnostics);
+
+    response?;
+
+    let diagnostics = diagnostics
+      .into_iter()
+      .map(serde_json::to_value)
+      .collect::<serde_json::Result<Vec<_>>>()?;
+
+    let diagnostics = diagnostics
+      .iter()
+      .find(|diagnostics| diagnostics["params"]["uri"] == root.as_str())
+      .unwrap();
+
+    assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
+
+    Ok(())
+  }
+
+  #[tokio::test]
   async fn goto_import_definition() -> Result {
     let tempdir = tempfile::tempdir()?;
 
@@ -2408,6 +2537,153 @@ mod tests {
       .response(HoverResponse {
         id: 3,
         content: "foo:\n  echo buffer",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 5,
+        end_line: 2,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn imported_symbol_navigation_rebuilds_affected_roots() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let first =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    let second =
+      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
+
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("baz.just")).unwrap();
+
+    let target =
+      lsp::Url::from_file_path(tempdir.path().join("qux.just")).unwrap();
+
+    std::fs::write(target.to_file_path().unwrap(), "qux:")?;
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: first.as_str(),
+        text: "import 'baz.just'\n\nfoo: qux",
+      })
+      .notification(DidOpenNotification {
+        uri: second.as_str(),
+        text: "import 'baz.just'\n\nbar: qux",
+      })
+      .notification(DidOpenNotification {
+        uri: imported.as_str(),
+        text: "",
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: first.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .notification(DidChangeNotification {
+        uri: imported.as_str(),
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: None,
+          range_length: None,
+          text: "import 'qux.just'".into(),
+        }],
+      })
+      .request(HoverRequest {
+        id: 3,
+        uri: first.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 3,
+        content: "qux:",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 5,
+        end_line: 2,
+        end_char: 8,
+      })
+      .request(HoverRequest {
+        id: 4,
+        uri: second.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 4,
+        content: "qux:",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 5,
+        end_line: 2,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn closing_imported_buffer_restores_disk_project() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    let target =
+      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
+
+    std::fs::write(imported.to_file_path().unwrap(), "import 'bar.just'")?;
+    std::fs::write(target.to_file_path().unwrap(), "bar:")?;
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'\n\nfoo: bar",
+      })
+      .notification(DidOpenNotification {
+        uri: imported.as_str(),
+        text: "",
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .notification(DidCloseNotification {
+        uri: imported.as_str(),
+      })
+      .request(HoverRequest {
+        id: 3,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 3,
+        content: "bar:",
         kind: "plaintext",
         start_line: 2,
         start_char: 5,
