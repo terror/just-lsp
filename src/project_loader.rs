@@ -14,13 +14,13 @@ impl<'a> ProjectLoader<'a> {
 
     let path = import.resolve(source);
 
-    let kind = DependencyKind::Import {
+    let kind = ProjectDependencyKind::Import {
       attributes: import.attributes,
       optional: import.optional,
     };
 
     let target = if dynamic {
-      DependencyTarget::Dynamic
+      ProjectDependencyTarget::Dynamic
     } else if let Some(path) = path {
       let path = path.as_path().lexiclean();
 
@@ -33,7 +33,7 @@ impl<'a> ProjectLoader<'a> {
             .or_default()
             .insert(source.clone());
 
-          DependencyTarget::Cycle
+          ProjectDependencyTarget::Cycle
         } else if self.documents.load(&uri).is_ok() {
           self
             .project
@@ -47,19 +47,19 @@ impl<'a> ProjectLoader<'a> {
             self.project.imported.push(uri.clone());
           }
 
-          DependencyTarget::Resolved(uri)
+          ProjectDependencyTarget::Resolved(uri)
         } else {
           if !import.optional {
             warn!(path = %path.display(), "failed to read import");
           }
 
-          DependencyTarget::Missing
+          ProjectDependencyTarget::Missing
         }
       } else {
-        DependencyTarget::Missing
+        ProjectDependencyTarget::Missing
       }
     } else {
-      DependencyTarget::Missing
+      ProjectDependencyTarget::Missing
     };
 
     self
@@ -200,29 +200,38 @@ mod tests {
     assert_eq!(root_dependencies.len(), 5);
     assert_eq!(
       root_dependencies[0].target,
-      DependencyTarget::Resolved(bar.clone())
+      ProjectDependencyTarget::Resolved(bar.clone())
     );
-    assert_eq!(root_dependencies[1].target, DependencyTarget::Missing);
+    assert_eq!(
+      root_dependencies[1].target,
+      ProjectDependencyTarget::Missing
+    );
     assert_eq!(
       root_dependencies[1].kind,
-      DependencyKind::Import {
+      ProjectDependencyKind::Import {
         attributes: Vec::new(),
         optional: true,
       }
     );
-    assert_eq!(root_dependencies[2].target, DependencyTarget::Missing);
+    assert_eq!(
+      root_dependencies[2].target,
+      ProjectDependencyTarget::Missing
+    );
     assert_eq!(
       root_dependencies[2].kind,
-      DependencyKind::Import {
+      ProjectDependencyKind::Import {
         attributes: Vec::new(),
         optional: false,
       }
     );
     assert_eq!(
       root_dependencies[3].target,
-      DependencyTarget::Resolved(bar.clone())
+      ProjectDependencyTarget::Resolved(bar.clone())
     );
-    assert_eq!(root_dependencies[4].target, DependencyTarget::Dynamic);
+    assert_eq!(
+      root_dependencies[4].target,
+      ProjectDependencyTarget::Dynamic
+    );
 
     assert_eq!(
       project.dependencies[&bar]
@@ -230,8 +239,8 @@ mod tests {
         .map(|dependency| dependency.target.clone())
         .collect::<Vec<_>>(),
       [
-        DependencyTarget::Resolved(baz.clone()),
-        DependencyTarget::Cycle
+        ProjectDependencyTarget::Resolved(baz.clone()),
+        ProjectDependencyTarget::Cycle
       ]
     );
 

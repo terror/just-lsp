@@ -31,9 +31,7 @@ pub use {
   count::Count,
   dependency::Dependency,
   dependency_argument::DependencyArgument,
-  dependency_kind::DependencyKind,
   dependency_phase::DependencyPhase,
-  dependency_target::DependencyTarget,
   deprecation::Deprecation,
   diagnostic::Diagnostic,
   document::Document,
@@ -52,6 +50,8 @@ pub use {
   position_ext::PositionExt,
   project::Project,
   project_dependency::ProjectDependency,
+  project_dependency_kind::ProjectDependencyKind,
+  project_dependency_target::ProjectDependencyTarget,
   project_loader::ProjectLoader,
   quickfix::Quickfix,
   quickfixer::Quickfixer,
@@ -81,9 +81,7 @@ mod config;
 mod count;
 mod dependency;
 mod dependency_argument;
-mod dependency_kind;
 mod dependency_phase;
-mod dependency_target;
 mod deprecation;
 mod diagnostic;
 mod document;
@@ -103,6 +101,8 @@ mod point_ext;
 mod position_ext;
 mod project;
 mod project_dependency;
+mod project_dependency_kind;
+mod project_dependency_target;
 mod project_loader;
 mod quickfix;
 mod quickfixer;

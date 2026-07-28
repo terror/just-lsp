@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProjectDependency {
-  pub kind: DependencyKind,
+  pub kind: ProjectDependencyKind,
   pub location: lsp::Range,
-  pub target: DependencyTarget,
+  pub target: ProjectDependencyTarget,
 }
