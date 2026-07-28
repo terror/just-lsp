@@ -5,6 +5,7 @@ define_rule! {
   UnknownAttributeRule {
     id: "unknown-attribute",
     message: "unknown attribute",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

@@ -6,6 +6,7 @@ define_rule! {
   AttributeTargetSupportRule {
     id: "attribute-target-support",
     message: "unsupported attribute target",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

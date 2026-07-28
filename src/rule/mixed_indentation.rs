@@ -49,6 +49,7 @@ define_rule! {
   MixedIndentationRule {
     id: "mixed-recipe-indentation",
     message: "mixed indentation",
+    phase: RulePhase::Document,
     run(context) {
       context
         .recipes()

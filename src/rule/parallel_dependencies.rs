@@ -6,6 +6,7 @@ define_rule! {
   ParallelDependenciesRule {
     id: "parallel-dependencies",
     message: "unnecessary parallel attribute",
+    phase: RulePhase::Document,
     run(context) {
       context
         .recipes()

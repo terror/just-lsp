@@ -7,6 +7,7 @@ define_rule! {
   ListFeaturesRule {
     id: "list-features",
     message: "list feature requires set lists",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

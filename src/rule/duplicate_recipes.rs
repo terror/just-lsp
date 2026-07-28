@@ -6,6 +6,7 @@ define_rule! {
   DuplicateRecipeRule {
     id: "duplicate-recipes",
     message: "duplicate recipes",
+    phase: RulePhase::Project,
     run(context) {
       let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
 

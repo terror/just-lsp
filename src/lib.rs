@@ -66,6 +66,7 @@ pub use {
   rope_ext::{Edit, Position as RopePosition, RopeExt},
   rule::Rule,
   rule_context::RuleContext,
+  rule_phase::RulePhase,
   scope::Scope,
   setting::Setting,
   setting_kind::SettingKind,
@@ -122,6 +123,7 @@ mod recipe;
 mod rope_ext;
 mod rule;
 mod rule_context;
+mod rule_phase;
 mod scope;
 mod setting;
 mod setting_kind;

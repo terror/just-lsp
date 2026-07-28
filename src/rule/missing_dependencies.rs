@@ -6,6 +6,7 @@ define_rule! {
   MissingDependencyRule {
     id: "missing-dependencies",
     message: "missing dependency",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 

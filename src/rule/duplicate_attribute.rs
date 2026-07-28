@@ -6,6 +6,7 @@ define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
     message: "duplicate attribute",
+    phase: RulePhase::Project,
     run(context) {
       let Some(tree) = context.tree() else {
         return Vec::new();

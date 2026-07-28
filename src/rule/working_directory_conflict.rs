@@ -5,6 +5,7 @@ define_rule! {
   WorkingDirectoryConflictRule {
     id: "working-directory-conflict",
     message: "conflicting directory attributes",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

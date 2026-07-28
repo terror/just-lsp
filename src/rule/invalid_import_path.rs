@@ -4,6 +4,7 @@ define_rule! {
   InvalidImportPathRule {
     id: "invalid-import-path",
     message: "invalid import path",
+    phase: RulePhase::Document,
     run(context) {
       let document = context.document();
 

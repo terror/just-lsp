@@ -6,6 +6,7 @@ define_rule! {
   CacheAttributeRule {
     id: "cache-attribute",
     message: "invalid cache attribute",
+    phase: RulePhase::Document,
     run(context) {
       let Some(tree) = context.tree() else {
         return Vec::new();

@@ -6,6 +6,7 @@ define_rule! {
   RecipeParameterRule {
     id: "recipe-parameters",
     message: "invalid recipe parameters",
+    phase: RulePhase::Document,
     run(context) {
       let mut diagnostics = Vec::new();
 

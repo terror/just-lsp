@@ -41,6 +41,7 @@ define_rule! {
   AliasRecipeConflictRule {
     id: "alias-recipe-conflict",
     message: "name conflict",
+    phase: RulePhase::Project,
     run(context) {
       let (aliases, recipes) = (context.aliases(), context.recipes());
 

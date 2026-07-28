@@ -6,6 +6,7 @@ define_rule! {
   FunctionArgumentsRule {
     id: "function-arguments",
     message: "invalid function arguments",
+    phase: RulePhase::Project,
     run(context) {
       let mut diagnostics = Vec::new();
 
