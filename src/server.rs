@@ -531,16 +531,19 @@ impl Inner {
 
     let mut links = Vec::new();
 
-    for import in document.imports() {
-      if let Some(path) = import.resolve(uri)
-        && let Ok(target) = lsp::Url::from_file_path(&path)
-      {
-        links.push(lsp::DocumentLink {
-          range: import.path.range,
-          target: Some(target),
-          tooltip: Some(path.display().to_string()),
-          data: None,
-        });
+    if let Some(project) = workspace.projects.get(uri) {
+      for dependency in project.dependencies(uri) {
+        if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
+          links.push(lsp::DocumentLink {
+            range: dependency.location,
+            target: Some(target.clone()),
+            tooltip: target
+              .to_file_path()
+              .ok()
+              .map(|path| path.display().to_string()),
+            data: None,
+          });
+        }
       }
     }
 
@@ -810,6 +813,20 @@ impl Inner {
     let position = params.text_document_position_params.position;
 
     let workspace = self.workspace.read().await;
+
+    if let Some(target) = workspace
+      .projects
+      .get(&uri)
+      .and_then(|project| project.dependency_at(&uri, position))
+      .and_then(|dependency| match &dependency.target {
+        ProjectDependencyTarget::Resolved(target) => Some(target),
+        _ => None,
+      })
+    {
+      return Ok(Some(lsp::GotoDefinitionResponse::Scalar(
+        lsp::Location::new(target.clone(), lsp::Range::default()),
+      )));
+    }
 
     Ok(workspace.documents.get_open(&uri).and_then(|document| {
       document
@@ -2164,6 +2181,42 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn goto_import_definition() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("foo.just");
+
+    std::fs::write(&target, "foo:")?;
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'",
+      })
+      .request(GotoDefinitionRequest {
+        id: 2,
+        uri: root.as_str(),
+        line: 0,
+        character: 9,
+      })
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: lsp::Url::from_file_path(target).unwrap().as_str(),
+        start_line: 0,
+        start_char: 0,
+        end_line: 0,
+        end_char: 0,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3449,30 +3502,25 @@ mod tests {
 
   #[tokio::test]
   async fn document_link_import() -> Result {
-    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
-      (
-        "file:///C:/foo/justfile",
-        "file:///C:/foo/bar.just",
-        "C:\\foo\\bar.just",
-      )
-    } else {
-      (
-        "file:///foo/justfile",
-        "file:///foo/bar.just",
-        "/foo/bar.just",
-      )
-    };
+    let tempdir = tempfile::tempdir()?;
+
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("bar.just");
+
+    std::fs::write(&target, "bar:")?;
+
+    let root_uri = lsp::Url::from_file_path(root).unwrap();
 
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
-        uri: justfile_uri,
+        uri: root_uri.as_str(),
         text: "import 'bar.just'\n",
       })
       .request(DocumentLinkRequest {
         id: 2,
-        uri: justfile_uri,
+        uri: root_uri.as_str(),
       })
       .response(json!({
         "jsonrpc": "2.0",
@@ -3483,10 +3531,37 @@ mod tests {
               "start": { "line": 0, "character": 7 },
               "end": { "line": 0, "character": 17 }
             },
-            "target": target_uri,
-            "tooltip": tooltip
+            "target": lsp::Url::from_file_path(&target).unwrap(),
+            "tooltip": target.display().to_string()
           }
         ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_link_ignores_unresolved_imports() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: "import? 'missing.just'\nimport x'dynamic.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: root.as_str(),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
       }))
       .run()
       .await

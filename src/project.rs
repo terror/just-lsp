@@ -33,6 +33,26 @@ impl Project {
       .insert(source.clone());
   }
 
+  pub fn dependencies(
+    &self,
+    source: &lsp::Url,
+  ) -> impl Iterator<Item = &ProjectDependency> {
+    self.dependencies.get(source).into_iter().flatten()
+  }
+
+  #[must_use]
+  pub fn dependency_at(
+    &self,
+    source: &lsp::Url,
+    position: lsp::Position,
+  ) -> Option<&ProjectDependency> {
+    self.dependencies(source).find(|dependency| {
+      dependency
+        .location
+        .overlaps(lsp::Range::new(position, position))
+    })
+  }
+
   pub fn imported_documents<'a>(
     &'a self,
     documents: &'a DocumentStore,
