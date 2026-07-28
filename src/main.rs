@@ -12,7 +12,7 @@ use {
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
