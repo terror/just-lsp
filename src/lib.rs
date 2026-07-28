@@ -43,6 +43,7 @@ pub use {
   group::Group,
   group_set::GroupSet,
   import::Import,
+  located::Located,
   module::Module,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
@@ -53,6 +54,7 @@ pub use {
   project_dependency_kind::ProjectDependencyKind,
   project_dependency_target::ProjectDependencyTarget,
   project_loader::ProjectLoader,
+  project_view::ProjectView,
   quickfix::Quickfix,
   quickfixer::Quickfixer,
   range_ext::RangeExt,
@@ -94,6 +96,7 @@ mod function_kind;
 mod group;
 mod group_set;
 mod import;
+mod located;
 mod module;
 mod node_ext;
 mod parameter;
@@ -104,6 +107,7 @@ mod project_dependency;
 mod project_dependency_kind;
 mod project_dependency_target;
 mod project_loader;
+mod project_view;
 mod quickfix;
 mod quickfixer;
 mod range_ext;
