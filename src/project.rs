@@ -9,10 +9,44 @@ pub struct Project {
 }
 
 impl Project {
+  pub(super) fn add_dependency(
+    &mut self,
+    source: &lsp::Url,
+    dependency: ProjectDependency,
+  ) {
+    self
+      .dependencies
+      .entry(source.clone())
+      .or_default()
+      .push(dependency);
+  }
+
+  pub(super) fn add_dependent(
+    &mut self,
+    dependency: &lsp::Url,
+    source: &lsp::Url,
+  ) {
+    self
+      .dependents
+      .entry(dependency.clone())
+      .or_default()
+      .insert(source.clone());
+  }
+
   pub fn imported_documents<'a>(
     &'a self,
     documents: &'a DocumentStore,
   ) -> impl Iterator<Item = &'a Document> {
     self.imported.iter().filter_map(|uri| documents.get(uri))
+  }
+
+  #[must_use]
+  pub fn new(root: lsp::Url) -> Self {
+    Self {
+      dependencies: HashMap::new(),
+      dependents: HashMap::new(),
+      imported: Vec::new(),
+      root,
+    }
   }
 }

@@ -10,6 +10,11 @@ pub struct Import {
 
 impl Import {
   #[must_use]
+  pub fn is_dynamic(&self) -> bool {
+    self.path.value.starts_with(['f', 'x'])
+  }
+
+  #[must_use]
   pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
     let raw = self.path.value.trim_matches(|c| c == '\'' || c == '"');
 

@@ -3,21 +3,12 @@ use super::*;
 pub struct ProjectLoader<'a> {
   active: HashSet<lsp::Url>,
   documents: &'a mut DocumentStore,
+  expanded: HashSet<lsp::Url>,
   project: Project,
-  visited: HashSet<lsp::Url>,
 }
 
 impl<'a> ProjectLoader<'a> {
-  fn add_dependent(&mut self, dependency: &lsp::Url, source: &lsp::Url) {
-    self
-      .project
-      .dependents
-      .entry(dependency.clone())
-      .or_default()
-      .insert(source.clone());
-  }
-
-  fn dependency(&mut self, source: &lsp::Url, import: Import) -> Result {
+  fn add_dependency(&mut self, source: &lsp::Url, import: Import) -> Result {
     let target = self.resolve_dependency_target(source, &import)?;
 
     let dependency = ProjectDependency {
@@ -29,12 +20,7 @@ impl<'a> ProjectLoader<'a> {
       target,
     };
 
-    self
-      .project
-      .dependencies
-      .entry(source.clone())
-      .or_default()
-      .push(dependency);
+    self.project.add_dependency(source, dependency);
 
     Ok(())
   }
@@ -51,13 +37,8 @@ impl<'a> ProjectLoader<'a> {
     let mut loader = Self {
       active: HashSet::new(),
       documents,
-      project: Project {
-        dependencies: HashMap::new(),
-        dependents: HashMap::new(),
-        imported: Vec::new(),
-        root: root.clone(),
-      },
-      visited: HashSet::new(),
+      expanded: HashSet::new(),
+      project: Project::new(root.clone()),
     };
 
     loader.visit(root)?;
@@ -70,7 +51,7 @@ impl<'a> ProjectLoader<'a> {
     source: &lsp::Url,
     import: &Import,
   ) -> Result<ProjectDependencyTarget> {
-    if import.path.value.starts_with(['f', 'x']) {
+    if import.is_dynamic() {
       return Ok(ProjectDependencyTarget::Dynamic);
     }
 
@@ -85,7 +66,7 @@ impl<'a> ProjectLoader<'a> {
     };
 
     if self.active.contains(&uri) {
-      self.add_dependent(&uri, source);
+      self.project.add_dependent(&uri, source);
       return Ok(ProjectDependencyTarget::Cycle);
     }
 
@@ -97,9 +78,9 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Missing);
     }
 
-    self.add_dependent(&uri, source);
+    self.project.add_dependent(&uri, source);
 
-    if !self.visited.contains(&uri) {
+    if !self.expanded.contains(&uri) {
       self.visit(&uri)?;
       self.project.imported.push(uri.clone());
     }
@@ -115,11 +96,11 @@ impl<'a> ProjectLoader<'a> {
     self.project.dependencies.entry(uri.clone()).or_default();
 
     for import in imports {
-      self.dependency(uri, import)?;
+      self.add_dependency(uri, import)?;
     }
 
     self.active.remove(uri);
-    self.visited.insert(uri.clone());
+    self.expanded.insert(uri.clone());
 
     Ok(())
   }
