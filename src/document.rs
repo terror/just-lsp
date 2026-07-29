@@ -1013,6 +1013,36 @@ mod tests {
   }
 
   #[test]
+  fn get_boolean_false_setting() {
+    let document = Document::from(indoc! {
+      "
+      set foo := false
+      "
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::Boolean(false),
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "false".into(),
+          range: lsp::Range::at(0, 11, 0, 16),
+        },
+      }]
+    );
+  }
+
+  #[test]
   fn get_boolean_flag_setting() {
     let document = Document::from(indoc! {
       "
@@ -1113,6 +1143,66 @@ mod tests {
           range: lsp::Range::at(1, 0, 1, 22)
         }
       ]
+    );
+  }
+
+  #[test]
+  fn get_expression_setting() {
+    let document = Document::from(indoc! {
+      r#"
+      set foo := "bar" / baz
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar\" / baz".into(),
+          range: lsp::Range::at(0, 11, 0, 22),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_hyphenated_array_setting() {
+    let document = Document::from(indoc! {
+      r#"
+      set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "windows-shell".into(),
+          range: lsp::Range::at(0, 4, 0, 17),
+        },
+        kind: SettingKind::Array,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]".into(),
+          range: lsp::Range::at(0, 21, 0, 62),
+        },
+      }]
     );
   }
 
@@ -1287,6 +1377,36 @@ mod tests {
         value: TextNode {
           value: "'wow!'".into(),
           range: lsp::Range::at(0, 11, 0, 17),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_string_setting_containing_walrus() {
+    let document = Document::from(indoc! {
+      r#"
+      set foo := "bar := baz"
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar := baz\"".into(),
+          range: lsp::Range::at(0, 11, 0, 23),
         },
       }]
     );
@@ -2104,6 +2224,26 @@ mod tests {
   }
 
   #[test]
+  fn recipe_with_complex_default_parameter() {
+    let document = Document::from(indoc! {
+      r#"
+      foo triple=(arch + "-unknown-unknown"):
+      "#
+    });
+
+    assert_eq!(
+      document.find_recipe("foo").unwrap().parameters,
+      vec![Parameter {
+        name: "triple".into(),
+        kind: ParameterKind::Normal,
+        default_value: Some("(arch + \"-unknown-unknown\")".into()),
+        content: "triple=(arch + \"-unknown-unknown\")".into(),
+        range: lsp::Range::at(0, 4, 0, 38),
+      }],
+    );
+  }
+
+  #[test]
   fn recipe_with_default_parameter() {
     let document = Document::from(indoc! {
       "
@@ -2225,6 +2365,24 @@ mod tests {
         shebang: None,
       })
     );
+  }
+
+  #[test]
+  fn recipe_with_invalid_parameters() {
+    #[track_caller]
+    fn case(source: &str) {
+      assert_eq!(
+        Document::from(source)
+          .find_recipe("foo")
+          .unwrap()
+          .parameters,
+        vec![],
+      );
+    }
+
+    case("foo $:\n");
+    case("foo +:\n");
+    case("foo *:\n");
   }
 
   #[test]
@@ -2493,6 +2651,26 @@ mod tests {
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       })
+    );
+  }
+
+  #[test]
+  fn recipe_with_zero_or_more_variadic_parameter() {
+    let document = Document::from(indoc! {
+      "
+      foo *FLAGS:
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo").unwrap().parameters,
+      vec![Parameter {
+        name: "FLAGS".into(),
+        kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
+        default_value: None,
+        content: "*FLAGS".into(),
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
     );
   }
 
