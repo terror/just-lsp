@@ -287,6 +287,24 @@ mod tests {
   }
 
   #[test]
+  fn loading_prefers_open_import() {
+    let mut test = Test::new("import 'foo.just'").file("foo.just", "disk:");
+
+    test.open("foo.just", "buffer:");
+
+    let project = test.load();
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .flat_map(Document::recipes)
+        .map(|recipe| recipe.name.value)
+        .collect::<Vec<_>>(),
+      ["buffer"]
+    );
+  }
+
+  #[test]
   fn loads_import_graph() {
     let mut test = Test::new(indoc! {
       "
@@ -385,23 +403,5 @@ mod tests {
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
     assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
-  }
-
-  #[test]
-  fn loading_prefers_open_import() {
-    let mut test = Test::new("import 'foo.just'").file("foo.just", "disk:");
-
-    test.open("foo.just", "buffer:");
-
-    let project = test.load();
-
-    assert_eq!(
-      project
-        .imported_documents(&test.documents)
-        .flat_map(Document::recipes)
-        .map(|recipe| recipe.name.value)
-        .collect::<Vec<_>>(),
-      ["buffer"]
-    );
   }
 }

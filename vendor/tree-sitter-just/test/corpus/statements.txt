@@ -1,106 +1,4 @@
 ================================================================================
-empty
-================================================================================
-
---------------------------------------------------------------------------------
-
-(source_file)
-
-================================================================================
-assignment
-================================================================================
-
-foo := "abc"
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string)))))
-
-================================================================================
-expression
-================================================================================
-
-foo := "abc" + 'def'
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
-      (value
-        (string)))))
-
-================================================================================
-unary negation
-================================================================================
-
-foo := !bar
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (not_expression
-          (value
-            (identifier)))))))
-
-================================================================================
-logical operators
-================================================================================
-
-foo := '' || 'bar'
-bar := 'foo' && 'bar'
-baz := 'foo' && '' || 'bar'
-qux := 'foo' || 'bar' + 'baz'
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
-      (value
-        (string))))
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
-      (value
-        (string))))
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
-      (value
-        (string))
-      (value
-        (string))))
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
-      (value
-        (string))
-      (value
-        (string)))))
-
-================================================================================
 assert expression
 ================================================================================
 
@@ -139,12 +37,147 @@ bar := assert('foo' == 'bar', 'baz')
               (string))))))))
 
 ================================================================================
-paths
+assignment
 ================================================================================
 
-relative := "abc" / 'def'
-absolute := / "abc"
-combined := "foo" / bar() / baz
+foo := "abc"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string)))))
+
+================================================================================
+attribute on alias: Issue #158
+================================================================================
+
+[private]
+alias o := open
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (alias
+    (attribute
+      (identifier))
+    (identifier)
+    (identifier)))
+
+================================================================================
+comment
+================================================================================
+
+# comment
+foo := bar # + baz
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (identifier)))
+    (comment)))
+
+================================================================================
+else if
+================================================================================
+
+foo := if a == "x" {
+  "val"
+} else if "1" != "2" {
+  foo_fn("val")
+} else if "3" == "4" {
+  if some_bool { val }
+} else { val }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (identifier))
+            (value
+              (string))))
+        (expression
+          (value
+            (string)))
+        (else_if_clause
+          (condition
+            (expression
+              (value
+                (string))
+              (value
+                (string))))
+          (expression
+            (value
+              (function_call
+                (identifier)
+                (sequence
+                  (expression
+                    (value
+                      (string))))))))
+        (else_if_clause
+          (condition
+            (expression
+              (value
+                (string))
+              (value
+                (string))))
+          (expression
+            (if_expression
+              (condition
+                (expression
+                  (value
+                    (identifier))))
+              (expression
+                (value
+                  (identifier))))))
+        (else_clause
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
+empty
+================================================================================
+
+--------------------------------------------------------------------------------
+
+(source_file)
+
+================================================================================
+export
+================================================================================
+
+export foo := "abc"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (export
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string))))))
+
+================================================================================
+expression
+================================================================================
+
+foo := "abc" + 'def'
 
 --------------------------------------------------------------------------------
 
@@ -155,22 +188,115 @@ combined := "foo" / bar() / baz
       (value
         (string))
       (value
-        (string))))
+        (string)))))
+
+================================================================================
+function
+================================================================================
+
+foo := some_fn("param1", param2)
+bar := env_var("foo",)
+
+--------------------------------------------------------------------------------
+
+(source_file
   (assignment
     (identifier)
     (expression
-      (value
-        (string))))
-  (assignment
-    (identifier)
-    (expression
-      (value
-        (string))
       (value
         (function_call
-          (identifier)))
+          (identifier)
+          (sequence
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (identifier))))))))
+  (assignment
+    (identifier)
+    (expression
       (value
-        (identifier)))))
+        (function_call
+          (identifier)
+          (sequence
+            (expression
+              (value
+                (string)))))))))
+
+================================================================================
+functions, imports, and unexports with attributes
+================================================================================
+
+[windows]
+foo() := 'bar'
+
+[unix]
+import 'foo.just'
+
+[windows]
+unexport FOO
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_definition
+    (attribute
+      (identifier))
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (import
+    (attribute
+      (identifier))
+    (string))
+  (unexport
+    (attribute
+      (identifier))
+    (identifier)))
+
+================================================================================
+if
+================================================================================
+
+foo := if bar == baz { qux } else { quux }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (if_expression
+        (condition
+          (expression
+            (value
+              (identifier))
+            (value
+              (identifier))))
+        (expression
+          (value
+            (identifier)))
+        (else_clause
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
+import
+================================================================================
+
+import 'foo/bar.just'
+import? 'baz.just'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (import
+    (string))
+  (import
+    (string)))
 
 ================================================================================
 list expressions
@@ -256,102 +382,13 @@ trailing := [foo(), bar,]
                 (identifier)))))))))
 
 ================================================================================
-if
+logical operators
 ================================================================================
 
-foo := if bar == baz { qux } else { quux }
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (if_expression
-        (condition
-          (expression
-            (value
-              (identifier))
-            (value
-              (identifier))))
-        (expression
-          (value
-            (identifier)))
-        (else_clause
-          (expression
-            (value
-              (identifier))))))))
-
-================================================================================
-else if
-================================================================================
-
-foo := if a == "x" {
-  "val"
-} else if "1" != "2" {
-  foo_fn("val")
-} else if "3" == "4" {
-  if some_bool { val }
-} else { val }
-
---------------------------------------------------------------------------------
-
-(source_file
-  (assignment
-    (identifier)
-    (expression
-      (if_expression
-        (condition
-          (expression
-            (value
-              (identifier))
-            (value
-              (string))))
-        (expression
-          (value
-            (string)))
-        (else_if_clause
-          (condition
-            (expression
-              (value
-                (string))
-              (value
-                (string))))
-          (expression
-            (value
-              (function_call
-                (identifier)
-                (sequence
-                  (expression
-                    (value
-                      (string))))))))
-        (else_if_clause
-          (condition
-            (expression
-              (value
-                (string))
-              (value
-                (string))))
-          (expression
-            (if_expression
-              (condition
-                (expression
-                  (value
-                    (identifier))))
-              (expression
-                (value
-                  (identifier))))))
-        (else_clause
-          (expression
-            (value
-              (identifier))))))))
-
-================================================================================
-function
-================================================================================
-
-foo := some_fn("param1", param2)
-bar := env_var("foo",)
+foo := '' || 'bar'
+bar := 'foo' && 'bar'
+baz := 'foo' && '' || 'bar'
+qux := 'foo' || 'bar' + 'baz'
 
 --------------------------------------------------------------------------------
 
@@ -360,137 +397,34 @@ bar := env_var("foo",)
     (identifier)
     (expression
       (value
-        (function_call
-          (identifier)
-          (sequence
-            (expression
-              (value
-                (string)))
-            (expression
-              (value
-                (identifier))))))))
+        (string))
+      (value
+        (string))))
   (assignment
     (identifier)
     (expression
       (value
-        (function_call
-          (identifier)
-          (sequence
-            (expression
-              (value
-                (string)))))))))
-
-================================================================================
-export
-================================================================================
-
-export foo := "abc"
-
---------------------------------------------------------------------------------
-
-(source_file
-  (export
-    (assignment
-      (identifier)
-      (expression
-        (value
-          (string))))))
-
-================================================================================
-wrapped assignments with attributes
-================================================================================
-
-[private]
-eager foo := "abc"
-
-[private]
-export bar := "def"
-
---------------------------------------------------------------------------------
-
-(source_file
-  (eager
-    (attribute
-      (identifier))
-    (assignment
-      (identifier)
-      (expression
-        (value
-          (string)))))
-  (export
-    (attribute
-      (identifier))
-    (assignment
-      (identifier)
-      (expression
-        (value
-          (string))))))
-
-================================================================================
-unexport
-================================================================================
-
-unexport FOO
-
---------------------------------------------------------------------------------
-
-(source_file
-  (unexport
-    (identifier)))
-
-================================================================================
-unexport assignment fallback
-================================================================================
-
-unexport := "bar"
-
---------------------------------------------------------------------------------
-
-(source_file
-    (assignment
-      (identifier)
-      (expression
-        (value
-          (string)))))
-
-================================================================================
-unexport recipe fallback
-================================================================================
-
-unexport foo:
-  echo {{foo}}
-
---------------------------------------------------------------------------------
-
-(source_file
-  (recipe
-    (recipe_header
-      (identifier)
-      (parameters
-        (parameter
-          (identifier))))
-    (recipe_body
-      (recipe_line
-        (text)
-        (interpolation
-          (expression
-            (value
-              (identifier))))))))
-
-================================================================================
-import
-================================================================================
-
-import 'foo/bar.just'
-import? 'baz.just'
-
---------------------------------------------------------------------------------
-
-(source_file
-  (import
-    (string))
-  (import
-    (string)))
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (string))
+      (value
+        (string)))))
 
 ================================================================================
 modules
@@ -534,134 +468,38 @@ mod foo
     (identifier)))
 
 ================================================================================
-functions, imports, and unexports with attributes
+paths
 ================================================================================
 
-[windows]
-foo() := 'bar'
-
-[unix]
-import 'foo.just'
-
-[windows]
-unexport FOO
+relative := "abc" / 'def'
+absolute := / "abc"
+combined := "foo" / bar() / baz
 
 --------------------------------------------------------------------------------
 
 (source_file
-  (function_definition
-    (attribute
-      (identifier))
-    (identifier)
-    (expression
-      (value
-        (string))))
-  (import
-    (attribute
-      (identifier))
-    (string))
-  (unexport
-    (attribute
-      (identifier))
-    (identifier)))
-
-================================================================================
-set
-================================================================================
-
-set SOME_BOOL
-set FOO := true
-set dotenv-load
-set tempdir := "/tmp/just"
-set shell := ["powershell.exe", "-c"]
-
---------------------------------------------------------------------------------
-
-(source_file
-  (setting
-    (identifier))
-  (setting
-    (identifier)
-    (boolean))
-  (setting
-    (identifier))
-  (setting
-    (identifier)
-    (expression
-      (value
-        (string))))
-  (setting
-    (identifier)
-    (expression
-      (value
-        (list_literal
-          (list_elements
-            (expression
-              (value
-                (string)))
-            (expression
-              (value
-                (string)))))))))
-
-================================================================================
-comment
-================================================================================
-
-# comment
-foo := bar # + baz
-
---------------------------------------------------------------------------------
-
-(source_file
-  (comment)
   (assignment
     (identifier)
     (expression
       (value
-        (identifier)))
-    (comment)))
-
-================================================================================
-shebang
-================================================================================
-
-#!/usr/bin/env just
-
-foo:
-  body
-
---------------------------------------------------------------------------------
-
-(source_file
-  (shebang
-    (language))
-  (recipe
-    (recipe_header
-      (identifier))
-    (recipe_body
-      (recipe_line
-        (text)))))
-
-================================================================================
-shebang with space
-================================================================================
-
-#! /usr/bin/env just
-
-foo:
-  body
-
---------------------------------------------------------------------------------
-
-(source_file
-  (shebang
-    (language))
-  (recipe
-    (recipe_header
-      (identifier))
-    (recipe_body
-      (recipe_line
-        (text)))))
+        (string))
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))
+      (value
+        (function_call
+          (identifier)))
+      (value
+        (identifier)))))
 
 ================================================================================
 regex literal
@@ -718,17 +556,179 @@ foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
               (string))))))))
 
 ================================================================================
-attribute on alias: Issue #158
+set
 ================================================================================
 
-[private]
-alias o := open
+set SOME_BOOL
+set FOO := true
+set dotenv-load
+set tempdir := "/tmp/just"
+set shell := ["powershell.exe", "-c"]
 
 --------------------------------------------------------------------------------
 
 (source_file
-  (alias
+  (setting
+    (identifier))
+  (setting
+    (identifier)
+    (boolean))
+  (setting
+    (identifier))
+  (setting
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (setting
+    (identifier)
+    (expression
+      (value
+        (list_literal
+          (list_elements
+            (expression
+              (value
+                (string)))
+            (expression
+              (value
+                (string)))))))))
+
+================================================================================
+shebang
+================================================================================
+
+#!/usr/bin/env just
+
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang
+    (language))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+shebang with space
+================================================================================
+
+#! /usr/bin/env just
+
+foo:
+  body
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang
+    (language))
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)))))
+
+================================================================================
+unary negation
+================================================================================
+
+foo := !bar
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (not_expression
+          (value
+            (identifier)))))))
+
+================================================================================
+unexport
+================================================================================
+
+unexport FOO
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (unexport
+    (identifier)))
+
+================================================================================
+unexport assignment fallback
+================================================================================
+
+unexport := "bar"
+
+--------------------------------------------------------------------------------
+
+(source_file
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string)))))
+
+================================================================================
+unexport recipe fallback
+================================================================================
+
+unexport foo:
+  echo {{foo}}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier)
+      (parameters
+        (parameter
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
+wrapped assignments with attributes
+================================================================================
+
+[private]
+eager foo := "abc"
+
+[private]
+export bar := "def"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (eager
     (attribute
       (identifier))
-    (identifier)
-    (identifier)))
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string)))))
+  (export
+    (attribute
+      (identifier))
+    (assignment
+      (identifier)
+      (expression
+        (value
+          (string))))))

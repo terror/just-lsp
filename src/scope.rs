@@ -312,204 +312,6 @@ mod tests {
   }
 
   #[test]
-  fn empty_justfile() {
-    Test::new("").run();
-  }
-
-  #[test]
-  fn variable_defined_and_unused() {
-    Test::new("foo := 'bar'\n").unused(&["foo"]).run();
-  }
-
-  #[test]
-  fn variable_used_in_recipe_body() {
-    Test::new(indoc! {
-      "
-      foo := 'bar'
-
-      baz:
-        echo {{foo}}
-      "
-    })
-    .used(&["foo"])
-    .run();
-  }
-
-  #[test]
-  fn variable_used_in_assignment() {
-    Test::new(indoc! {
-      "
-      foo := 'bar'
-      baz := foo
-      "
-    })
-    .used(&["foo"])
-    .unused(&["baz"])
-    .run();
-  }
-
-  #[test]
-  fn variable_used_in_unary_assignment() {
-    Test::new(indoc! {
-      "
-      foo := 'bar'
-      baz := !foo
-      "
-    })
-    .used(&["foo"])
-    .unused(&["baz"])
-    .run();
-  }
-
-  #[test]
-  fn undefined_identifier_in_recipe() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{bar}}
-      "
-    })
-    .unresolved(&["bar"])
-    .run();
-  }
-
-  #[test]
-  fn undefined_identifier_in_assignment() {
-    Test::new("foo := bar\n")
-      .unresolved(&["bar"])
-      .unused(&["foo"])
-      .run();
-  }
-
-  #[test]
-  fn recipe_parameter_resolves_in_body() {
-    Test::new(indoc! {
-      "
-      foo bar:
-        echo {{bar}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameter_does_not_leak_to_other_recipes() {
-    Test::new(indoc! {
-      "
-      foo bar:
-        echo {{bar}}
-
-      baz:
-        echo {{bar}}
-      "
-    })
-    .unresolved(&["bar"])
-    .run();
-  }
-
-  #[test]
-  fn parameter_default_references_variable() {
-    Test::new(indoc! {
-      "
-      x := 'foo'
-
-      bar y=x:
-        echo {{y}}
-      "
-    })
-    .used(&["x"])
-    .run();
-  }
-
-  #[test]
-  fn parameter_default_references_earlier_parameter() {
-    Test::new(indoc! {
-      "
-      foo a b=a:
-        echo {{b}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parameter_default_cannot_reference_itself() {
-    Test::new(indoc! {
-      "
-      foo a=a:
-        echo {{a}}
-      "
-    })
-    .unresolved(&["a"])
-    .run();
-  }
-
-  #[test]
-  fn parameter_default_cannot_reference_later_parameter() {
-    Test::new(indoc! {
-      "
-      foo a=b b='x':
-        echo {{a}}
-      "
-    })
-    .unresolved(&["b"])
-    .run();
-  }
-
-  #[test]
-  fn variadic_parameter_resolves_in_body() {
-    Test::new(indoc! {
-      "
-      foo +bar:
-        echo {{bar}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn variadic_star_parameter_resolves_in_body() {
-    Test::new(indoc! {
-      "
-      foo *bar:
-        echo {{bar}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn variadic_parameter_with_default() {
-    Test::new(indoc! {
-      "
-      x := 'foo'
-
-      bar +args=x:
-        echo {{args}}
-      "
-    })
-    .used(&["x"])
-    .run();
-  }
-
-  #[test]
-  fn multiple_variables_usage_tracking() {
-    Test::new(indoc! {
-      "
-      a := 'foo'
-      b := 'bar'
-      c := 'baz'
-
-      recipe:
-        echo {{a}} {{c}}
-      "
-    })
-    .used(&["a", "c"])
-    .unused(&["b"])
-    .run();
-  }
-
-  #[test]
   fn builtin_constants_resolve() {
     Test::new(indoc! {
       "
@@ -521,138 +323,19 @@ mod tests {
   }
 
   #[test]
-  fn recipe_identifier_usage_tracks_body() {
+  fn complex_parameter_ordering() {
     Test::new(indoc! {
       "
-      x := 'foo'
-
-      bar:
-        echo {{x}}
-      "
-    })
-    .used(&["x"])
-    .recipe_usage("bar", &["x"])
-    .run();
-  }
-
-  #[test]
-  fn recipe_identifier_usage_tracks_parameters() {
-    Test::new(indoc! {
-      "
-      foo bar:
-        echo {{bar}}
-      "
-    })
-    .recipe_usage("foo", &["bar"])
-    .run();
-  }
-
-  #[test]
-  fn recipe_identifier_usage_parameter_default_self_reference() {
-    Test::new(indoc! {
-      "
-      x := 'bar'
-
-      foo a=a:
-        echo {{a}}
-      "
-    })
-    .unresolved(&["a"])
-    .recipe_usage("foo", &["a"])
-    .unused(&["x"])
-    .run();
-  }
-
-  #[test]
-  fn multiple_recipes_isolated_scopes() {
-    Test::new(indoc! {
-      "
-      foo a:
-        echo {{a}}
-
-      bar b:
-        echo {{b}}
-      "
-    })
-    .recipe_usage("foo", &["a"])
-    .recipe_usage("bar", &["b"])
-    .run();
-  }
-
-  #[test]
-  fn variable_used_across_multiple_recipes() {
-    Test::new(indoc! {
-      "
-      x := 'foo'
-
-      a:
-        echo {{x}}
-
-      b:
-        echo {{x}}
-      "
-    })
-    .used(&["x"])
-    .recipe_usage("a", &["x"])
-    .recipe_usage("b", &["x"])
-    .run();
-  }
-
-  #[test]
-  fn parameter_shadows_variable_in_recipe() {
-    Test::new(indoc! {
-      "
-      x := 'foo'
-
-      bar x:
-        echo {{x}}
-      "
-    })
-    .unused(&["x"])
-    .run();
-  }
-
-  #[test]
-  fn user_defined_function_resolves() {
-    Test::new(indoc! {
-      "
-      set unstable
-
-      greet(name) := f\"hello {name}\"
-
-      foo:
-        echo {{greet('world')}}
+      foo a b=a c=b:
+        echo {{c}}
       "
     })
     .run();
   }
 
   #[test]
-  fn function_parameter_resolves_in_body() {
-    Test::new(indoc! {
-      "
-      set unstable
-
-      add(a) := a + 'x'
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn function_parameter_does_not_leak() {
-    Test::new(indoc! {
-      "
-      set unstable
-
-      add(a) := a + 'x'
-
-      foo:
-        echo {{a}}
-      "
-    })
-    .unresolved(&["a"])
-    .run();
+  fn empty_justfile() {
+    Test::new("").run();
   }
 
   #[test]
@@ -684,14 +367,30 @@ mod tests {
   }
 
   #[test]
-  fn multiple_parameters_in_recipe() {
+  fn function_parameter_does_not_leak() {
     Test::new(indoc! {
       "
-      foo a b c:
-        echo {{a}} {{b}} {{c}}
+      set unstable
+
+      add(a) := a + 'x'
+
+      foo:
+        echo {{a}}
       "
     })
-    .recipe_usage("foo", &["a", "b", "c"])
+    .unresolved(&["a"])
+    .run();
+  }
+
+  #[test]
+  fn function_parameter_resolves_in_body() {
+    Test::new(indoc! {
+      "
+      set unstable
+
+      add(a) := a + 'x'
+      "
+    })
     .run();
   }
 
@@ -704,6 +403,292 @@ mod tests {
       add(a, b) := a + b
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn multiple_parameters_in_recipe() {
+    Test::new(indoc! {
+      "
+      foo a b c:
+        echo {{a}} {{b}} {{c}}
+      "
+    })
+    .recipe_usage("foo", &["a", "b", "c"])
+    .run();
+  }
+
+  #[test]
+  fn multiple_recipes_isolated_scopes() {
+    Test::new(indoc! {
+      "
+      foo a:
+        echo {{a}}
+
+      bar b:
+        echo {{b}}
+      "
+    })
+    .recipe_usage("foo", &["a"])
+    .recipe_usage("bar", &["b"])
+    .run();
+  }
+
+  #[test]
+  fn multiple_unresolved_identifiers() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{a}} {{b}} {{c}}
+      "
+    })
+    .unresolved(&["a", "b", "c"])
+    .run();
+  }
+
+  #[test]
+  fn multiple_variables_usage_tracking() {
+    Test::new(indoc! {
+      "
+      a := 'foo'
+      b := 'bar'
+      c := 'baz'
+
+      recipe:
+        echo {{a}} {{c}}
+      "
+    })
+    .used(&["a", "c"])
+    .unused(&["b"])
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_cannot_reference_itself() {
+    Test::new(indoc! {
+      "
+      foo a=a:
+        echo {{a}}
+      "
+    })
+    .unresolved(&["a"])
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_cannot_reference_later_parameter() {
+    Test::new(indoc! {
+      "
+      foo a=b b='x':
+        echo {{a}}
+      "
+    })
+    .unresolved(&["b"])
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_references_earlier_parameter() {
+    Test::new(indoc! {
+      "
+      foo a b=a:
+        echo {{b}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_references_variable() {
+    Test::new(indoc! {
+      "
+      x := 'foo'
+
+      bar y=x:
+        echo {{y}}
+      "
+    })
+    .used(&["x"])
+    .run();
+  }
+
+  #[test]
+  fn parameter_shadows_variable_in_recipe() {
+    Test::new(indoc! {
+      "
+      x := 'foo'
+
+      bar x:
+        echo {{x}}
+      "
+    })
+    .unused(&["x"])
+    .run();
+  }
+
+  #[test]
+  fn recipe_identifier_usage_parameter_default_self_reference() {
+    Test::new(indoc! {
+      "
+      x := 'bar'
+
+      foo a=a:
+        echo {{a}}
+      "
+    })
+    .unresolved(&["a"])
+    .recipe_usage("foo", &["a"])
+    .unused(&["x"])
+    .run();
+  }
+
+  #[test]
+  fn recipe_identifier_usage_tracks_body() {
+    Test::new(indoc! {
+      "
+      x := 'foo'
+
+      bar:
+        echo {{x}}
+      "
+    })
+    .used(&["x"])
+    .recipe_usage("bar", &["x"])
+    .run();
+  }
+
+  #[test]
+  fn recipe_identifier_usage_tracks_parameters() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{bar}}
+      "
+    })
+    .recipe_usage("foo", &["bar"])
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameter_does_not_leak_to_other_recipes() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{bar}}
+
+      baz:
+        echo {{bar}}
+      "
+    })
+    .unresolved(&["bar"])
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameter_resolves_in_body() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_with_no_parameters_or_body() {
+    Test::new(indoc! {
+      "
+      foo:
+      "
+    })
+    .recipe_usage("foo", &[])
+    .run();
+  }
+
+  #[test]
+  fn undefined_identifier_in_assignment() {
+    Test::new("foo := bar\n")
+      .unresolved(&["bar"])
+      .unused(&["foo"])
+      .run();
+  }
+
+  #[test]
+  fn undefined_identifier_in_recipe() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{bar}}
+      "
+    })
+    .unresolved(&["bar"])
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_resolves() {
+    Test::new(indoc! {
+      "
+      set unstable
+
+      greet(name) := f\"hello {name}\"
+
+      foo:
+        echo {{greet('world')}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn variable_chain() {
+    Test::new(indoc! {
+      "
+      a := 'foo'
+      b := a
+      c := b
+      "
+    })
+    .used(&["a", "b"])
+    .unused(&["c"])
+    .run();
+  }
+
+  #[test]
+  fn variable_defined_and_unused() {
+    Test::new("foo := 'bar'\n").unused(&["foo"]).run();
+  }
+
+  #[test]
+  fn variable_used_across_multiple_recipes() {
+    Test::new(indoc! {
+      "
+      x := 'foo'
+
+      a:
+        echo {{x}}
+
+      b:
+        echo {{x}}
+      "
+    })
+    .used(&["x"])
+    .recipe_usage("a", &["x"])
+    .recipe_usage("b", &["x"])
+    .run();
+  }
+
+  #[test]
+  fn variable_used_in_assignment() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+      baz := foo
+      "
+    })
+    .used(&["foo"])
+    .unused(&["baz"])
     .run();
   }
 
@@ -722,50 +707,65 @@ mod tests {
   }
 
   #[test]
-  fn complex_parameter_ordering() {
+  fn variable_used_in_recipe_body() {
     Test::new(indoc! {
       "
-      foo a b=a c=b:
-        echo {{c}}
+      foo := 'bar'
+
+      baz:
+        echo {{foo}}
+      "
+    })
+    .used(&["foo"])
+    .run();
+  }
+
+  #[test]
+  fn variable_used_in_unary_assignment() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+      baz := !foo
+      "
+    })
+    .used(&["foo"])
+    .unused(&["baz"])
+    .run();
+  }
+
+  #[test]
+  fn variadic_parameter_resolves_in_body() {
+    Test::new(indoc! {
+      "
+      foo +bar:
+        echo {{bar}}
       "
     })
     .run();
   }
 
   #[test]
-  fn recipe_with_no_parameters_or_body() {
+  fn variadic_parameter_with_default() {
     Test::new(indoc! {
       "
-      foo:
+      x := 'foo'
+
+      bar +args=x:
+        echo {{args}}
       "
     })
-    .recipe_usage("foo", &[])
+    .used(&["x"])
     .run();
   }
 
   #[test]
-  fn multiple_unresolved_identifiers() {
+  fn variadic_star_parameter_resolves_in_body() {
     Test::new(indoc! {
       "
-      foo:
-        echo {{a}} {{b}} {{c}}
+      foo *bar:
+        echo {{bar}}
       "
     })
-    .unresolved(&["a", "b", "c"])
-    .run();
-  }
-
-  #[test]
-  fn variable_chain() {
-    Test::new(indoc! {
-      "
-      a := 'foo'
-      b := a
-      c := b
-      "
-    })
-    .used(&["a", "b"])
-    .unused(&["c"])
     .run();
   }
 }

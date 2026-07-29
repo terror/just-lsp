@@ -286,6 +286,47 @@ mod tests {
   }
 
   #[test]
+  fn circular_imports_are_handled() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(
+      dir.path().join("bar.just"),
+      indoc! {
+        "
+        import 'justfile'
+
+        bar:
+          echo bar
+        "
+      },
+    )
+    .unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo:
+          echo foo
+        "
+      },
+    )
+    .unwrap();
+
+    context(&dir.path().join("justfile"), |context| {
+      let recipe_names = context
+        .recipes()
+        .iter()
+        .map(|recipe| recipe.name.value.as_str())
+        .collect::<Vec<_>>();
+
+      assert_eq!(recipe_names, ["foo", "bar"]);
+    });
+  }
+
+  #[test]
   fn imported_recipes_are_merged() {
     let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
@@ -325,35 +366,6 @@ mod tests {
   }
 
   #[test]
-  fn imported_variables_are_merged() {
-    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
-
-    fs::write(dir.path().join("bar.just"), "bar := 'baz'\n").unwrap();
-
-    fs::write(
-      dir.path().join("justfile"),
-      indoc! {
-        "
-        import 'bar.just'
-
-        foo := 'qux'
-        "
-      },
-    )
-    .unwrap();
-
-    context(&dir.path().join("justfile"), |context| {
-      let variable_names = context
-        .variables()
-        .iter()
-        .map(|variable| variable.name.value.as_str())
-        .collect::<Vec<_>>();
-
-      assert_eq!(variable_names, ["foo", "bar"]);
-    });
-  }
-
-  #[test]
   fn imported_settings_are_merged() {
     let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
@@ -379,6 +391,35 @@ mod tests {
         .collect::<Vec<_>>();
 
       assert_eq!(setting_names, ["dotenv-load", "export"]);
+    });
+  }
+
+  #[test]
+  fn imported_variables_are_merged() {
+    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+    fs::write(dir.path().join("bar.just"), "bar := 'baz'\n").unwrap();
+
+    fs::write(
+      dir.path().join("justfile"),
+      indoc! {
+        "
+        import 'bar.just'
+
+        foo := 'qux'
+        "
+      },
+    )
+    .unwrap();
+
+    context(&dir.path().join("justfile"), |context| {
+      let variable_names = context
+        .variables()
+        .iter()
+        .map(|variable| variable.name.value.as_str())
+        .collect::<Vec<_>>();
+
+      assert_eq!(variable_names, ["foo", "bar"]);
     });
   }
 
@@ -459,47 +500,6 @@ mod tests {
         .collect::<Vec<_>>();
 
       assert_eq!(recipe_names, ["foo", "bar", "baz"]);
-    });
-  }
-
-  #[test]
-  fn circular_imports_are_handled() {
-    let dir = Builder::new().prefix("just-lsp").tempdir().unwrap();
-
-    fs::write(
-      dir.path().join("bar.just"),
-      indoc! {
-        "
-        import 'justfile'
-
-        bar:
-          echo bar
-        "
-      },
-    )
-    .unwrap();
-
-    fs::write(
-      dir.path().join("justfile"),
-      indoc! {
-        "
-        import 'bar.just'
-
-        foo:
-          echo foo
-        "
-      },
-    )
-    .unwrap();
-
-    context(&dir.path().join("justfile"), |context| {
-      let recipe_names = context
-        .recipes()
-        .iter()
-        .map(|recipe| recipe.name.value.as_str())
-        .collect::<Vec<_>>();
-
-      assert_eq!(recipe_names, ["foo", "bar"]);
     });
   }
 }

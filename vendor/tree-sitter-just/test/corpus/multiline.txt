@@ -1,15 +1,29 @@
 ================================================================================
-trailing whitespace
+dependency_wrap
 ================================================================================
 
-a: # 
+baz: foo \
+	bar
+	echo baz {{ a }}
+
 --------------------------------------------------------------------------------
 
 (source_file
   (recipe
     (recipe_header
-      (identifier))
-    (comment)))
+      (identifier)
+      (dependencies
+        (dependency
+          (identifier))
+        (dependency
+          (identifier))))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
 
 ================================================================================
 smooshed recipes
@@ -55,28 +69,14 @@ a := "foo" + \
         (string)))))
 
 ================================================================================
-dependency_wrap
+trailing whitespace
 ================================================================================
 
-baz: foo \
-	bar
-	echo baz {{ a }}
-
+a: # 
 --------------------------------------------------------------------------------
 
 (source_file
   (recipe
     (recipe_header
-      (identifier)
-      (dependencies
-        (dependency
-          (identifier))
-        (dependency
-          (identifier))))
-    (recipe_body
-      (recipe_line
-        (text)
-        (interpolation
-          (expression
-            (value
-              (identifier))))))))
+      (identifier))
+    (comment)))
