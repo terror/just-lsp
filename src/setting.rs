@@ -90,20 +90,51 @@ mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   #[test]
-  fn parse_boolean_with_value() {
+  fn parse_array() {
     assert_eq!(
-      Document::from("set foo := true\n").settings(),
+      Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
       vec![Setting {
         attributes: vec![],
         name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
         },
-        kind: SettingKind::Boolean(true),
+        kind: SettingKind::Array,
         range: lsp::Range::at(0, 0, 1, 0),
         value: TextNode {
+          value: "[\"zsh\", \"-cu\"]".into(),
+          range: lsp::Range::at(0, 13, 0, 27),
+        },
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_attributes() {
+    assert_eq!(
+      Document::from("[group(\"foo\")]\nset bar := true\n").settings(),
+      vec![Setting {
+        attributes: vec![Attribute {
+          name: TextNode {
+            value: "group".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          arguments: vec![TextNode {
+            value: "\"foo\"".into(),
+            range: lsp::Range::at(0, 7, 0, 12),
+          }],
+          target: Some(AttributeTarget::Setting),
+          range: lsp::Range::at(0, 0, 1, 0),
+        }],
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 4, 1, 7),
+        },
+        kind: SettingKind::Boolean(true),
+        range: lsp::Range::at(0, 0, 2, 0),
+        value: TextNode {
           value: "true".into(),
-          range: lsp::Range::at(0, 11, 0, 15),
+          range: lsp::Range::at(1, 11, 1, 15),
         },
       }],
     );
@@ -130,6 +161,26 @@ mod tests {
   }
 
   #[test]
+  fn parse_boolean_with_value() {
+    assert_eq!(
+      Document::from("set foo := true\n").settings(),
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::Boolean(true),
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(0, 11, 0, 15),
+        },
+      }],
+    );
+  }
+
+  #[test]
   fn parse_boolean_without_value() {
     assert_eq!(
       Document::from("set export\n").settings(),
@@ -150,20 +201,20 @@ mod tests {
   }
 
   #[test]
-  fn parse_array() {
+  fn parse_expression() {
     assert_eq!(
-      Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
+      Document::from("set foo := \"bar\" / baz\n").settings(),
       vec![Setting {
         attributes: vec![],
         name: TextNode {
-          value: "shell".into(),
-          range: lsp::Range::at(0, 4, 0, 9),
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
         },
-        kind: SettingKind::Array,
+        kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
         value: TextNode {
-          value: "[\"zsh\", \"-cu\"]".into(),
-          range: lsp::Range::at(0, 13, 0, 27),
+          value: "\"bar\" / baz".into(),
+          range: lsp::Range::at(0, 11, 0, 22),
         },
       }],
     );
@@ -187,66 +238,6 @@ mod tests {
         value: TextNode {
           value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]".into(),
           range: lsp::Range::at(0, 21, 0, 62),
-        },
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_string() {
-    assert_eq!(
-      Document::from("set foo := \"bar\"\n").settings(),
-      vec![Setting {
-        attributes: vec![],
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-        value: TextNode {
-          value: "\"bar\"".into(),
-          range: lsp::Range::at(0, 11, 0, 16),
-        },
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_string_containing_walrus() {
-    assert_eq!(
-      Document::from("set foo := \"bar := baz\"\n").settings(),
-      vec![Setting {
-        attributes: vec![],
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-        value: TextNode {
-          value: "\"bar := baz\"".into(),
-          range: lsp::Range::at(0, 11, 0, 23),
-        },
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_expression() {
-    assert_eq!(
-      Document::from("set foo := \"bar\" / baz\n").settings(),
-      vec![Setting {
-        attributes: vec![],
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-        value: TextNode {
-          value: "\"bar\" / baz".into(),
-          range: lsp::Range::at(0, 11, 0, 22),
         },
       }],
     );
@@ -306,31 +297,40 @@ mod tests {
   }
 
   #[test]
-  fn parse_attributes() {
+  fn parse_string() {
     assert_eq!(
-      Document::from("[group(\"foo\")]\nset bar := true\n").settings(),
+      Document::from("set foo := \"bar\"\n").settings(),
       vec![Setting {
-        attributes: vec![Attribute {
-          name: TextNode {
-            value: "group".into(),
-            range: lsp::Range::at(0, 1, 0, 6),
-          },
-          arguments: vec![TextNode {
-            value: "\"foo\"".into(),
-            range: lsp::Range::at(0, 7, 0, 12),
-          }],
-          target: Some(AttributeTarget::Setting),
-          range: lsp::Range::at(0, 0, 1, 0),
-        }],
+        attributes: vec![],
         name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(1, 4, 1, 7),
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
         },
-        kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 2, 0),
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
         value: TextNode {
-          value: "true".into(),
-          range: lsp::Range::at(1, 11, 1, 15),
+          value: "\"bar\"".into(),
+          range: lsp::Range::at(0, 11, 0, 16),
+        },
+      }],
+    );
+  }
+
+  #[test]
+  fn parse_string_containing_walrus() {
+    assert_eq!(
+      Document::from("set foo := \"bar := baz\"\n").settings(),
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar := baz\"".into(),
+          range: lsp::Range::at(0, 11, 0, 23),
         },
       }],
     );

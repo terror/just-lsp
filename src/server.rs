@@ -2089,49 +2089,432 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn initialize() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .run()
-      .await
-  }
+  async fn closing_imported_buffer_restores_disk_project() -> Result {
+    let tempdir = tempfile::tempdir()?;
 
-  #[tokio::test]
-  async fn initialize_once() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .request(InitializeRequest { id: 1 })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "error": {
-          "code": -32600,
-          "message": "Invalid request"
-        }
-      }))
-      .run()
-      .await
-  }
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
 
-  #[tokio::test]
-  async fn shutdown() -> Result {
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    let target =
+      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
+
+    std::fs::write(imported.to_file_path().unwrap(), "import 'bar.just'")?;
+    std::fs::write(target.to_file_path().unwrap(), "bar:")?;
+
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "shutdown",
-      }))
+      .notification(DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'\n\nfoo: bar",
+      })
+      .notification(DidOpenNotification {
+        uri: imported.as_str(),
+        text: "",
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
       .response(json!({
         "jsonrpc": "2.0",
         "id": 2,
         "result": null
       }))
+      .notification(DidCloseNotification {
+        uri: imported.as_str(),
+      })
+      .request(HoverRequest {
+        id: 3,
+        uri: root.as_str(),
+        line: 2,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 3,
+        content: "bar:",
+        kind: "plaintext",
+        start_line: 2,
+        start_char: 5,
+        end_line: 2,
+        end_char: 8,
+      })
       .run()
       .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_or_default_quickfix() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var_or_default(\"BAR\", \"baz\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 10, 0, 10),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var_or_default` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 25 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_outside_range() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 0, 0, 3),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_deprecated_function_quickfix() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "foo := env_var(\"BAR\")\n",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 10, 0, 10),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "title": "Replace `env_var` with `env`",
+            "kind": "quickfix",
+            "edit": {
+              "changes": {
+                "file:///test.just": [
+                  {
+                    "range": {
+                      "start": { "line": 0, "character": 7 },
+                      "end": { "line": 0, "character": 14 }
+                    },
+                    "newText": "env"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_empty_document() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///empty.just",
+        range: lsp::Range::at(0, 0, 0, 0),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_action_with_recipes() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          bar arg1 arg2='default':
+            echo bar
+          "
+        },
+      })
+      .request(CodeActionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 0, 0, 0),
+      })
+      .response(CodeActionResponse {
+        id: 2,
+        actions: vec![
+          CodeAction {
+            title: "foo",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![],
+          },
+          CodeAction {
+            title: "bar",
+            kind: "source",
+            command: Command::RunRecipe,
+            arguments: vec![
+              ParameterJson {
+                name: "arg1".into(),
+                default_value: None,
+              },
+              ParameterJson {
+                name: "arg2".into(),
+                default_value: Some("'default'".to_string()),
+              },
+            ],
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_empty_document() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(CodeLensRequest {
+        id: 2,
+        uri: "file:///empty.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_with_recipes() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
+
+          bar arg1 arg2='default':
+            echo bar
+          "
+        },
+      })
+      .request(CodeLensRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            },
+            "command": {
+              "title": "Run",
+              "command": "just-lsp.run_recipe",
+              "arguments": ["foo", "file:///test.just", []]
+            }
+          },
+          {
+            "range": {
+              "start": { "line": 3, "character": 0 },
+              "end": { "line": 3, "character": 3 }
+            },
+            "command": {
+              "title": "Run",
+              "command": "just-lsp.run_recipe",
+              "arguments": [
+                "bar",
+                "file:///test.just",
+                [
+                  { "name": "arg1", "default_value": null },
+                  { "name": "arg2", "default_value": "'default'" }
+                ]
+              ]
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[derive(Debug)]
+  struct DocumentLinkRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for DocumentLinkRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/documentLink",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn dependency_open_republishes_root_diagnostics() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    std::fs::write(imported.to_file_path().unwrap(), "")?;
+
+    let (service, mut socket) = LspService::new(Server::new);
+
+    let mut service = Spawn::new(service);
+
+    service
+      .call(serde_json::from_value(
+        InitializeRequest { id: 1 }.into_value(),
+      )?)
+      .await?;
+
+    let initialized = service.call(serde_json::from_value(json!({
+      "jsonrpc": "2.0",
+      "method": "initialized",
+      "params": {}
+    }))?);
+
+    let (response, _) = tokio::join!(initialized, socket.next());
+
+    response?;
+
+    let open = service.call(serde_json::from_value(
+      DidOpenNotification {
+        uri: root.as_str(),
+        text: "import 'foo.just'\n\nbar: foo",
+      }
+      .into_value(),
+    )?);
+
+    let (response, diagnostics) = tokio::join!(open, socket.next());
+
+    response?;
+
+    let diagnostics = serde_json::to_value(diagnostics.unwrap())?;
+
+    assert_eq!(diagnostics["method"], "textDocument/publishDiagnostics");
+    assert_eq!(diagnostics["params"]["uri"], root.as_str());
+
+    assert!(
+      !diagnostics["params"]["diagnostics"]
+        .as_array()
+        .unwrap()
+        .is_empty()
+    );
+
+    let open = service.call(serde_json::from_value(
+      DidOpenNotification {
+        uri: imported.as_str(),
+        text: "foo:",
+      }
+      .into_value(),
+    )?);
+
+    let diagnostics =
+      async { [socket.next().await.unwrap(), socket.next().await.unwrap()] };
+
+    let (response, diagnostics) = tokio::join!(open, diagnostics);
+
+    response?;
+
+    let diagnostics = diagnostics
+      .into_iter()
+      .map(serde_json::to_value)
+      .collect::<serde_json::Result<Vec<_>>>()?;
+
+    let diagnostics = diagnostics
+      .iter()
+      .find(|diagnostics| diagnostics["params"]["uri"] == root.as_str())
+      .unwrap();
+
+    assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
+
+    Ok(())
   }
 
   #[tokio::test]
@@ -2222,89 +2605,440 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn dependency_open_republishes_root_diagnostics() -> Result {
+  async fn document_highlight() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+
+          alias baz := foo
+          "
+        },
+      })
+      .request(DocumentHighlightRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 1,
+      })
+      .response(DocumentHighlightResponse {
+        id: 2,
+        highlights: vec![
+          Highlight {
+            start_line: 0,
+            start_char: 0,
+            end_line: 0,
+            end_char: 3,
+            kind: "text",
+          },
+          Highlight {
+            start_line: 3,
+            start_char: 5,
+            end_line: 3,
+            end_char: 8,
+            kind: "text",
+          },
+          Highlight {
+            start_line: 6,
+            start_char: 13,
+            end_line: 6,
+            end_char: 16,
+            kind: "text",
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_link_empty_document() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: "",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn document_link_ignores_unresolved_imports() -> Result {
     let tempdir = tempfile::tempdir()?;
 
     let root =
       lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
 
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
-
-    std::fs::write(imported.to_file_path().unwrap(), "")?;
-
-    let (service, mut socket) = LspService::new(Server::new);
-
-    let mut service = Spawn::new(service);
-
-    service
-      .call(serde_json::from_value(
-        InitializeRequest { id: 1 }.into_value(),
-      )?)
-      .await?;
-
-    let initialized = service.call(serde_json::from_value(json!({
-      "jsonrpc": "2.0",
-      "method": "initialized",
-      "params": {}
-    }))?);
-
-    let (response, _) = tokio::join!(initialized, socket.next());
-
-    response?;
-
-    let open = service.call(serde_json::from_value(
-      DidOpenNotification {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
         uri: root.as_str(),
-        text: "import 'foo.just'\n\nbar: foo",
-      }
-      .into_value(),
-    )?);
+        text: "import? 'missing.just'\nimport x'dynamic.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: root.as_str(),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
 
-    let (response, diagnostics) = tokio::join!(open, socket.next());
+  #[tokio::test]
+  async fn document_link_import() -> Result {
+    let tempdir = tempfile::tempdir()?;
 
-    response?;
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("bar.just");
 
-    let diagnostics = serde_json::to_value(diagnostics.unwrap())?;
+    std::fs::write(&target, "bar:")?;
 
-    assert_eq!(diagnostics["method"], "textDocument/publishDiagnostics");
-    assert_eq!(diagnostics["params"]["uri"], root.as_str());
+    let root_uri = lsp::Url::from_file_path(root).unwrap();
 
-    assert!(
-      !diagnostics["params"]["diagnostics"]
-        .as_array()
-        .unwrap()
-        .is_empty()
-    );
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: root_uri.as_str(),
+        text: "import 'bar.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: root_uri.as_str(),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 7 },
+              "end": { "line": 0, "character": 17 }
+            },
+            "target": lsp::Url::from_file_path(&target).unwrap(),
+            "tooltip": target.display().to_string()
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
 
-    let open = service.call(serde_json::from_value(
-      DidOpenNotification {
-        uri: imported.as_str(),
-        text: "foo:",
-      }
-      .into_value(),
-    )?);
+  #[tokio::test]
+  async fn document_link_module_with_path() -> Result {
+    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
+      (
+        "file:///C:/foo/justfile",
+        "file:///C:/foo/baz.just",
+        "C:\\foo\\baz.just",
+      )
+    } else {
+      (
+        "file:///foo/justfile",
+        "file:///foo/baz.just",
+        "/foo/baz.just",
+      )
+    };
 
-    let diagnostics =
-      async { [socket.next().await.unwrap(), socket.next().await.unwrap()] };
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: justfile_uri,
+        text: "mod bar 'baz.just'\n",
+      })
+      .request(DocumentLinkRequest {
+        id: 2,
+        uri: justfile_uri,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "range": {
+              "start": { "line": 0, "character": 8 },
+              "end": { "line": 0, "character": 18 }
+            },
+            "target": target_uri,
+            "tooltip": tooltip
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
 
-    let (response, diagnostics) = tokio::join!(open, diagnostics);
+  #[tokio::test]
+  async fn document_symbol_empty_document() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///empty.just",
+        text: "",
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///empty.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": []
+      }))
+      .run()
+      .await
+  }
 
-    response?;
+  #[tokio::test]
+  async fn document_symbol_with_alias() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo foo
 
-    let diagnostics = diagnostics
-      .into_iter()
-      .map(serde_json::to_value)
-      .collect::<serde_json::Result<Vec<_>>>()?;
+          alias bar := foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 3, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            }
+          },
+          {
+            "name": "bar",
+            "detail": "alias for foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 3, "character": 0 },
+              "end": { "line": 3, "character": 16 }
+            },
+            "selectionRange": {
+              "start": { "line": 3, "character": 6 },
+              "end": { "line": 3, "character": 9 }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
 
-    let diagnostics = diagnostics
-      .iter()
-      .find(|diagnostics| diagnostics["params"]["uri"] == root.as_str())
-      .unwrap();
+  #[tokio::test]
+  async fn document_symbol_with_recipes_and_variables() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          bar := 'baz'
 
-    assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
+          foo:
+            echo foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "bar",
+            "kind": 13,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 0, "character": 3 }
+            }
+          },
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 4, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 2, "character": 3 }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
 
-    Ok(())
+  #[tokio::test]
+  async fn document_symbol_with_setting() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          set export := true
+
+          foo:
+            echo foo
+          "
+        },
+      })
+      .request(DocumentSymbolRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": [
+          {
+            "name": "export",
+            "detail": "boolean",
+            "kind": 7,
+            "range": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 0, "character": 0 },
+              "end": { "line": 1, "character": 0 }
+            }
+          },
+          {
+            "name": "foo",
+            "kind": 12,
+            "range": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 4, "character": 0 }
+            },
+            "selectionRange": {
+              "start": { "line": 2, "character": 0 },
+              "end": { "line": 2, "character": 3 }
+            }
+          }
+        ]
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn folding_range() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+            echo \"another line\"
+
+          bar:
+            echo \"bar\"
+          "
+        },
+      })
+      .request(FoldingRangeRequest {
+        id: 2,
+        uri: "file:///test.just",
+      })
+      .response(FoldingRangeResponse {
+        id: 2,
+        ranges: vec![
+          FoldingRange {
+            start_line: 0,
+            end_line: 3,
+            kind: "region",
+          },
+          FoldingRange {
+            start_line: 4,
+            end_line: 5,
+            kind: "region",
+          },
+        ],
+      })
+      .run()
+      .await
+  }
+
+  #[derive(Debug)]
+  struct DocumentSymbolRequest<'a> {
+    id: i64,
+    uri: &'a str,
+  }
+
+  impl IntoValue for DocumentSymbolRequest<'_> {
+    fn into_value(self) -> Value {
+      json!({
+        "jsonrpc": "2.0",
+        "id": self.id,
+        "method": "textDocument/documentSymbol",
+        "params": {
+          "textDocument": {
+            "uri": self.uri
+          }
+        }
+      })
+    }
   }
 
   #[tokio::test]
@@ -2338,6 +3072,479 @@ mod tests {
         start_char: 0,
         end_line: 0,
         end_char: 0,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn goto_recipe_definition_from_dependency() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(GotoDefinitionRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: "file:///test.just",
+        start_line: 0,
+        start_char: 0,
+        end_line: 3,
+        end_char: 0,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_attribute() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          [no-cd]
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 3,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: indoc! {
+          "
+          Don't change directory before executing the recipe.
+
+          Normally `just` runs recipes with the current directory set to
+          the directory containing the `justfile`. With `[no-cd]`, the
+          recipe runs with the current directory unchanged, so it can use
+          paths relative to the invocation directory or operate on the
+          user's current directory.
+
+          ```just
+          [no-cd]
+          commit file:
+            git add {{file}}
+            git commit
+          ```
+          "
+        },
+        kind: "markdown",
+        start_line: 0,
+        start_char: 1,
+        end_line: 0,
+        end_char: 6,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_builtin_function() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        },
+        kind: "markdown",
+        start_line: 1,
+        start_char: 9,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_constant() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ HEX }}
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 12,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: indoc! {
+          "
+          Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
+
+          Useful as the alphabet argument to `choose()` for generating
+          random hex strings.
+
+          ```just
+          token := choose('32', HEX)
+          ```
+          "
+        },
+        kind: "markdown",
+        start_line: 1,
+        start_char: 10,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_local_parameter() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          bar arg='cooler':
+            echo {{ arg }}
+
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
+  -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          arg := 'wow'
+
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 10,
+        end_line: 3,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_recipe() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_recipe_parameter_in_interpolation() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo arg='cool':
+            echo {{ arg }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arg='cool'",
+        kind: "plaintext",
+        start_line: 1,
+        start_char: 10,
+        end_line: 1,
+        end_char: 13,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_same_named_recipes_and_functions() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          arch:
+            echo \"foo\"
+
+          bar: arch
+            echo {{ arch() }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 5,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "arch:\n  echo \"foo\"",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 9,
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 4,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        },
+        kind: "markdown",
+        start_line: 4,
+        start_char: 10,
+        end_line: 4,
+        end_char: 14,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_setting() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          set export := true
+
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 4,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: indoc! {
+          "
+          Export every top-level `just` variable as an environment
+          variable.
+
+          Equivalent to prefixing each assignment with `export`, so
+          recipes and backticks see the variables as `$NAME` rather than
+          needing `{{ name }}` interpolation.
+
+          ```just
+          set export
+
+          a := \"hello\"
+
+          @foo b:
+            echo $a
+            echo $b
+          ```
+          "
+        },
+        kind: "markdown",
+        start_line: 0,
+        start_char: 4,
+        end_line: 0,
+        end_char: 10,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn hover_variable_in_interpolation() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo := 'foo'
+
+          foo:
+            echo {{ foo }}
+          "
+        },
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 3,
+        character: 11,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo := 'foo'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 10,
+        end_line: 3,
+        end_char: 13,
       })
       .run()
       .await
@@ -2492,62 +3699,6 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn imported_symbol_navigation_uses_open_buffer() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let root = tempdir.path().join("justfile");
-    let target = tempdir.path().join("foo.just");
-
-    std::fs::write(&target, "foo:\n  echo disk")?;
-
-    let root = lsp::Url::from_file_path(root).unwrap();
-    let target = lsp::Url::from_file_path(target).unwrap();
-
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import 'foo.just'\n\nbar: foo",
-      })
-      .notification(DidOpenNotification {
-        uri: target.as_str(),
-        text: "\nfoo:\n  echo buffer",
-      })
-      .request(GotoDefinitionRequest {
-        id: 2,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(GotoDefinitionResponse {
-        id: 2,
-        uri: target.as_str(),
-        start_line: 1,
-        start_char: 0,
-        end_line: 2,
-        end_char: 13,
-      })
-      .request(HoverRequest {
-        id: 3,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 3,
-        content: "foo:\n  echo buffer",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 5,
-        end_line: 2,
-        end_char: 8,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
   async fn imported_symbol_navigation_rebuilds_affected_roots() -> Result {
     let tempdir = tempfile::tempdir()?;
 
@@ -2635,45 +3786,41 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn closing_imported_buffer_restores_disk_project() -> Result {
+  async fn imported_symbol_navigation_uses_open_buffer() -> Result {
     let tempdir = tempfile::tempdir()?;
 
-    let root =
-      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+    let root = tempdir.path().join("justfile");
+    let target = tempdir.path().join("foo.just");
 
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+    std::fs::write(&target, "foo:\n  echo disk")?;
 
-    let target =
-      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
-
-    std::fs::write(imported.to_file_path().unwrap(), "import 'bar.just'")?;
-    std::fs::write(target.to_file_path().unwrap(), "bar:")?;
+    let root = lsp::Url::from_file_path(root).unwrap();
+    let target = lsp::Url::from_file_path(target).unwrap();
 
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: root.as_str(),
-        text: "import 'foo.just'\n\nfoo: bar",
+        text: "import 'foo.just'\n\nbar: foo",
       })
       .notification(DidOpenNotification {
-        uri: imported.as_str(),
-        text: "",
+        uri: target.as_str(),
+        text: "\nfoo:\n  echo buffer",
       })
-      .request(HoverRequest {
+      .request(GotoDefinitionRequest {
         id: 2,
         uri: root.as_str(),
         line: 2,
         character: 5,
       })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
-      .notification(DidCloseNotification {
-        uri: imported.as_str(),
+      .response(GotoDefinitionResponse {
+        id: 2,
+        uri: target.as_str(),
+        start_line: 1,
+        start_char: 0,
+        end_line: 2,
+        end_char: 13,
       })
       .request(HoverRequest {
         id: 3,
@@ -2683,7 +3830,7 @@ mod tests {
       })
       .response(HoverResponse {
         id: 3,
-        content: "bar:",
+        content: "foo:\n  echo buffer",
         kind: "plaintext",
         start_line: 2,
         start_char: 5,
@@ -2695,7 +3842,34 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn goto_recipe_definition_from_dependency() -> Result {
+  async fn initialize() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn initialize_once() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .request(InitializeRequest { id: 1 })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32600,
+          "message": "Invalid request"
+        }
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_identifier() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
@@ -2705,26 +3879,52 @@ mod tests {
           "
           foo:
             echo \"foo\"
-
-          bar: foo
-            echo \"bar\"
           "
         },
       })
-      .request(GotoDefinitionRequest {
+      .request(PrepareRenameRequest {
         id: 2,
         uri: "file:///test.just",
-        line: 3,
-        character: 5,
+        line: 0,
+        character: 1,
       })
-      .response(GotoDefinitionResponse {
+      .response(PrepareRenameResponse {
         id: 2,
-        uri: "file:///test.just",
         start_line: 0,
         start_char: 0,
-        end_line: 3,
-        end_char: 0,
+        end_line: 0,
+        end_char: 3,
+        placeholder: "foo",
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_non_identifier() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo \"foo\"
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 3,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
       .run()
       .await
   }
@@ -2843,499 +4043,6 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn hover_builtin_function() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo {{arch()}}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
-          Instruction set architecture of the host machine.
-
-          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
-          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
-          `x86`, `x86_64`, or `xcore`.
-
-          ```just
-          system-info:
-            @echo This is an {{arch()}} machine.
-          ```
-          "
-        },
-        kind: "markdown",
-        start_line: 1,
-        start_char: 9,
-        end_line: 1,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_recipe() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo \"foo\"
-
-          bar: foo
-            echo \"bar\"
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo \"foo\"",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 8,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_constant() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo {{ HEX }}
-
-          bar: foo
-            echo \"bar\"
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 12,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
-          Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
-
-          Useful as the alphabet argument to `choose()` for generating
-          random hex strings.
-
-          ```just
-          token := choose('32', HEX)
-          ```
-          "
-        },
-        kind: "markdown",
-        start_line: 1,
-        start_char: 10,
-        end_line: 1,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_same_named_recipes_and_functions() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          arch:
-            echo \"foo\"
-
-          bar: arch
-            echo {{ arch() }}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arch:\n  echo \"foo\"",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 9,
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 4,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
-          Instruction set architecture of the host machine.
-
-          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
-          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
-          `x86`, `x86_64`, or `xcore`.
-
-          ```just
-          system-info:
-            @echo This is an {{arch()}} machine.
-          ```
-          "
-        },
-        kind: "markdown",
-        start_line: 4,
-        start_char: 10,
-        end_line: 4,
-        end_char: 14,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_attribute() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          [no-cd]
-          foo:
-            echo \"foo\"
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 3,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
-          Don't change directory before executing the recipe.
-
-          Normally `just` runs recipes with the current directory set to
-          the directory containing the `justfile`. With `[no-cd]`, the
-          recipe runs with the current directory unchanged, so it can use
-          paths relative to the invocation directory or operate on the
-          user's current directory.
-
-          ```just
-          [no-cd]
-          commit file:
-            git add {{file}}
-            git commit
-          ```
-          "
-        },
-        kind: "markdown",
-        start_line: 0,
-        start_char: 1,
-        end_line: 0,
-        end_char: 6,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_setting() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          set export := true
-
-          foo:
-            echo \"foo\"
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 4,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
-          Export every top-level `just` variable as an environment
-          variable.
-
-          Equivalent to prefixing each assignment with `export`, so
-          recipes and backticks see the variables as `$NAME` rather than
-          needing `{{ name }}` interpolation.
-
-          ```just
-          set export
-
-          a := \"hello\"
-
-          @foo b:
-            echo $a
-            echo $b
-          ```
-          "
-        },
-        kind: "markdown",
-        start_line: 0,
-        start_char: 4,
-        end_line: 0,
-        end_char: 10,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_variable_in_interpolation() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo := 'foo'
-
-          foo:
-            echo {{ foo }}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo := 'foo'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 10,
-        end_line: 3,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_recipe_parameter_in_interpolation() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo arg='cool':
-            echo {{ arg }}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 1,
-        start_char: 10,
-        end_line: 1,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
-  -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          arg := 'wow'
-
-          foo arg='cool':
-            echo {{ arg }}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 10,
-        end_line: 3,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn hover_local_parameter() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          bar arg='cooler':
-            echo {{ arg }}
-
-          foo arg='cool':
-            echo {{ arg }}
-          "
-        },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 4,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 4,
-        start_char: 10,
-        end_line: 4,
-        end_char: 13,
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_highlight() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo \"foo\"
-
-          bar: foo
-            echo \"bar\"
-
-          alias baz := foo
-          "
-        },
-      })
-      .request(DocumentHighlightRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-      })
-      .response(DocumentHighlightResponse {
-        id: 2,
-        highlights: vec![
-          Highlight {
-            start_line: 0,
-            start_char: 0,
-            end_line: 0,
-            end_char: 3,
-            kind: "text",
-          },
-          Highlight {
-            start_line: 3,
-            start_char: 5,
-            end_line: 3,
-            end_char: 8,
-            kind: "text",
-          },
-          Highlight {
-            start_line: 6,
-            start_char: 13,
-            end_line: 6,
-            end_char: 16,
-            kind: "text",
-          },
-        ],
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
   async fn semantic_tokens_basic() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3365,726 +4072,19 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn folding_range() -> Result {
+  async fn shutdown() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
       .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo \"foo\"
-            echo \"another line\"
-
-          bar:
-            echo \"bar\"
-          "
-        },
-      })
-      .request(FoldingRangeRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(FoldingRangeResponse {
-        id: 2,
-        ranges: vec![
-          FoldingRange {
-            start_line: 0,
-            end_line: 3,
-            kind: "region",
-          },
-          FoldingRange {
-            start_line: 4,
-            end_line: 5,
-            kind: "region",
-          },
-        ],
-      })
-      .run()
-      .await
-  }
-
-  #[derive(Debug)]
-  struct DocumentSymbolRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DocumentSymbolRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/documentSymbol",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
-  }
-
-  #[tokio::test]
-  async fn document_symbol_empty_document() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///empty.just",
-      })
-      .response(json!({
+      .request(json!({
         "jsonrpc": "2.0",
         "id": 2,
-        "result": []
+        "method": "shutdown",
       }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_symbol_with_recipes_and_variables() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          bar := 'baz'
-
-          foo:
-            echo foo
-          "
-        },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "bar",
-            "kind": 13,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            }
-          },
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 4, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 2, "character": 3 }
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_symbol_with_alias() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo foo
-
-          alias bar := foo
-          "
-        },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 3, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            }
-          },
-          {
-            "name": "bar",
-            "detail": "alias for foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 3, "character": 0 },
-              "end": { "line": 3, "character": 16 }
-            },
-            "selectionRange": {
-              "start": { "line": 3, "character": 6 },
-              "end": { "line": 3, "character": 9 }
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_symbol_with_setting() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          set export := true
-
-          foo:
-            echo foo
-          "
-        },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "export",
-            "detail": "boolean",
-            "kind": 7,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            }
-          },
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 4, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 2, "character": 3 }
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_action_empty_document() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///empty.just",
-        range: lsp::Range::at(0, 0, 0, 0),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_action_with_recipes() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo foo
-
-          bar arg1 arg2='default':
-            echo bar
-          "
-        },
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 0, 0, 0),
-      })
-      .response(CodeActionResponse {
-        id: 2,
-        actions: vec![
-          CodeAction {
-            title: "foo",
-            kind: "source",
-            command: Command::RunRecipe,
-            arguments: vec![],
-          },
-          CodeAction {
-            title: "bar",
-            kind: "source",
-            command: Command::RunRecipe,
-            arguments: vec![
-              ParameterJson {
-                name: "arg1".into(),
-                default_value: None,
-              },
-              ParameterJson {
-                name: "arg2".into(),
-                default_value: Some("'default'".to_string()),
-              },
-            ],
-          },
-        ],
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_action_deprecated_function_quickfix() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 10, 0, 10),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "title": "Replace `env_var` with `env`",
-            "kind": "quickfix",
-            "edit": {
-              "changes": {
-                "file:///test.just": [
-                  {
-                    "range": {
-                      "start": { "line": 0, "character": 7 },
-                      "end": { "line": 0, "character": 14 }
-                    },
-                    "newText": "env"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_action_deprecated_function_or_default_quickfix() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env_var_or_default(\"BAR\", \"baz\")\n",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 10, 0, 10),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "title": "Replace `env_var_or_default` with `env`",
-            "kind": "quickfix",
-            "edit": {
-              "changes": {
-                "file:///test.just": [
-                  {
-                    "range": {
-                      "start": { "line": 0, "character": 7 },
-                      "end": { "line": 0, "character": 25 }
-                    },
-                    "newText": "env"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_action_deprecated_function_outside_range() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 0, 0, 3),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn prepare_rename_identifier() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo \"foo\"
-          "
-        },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-      })
-      .response(PrepareRenameResponse {
-        id: 2,
-        start_line: 0,
-        start_char: 0,
-        end_line: 0,
-        end_char: 3,
-        placeholder: "foo",
-      })
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn prepare_rename_non_identifier() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo \"foo\"
-          "
-        },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 3,
-      })
       .response(json!({
         "jsonrpc": "2.0",
         "id": 2,
         "result": null
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_lens_empty_document() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(CodeLensRequest {
-        id: 2,
-        uri: "file:///empty.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_lens_with_recipes() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
-          "
-          foo:
-            echo foo
-
-          bar arg1 arg2='default':
-            echo bar
-          "
-        },
-      })
-      .request(CodeLensRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            },
-            "command": {
-              "title": "Run",
-              "command": "just-lsp.run_recipe",
-              "arguments": ["foo", "file:///test.just", []]
-            }
-          },
-          {
-            "range": {
-              "start": { "line": 3, "character": 0 },
-              "end": { "line": 3, "character": 3 }
-            },
-            "command": {
-              "title": "Run",
-              "command": "just-lsp.run_recipe",
-              "arguments": [
-                "bar",
-                "file:///test.just",
-                [
-                  { "name": "arg1", "default_value": null },
-                  { "name": "arg2", "default_value": "'default'" }
-                ]
-              ]
-            }
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[derive(Debug)]
-  struct DocumentLinkRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DocumentLinkRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/documentLink",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
-  }
-
-  #[tokio::test]
-  async fn document_link_empty_document() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_link_import() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let root = tempdir.path().join("justfile");
-    let target = tempdir.path().join("bar.just");
-
-    std::fs::write(&target, "bar:")?;
-
-    let root_uri = lsp::Url::from_file_path(root).unwrap();
-
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root_uri.as_str(),
-        text: "import 'bar.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: root_uri.as_str(),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 7 },
-              "end": { "line": 0, "character": 17 }
-            },
-            "target": lsp::Url::from_file_path(&target).unwrap(),
-            "tooltip": target.display().to_string()
-          }
-        ]
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_link_ignores_unresolved_imports() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let root =
-      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
-
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import? 'missing.just'\nimport x'dynamic.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: root.as_str(),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn document_link_module_with_path() -> Result {
-    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
-      (
-        "file:///C:/foo/justfile",
-        "file:///C:/foo/baz.just",
-        "C:\\foo\\baz.just",
-      )
-    } else {
-      (
-        "file:///foo/justfile",
-        "file:///foo/baz.just",
-        "/foo/baz.just",
-      )
-    };
-
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: justfile_uri,
-        text: "mod bar 'baz.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: justfile_uri,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 8 },
-              "end": { "line": 0, "character": 18 }
-            },
-            "target": target_uri,
-            "tooltip": tooltip
-          }
-        ]
       }))
       .run()
       .await

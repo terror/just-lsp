@@ -82,6 +82,28 @@ mod tests {
   use {super::*, pretty_assertions::assert_eq};
 
   #[test]
+  fn invalid_parameter_input() {
+    assert_eq!(Document::from("foo:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo $:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo +:\n").recipes()[0].parameters, vec![]);
+    assert_eq!(Document::from("foo *:\n").recipes()[0].parameters, vec![]);
+  }
+
+  #[test]
+  fn parse_export_parameter() {
+    assert_eq!(
+      Document::from("foo $bar:\n").recipes()[0].parameters,
+      vec![Parameter {
+        name: "bar".to_string(),
+        kind: ParameterKind::Export,
+        default_value: None,
+        content: "$bar".to_string(),
+        range: lsp::Range::at(0, 4, 0, 8),
+      }],
+    );
+  }
+
+  #[test]
   fn parse_normal_parameter() {
     assert_eq!(
       Document::from("foo target:\n").recipes()[0].parameters,
@@ -91,20 +113,6 @@ mod tests {
         default_value: None,
         content: "target".to_string(),
         range: lsp::Range::at(0, 4, 0, 10),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_parameter_with_default() {
-    assert_eq!(
-      Document::from("foo tests=\"default\":\n").recipes()[0].parameters,
-      vec![Parameter {
-        name: "tests".to_string(),
-        kind: ParameterKind::Normal,
-        default_value: Some("\"default\"".to_string()),
-        content: "tests=\"default\"".to_string(),
-        range: lsp::Range::at(0, 4, 0, 19),
       }],
     );
   }
@@ -126,15 +134,15 @@ mod tests {
   }
 
   #[test]
-  fn parse_export_parameter() {
+  fn parse_parameter_with_default() {
     assert_eq!(
-      Document::from("foo $bar:\n").recipes()[0].parameters,
+      Document::from("foo tests=\"default\":\n").recipes()[0].parameters,
       vec![Parameter {
-        name: "bar".to_string(),
-        kind: ParameterKind::Export,
-        default_value: None,
-        content: "$bar".to_string(),
-        range: lsp::Range::at(0, 4, 0, 8),
+        name: "tests".to_string(),
+        kind: ParameterKind::Normal,
+        default_value: Some("\"default\"".to_string()),
+        content: "tests=\"default\"".to_string(),
+        range: lsp::Range::at(0, 4, 0, 19),
       }],
     );
   }
@@ -148,20 +156,6 @@ mod tests {
         kind: ParameterKind::Variadic(VariadicType::OneOrMore),
         default_value: None,
         content: "+FILES".to_string(),
-        range: lsp::Range::at(0, 4, 0, 10),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_variadic_zero_or_more_parameter() {
-    assert_eq!(
-      Document::from("foo *FLAGS:\n").recipes()[0].parameters,
-      vec![Parameter {
-        name: "FLAGS".to_string(),
-        kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
-        default_value: None,
-        content: "*FLAGS".to_string(),
         range: lsp::Range::at(0, 4, 0, 10),
       }],
     );
@@ -182,10 +176,16 @@ mod tests {
   }
 
   #[test]
-  fn invalid_parameter_input() {
-    assert_eq!(Document::from("foo:\n").recipes()[0].parameters, vec![]);
-    assert_eq!(Document::from("foo $:\n").recipes()[0].parameters, vec![]);
-    assert_eq!(Document::from("foo +:\n").recipes()[0].parameters, vec![]);
-    assert_eq!(Document::from("foo *:\n").recipes()[0].parameters, vec![]);
+  fn parse_variadic_zero_or_more_parameter() {
+    assert_eq!(
+      Document::from("foo *FLAGS:\n").recipes()[0].parameters,
+      vec![Parameter {
+        name: "FLAGS".to_string(),
+        kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
+        default_value: None,
+        content: "*FLAGS".to_string(),
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
+    );
   }
 }

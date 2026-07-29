@@ -39,90 +39,6 @@ mod tests {
   use super::*;
 
   #[test]
-  fn recipe_groups_no_attributes() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(0, 0, 0, 4),
-      },
-      attributes: vec![],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "test:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 2, 0),
-    };
-
-    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
-  }
-
-  #[test]
-  fn recipe_groups_single_attribute() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(1, 0, 1, 4),
-      },
-      attributes: vec![Attribute {
-        name: TextNode {
-          value: "linux".to_string(),
-          range: lsp::Range::at(0, 1, 0, 6),
-        },
-        arguments: vec![],
-        target: Some(AttributeTarget::Recipe),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "[linux]\ntest:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 3, 0),
-    };
-
-    assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
-  }
-
-  #[test]
-  fn recipe_groups_multiple_attributes() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(2, 0, 2, 4),
-      },
-      attributes: vec![
-        Attribute {
-          name: TextNode {
-            value: "linux".to_string(),
-            range: lsp::Range::at(0, 1, 0, 6),
-          },
-          arguments: vec![],
-          target: Some(AttributeTarget::Recipe),
-          range: lsp::Range::at(0, 0, 1, 0),
-        },
-        Attribute {
-          name: TextNode {
-            value: "windows".to_string(),
-            range: lsp::Range::at(1, 1, 1, 8),
-          },
-          arguments: vec![],
-          target: Some(AttributeTarget::Recipe),
-          range: lsp::Range::at(1, 0, 2, 0),
-        },
-      ],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 4, 0),
-    };
-
-    assert_eq!(
-      recipe.groups(),
-      GroupSet::from([Group::Linux, Group::Windows])
-    );
-  }
-
-  #[test]
   fn recipe_groups_all_attributes() {
     let recipe = Recipe {
       name: TextNode {
@@ -228,6 +144,64 @@ mod tests {
   }
 
   #[test]
+  fn recipe_groups_multiple_attributes() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(2, 0, 2, 4),
+      },
+      attributes: vec![
+        Attribute {
+          name: TextNode {
+            value: "linux".to_string(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: lsp::Range::at(0, 0, 1, 0),
+        },
+        Attribute {
+          name: TextNode {
+            value: "windows".to_string(),
+            range: lsp::Range::at(1, 1, 1, 8),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: lsp::Range::at(1, 0, 2, 0),
+        },
+      ],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 4, 0),
+    };
+
+    assert_eq!(
+      recipe.groups(),
+      GroupSet::from([Group::Linux, Group::Windows])
+    );
+  }
+
+  #[test]
+  fn recipe_groups_no_attributes() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(0, 0, 0, 4),
+      },
+      attributes: vec![],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "test:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 2, 0),
+    };
+
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
+  }
+
+  #[test]
   fn recipe_groups_non_os_attributes() {
     let recipe = Recipe {
       name: TextNode {
@@ -251,5 +225,31 @@ mod tests {
     };
 
     assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
+  }
+
+  #[test]
+  fn recipe_groups_single_attribute() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(1, 0, 1, 4),
+      },
+      attributes: vec![Attribute {
+        name: TextNode {
+          value: "linux".to_string(),
+          range: lsp::Range::at(0, 1, 0, 6),
+        },
+        arguments: vec![],
+        target: Some(AttributeTarget::Recipe),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "[linux]\ntest:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 3, 0),
+    };
+
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
   }
 }
