@@ -251,8 +251,6 @@ impl Inner {
       serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
     }
 
-    let config = self.config.read().await;
-
     let workspace = self.workspace.read().await;
 
     let Some(document) =
@@ -288,21 +286,17 @@ impl Inner {
       }));
     }
 
-    let imported_documents = workspace
-      .projects
+    let diagnostics = workspace
+      .diagnostics
       .get(&params.text_document.uri)
-      .into_iter()
-      .flat_map(|project| project.imported_documents(&workspace.documents));
+      .map_or::<&[Diagnostic], _>(&[], Vec::as_slice);
 
-    actions.extend(
-      Quickfixer {
-        config: Some(&config),
-        document,
-        imported_documents: imported_documents.collect(),
-        parameters: &params,
-      }
-      .collect(),
-    );
+    let quickfixer = Quickfixer {
+      diagnostics,
+      parameters: &params,
+    };
+
+    actions.extend(quickfixer.collect());
 
     Ok(Some(actions))
   }
@@ -447,6 +441,10 @@ impl Inner {
 
       let roots = workspace.affected_roots(&uri);
 
+      for root in &roots {
+        workspace.diagnostics.remove(root);
+      }
+
       workspace.documents.change(params)?;
       workspace.load_projects(roots.iter().cloned())?;
 
@@ -476,6 +474,12 @@ impl Inner {
         return;
       }
 
+      workspace.diagnostics.remove(&uri);
+
+      for root in &roots {
+        workspace.diagnostics.remove(root);
+      }
+
       if let Err(error) = workspace.load_projects(roots.iter().cloned()) {
         warn!(%error, "failed to rebuild affected projects");
       }
@@ -498,6 +502,10 @@ impl Inner {
       let mut roots = workspace.affected_roots(&uri);
 
       roots.insert(uri.clone());
+
+      for root in &roots {
+        workspace.diagnostics.remove(root);
+      }
 
       workspace.documents.open(params)?;
       workspace.load_projects(roots.iter().cloned())?;
@@ -954,15 +962,12 @@ impl Inner {
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
-      return;
-    }
-
     let (diagnostics, version) = {
-      let workspace = self.workspace.read().await;
       let config = self.config.read().await;
 
-      match workspace.documents.get_open(uri) {
+      let mut workspace = self.workspace.write().await;
+
+      let (diagnostics, version) = match workspace.documents.get_open(uri) {
         Some(document) => {
           let imported_documents =
             workspace.projects.get(uri).into_iter().flat_map(|project| {
@@ -975,18 +980,21 @@ impl Inner {
             imported_documents: imported_documents.collect(),
           };
 
-          (
-            analyzer
-              .analyze()
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            document.version,
-          )
+          (analyzer.analyze(), document.version)
         }
         None => return,
-      }
+      };
+
+      let published = diagnostics.iter().map(lsp::Diagnostic::from).collect();
+
+      workspace.diagnostics.insert(uri.clone(), diagnostics);
+
+      (published, version)
     };
+
+    if !self.initialized.load(Ordering::Relaxed) {
+      return;
+    }
 
     self
       .client
@@ -2219,7 +2227,16 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
+        text: "foo := env(\"BAR\")\n",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 10)),
+          range_length: None,
+          text: "env_var".into(),
+        }],
       })
       .request(CodeActionRequest {
         id: 2,
