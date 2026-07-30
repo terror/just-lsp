@@ -18,7 +18,10 @@ use {
     io::{self, stderr},
     path::PathBuf,
     process,
-    sync::{Arc, LazyLock, atomic::{AtomicBool, Ordering}},
+    sync::{
+      Arc, LazyLock,
+      atomic::{AtomicBool, Ordering},
+    },
     time::Instant,
   },
   subcommand::Subcommand,
