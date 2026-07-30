@@ -19,7 +19,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `cache-attribute`                 | Cache Attribute                 | `[cache]` uses an unknown keyword, a keyword without a value, or a positional argument.                                      |
 | `cache-without-script`            | Cache Without Script Mode       | Recipe uses `[cache]` without script mode.                                                                                    |
 | `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique appear more than once on a target, or `[default]` appears more than once in a module.          |
-| `script-shebang-conflict`         | Script Shebang Conflict         | Recipe combines a shebang line with the `[script]` attribute.                                                                 |
+| `script-shell-conflict`           | Script Shell Conflict           | Recipe combines mutually exclusive `[script]` and `[shell]` attributes.                                                       |
 | `exit-message-conflict`           | Exit Message Conflict           | Recipe combines mutually exclusive `[exit-message]` and `[no-exit-message]` attributes.                                       |
 | `extension-without-script`        | Extension Without Script        | Recipe uses `[extension]` without `[script]` or a shebang, so the attribute has no effect.                                    |
 | `duplicate-recipes`               | Duplicate Recipes               | Recipe name collides with another recipe for overlapping targets unless duplicates are allowed.                               |
