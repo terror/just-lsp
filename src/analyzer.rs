@@ -1610,7 +1610,7 @@ mod tests {
   fn continue_attribute_accepts_multiple_arguments() {
     Test::new(indoc! {
       "
-      [continue(\"SIGHUP\", \"SIGINT\")]
+      [continue(\"SIGHUP\", \"SIGINT\", \"SIGQUIT\")]
       foo:
         echo foo
       "
@@ -1656,6 +1656,26 @@ mod tests {
     .error(
       "Attribute `continue` cannot be applied to alias target",
       lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unknown_signals() {
+    Test::new(indoc! {
+      "
+      [continue(\"SIGTERM\", \"sigint\")]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 10, 0, 19),
+    )
+    .error(
+      "Invalid signal `sigint`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 21, 0, 29),
     )
     .run();
   }

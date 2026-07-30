@@ -51,6 +51,7 @@ mod attribute_invalid_target;
 mod attribute_target_support;
 mod cache_attribute;
 mod cache_without_script;
+mod continue_signals;
 mod dependency_arguments;
 mod deprecated_function;
 mod deprecated_setting;
