@@ -753,15 +753,33 @@ mod tests {
   }
 
   #[test]
-  fn attributes_duplicate_group_attribute_allowed() {
+  fn attributes_duplicate_group_attribute() {
     Test::new(indoc! {
       "
       [group('dev')]
-      [group('dev')]
+      [group(\"dev\")]
       build:
         echo \"build\"
       "
     })
+    .error(
+      "Recipe attribute `group` with value `dev` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [group(x'dev')]
+      [group(x'dev')]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `group` with value `x'dev'` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -1003,6 +1021,20 @@ mod tests {
       [group('rust')]
       build:
         echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_same_group_on_multiple_targets_allowed() {
+    Test::new(indoc! {
+      "
+      [group('dev')]
+      build:
+
+      [group('dev')]
+      test:
       "
     })
     .run();

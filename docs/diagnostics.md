@@ -19,7 +19,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind.                                                                              |
 | `cache-attribute`                 | Cache Attribute                 | `[cache]` uses an unknown keyword, a keyword without a value, or a positional argument.                                      |
 | `cache-without-script`            | Cache Without Script Mode       | Recipe uses `[cache]` without script mode.                                                                                    |
-| `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique appear more than once on a target, or `[default]` appears more than once in a module.          |
+| `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique or group values appear more than once on a target, or `[default]` appears more than once in a module. |
 | `script-shell-conflict`           | Script Shell Conflict           | Recipe combines mutually exclusive `[script]` and `[shell]` attributes.                                                       |
 | `exit-message-conflict`           | Exit Message Conflict           | Recipe combines mutually exclusive `[exit-message]` and `[no-exit-message]` attributes.                                       |
 | `extension-without-script`        | Extension Without Script        | Recipe uses `[extension]` without `[script]` or a shebang, so the attribute has no effect.                                    |
