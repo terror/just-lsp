@@ -13,6 +13,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `unknown-attribute`               | Unknown Attribute               | Attribute name is not part of the builtin catalog.                                                                            |
 | `attribute-arguments`             | Attribute Arguments             | Attribute invocation uses the wrong number of arguments.                                                                      |
 | `attribute-argument-expressions`  | Attribute Argument Expressions  | Attribute invocation uses an expression where just requires a string literal.                                                 |
+| `continue-signals`                | Continue Signals                | `[continue]` arguments must be `SIGHUP`, `SIGINT`, or `SIGQUIT`.                                                               |
 | `arg-attribute`                   | Arg Attribute                   | `[arg(NAME, ...)]` references an unknown parameter, duplicates a parameter config, or contains invalid keywords or keyword values. |
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                                                        |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind.                                                                              |
