@@ -4411,6 +4411,24 @@ mod tests {
   }
 
   #[test]
+  fn timestamp_attribute_accepts_optional_expression() {
+    Test::new(indoc! {
+      "
+      format := '%H:%M:%S'
+
+      [timestamp]
+      foo:
+        echo foo
+
+      [timestamp(format)]
+      bar:
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn unexported_names_are_not_variables() {
     Test::new(indoc! {
       "
