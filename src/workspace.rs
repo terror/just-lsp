@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, Default)]
 pub struct Workspace {
+  pub diagnostics: HashMap<lsp::Url, Vec<Diagnostic>>,
   pub documents: DocumentStore,
   pub projects: HashMap<lsp::Url, Project>,
 }

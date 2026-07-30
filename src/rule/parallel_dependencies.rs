@@ -13,32 +13,28 @@ define_rule! {
         .filter_map(|recipe| {
           let attribute = recipe.find_attribute("parallel")?;
 
-          let message = match recipe.dependencies.len() {
-            0 => format!(
-              "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
-              recipe.name.value
+          let diagnostic = match recipe.dependencies.len() {
+            0 => Diagnostic::warning(
+              format!(
+                "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
+                recipe.name.value
+              ),
+              attribute.range,
             ),
-            1 => format!(
-              "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
-              recipe.name.value
+            1 => Diagnostic::warning(
+              format!(
+                "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
+                recipe.name.value
+              ),
+              attribute.range,
             ),
             _ => return None,
           };
 
-          Some(Diagnostic::warning(message, attribute.range))
-        })
-        .collect()
-    },
-    quickfixes(context) {
-      context
-        .recipes()
-        .iter()
-        .filter_map(|recipe| {
-          let attribute = recipe.find_attribute("parallel")?;
-
-          (recipe.dependencies.len() < 2).then(|| {
-            Quickfix::removal(attribute.range, "Remove `[parallel]`")
-          })
+          Some(diagnostic.quickfix(Quickfix::removal(
+            attribute.range,
+            "Remove `[parallel]`",
+          )))
         })
         .collect()
     }

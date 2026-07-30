@@ -1,37 +1,39 @@
 use super::*;
 
 pub struct Quickfixer<'a> {
-  pub config: Option<&'a Config>,
-  pub document: &'a Document,
-  pub imported_documents: Vec<&'a Document>,
+  pub diagnostics: &'a [Diagnostic],
   pub parameters: &'a lsp::CodeActionParams,
 }
 
 impl Quickfixer<'_> {
-  fn action(&self, code: &str, quickfix: Quickfix) -> lsp::CodeActionOrCommand {
+  fn action(
+    &self,
+    source: &Diagnostic,
+    quickfix: &Quickfix,
+  ) -> lsp::CodeActionOrCommand {
     let diagnostics = self
       .parameters
       .context
       .diagnostics
       .iter()
       .filter(|diagnostic| {
-        diagnostic.range == quickfix.range
+        diagnostic.range == source.range
           && matches!(
             &diagnostic.code,
-            Some(lsp::NumberOrString::String(c)) if c == code
+            Some(lsp::NumberOrString::String(value)) if value == &source.id
           )
       })
       .cloned()
       .collect::<Vec<_>>();
 
     lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: quickfix.title,
+      title: quickfix.title.clone(),
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
       edit: Some(lsp::WorkspaceEdit {
         changes: Some(HashMap::from([(
           self.parameters.text_document.uri.clone(),
-          quickfix.edits,
+          quickfix.edits.clone(),
         )])),
         ..Default::default()
       }),
@@ -41,25 +43,15 @@ impl Quickfixer<'_> {
 
   #[must_use]
   pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    let context =
-      RuleContext::new(self.document, self.imported_documents.iter().copied());
-
-    inventory::iter::<&dyn Rule>
-      .into_iter()
-      .filter(|rule| {
-        self
-          .config
-          .unwrap_or(&Config::default())
-          .rule_config(rule.id())
-          .level()
-          != Some(RuleLevel::Off)
-      })
-      .flat_map(|rule| {
-        rule
-          .quickfixes(&context)
-          .into_iter()
-          .filter(|quickfix| quickfix.range.overlaps(self.parameters.range))
-          .map(|quickfix| self.action(rule.id(), quickfix))
+    self
+      .diagnostics
+      .iter()
+      .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
+      .filter_map(|diagnostic| {
+        diagnostic
+          .quickfix
+          .as_ref()
+          .map(|quickfix| self.action(diagnostic, quickfix))
       })
       .collect()
   }
@@ -123,10 +115,15 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let actions = Quickfixer {
+      let diagnostics = Analyzer {
         config: Some(&config),
         document: &document,
         imported_documents: Vec::new(),
+      }
+      .analyze();
+
+      let actions = Quickfixer {
+        diagnostics: &diagnostics,
         parameters: &parameters,
       }
       .collect();
@@ -232,6 +229,15 @@ mod tests {
   }
 
   #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    Test::new(
+      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
+    )
+    .range(lsp::Range::at(2, 4, 2, 4))
+    .run();
+  }
+
+  #[test]
   fn skips_disabled_rules() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
@@ -244,14 +250,5 @@ mod tests {
       .config(config)
       .range(lsp::Range::at(0, 10, 0, 10))
       .run();
-  }
-
-  #[test]
-  fn skips_windows_shell_setting_when_replacement_exists() {
-    Test::new(
-      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
-    )
-    .range(lsp::Range::at(2, 4, 2, 4))
-    .run();
   }
 }
