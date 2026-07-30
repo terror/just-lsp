@@ -607,6 +607,29 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "timestamp",
+    kind: AttributeKind::Optional,
+    description: indoc! {
+      "
+      Print timestamps before commands in this recipe.
+
+      With no argument, timestamps are formatted as `HH:MM:SS`. Pass a
+      `strftime`-style format string to customize the output.
+
+      ```just
+      [timestamp]
+      build:
+        cargo build
+
+      [timestamp(\"%H:%M:%S%.3f %Z\")]
+      test:
+        cargo test
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "unix",
     kind: AttributeKind::Nullary,
     description: indoc! {
