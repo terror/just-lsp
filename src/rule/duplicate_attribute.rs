@@ -2,6 +2,12 @@ use super::*;
 
 const REPEATABLE_ATTRIBUTES: &[&str] = &["arg", "env", "metadata"];
 
+#[derive(Debug, Eq, Hash, PartialEq)]
+enum GroupValue {
+  Cooked(String),
+  Raw(String),
+}
+
 define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
@@ -41,10 +47,8 @@ define_rule! {
 
       let mut target_seen: HashMap<(usize, usize), HashSet<String>> =
         HashMap::new();
-      let mut target_groups: HashMap<
-        (usize, usize),
-        HashSet<(bool, String)>,
-      > = HashMap::new();
+      let mut target_groups: HashMap<(usize, usize), HashSet<GroupValue>> =
+        HashMap::new();
 
       for attribute_node in tree.root_node().find_all("attribute") {
         let Some(parent) = attribute_node.parent() else {
@@ -65,22 +69,25 @@ define_rule! {
               .siblings()
               .take_while(|node| node.kind() != "identifier")
               .find(|node| node.kind() == "expression")
-              .and_then(|argument| Self::group(argument, document));
+              .and_then(|argument| GroupValue::new(argument, document));
 
-            let Some((decoded, group)) = group else {
+            let Some(group) = group else {
               continue;
             };
 
             let seen = target_groups.entry(target_key).or_default();
 
-            if !seen.insert((decoded, group.clone())) {
+            if seen.contains(&group) {
               diagnostics.push(Diagnostic::error(
                 format!(
-                  "{} attribute `group` with value `{group}` is duplicated",
-                  target.target_name()
+                  "{} attribute `group` with value `{}` is duplicated",
+                  target.target_name(),
+                  group.value(),
                 ),
                 attribute_node.get_range(document),
               ));
+            } else {
+              seen.insert(group);
             }
 
             continue;
@@ -117,27 +124,26 @@ define_rule! {
   }
 }
 
-impl DuplicateAttributeRule {
-  fn group(argument: Node, document: &Document) -> Option<(bool, String)> {
+impl GroupValue {
+  fn new(argument: Node, document: &Document) -> Option<Self> {
     let value = argument.find("^value")?;
+    let string = value.find("^string")?;
 
-    let mut cursor = value.walk();
-
-    let children = value.named_children(&mut cursor).collect::<Vec<_>>();
-
-    let [string] = children.as_slice() else {
-      return None;
-    };
-
-    if string.kind() != "string" || string.find("format_string").is_some() {
+    if string.find("format_string").is_some() {
       return None;
     }
 
     let group = document.get_node_text(&argument);
 
     Some(match group.literal() {
-      Some(group) => (true, group),
-      None => (false, group),
+      Some(group) => Self::Cooked(group),
+      None => Self::Raw(group),
     })
+  }
+
+  fn value(&self) -> &str {
+    match self {
+      Self::Cooked(value) | Self::Raw(value) => value,
+    }
   }
 }
