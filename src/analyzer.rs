@@ -1310,6 +1310,10 @@ mod tests {
         cargo build
       "
     })
+    .error(
+      "Recipe `build` can't combine `[script]` with `[shell]`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -3852,7 +3856,7 @@ mod tests {
   }
 
   #[test]
-  fn script_attribute_with_shebang_conflict() {
+  fn script_attribute_with_shebang_is_allowed() {
     Test::new(indoc! {
       "
       [script]
@@ -3861,10 +3865,6 @@ mod tests {
         echo \"publish\"
       "
     })
-    .error(
-      "Recipe `publish` has both shebang line and `[script]` attribute",
-      lsp::Range::at(0, 0, 1, 0),
-    )
     .run();
   }
 

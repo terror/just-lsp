@@ -80,7 +80,7 @@ mod mixed_indentation;
 mod parallel_dependencies;
 mod recipe_dependency_cycles;
 mod recipe_parameters;
-mod script_shebang_conflict;
+mod script_shell_conflict;
 mod syntax;
 mod undefined_identifiers;
 mod unknown_attribute;
