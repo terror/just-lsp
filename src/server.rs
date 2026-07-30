@@ -432,7 +432,9 @@ impl Inner {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    let diagnostics = {
+      let config = self.config.read().await;
+
       let mut workspace = self.workspace.write().await;
 
       if !workspace.documents.is_open(&uri) {
@@ -448,12 +450,10 @@ impl Inner {
       workspace.documents.change(params)?;
       workspace.load_projects(roots.iter().cloned())?;
 
-      roots
+      Self::update_diagnostics(&config, &mut workspace, roots)
     };
 
-    for root in roots {
-      self.publish_diagnostics(&root).await;
-    }
+    self.publish_diagnostics(diagnostics).await;
 
     Ok(())
   }
@@ -461,7 +461,9 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    let diagnostics = {
+      let config = self.config.read().await;
+
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
@@ -484,20 +486,20 @@ impl Inner {
         warn!(%error, "failed to rebuild affected projects");
       }
 
-      roots
+      Self::update_diagnostics(&config, &mut workspace, roots)
     };
 
     self.client.publish_diagnostics(uri, vec![], None).await;
 
-    for root in roots {
-      self.publish_diagnostics(&root).await;
-    }
+    self.publish_diagnostics(diagnostics).await;
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    let diagnostics = {
+      let config = self.config.read().await;
+
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
@@ -510,12 +512,10 @@ impl Inner {
       workspace.documents.open(params)?;
       workspace.load_projects(roots.iter().cloned())?;
 
-      roots
+      Self::update_diagnostics(&config, &mut workspace, roots)
     };
 
-    for root in roots {
-      self.publish_diagnostics(&root).await;
-    }
+    self.publish_diagnostics(diagnostics).await;
 
     Ok(())
   }
@@ -961,45 +961,20 @@ impl Inner {
     }))
   }
 
-  async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    let (diagnostics, version) = {
-      let config = self.config.read().await;
-
-      let mut workspace = self.workspace.write().await;
-
-      let (diagnostics, version) = match workspace.documents.get_open(uri) {
-        Some(document) => {
-          let imported_documents =
-            workspace.projects.get(uri).into_iter().flat_map(|project| {
-              project.imported_documents(&workspace.documents)
-            });
-
-          let analyzer = Analyzer {
-            config: Some(&config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
-
-          (analyzer.analyze(), document.version)
-        }
-        None => return,
-      };
-
-      let published = diagnostics.iter().map(lsp::Diagnostic::from).collect();
-
-      workspace.diagnostics.insert(uri.clone(), diagnostics);
-
-      (published, version)
-    };
-
+  async fn publish_diagnostics(
+    &self,
+    diagnostics: Vec<(lsp::Url, Vec<lsp::Diagnostic>, i32)>,
+  ) {
     if !self.initialized.load(Ordering::Relaxed) {
       return;
     }
 
-    self
-      .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
-      .await;
+    for (uri, diagnostics, version) in diagnostics {
+      self
+        .client
+        .publish_diagnostics(uri, diagnostics, Some(version))
+        .await;
+    }
   }
 
   async fn references(
@@ -1273,6 +1248,43 @@ impl Inner {
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
+
+  fn update_diagnostics(
+    config: &Config,
+    workspace: &mut Workspace,
+    uris: impl IntoIterator<Item = lsp::Url>,
+  ) -> Vec<(lsp::Url, Vec<lsp::Diagnostic>, i32)> {
+    uris
+      .into_iter()
+      .filter_map(|uri| {
+        let (diagnostics, version) = {
+          let document = workspace.documents.get_open(&uri)?;
+
+          let imported_documents = workspace
+            .projects
+            .get(&uri)
+            .into_iter()
+            .flat_map(|project| {
+              project.imported_documents(&workspace.documents)
+            });
+
+          let analyzer = Analyzer {
+            config: Some(config),
+            document,
+            imported_documents: imported_documents.collect(),
+          };
+
+          (analyzer.analyze(), document.version)
+        };
+
+        let published = diagnostics.iter().map(lsp::Diagnostic::from).collect();
+
+        workspace.diagnostics.insert(uri.clone(), diagnostics);
+
+        Some((uri, published, version))
+      })
+      .collect()
+  }
 }
 
 #[cfg(test)]
@@ -1283,7 +1295,7 @@ mod tests {
     pretty_assertions::assert_eq,
     serde_json::{Value, json},
     std::env,
-    tower_lsp::LspService,
+    tower_lsp::{ClientSocket, LspService},
     tower_test::mock::Spawn,
   };
 
@@ -1292,16 +1304,39 @@ mod tests {
     requests: Vec<Value>,
     responses: Vec<Option<Value>>,
     service: Spawn<LspService<Server>>,
+    socket: ClientSocket,
   }
 
   impl Test {
+    async fn initialize(&mut self) -> Result {
+      self
+        .service
+        .call(serde_json::from_value(
+          InitializeRequest { id: 1 }.into_value(),
+        )?)
+        .await?;
+
+      let initialized = self.service.call(serde_json::from_value(json!({
+        "jsonrpc": "2.0",
+        "method": "initialized",
+        "params": {}
+      }))?);
+
+      let (response, _) = tokio::join!(initialized, self.socket.next());
+
+      response?;
+
+      Ok(())
+    }
+
     fn new() -> Self {
-      let (service, _) = LspService::new(Server::new);
+      let (service, socket) = LspService::new(Server::new);
 
       Self {
         requests: Vec::new(),
         responses: Vec::new(),
         service: Spawn::new(service),
+        socket,
       }
     }
 
@@ -1309,6 +1344,21 @@ mod tests {
       self.requests.push(notification.into_value());
       self.responses.push(None);
       self
+    }
+
+    async fn notification_with_server_message(
+      &mut self,
+      notification: impl IntoValue,
+    ) -> Result {
+      let notification = self
+        .service
+        .call(serde_json::from_value(notification.into_value())?);
+
+      let (response, _) = tokio::join!(notification, self.socket.next());
+
+      response?;
+
+      Ok(())
     }
 
     fn request<T: IntoValue>(mut self, request: T) -> Self {
@@ -1319,6 +1369,35 @@ mod tests {
     fn response<T: IntoValue>(mut self, response: T) -> Self {
       self.responses.push(Some(response.into_value()));
       self
+    }
+
+    async fn response_during_notification(
+      &mut self,
+      notification: impl IntoValue,
+      server_messages: usize,
+      request: impl FnOnce(&Value) -> Value,
+    ) -> Result<Value> {
+      let notification = self
+        .service
+        .call(serde_json::from_value(notification.into_value())?);
+
+      let notification = tokio::spawn(notification);
+
+      let first = serde_json::to_value(self.socket.next().await.unwrap())?;
+
+      let response = self
+        .service
+        .call(serde_json::from_value(request(&first))?)
+        .await?
+        .unwrap();
+
+      for _ in 1..server_messages {
+        self.socket.next().await.unwrap();
+      }
+
+      notification.await??;
+
+      Ok(serde_json::to_value(response)?)
     }
 
     async fn run(mut self) -> Result {
@@ -1982,13 +2061,13 @@ mod tests {
   }
 
   #[derive(Debug)]
-  struct CodeActionRequest {
+  struct CodeActionRequest<'a> {
     id: i64,
     range: lsp::Range,
-    uri: &'static str,
+    uri: &'a str,
   }
 
-  impl IntoValue for CodeActionRequest {
+  impl IntoValue for CodeActionRequest<'_> {
     fn into_value(self) -> Value {
       json!({
         "jsonrpc": "2.0",
@@ -2530,6 +2609,67 @@ mod tests {
       .unwrap();
 
     assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
+
+    Ok(())
+  }
+
+  #[tokio::test]
+  async fn dependency_open_updates_all_quickfixes_before_publication() -> Result
+  {
+    let tempdir = tempfile::tempdir()?;
+
+    let root_a =
+      lsp::Url::from_file_path(tempdir.path().join("a.just")).unwrap();
+
+    let root_b =
+      lsp::Url::from_file_path(tempdir.path().join("b.just")).unwrap();
+
+    let imported =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    std::fs::write(imported.to_file_path().unwrap(), "")?;
+
+    let mut test = Test::new();
+
+    test.initialize().await?;
+
+    for root in [&root_a, &root_b] {
+      test
+        .notification_with_server_message(DidOpenNotification {
+          uri: root.as_str(),
+          text: "import 'foo.just'\n\nfoo := env_var('BAR')",
+        })
+        .await?;
+    }
+
+    let response = test
+      .response_during_notification(
+        DidOpenNotification {
+          uri: imported.as_str(),
+          text: "",
+        },
+        3,
+        |first| {
+          let target = if first["params"]["uri"] == root_a.as_str() {
+            &root_b
+          } else {
+            &root_a
+          };
+
+          CodeActionRequest {
+            id: 2,
+            uri: target.as_str(),
+            range: lsp::Range::at(2, 10, 2, 10),
+          }
+          .into_value()
+        },
+      )
+      .await?;
+
+    assert_eq!(
+      response["result"][0]["title"],
+      "Replace `env_var` with `env`"
+    );
 
     Ok(())
   }
