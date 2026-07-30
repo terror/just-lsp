@@ -12,9 +12,10 @@ use {
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
+    fs,
     io::{self, stderr},
     path::PathBuf,
     process,

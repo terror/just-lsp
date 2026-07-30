@@ -258,6 +258,27 @@ fn analyze_errors_when_justfile_cannot_be_found() -> Result {
 }
 
 #[test]
+fn analyze_errors_when_multiple_justfiles_are_found() -> Result {
+  Test::new()?
+    .file("justfile", "")
+    .file(".justfile", "")
+    .expected_status(1)
+    .expected_stderr("error: multiple candidate justfiles found in `[ROOT]`\n")
+    .run()
+}
+
+#[test]
+fn analyze_finds_case_insensitive_justfiles() -> Result {
+  #[track_caller]
+  fn case(name: &str) -> Result {
+    Test::new()?.file(name, "foo:\n").directory("bar").run()
+  }
+
+  case("JuStFiLe")?;
+  case(".JuStFiLe")
+}
+
+#[test]
 fn analyze_finds_justfile_in_parent_directory() -> Result {
   Test::new()?
     .file(
@@ -269,6 +290,15 @@ fn analyze_finds_justfile_in_parent_directory() -> Result {
         "
       },
     )
+    .directory("foo/bar")
+    .run()
+}
+
+#[test]
+fn analyze_finds_nearest_dot_justfile() -> Result {
+  Test::new()?
+    .file("justfile", "foo:\n  echo {{bar()}}\n")
+    .file("foo/.justfile", "foo:\n")
     .directory("foo/bar")
     .run()
 }
