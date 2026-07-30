@@ -3918,6 +3918,24 @@ mod tests {
   }
 
   #[test]
+  fn settings_array_type_error_with_nested_list() {
+    Test::new(indoc! {
+      "
+      set lists
+      set shell := show(['foo'])
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `shell` expects an array value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn settings_boolean_shorthand() {
     Test::new(indoc! {
       "
