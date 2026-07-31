@@ -36,7 +36,7 @@ define_rule! {
             let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
             let is_unused = !identifiers.contains(&parameter.name)
-              && parameter.kind != ParameterKind::Export
+              && !parameter.export
               && !exported
               && !used_via_position;
 

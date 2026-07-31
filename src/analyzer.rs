@@ -4902,6 +4902,20 @@ mod tests {
   }
 
   #[test]
+  fn exported_variadic_recipe_parameters_are_not_unused() {
+    Test::new(indoc! {
+      "
+      foo +$args:
+        echo foo
+
+      bar *$args:
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn warn_for_unused_variables() {
     Test::new(indoc! {
       "
