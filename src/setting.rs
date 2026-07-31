@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Setting {
+  pub array_has_command: bool,
   pub attributes: Vec<Attribute>,
   pub kind: SettingKind,
   pub name: TextNode,
@@ -55,12 +56,15 @@ impl Setting {
         },
       );
 
-    let kind = if expression_child.is_some_and(|expression| {
-      expression
-        .named_child(0)
-        .and_then(|value| value.named_child(0))
-        .is_some_and(|child| child.kind() == "list_literal")
-    }) {
+    let array =
+      expression_child.and_then(|expression| Self::list_literal(*expression));
+
+    let array_has_command = array
+      .and_then(|array| array.child_by_field_name("elements"))
+      .and_then(|elements| elements.named_child(0))
+      .is_some_and(|command| Self::list_literal(command).is_none());
+
+    let kind = if array.is_some() {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
@@ -74,6 +78,7 @@ impl Setting {
 
     Some(Setting {
       attributes: document.attributes_for_node(node),
+      array_has_command,
       kind,
       name,
       range,
@@ -87,5 +92,12 @@ impl Setting {
       .attributes
       .iter()
       .any(|attribute| attribute.name.value == name)
+  }
+
+  fn list_literal(expression: Node<'_>) -> Option<Node<'_>> {
+    expression
+      .named_child(0)
+      .and_then(|value| value.named_child(0))
+      .filter(|value| value.kind() == "list_literal")
   }
 }

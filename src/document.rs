@@ -969,6 +969,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: true,
         name: TextNode {
           value: "shell".into(),
           range: lsp::Range::at(0, 4, 0, 9),
@@ -1028,6 +1029,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -1058,6 +1060,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "export".into(),
           range: lsp::Range::at(0, 4, 0, 10),
@@ -1088,6 +1091,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "export".into(),
           range: lsp::Range::at(0, 4, 0, 10),
@@ -1162,6 +1166,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -1192,6 +1197,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: true,
         name: TextNode {
           value: "windows-shell".into(),
           range: lsp::Range::at(0, 4, 0, 17),
@@ -1269,6 +1275,7 @@ mod tests {
       vec![
         Setting {
           attributes: vec![],
+          array_has_command: false,
           name: TextNode {
             value: "export".into(),
             range: lsp::Range::at(0, 4, 0, 10),
@@ -1282,6 +1289,7 @@ mod tests {
         },
         Setting {
           attributes: vec![],
+          array_has_command: true,
           name: TextNode {
             value: "shell".into(),
             range: lsp::Range::at(1, 4, 1, 9),
@@ -1295,6 +1303,7 @@ mod tests {
         },
         Setting {
           attributes: vec![],
+          array_has_command: false,
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(2, 4, 2, 7),
@@ -1338,6 +1347,7 @@ mod tests {
           target: Some(AttributeTarget::Setting),
           range: lsp::Range::at(0, 0, 1, 0),
         }],
+        array_has_command: false,
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(1, 4, 1, 7),
@@ -1368,6 +1378,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(0, 4, 0, 7),
@@ -1398,6 +1409,7 @@ mod tests {
       settings,
       vec![Setting {
         attributes: vec![],
+        array_has_command: false,
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 4, 0, 7),
