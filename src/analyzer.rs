@@ -4173,6 +4173,87 @@ mod tests {
   }
 
   #[test]
+  fn settings_interpreter_array_requires_command() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      let content = format!("set {setting} := []\n");
+      let start = u32::try_from(8 + setting.len()).unwrap();
+
+      Test::new(&content)
+        .config(Config {
+          rules: HashMap::from([(
+            "deprecated-setting".to_string(),
+            RuleConfig::Level(RuleLevel::Off),
+          )]),
+          ..Config::default()
+        })
+        .error(message, lsp::Range::at(0, start, 0, start + 2))
+        .run();
+    }
+
+    case("shell", "Setting `shell` requires a command");
+    case(
+      "script-interpreter",
+      "Setting `script-interpreter` requires a command",
+    );
+    case(
+      "windows-shell",
+      "Setting `windows-shell` requires a command",
+    );
+  }
+
+  #[test]
+  fn settings_interpreter_array_requires_command_with_attribute() {
+    Test::new(indoc! {
+      "
+      [windows]
+      set shell := []
+      "
+    })
+    .error(
+      "Setting `shell` requires a command",
+      lsp::Range::at(1, 13, 1, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_interpreter_array_requires_non_list_command() {
+    Test::new(indoc! {
+      "
+      set lists
+      set shell := [[]]
+      "
+    })
+    .error(
+      "Setting `shell` requires a command",
+      lsp::Range::at(1, 13, 1, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_interpreter_arrays_accept_commands_and_arguments_without_lists() {
+    #[track_caller]
+    fn case(setting: &str, value: &str) {
+      Test::new(&format!("set {setting} := {value}\n"))
+        .config(Config {
+          rules: HashMap::from([(
+            "deprecated-setting".to_string(),
+            RuleConfig::Level(RuleLevel::Off),
+          )]),
+          ..Config::default()
+        })
+        .run();
+    }
+
+    case("shell", "['sh']");
+    case("shell", "['sh', '-cu']");
+    case("script-interpreter", "['sh', '-eu']");
+    case("windows-shell", "['cmd', '/c']");
+  }
+
+  #[test]
   fn settings_lazy_recognized() {
     Test::new(indoc! {
       "

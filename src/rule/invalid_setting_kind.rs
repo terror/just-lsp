@@ -17,6 +17,22 @@ define_rule! {
         };
 
         if kind.accepts(&setting.kind) {
+          if setting.kind == SettingKind::Array
+            && !setting.array_has_command
+            && matches!(
+              setting.name.value.as_str(),
+              "script-interpreter" | "shell" | "windows-shell"
+            )
+          {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Setting `{}` requires a command",
+                setting.name.value
+              ),
+              setting.value.range,
+            ));
+          }
+
           continue;
         }
 
