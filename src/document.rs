@@ -2236,6 +2236,7 @@ mod tests {
       vec![Parameter {
         name: "triple".into(),
         kind: ParameterKind::Normal,
+        export: false,
         default_value: Some("(arch + \"-unknown-unknown\")".into()),
         content: "triple=(arch + \"-unknown-unknown\")".into(),
         range: lsp::Range::at(0, 4, 0, 38),
@@ -2265,6 +2266,7 @@ mod tests {
           Parameter {
             name: "first".into(),
             kind: ParameterKind::Normal,
+            export: false,
             default_value: None,
             content: "first".into(),
             range: lsp::Range::at(0, 4, 0, 9),
@@ -2272,6 +2274,7 @@ mod tests {
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Normal,
+            export: false,
             default_value: Some("\"default\"".into()),
             content: "second=\"default\"".into(),
             range: lsp::Range::at(0, 10, 0, 26),
@@ -2426,6 +2429,7 @@ mod tests {
         parameters: vec![Parameter {
           name: "args".into(),
           kind: ParameterKind::Normal,
+          export: false,
           default_value: None,
           content: "args".into(),
           range: lsp::Range::at(3, 4, 3, 8),
@@ -2544,13 +2548,15 @@ mod tests {
           Parameter {
             name: "target".into(),
             kind: ParameterKind::Normal,
+            export: false,
             default_value: None,
             content: "target".into(),
             range: lsp::Range::at(0, 4, 0, 10),
           },
           Parameter {
             name: "lol".into(),
-            kind: ParameterKind::Export,
+            kind: ParameterKind::Normal,
+            export: true,
             default_value: None,
             content: "$lol".into(),
             range: lsp::Range::at(0, 11, 0, 15),
@@ -2633,6 +2639,7 @@ mod tests {
           Parameter {
             name: "first".into(),
             kind: ParameterKind::Normal,
+            export: false,
             default_value: None,
             content: "first".into(),
             range: lsp::Range::at(0, 4, 0, 9),
@@ -2640,6 +2647,7 @@ mod tests {
           Parameter {
             name: "second".into(),
             kind: ParameterKind::Variadic(VariadicType::OneOrMore),
+            export: false,
             default_value: Some("\"default\"".into()),
             content: "+second=\"default\"".into(),
             range: lsp::Range::at(0, 10, 0, 27),
@@ -2667,11 +2675,32 @@ mod tests {
       vec![Parameter {
         name: "FLAGS".into(),
         kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
+        export: false,
         default_value: None,
         content: "*FLAGS".into(),
         range: lsp::Range::at(0, 4, 0, 10),
       }],
     );
+  }
+
+  #[test]
+  fn recipe_with_exported_variadic_parameter() {
+    #[track_caller]
+    fn case(source: &str, expected: VariadicType) {
+      let parameter = Document::from(source)
+        .find_recipe("foo")
+        .unwrap()
+        .parameters
+        .into_iter()
+        .next()
+        .unwrap();
+
+      assert!(parameter.export);
+      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
+    }
+
+    case("foo +$args:\n", VariadicType::OneOrMore);
+    case("foo *$args:\n", VariadicType::ZeroOrMore);
   }
 
   #[test]
