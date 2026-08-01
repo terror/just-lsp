@@ -12,16 +12,6 @@ pub enum VariadicType {
   ZeroOrMore,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Parameter {
-  pub content: String,
-  pub default_value: Option<String>,
-  pub export: bool,
-  pub kind: ParameterKind,
-  pub name: String,
-  pub range: lsp::Range,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ParameterJson {
   pub default_value: Option<String>,
@@ -35,6 +25,16 @@ impl From<Parameter> for ParameterJson {
       default_value: parameter.default_value,
     }
   }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameter {
+  pub content: String,
+  pub default_value: Option<String>,
+  pub export: bool,
+  pub kind: ParameterKind,
+  pub name: String,
+  pub range: lsp::Range,
 }
 
 impl Parameter {

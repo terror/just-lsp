@@ -2,12 +2,6 @@ use super::*;
 
 pub(crate) struct Server(Arc<Inner>);
 
-impl Debug for Server {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Server").finish()
-  }
-}
-
 impl Server {
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     lsp::ServerCapabilities {
@@ -83,6 +77,12 @@ impl Server {
       .await;
 
     Ok(())
+  }
+}
+
+impl Debug for Server {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Server").finish()
   }
 }
 

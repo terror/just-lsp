@@ -8,42 +8,6 @@ pub struct Document {
   pub version: i32,
 }
 
-impl From<&str> for Document {
-  fn from(value: &str) -> Self {
-    let mut document = Self {
-      content: value.into(),
-      tree: None,
-      uri: lsp::Url::parse("file:///test.just").unwrap(),
-      version: 1,
-    };
-
-    document.parse().unwrap();
-
-    document
-  }
-}
-
-impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
-  type Error = Error;
-
-  fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
-    let lsp::TextDocumentItem {
-      text, uri, version, ..
-    } = params.text_document;
-
-    let mut document = Self {
-      content: Rope::from_str(&text),
-      tree: None,
-      uri,
-      version,
-    };
-
-    document.parse()?;
-
-    Ok(document)
-  }
-}
-
 impl Document {
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
@@ -673,6 +637,42 @@ impl Document {
         })
         .collect()
     })
+  }
+}
+
+impl From<&str> for Document {
+  fn from(value: &str) -> Self {
+    let mut document = Self {
+      content: value.into(),
+      tree: None,
+      uri: lsp::Url::parse("file:///test.just").unwrap(),
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    document
+  }
+}
+
+impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
+  type Error = Error;
+
+  fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
+    let lsp::TextDocumentItem {
+      text, uri, version, ..
+    } = params.text_document;
+
+    let mut document = Self {
+      content: Rope::from_str(&text),
+      tree: None,
+      uri,
+      version,
+    };
+
+    document.parse()?;
+
+    Ok(document)
   }
 }
 
