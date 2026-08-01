@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.6.0](https://github.com/terror/just-lsp/releases/tag/0.6.0) - 2026-07-31
+
+### Added
+
+- Add `continue-signals` rule (#531)
+- Add support for `timestamp` attribute (#529)
+- Resolve imported symbols (#514)
+- Reuse import edges for navigation (#513)
+- Add support for conditional attributes on all top-level items (#505)
+
+### Fixed
+
+- Preserve export status on variadic parameters (#534)
+- Match `just` justfile discovery (#532)
+- Fix setting kind inference (#530)
+- Fix script attribute conflict rule (#528)
+- Resolve declarations with import precedence (#523)
+- Respect platform conditions in duplicate diagnostics (#509)
+- Fix list feature detection for conditional settings (#506)
+
+### Misc
+
+- Consolidate document parsing tests (#527)
+- Sort all tests alphabetically (#526)
+- Build semantic import scope (#522)
+- Bump tokio-stream from 0.1.18 to 0.1.19 (#521)
+- Bump tokio from 1.52.3 to 1.53.1 (#520)
+- Bump thiserror from 2.0.18 to 2.0.19 (#519)
+- Bump tree-sitter-highlight from 0.26.10 to 0.26.11 (#518)
+- Bump cc from 1.3.0 to 1.4.0 (#517)
+- Deduplicate setting attribute parsing (#516)
+- Rebuild reverse dependents (#515)
+- Build import project graph (#512)
+- Centralize document loading (#511)
+- Sort document tests alphabetically (#508)
+- Retain attributes on declarations (#507)
+
 ## [0.5.1](https://github.com/terror/just-lsp/releases/tag/0.5.1) - 2026-07-27
 
 ### Fixed
