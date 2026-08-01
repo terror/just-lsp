@@ -8,6 +8,22 @@ pub enum SettingKind {
   StringOrArray,
 }
 
+impl SettingKind {
+  #[must_use]
+  pub fn accepts(&self, other: &Self) -> bool {
+    matches!(
+      (self, other),
+      (SettingKind::Array, SettingKind::Array)
+        | (SettingKind::Boolean(_), SettingKind::Boolean(_))
+        | (SettingKind::String, SettingKind::String)
+        | (
+          SettingKind::StringOrArray,
+          SettingKind::Array | SettingKind::String
+        )
+    )
+  }
+}
+
 impl Display for SettingKind {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
@@ -27,22 +43,6 @@ impl PartialEq for SettingKind {
         | (SettingKind::Boolean(_), SettingKind::Boolean(_))
         | (SettingKind::String, SettingKind::String)
         | (SettingKind::StringOrArray, SettingKind::StringOrArray)
-    )
-  }
-}
-
-impl SettingKind {
-  #[must_use]
-  pub fn accepts(&self, other: &Self) -> bool {
-    matches!(
-      (self, other),
-      (SettingKind::Array, SettingKind::Array)
-        | (SettingKind::Boolean(_), SettingKind::Boolean(_))
-        | (SettingKind::String, SettingKind::String)
-        | (
-          SettingKind::StringOrArray,
-          SettingKind::Array | SettingKind::String
-        )
     )
   }
 }

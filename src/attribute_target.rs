@@ -12,25 +12,6 @@ pub enum AttributeTarget {
   Unexport,
 }
 
-impl Display for AttributeTarget {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "{}",
-      match self {
-        AttributeTarget::Alias => "alias",
-        AttributeTarget::Assignment => "assignment",
-        AttributeTarget::Function => "function",
-        AttributeTarget::Import => "import",
-        AttributeTarget::Module => "module",
-        AttributeTarget::Recipe => "recipe",
-        AttributeTarget::Setting => "setting",
-        AttributeTarget::Unexport => "unexport",
-      }
-    )
-  }
-}
-
 impl AttributeTarget {
   pub const ALL: &[Self] = &[
     Self::Alias,
@@ -70,5 +51,24 @@ impl AttributeTarget {
       "unexport" => Some(Self::Unexport),
       _ => None,
     }
+  }
+}
+
+impl Display for AttributeTarget {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(
+      f,
+      "{}",
+      match self {
+        AttributeTarget::Alias => "alias",
+        AttributeTarget::Assignment => "assignment",
+        AttributeTarget::Function => "function",
+        AttributeTarget::Import => "import",
+        AttributeTarget::Module => "module",
+        AttributeTarget::Recipe => "recipe",
+        AttributeTarget::Setting => "setting",
+        AttributeTarget::Unexport => "unexport",
+      }
+    )
   }
 }
