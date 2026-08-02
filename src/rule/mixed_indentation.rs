@@ -62,11 +62,9 @@ define_rule! {
 
 impl MixedIndentationRule {
   fn find_mixed_indentation(recipe: &Recipe) -> Option<Diagnostic> {
-    let body_start_line = recipe.range.start.line + 1;
-
     Self::recipe_body_lines(&recipe.content)
       .try_fold(None, |expected_kind: Option<IndentKind>, line| {
-        let absolute_line = body_start_line + line.relative_line;
+        let absolute_line = recipe.range.start.line + line.relative_line;
 
         let Some(line_kind) = line.kind else {
           return ControlFlow::Break(Self::make_diagnostic(

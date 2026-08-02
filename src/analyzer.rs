@@ -3461,7 +3461,7 @@ mod tests {
   fn recipe_inconsistent_indentation_between_lines() {
     Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
     .error(
-      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(3, 0, 3, 2))
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(2, 0, 2, 2))
     .run();
   }
 
@@ -3654,7 +3654,7 @@ mod tests {
     })
     .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-      lsp::Range::at(3, 0, 3, 2),
+      lsp::Range::at(2, 0, 2, 2),
     )
     .run();
   }
@@ -3669,7 +3669,7 @@ mod tests {
     })
     .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-      lsp::Range::at(2, 0, 2, 3),
+      lsp::Range::at(1, 0, 1, 3),
     )
     .run();
   }
