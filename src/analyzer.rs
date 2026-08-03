@@ -2637,7 +2637,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_len_function_requires_lists() {
+  fn list_features_len_function_accepts_scalar_without_lists() {
     Test::new(indoc! {
       "
       foo := len('bar')
@@ -2646,10 +2646,6 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .error(
-      "the `len()` function requires `set lists`",
-      lsp::Range::at(0, 7, 0, 10),
-    )
     .run();
   }
 
