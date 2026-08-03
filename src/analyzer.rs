@@ -1786,6 +1786,89 @@ mod tests {
   }
 
   #[test]
+  fn dotenv_command_conflicts_with_loading_settings() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      Test::new(&format!("set dotenv-command := 'foo'\n{setting}\n"))
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      "set dotenv-filename := 'bar'",
+      "`dotenv-command` is incompatible with `dotenv-filename`",
+    );
+    case(
+      "set dotenv-load",
+      "`dotenv-command` is incompatible with `dotenv-load`",
+    );
+    case(
+      "set dotenv-path := 'bar'",
+      "`dotenv-command` is incompatible with `dotenv-path`",
+    );
+    case(
+      "set dotenv-required",
+      "`dotenv-command` is incompatible with `dotenv-required`",
+    );
+  }
+
+  #[test]
+  fn dotenv_loading_setting_conflicts_with_later_command() {
+    Test::new(indoc! {
+      "
+      set dotenv-required
+      set dotenv-command := 'foo'
+      "
+    })
+    .error(
+      "`dotenv-required` is incompatible with `dotenv-command`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_allows_false_loading_settings_and_override() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-load := false
+      set dotenv-required := false
+      set dotenv-override
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn disjoint_dotenv_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn disjoint_dotenv_path_and_filename_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-filename := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn dotenv_path_without_filename_is_ok() {
     Test::new(indoc! {
       "
