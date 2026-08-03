@@ -1779,6 +1779,20 @@ mod tests {
   }
 
   #[test]
+  fn disjoint_dotenv_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn doc_attribute_rejects_non_const_expression() {
     Test::new(indoc! {
       "
@@ -1792,6 +1806,87 @@ mod tests {
       lsp::Range::at(0, 5, 0, 21),
     )
     .run();
+  }
+
+  #[test]
+  fn dotenv_command_allows_disabled_loading_and_override() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-load := false
+      set dotenv-override
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_deduplicates_identical_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-command := 'bar'
+
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_preserves_distinct_locations() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+
+      [linux]
+      set dotenv-path := 'bar'
+
+      [windows]
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(2, 0, 4, 0),
+    )
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(5, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflicts_with_loading_settings() {
+    #[track_caller]
+    fn case(justfile: &str, message: &'static str) {
+      Test::new(justfile)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
+      "`dotenv-command` is incompatible with `dotenv-filename`",
+    );
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-load\n",
+      "`dotenv-command` is incompatible with `dotenv-load`",
+    );
+
+    case(
+      "set dotenv-required\nset dotenv-command := 'foo'\n",
+      "`dotenv-required` is incompatible with `dotenv-command`",
+    );
   }
 
   #[test]
@@ -2585,6 +2680,7 @@ mod tests {
       bool(value) := value
       join_list(value) := value
       len(value) := value
+      num_jobs() := 'qux'
       show(value) := value
       split(value) := value
       which(value) := value
@@ -2592,9 +2688,10 @@ mod tests {
       foo := bool('foo')
       bar := join_list('bar')
       baz := len('baz')
-      qux := show('qux')
-      quux := split('quux')
-      corge := which('corge')
+      qux := num_jobs()
+      quux := show('quux')
+      corge := split('corge')
+      grault := which('grault')
 
       recipe:
         echo {{ foo }}
@@ -2603,6 +2700,7 @@ mod tests {
         echo {{ qux }}
         echo {{ quux }}
         echo {{ corge }}
+        echo {{ grault }}
       "
     })
     .run();
@@ -2677,7 +2775,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_len_function_requires_lists() {
+  fn list_features_len_function_accepts_scalar_without_lists() {
     Test::new(indoc! {
       "
       foo := len('bar')
@@ -2686,10 +2784,6 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .error(
-      "the `len()` function requires `set lists`",
-      lsp::Range::at(0, 7, 0, 10),
-    )
     .run();
   }
 
@@ -2804,6 +2898,23 @@ mod tests {
     .error(
       "`if` and `assert` conditions other than comparisons require `set lists`",
       lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_num_jobs_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := num_jobs()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `num_jobs()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 15),
     )
     .run();
   }

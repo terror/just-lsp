@@ -88,4 +88,15 @@ impl Setting {
       .iter()
       .any(|attribute| attribute.name.value == name)
   }
+
+  #[must_use]
+  pub fn loads_dotenv(&self) -> bool {
+    match self.name.value.as_str() {
+      "dotenv-filename" | "dotenv-path" => true,
+      "dotenv-load" | "dotenv-required" => {
+        matches!(self.kind, SettingKind::Boolean(true))
+      }
+      _ => false,
+    }
+  }
 }

@@ -1626,8 +1626,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Return the number of elements in `value`.
-
-      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1727,6 +1725,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the value passed to `just` with `--jobs`, or an empty
       list if `--jobs` was not passed.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
