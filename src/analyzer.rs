@@ -1793,10 +1793,12 @@ mod tests {
       "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
       "`dotenv-command` is incompatible with `dotenv-filename`",
     );
+
     case(
       "set dotenv-command := 'foo'\nset dotenv-load\n",
       "`dotenv-command` is incompatible with `dotenv-load`",
     );
+
     case(
       "set dotenv-required\nset dotenv-command := 'foo'\n",
       "`dotenv-required` is incompatible with `dotenv-command`",
