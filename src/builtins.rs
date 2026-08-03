@@ -1626,8 +1626,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Return the number of elements in `value`.
-
-      Requires `set lists`.
       "
     },
     deprecated: None,
