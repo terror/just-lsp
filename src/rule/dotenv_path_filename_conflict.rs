@@ -5,42 +5,24 @@ define_rule! {
     id: "dotenv-path-filename-conflict",
     message: "conflicting dotenv settings",
     run(context) {
-      let mut diagnostics = Vec::new();
+      let dotenv_path = context
+        .settings()
+        .iter()
+        .any(|setting| setting.name.value == "dotenv-path");
 
-      let settings = context.settings();
+      let dotenv_filename = context
+        .settings()
+        .iter()
+        .find(|setting| setting.name.value == "dotenv-filename");
 
-      for (index, setting) in settings.iter().enumerate() {
-        let groups = GroupSet::from_attributes(&setting.attributes);
-
-        for previous in &settings[..index] {
-          if !GroupSet::from_attributes(&previous.attributes)
-            .conflicts_with(&groups)
-          {
-            continue;
-          }
-
-          let filename_range = if previous.name.value == "dotenv-filename"
-            && setting.name.value == "dotenv-path"
-          {
-            Some(previous.range)
-          } else if previous.name.value == "dotenv-path"
-            && setting.name.value == "dotenv-filename"
-          {
-            Some(setting.range)
-          } else {
-            None
-          };
-
-          if let Some(range) = filename_range {
-            diagnostics.push(Diagnostic::warning(
-              "`dotenv-path` overrides `dotenv-filename`".to_string(),
-              range,
-            ));
-          }
-        }
+      if dotenv_path && let Some(filename) = dotenv_filename {
+        return vec![Diagnostic::warning(
+          "`dotenv-path` overrides `dotenv-filename`".to_string(),
+          filename.range,
+        )];
       }
 
-      diagnostics
+      vec![]
     }
   }
 }

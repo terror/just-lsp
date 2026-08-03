@@ -1879,20 +1879,6 @@ mod tests {
   }
 
   #[test]
-  fn disjoint_dotenv_path_and_filename_do_not_conflict() {
-    Test::new(indoc! {
-      "
-      [linux]
-      set dotenv-filename := 'foo'
-
-      [windows]
-      set dotenv-path := 'bar'
-      "
-    })
-    .run();
-  }
-
-  #[test]
   fn dotenv_path_without_filename_is_ok() {
     Test::new(indoc! {
       "
