@@ -1036,6 +1036,46 @@ mod tests {
   }
 
   #[test]
+  fn settings_no_cd_conflicts_with_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_false_no_cd_allows_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd := false
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_disjoint_directory_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_no_parameters_needed() {
     Test::new(indoc! {
       "

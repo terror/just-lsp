@@ -4,9 +4,39 @@ define_rule! {
   /// Detects conflicts between working-directory and no-cd directives.
   WorkingDirectoryConflictRule {
     id: "working-directory-conflict",
-    message: "conflicting directory attributes",
+    message: "conflicting working directory configuration",
     run(context) {
       let mut diagnostics = Vec::new();
+
+      let mut settings = Vec::<&Setting>::new();
+
+      for setting in context.settings() {
+        let relevant = setting.name.value == "working-directory"
+          || setting.name.value == "no-cd"
+            && matches!(setting.kind, SettingKind::Boolean(true));
+
+        if !relevant {
+          continue;
+        }
+
+        let groups = GroupSet::from_attributes(&setting.attributes);
+
+        if let Some(previous) = settings.iter().find(|previous| {
+          previous.name.value != setting.name.value
+            && GroupSet::from_attributes(&previous.attributes)
+              .conflicts_with(&groups)
+        }) {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "`{}` is incompatible with `{}`",
+              previous.name.value, setting.name.value
+            ),
+            setting.range,
+          ));
+        }
+
+        settings.push(setting);
+      }
 
       for recipe in context.recipes() {
         let working_directory_attribute =
