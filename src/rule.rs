@@ -55,6 +55,7 @@ mod continue_signals;
 mod dependency_arguments;
 mod deprecated_function;
 mod deprecated_setting;
+mod dotenv_command_conflict;
 mod dotenv_path_filename_conflict;
 mod duplicate_alias;
 mod duplicate_attribute;
