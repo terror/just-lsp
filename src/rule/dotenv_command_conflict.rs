@@ -5,37 +5,42 @@ define_rule! {
     id: "dotenv-command-conflict",
     message: "conflicting dotenv command setting",
     run(context) {
-      let mut diagnostics = Vec::new();
+      let settings = context
+        .settings()
+        .iter()
+        .map(|setting| {
+          (
+            setting,
+            GroupSet::from_attributes(&setting.attributes),
+          )
+        })
+        .collect::<Vec<_>>();
 
-      let settings = context.settings();
-
-      for (index, setting) in settings.iter().enumerate() {
-        let groups = GroupSet::from_attributes(&setting.attributes);
-
-        for previous in &settings[..index] {
-          if !GroupSet::from_attributes(&previous.attributes)
-            .conflicts_with(&groups)
-          {
-            continue;
-          }
-
-          if (previous.name.value == "dotenv-command"
-            && setting.loads_dotenv())
-            || (setting.name.value == "dotenv-command"
-              && previous.loads_dotenv())
-          {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "`{}` is incompatible with `{}`",
-                previous.name.value, setting.name.value
-              ),
-              setting.range,
-            ));
-          }
-        }
-      }
-
-      diagnostics
+      settings
+        .iter()
+        .enumerate()
+        .flat_map(|(index, current)| {
+          settings[..index]
+            .iter()
+            .map(move |previous| (previous, current))
+        })
+        .filter(|((previous, previous_groups), (current, current_groups))| {
+          previous_groups.conflicts_with(current_groups)
+            && (previous.name.value == "dotenv-command"
+              && current.loads_dotenv()
+              || current.name.value == "dotenv-command"
+                && previous.loads_dotenv())
+        })
+        .map(|((previous, _), (current, _))| {
+          Diagnostic::error(
+            format!(
+              "`{}` is incompatible with `{}`",
+              previous.name.value, current.name.value,
+            ),
+            current.range,
+          )
+        })
+        .collect()
     }
   }
 }
