@@ -1841,6 +1841,30 @@ mod tests {
   }
 
   #[test]
+  fn dotenv_command_conflict_can_be_disabled_independently() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "dotenv-command-conflict": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-filename := 'bar'
+      set dotenv-path := 'baz'
+      "
+    })
+    .config(config)
+    .warning(
+      "`dotenv-path` overrides `dotenv-filename`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn disjoint_dotenv_settings_do_not_conflict() {
     Test::new(indoc! {
       "

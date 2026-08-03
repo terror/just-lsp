@@ -51,5 +51,6 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `undefined-identifiers`           | Undefined Identifiers           | Expression identifier cannot be resolved to a parameter, variable, builtin, or user-defined function.                         |
 | `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
-| `dotenv-path-filename-conflict`   | Dotenv Setting Conflict         | `dotenv-command` conflicts with dotenv file-loading settings; warns when `dotenv-path` overrides `dotenv-filename`.           |
+| `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
+| `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
 | `invalid-import-path`             | Invalid Import Path             | Literal non-optional import path points to a path that does not exist on disk.                                                |
