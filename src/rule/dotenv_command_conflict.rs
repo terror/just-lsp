@@ -9,14 +9,6 @@ define_rule! {
 
       let settings = context.settings();
 
-      let loads_dotenv = |setting: &Setting| match setting.name.value.as_str() {
-        "dotenv-filename" | "dotenv-path" => true,
-        "dotenv-load" | "dotenv-required" => {
-          matches!(setting.kind, SettingKind::Boolean(true))
-        }
-        _ => false,
-      };
-
       for (index, setting) in settings.iter().enumerate() {
         let groups = GroupSet::from_attributes(&setting.attributes);
 
@@ -27,8 +19,10 @@ define_rule! {
             continue;
           }
 
-          if previous.name.value == "dotenv-command" && loads_dotenv(setting)
-            || setting.name.value == "dotenv-command" && loads_dotenv(previous)
+          if (previous.name.value == "dotenv-command"
+            && setting.loads_dotenv())
+            || (setting.name.value == "dotenv-command"
+              && previous.loads_dotenv())
           {
             diagnostics.push(Diagnostic::error(
               format!(
