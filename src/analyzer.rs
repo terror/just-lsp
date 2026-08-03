@@ -2545,6 +2545,7 @@ mod tests {
       bool(value) := value
       join_list(value) := value
       len(value) := value
+      num_jobs() := 'qux'
       show(value) := value
       split(value) := value
       which(value) := value
@@ -2552,9 +2553,10 @@ mod tests {
       foo := bool('foo')
       bar := join_list('bar')
       baz := len('baz')
-      qux := show('qux')
-      quux := split('quux')
-      corge := which('corge')
+      qux := num_jobs()
+      quux := show('quux')
+      corge := split('corge')
+      grault := which('grault')
 
       recipe:
         echo {{ foo }}
@@ -2563,6 +2565,7 @@ mod tests {
         echo {{ qux }}
         echo {{ quux }}
         echo {{ corge }}
+        echo {{ grault }}
       "
     })
     .run();
@@ -2764,6 +2767,23 @@ mod tests {
     .error(
       "`if` and `assert` conditions other than comparisons require `set lists`",
       lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_num_jobs_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := num_jobs()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `num_jobs()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 15),
     )
     .run();
   }

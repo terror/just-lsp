@@ -1727,6 +1727,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the value passed to `just` with `--jobs`, or an empty
       list if `--jobs` was not passed.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
