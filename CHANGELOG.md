@@ -5,12 +5,12 @@
 ### Added
 
 - Diagnose global dotenv setting conflicts (#540)
+- Diagnose global working directory conflicts (#539)
 
 ### Fixed
 
 - Require list support for `num_jobs` function (#542)
 - Allow `len` function without list support (#541)
-- Diagnose global working directory conflicts (#539)
 - Fix indentation diagnostic ranges (#538)
 
 ### Misc
