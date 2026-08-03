@@ -1739,6 +1739,20 @@ mod tests {
   }
 
   #[test]
+  fn disjoint_dotenv_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn doc_attribute_rejects_non_const_expression() {
     Test::new(indoc! {
       "
@@ -1752,6 +1766,41 @@ mod tests {
       lsp::Range::at(0, 5, 0, 21),
     )
     .run();
+  }
+
+  #[test]
+  fn dotenv_command_allows_disabled_loading_and_override() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-load := false
+      set dotenv-override
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflicts_with_loading_settings() {
+    #[track_caller]
+    fn case(justfile: &str, message: &'static str) {
+      Test::new(justfile)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
+      "`dotenv-command` is incompatible with `dotenv-filename`",
+    );
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-load\n",
+      "`dotenv-command` is incompatible with `dotenv-load`",
+    );
+    case(
+      "set dotenv-required\nset dotenv-command := 'foo'\n",
+      "`dotenv-required` is incompatible with `dotenv-command`",
+    );
   }
 
   #[test]
@@ -1782,55 +1831,6 @@ mod tests {
       "`dotenv-path` overrides `dotenv-filename`",
       lsp::Range::at(1, 0, 2, 0),
     )
-    .run();
-  }
-
-  #[test]
-  fn dotenv_command_conflicts_with_loading_settings() {
-    #[track_caller]
-    fn case(justfile: &str, message: &'static str) {
-      Test::new(justfile)
-        .error(message, lsp::Range::at(1, 0, 2, 0))
-        .run();
-    }
-
-    case(
-      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
-      "`dotenv-command` is incompatible with `dotenv-filename`",
-    );
-    case(
-      "set dotenv-command := 'foo'\nset dotenv-load\n",
-      "`dotenv-command` is incompatible with `dotenv-load`",
-    );
-    case(
-      "set dotenv-required\nset dotenv-command := 'foo'\n",
-      "`dotenv-required` is incompatible with `dotenv-command`",
-    );
-  }
-
-  #[test]
-  fn dotenv_command_allows_disabled_loading_and_override() {
-    Test::new(indoc! {
-      "
-      set dotenv-command := 'foo'
-      set dotenv-load := false
-      set dotenv-override
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn disjoint_dotenv_settings_do_not_conflict() {
-    Test::new(indoc! {
-      "
-      [linux]
-      set dotenv-command := 'foo'
-
-      [windows]
-      set dotenv-path := 'bar'
-      "
-    })
     .run();
   }
 
