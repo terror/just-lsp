@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.1](https://github.com/terror/just-lsp/releases/tag/0.6.1) - 2026-08-03
+
+### Added
+
+- Diagnose global dotenv setting conflicts (#540)
+- Diagnose global working directory conflicts (#539)
+
+### Fixed
+
+- Require list support for `num_jobs` function (#542)
+- Allow `len` function without list support (#541)
+- Fix indentation diagnostic ranges (#538)
+
+### Misc
+
+- Move trait impls below canonical impls (#537)
+
 ## [0.6.0](https://github.com/terror/just-lsp/releases/tag/0.6.0) - 2026-07-31
 
 ### Added
