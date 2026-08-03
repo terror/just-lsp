@@ -1144,6 +1144,20 @@ mod tests {
   }
 
   #[test]
+  fn attributes_working_directory_allowed_with_global_no_cd() {
+    Test::new(indoc! {
+      "
+      set no-cd
+
+      [working-directory: '/tmp']
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_working_directory_conflicts_with_no_cd() {
     Test::new(indoc! {
       "
@@ -1643,24 +1657,6 @@ mod tests {
   }
 
   #[test]
-  fn continue_attribute_rejects_unsupported_target() {
-    Test::new(indoc! {
-      "
-      [continue]
-      alias bar := foo
-
-      foo:
-        echo foo
-      "
-    })
-    .error(
-      "Attribute `continue` cannot be applied to alias target",
-      lsp::Range::at(0, 0, 1, 0),
-    )
-    .run();
-  }
-
-  #[test]
   fn continue_attribute_rejects_unknown_signals() {
     Test::new(indoc! {
       "
@@ -1676,6 +1672,24 @@ mod tests {
     .error(
       "Invalid signal `sigint`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
       lsp::Range::at(0, 21, 0, 29),
+    )
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unsupported_target() {
+    Test::new(indoc! {
+      "
+      [continue]
+      alias bar := foo
+
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `continue` cannot be applied to alias target",
+      lsp::Range::at(0, 0, 1, 0),
     )
     .run();
   }
@@ -2237,6 +2251,20 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .run();
+  }
+
+  #[test]
+  fn exported_variadic_recipe_parameters_are_not_unused() {
+    Test::new(indoc! {
+      "
+      foo +$args:
+        echo foo
+
+      bar *$args:
+        echo bar
+      "
+    })
     .run();
   }
 
@@ -4155,6 +4183,20 @@ mod tests {
   }
 
   #[test]
+  fn settings_disjoint_directory_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_dotenv_command_duplicate() {
     Test::new(indoc! {
       "
@@ -4237,6 +4279,17 @@ mod tests {
       "
     })
     .error("Duplicate setting `export`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_false_no_cd_allows_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd := false
+      set working-directory := 'foo'
+      "
+    })
     .run();
   }
 
@@ -4361,6 +4414,21 @@ mod tests {
       lsp::Range::at(0, 0, 1, 0),
     )
     .error("Duplicate setting `export`", lsp::Range::at(3, 0, 4, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_no_cd_conflicts_with_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -4515,6 +4583,26 @@ mod tests {
       set shell := ['cmd', '/c']
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn settings_working_directory_conflict_deduplicates_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set no-cd
+
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
     .run();
   }
 
@@ -5007,20 +5095,6 @@ mod tests {
 
       foo bar:
         echo foo
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn exported_variadic_recipe_parameters_are_not_unused() {
-    Test::new(indoc! {
-      "
-      foo +$args:
-        echo foo
-
-      bar *$args:
-        echo bar
       "
     })
     .run();
