@@ -1781,6 +1781,50 @@ mod tests {
   }
 
   #[test]
+  fn dotenv_command_conflict_deduplicates_identical_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-command := 'bar'
+
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_preserves_distinct_locations() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+
+      [linux]
+      set dotenv-path := 'bar'
+
+      [windows]
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(2, 0, 4, 0),
+    )
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(5, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn dotenv_command_conflicts_with_loading_settings() {
     #[track_caller]
     fn case(justfile: &str, message: &'static str) {

@@ -6,15 +6,17 @@ define_rule! {
     message: "conflicting dotenv command setting",
     run(context) {
       let settings = context
+        .document()
         .settings()
-        .iter()
+        .into_iter()
         .map(|setting| {
-          (
-            setting,
-            GroupSet::from_attributes(&setting.attributes),
-          )
+          let groups = GroupSet::from_attributes(&setting.attributes);
+
+          (setting, groups)
         })
         .collect::<Vec<_>>();
+
+      let mut seen = HashSet::new();
 
       settings
         .iter()
@@ -31,14 +33,23 @@ define_rule! {
               || current.name.value == "dotenv-command"
                 && previous.loads_dotenv())
         })
-        .map(|((previous, _), (current, _))| {
-          Diagnostic::error(
-            format!(
-              "`{}` is incompatible with `{}`",
-              previous.name.value, current.name.value,
-            ),
-            current.range,
-          )
+        .filter_map(|((previous, _), (current, _))| {
+          let message = format!(
+            "`{}` is incompatible with `{}`",
+            previous.name.value, current.name.value,
+          );
+
+          let key = (
+            message.clone(),
+            current.range.start.line,
+            current.range.start.character,
+            current.range.end.line,
+            current.range.end.character,
+          );
+
+          seen
+            .insert(key)
+            .then(|| Diagnostic::error(message, current.range))
         })
         .collect()
     }
