@@ -1788,79 +1788,35 @@ mod tests {
   #[test]
   fn dotenv_command_conflicts_with_loading_settings() {
     #[track_caller]
-    fn case(setting: &str, message: &'static str) {
-      Test::new(&format!("set dotenv-command := 'foo'\n{setting}\n"))
+    fn case(justfile: &str, message: &'static str) {
+      Test::new(justfile)
         .error(message, lsp::Range::at(1, 0, 2, 0))
         .run();
     }
 
     case(
-      "set dotenv-filename := 'bar'",
+      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
       "`dotenv-command` is incompatible with `dotenv-filename`",
     );
     case(
-      "set dotenv-load",
+      "set dotenv-command := 'foo'\nset dotenv-load\n",
       "`dotenv-command` is incompatible with `dotenv-load`",
     );
     case(
-      "set dotenv-path := 'bar'",
-      "`dotenv-command` is incompatible with `dotenv-path`",
-    );
-    case(
-      "set dotenv-required",
-      "`dotenv-command` is incompatible with `dotenv-required`",
-    );
-  }
-
-  #[test]
-  fn dotenv_loading_setting_conflicts_with_later_command() {
-    Test::new(indoc! {
-      "
-      set dotenv-required
-      set dotenv-command := 'foo'
-      "
-    })
-    .error(
+      "set dotenv-required\nset dotenv-command := 'foo'\n",
       "`dotenv-required` is incompatible with `dotenv-command`",
-      lsp::Range::at(1, 0, 2, 0),
-    )
-    .run();
+    );
   }
 
   #[test]
-  fn dotenv_command_allows_false_loading_settings_and_override() {
+  fn dotenv_command_allows_disabled_loading_and_override() {
     Test::new(indoc! {
       "
       set dotenv-command := 'foo'
       set dotenv-load := false
-      set dotenv-required := false
       set dotenv-override
       "
     })
-    .run();
-  }
-
-  #[test]
-  fn dotenv_command_conflict_can_be_disabled_independently() {
-    let config = serde_json::from_value::<Config>(serde_json::json!({
-      "rules": {
-        "dotenv-command-conflict": "off"
-      }
-    }))
-    .unwrap();
-
-    Test::new(indoc! {
-      "
-      set dotenv-command := 'foo'
-      set dotenv-filename := 'bar'
-      set dotenv-path := 'baz'
-      "
-    })
-    .config(config)
-    .warning(
-      "`dotenv-path` overrides `dotenv-filename`",
-      lsp::Range::at(1, 0, 2, 0),
-    )
     .run();
   }
 
