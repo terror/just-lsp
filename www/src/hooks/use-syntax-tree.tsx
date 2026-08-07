@@ -1,7 +1,7 @@
 import type { SyntaxNode } from '@/lib/syntax-node';
 import { parse } from '@/lib/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Parser, Language as TSLanguage } from 'web-tree-sitter';
+import { Parser, Language as TSLanguage, Tree } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
   parser: Parser | undefined;
@@ -20,15 +20,25 @@ export function useSyntaxTree({
   language,
   code,
 }: UseSyntaxTreeOptions): UseSyntaxTree {
-  const root = useMemo(() => {
+  const [tree, setTree] = useState<Tree | undefined>(undefined);
+
+  useEffect(() => {
     if (!parser || !language) {
-      return undefined;
+      setTree(undefined);
+      return;
     }
 
     const tree = parse({ parser, language, code });
 
-    return (tree?.rootNode as unknown as SyntaxNode) ?? undefined;
+    setTree(tree ?? undefined);
+
+    return () => tree?.delete();
   }, [parser, language, code]);
+
+  const root = useMemo(
+    () => (tree?.rootNode as unknown as SyntaxNode) ?? undefined,
+    [tree]
+  );
 
   const [expandedNodes, setExpandedNodes] = useState<Set<SyntaxNode>>(
     () => new Set()
