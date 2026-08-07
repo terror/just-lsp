@@ -52,7 +52,7 @@ jobs:
 
     - name: Test
       working-directory: ./www
-      run: bun test --pass-with-no-tests
+      run: bun run test
 
     - name: Build
       working-directory: ./www
