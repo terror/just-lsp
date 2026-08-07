@@ -40,7 +40,7 @@ jobs:
 
     - name: Install dependencies
       working-directory: ./www
-      run: bun install
+      run: bun install --frozen-lockfile
 
     - name: Format
       working-directory: ./www
