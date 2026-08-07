@@ -15,6 +15,7 @@ export function useTreeSitter(): UseTreeSitter {
   const [parser, setParser] = useState<Parser | undefined>(undefined);
 
   useEffect(() => {
+    let disposed = false;
     let parserInstance: Parser | undefined;
 
     const initialize = async () => {
@@ -27,27 +28,42 @@ export function useTreeSitter(): UseTreeSitter {
           },
         });
 
+        if (disposed) {
+          return;
+        }
+
         parserInstance = new Parser();
 
         const loadedLanguage = await TSLanguage.load('tree-sitter-just.wasm');
 
+        if (disposed) {
+          return;
+        }
+
         setParser(parserInstance);
         setLanguage(loadedLanguage);
       } catch (err) {
-        setError(
-          `Failed to initialize parser: ${err instanceof Error ? err.message : String(err)}`
-        );
+        parserInstance?.delete();
+        parserInstance = undefined;
+
+        if (!disposed) {
+          setError(
+            `Failed to initialize parser: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!disposed) {
+          setLoading(false);
+        }
       }
     };
 
     initialize();
 
     return () => {
-      if (parserInstance) {
-        parserInstance.delete();
-      }
+      disposed = true;
+      parserInstance?.delete();
+      parserInstance = undefined;
     };
   }, []);
 
