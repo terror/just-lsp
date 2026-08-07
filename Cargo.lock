@@ -654,7 +654,6 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
- "target",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1152,12 +1151,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
 ]
-
-[[package]]
-name = "target"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e8f05f774b2db35bdad5a8237a90be1102669f8ea013fea9777b366d34ab145"
 
 [[package]]
 name = "tempfile"
