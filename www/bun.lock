@@ -36,6 +36,7 @@
         "eslint": "^8.38.0",
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-react-refresh": "^0.3.4",
+        "prettier": "^3.6.2",
         "prettier-plugin-tailwindcss": "^0.6.11",
         "tailwindcss": "^4.0.10",
         "tailwindcss-animate": "^1.0.7",
