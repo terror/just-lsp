@@ -189,7 +189,6 @@ impl LanguageServer for Server {
     self.0.hover(params).await
   }
 
-  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
@@ -884,7 +883,6 @@ impl Inner {
     }))
   }
 
-  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
