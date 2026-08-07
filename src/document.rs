@@ -320,7 +320,6 @@ impl Document {
   }
 
   #[must_use]
-  #[allow(dead_code)]
   pub fn modules(&self) -> Vec<Module> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
