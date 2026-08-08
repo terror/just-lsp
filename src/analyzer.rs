@@ -4056,6 +4056,20 @@ mod tests {
   }
 
   #[test]
+  fn underscore_suppresses_unused_variable_warnings() {
+    Test::new(indoc! {
+      "
+      _ := 'foo'
+      _bar := 'baz'
+
+      recipe:
+        echo 'Hello!'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_array_type_error() {
     Test::new(indoc! {
       "
