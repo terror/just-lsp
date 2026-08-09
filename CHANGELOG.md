@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.6.2](https://github.com/terror/just-lsp/releases/tag/0.6.2) - 2026-08-09
+
+### Fixed
+
+- Adjust unused variable rule to ignore variables starting with `_` (#565)
+- Fix web assembly asset permissions (#560)
+- Synchronize deployed tree-sitter runtime (#559)
+
+### Misc
+
+- Remove redundant exclude field (#566)
+- Declare `codemirror` vim peer dependencies (#563)
+- Upgrade `vite` dependency (#562)
+- Add direct `prettier` dependency (#561)
+- Remove inert clippy threshold (#556)
+- Update rustfmt edition (#555)
+- Remove stale unused async allowances (#554)
+- Remove stale dead code allowance (#553)
+- Remove unused web interface components (#552)
+- Add web test script (#551)
+- Freeze web dependency installation (#550)
+- Remove stale changelog lockfile (#549)
+- Clean up web dependencies (#548)
+- Remove duplicate `serde_json` dependency (#547)
+- Remove unused `target` dependency (#546)
+- Bump clap from 4.6.1 to 4.6.5 (#544)
+
 ## [0.6.1](https://github.com/terror/just-lsp/releases/tag/0.6.1) - 2026-08-03
 
 ### Added
