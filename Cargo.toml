@@ -7,7 +7,6 @@ license = "CC0-1.0"
 homepage = "https://github.com/terror/just-lsp"
 repository = "https://github.com/terror/just-lsp"
 edition = "2024"
-exclude = ["/screenshot.png", "/www"]
 categories = ["development-tools"]
 keywords = ["productivity", "compilers", "language-servers", "just", "tree-sitter"]
 resolver = "2"
