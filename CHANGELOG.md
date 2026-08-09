@@ -4,175 +4,175 @@
 
 ### Fixed
 
-- Adjust unused variable rule to ignore variables starting with `_` (#565)
-- Fix web assembly asset permissions (#560)
-- Synchronize deployed tree-sitter runtime (#559)
+- Adjust unused variable rule to ignore variables starting with `_` ([#565](https://github.com/terror/just-lsp/pull/565) by [asibahi](https://github.com/asibahi))
+- Fix web assembly asset permissions ([#560](https://github.com/terror/just-lsp/pull/560) by [terror](https://github.com/terror))
+- Synchronize deployed tree-sitter runtime ([#559](https://github.com/terror/just-lsp/pull/559) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Remove redundant exclude field (#566)
-- Declare `codemirror` vim peer dependencies (#563)
-- Upgrade `vite` dependency (#562)
-- Add direct `prettier` dependency (#561)
-- Remove inert clippy threshold (#556)
-- Update rustfmt edition (#555)
-- Remove stale unused async allowances (#554)
-- Remove stale dead code allowance (#553)
-- Remove unused web interface components (#552)
-- Add web test script (#551)
-- Freeze web dependency installation (#550)
-- Remove stale changelog lockfile (#549)
-- Clean up web dependencies (#548)
-- Remove duplicate `serde_json` dependency (#547)
-- Remove unused `target` dependency (#546)
-- Bump clap from 4.6.1 to 4.6.5 (#544)
+- Remove redundant exclude field ([#566](https://github.com/terror/just-lsp/pull/566) by [terror](https://github.com/terror))
+- Declare `codemirror` vim peer dependencies ([#563](https://github.com/terror/just-lsp/pull/563) by [terror](https://github.com/terror))
+- Upgrade `vite` dependency ([#562](https://github.com/terror/just-lsp/pull/562) by [terror](https://github.com/terror))
+- Add direct `prettier` dependency ([#561](https://github.com/terror/just-lsp/pull/561) by [terror](https://github.com/terror))
+- Remove inert clippy threshold ([#556](https://github.com/terror/just-lsp/pull/556) by [terror](https://github.com/terror))
+- Update rustfmt edition ([#555](https://github.com/terror/just-lsp/pull/555) by [terror](https://github.com/terror))
+- Remove stale unused async allowances ([#554](https://github.com/terror/just-lsp/pull/554) by [terror](https://github.com/terror))
+- Remove stale dead code allowance ([#553](https://github.com/terror/just-lsp/pull/553) by [terror](https://github.com/terror))
+- Remove unused web interface components ([#552](https://github.com/terror/just-lsp/pull/552) by [terror](https://github.com/terror))
+- Add web test script ([#551](https://github.com/terror/just-lsp/pull/551) by [terror](https://github.com/terror))
+- Freeze web dependency installation ([#550](https://github.com/terror/just-lsp/pull/550) by [terror](https://github.com/terror))
+- Remove stale changelog lockfile ([#549](https://github.com/terror/just-lsp/pull/549) by [terror](https://github.com/terror))
+- Clean up web dependencies ([#548](https://github.com/terror/just-lsp/pull/548) by [terror](https://github.com/terror))
+- Remove duplicate `serde_json` dependency ([#547](https://github.com/terror/just-lsp/pull/547) by [terror](https://github.com/terror))
+- Remove unused `target` dependency ([#546](https://github.com/terror/just-lsp/pull/546) by [terror](https://github.com/terror))
+- Bump clap from 4.6.1 to 4.6.5 ([#544](https://github.com/terror/just-lsp/pull/544) by [app/dependabot](https://github.com/app/dependabot))
 
 ## [0.6.1](https://github.com/terror/just-lsp/releases/tag/0.6.1) - 2026-08-03
 
 ### Added
 
-- Diagnose global dotenv setting conflicts (#540)
-- Diagnose global working directory conflicts (#539)
+- Diagnose global dotenv setting conflicts ([#540](https://github.com/terror/just-lsp/pull/540) by [terror](https://github.com/terror))
+- Diagnose global working directory conflicts ([#539](https://github.com/terror/just-lsp/pull/539) by [terror](https://github.com/terror))
 
 ### Fixed
 
-- Require list support for `num_jobs` function (#542)
-- Allow `len` function without list support (#541)
-- Fix indentation diagnostic ranges (#538)
+- Require list support for `num_jobs` function ([#542](https://github.com/terror/just-lsp/pull/542) by [terror](https://github.com/terror))
+- Allow `len` function without list support ([#541](https://github.com/terror/just-lsp/pull/541) by [terror](https://github.com/terror))
+- Fix indentation diagnostic ranges ([#538](https://github.com/terror/just-lsp/pull/538) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Move trait impls below canonical impls (#537)
+- Move trait impls below canonical impls ([#537](https://github.com/terror/just-lsp/pull/537) by [terror](https://github.com/terror))
 
 ## [0.6.0](https://github.com/terror/just-lsp/releases/tag/0.6.0) - 2026-07-31
 
 ### Added
 
-- Add `continue-signals` rule (#531)
-- Add support for `timestamp` attribute (#529)
-- Resolve imported symbols (#514)
-- Reuse import edges for navigation (#513)
-- Add support for conditional attributes on all top-level items (#505)
+- Add `continue-signals` rule ([#531](https://github.com/terror/just-lsp/pull/531) by [terror](https://github.com/terror))
+- Add support for `timestamp` attribute ([#529](https://github.com/terror/just-lsp/pull/529) by [terror](https://github.com/terror))
+- Resolve imported symbols ([#514](https://github.com/terror/just-lsp/pull/514) by [terror](https://github.com/terror))
+- Reuse import edges for navigation ([#513](https://github.com/terror/just-lsp/pull/513) by [terror](https://github.com/terror))
+- Add support for conditional attributes on all top-level items ([#505](https://github.com/terror/just-lsp/pull/505) by [terror](https://github.com/terror))
 
 ### Fixed
 
-- Preserve export status on variadic parameters (#534)
-- Match `just` justfile discovery (#532)
-- Fix setting kind inference (#530)
-- Fix script attribute conflict rule (#528)
-- Resolve declarations with import precedence (#523)
-- Respect platform conditions in duplicate diagnostics (#509)
-- Fix list feature detection for conditional settings (#506)
+- Preserve export status on variadic parameters ([#534](https://github.com/terror/just-lsp/pull/534) by [terror](https://github.com/terror))
+- Match `just` justfile discovery ([#532](https://github.com/terror/just-lsp/pull/532) by [terror](https://github.com/terror))
+- Fix setting kind inference ([#530](https://github.com/terror/just-lsp/pull/530) by [terror](https://github.com/terror))
+- Fix script attribute conflict rule ([#528](https://github.com/terror/just-lsp/pull/528) by [terror](https://github.com/terror))
+- Resolve declarations with import precedence ([#523](https://github.com/terror/just-lsp/pull/523) by [terror](https://github.com/terror))
+- Respect platform conditions in duplicate diagnostics ([#509](https://github.com/terror/just-lsp/pull/509) by [terror](https://github.com/terror))
+- Fix list feature detection for conditional settings ([#506](https://github.com/terror/just-lsp/pull/506) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Consolidate document parsing tests (#527)
-- Sort all tests alphabetically (#526)
-- Build semantic import scope (#522)
-- Bump tokio-stream from 0.1.18 to 0.1.19 (#521)
-- Bump tokio from 1.52.3 to 1.53.1 (#520)
-- Bump thiserror from 2.0.18 to 2.0.19 (#519)
-- Bump tree-sitter-highlight from 0.26.10 to 0.26.11 (#518)
-- Bump cc from 1.3.0 to 1.4.0 (#517)
-- Deduplicate setting attribute parsing (#516)
-- Rebuild reverse dependents (#515)
-- Build import project graph (#512)
-- Centralize document loading (#511)
-- Sort document tests alphabetically (#508)
-- Retain attributes on declarations (#507)
+- Consolidate document parsing tests ([#527](https://github.com/terror/just-lsp/pull/527) by [terror](https://github.com/terror))
+- Sort all tests alphabetically ([#526](https://github.com/terror/just-lsp/pull/526) by [terror](https://github.com/terror))
+- Build semantic import scope ([#522](https://github.com/terror/just-lsp/pull/522) by [terror](https://github.com/terror))
+- Bump tokio-stream from 0.1.18 to 0.1.19 ([#521](https://github.com/terror/just-lsp/pull/521) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tokio from 1.52.3 to 1.53.1 ([#520](https://github.com/terror/just-lsp/pull/520) by [app/dependabot](https://github.com/app/dependabot))
+- Bump thiserror from 2.0.18 to 2.0.19 ([#519](https://github.com/terror/just-lsp/pull/519) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.10 to 0.26.11 ([#518](https://github.com/terror/just-lsp/pull/518) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.3.0 to 1.4.0 ([#517](https://github.com/terror/just-lsp/pull/517) by [app/dependabot](https://github.com/app/dependabot))
+- Deduplicate setting attribute parsing ([#516](https://github.com/terror/just-lsp/pull/516) by [terror](https://github.com/terror))
+- Rebuild reverse dependents ([#515](https://github.com/terror/just-lsp/pull/515) by [terror](https://github.com/terror))
+- Build import project graph ([#512](https://github.com/terror/just-lsp/pull/512) by [terror](https://github.com/terror))
+- Centralize document loading ([#511](https://github.com/terror/just-lsp/pull/511) by [terror](https://github.com/terror))
+- Sort document tests alphabetically ([#508](https://github.com/terror/just-lsp/pull/508) by [terror](https://github.com/terror))
+- Retain attributes on declarations ([#507](https://github.com/terror/just-lsp/pull/507) by [terror](https://github.com/terror))
 
 ## [0.5.1](https://github.com/terror/just-lsp/releases/tag/0.5.1) - 2026-07-27
 
 ### Fixed
 
-- Avoid analyzing disabled rules (#503)
+- Avoid analyzing disabled rules ([#503](https://github.com/terror/just-lsp/pull/503) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Migrate logging to tracing (#502)
-- Document package manager installations (#501)
+- Migrate logging to tracing ([#502](https://github.com/terror/just-lsp/pull/502) by [terror](https://github.com/terror))
+- Document package manager installations ([#501](https://github.com/terror/just-lsp/pull/501) by [terror](https://github.com/terror))
 
 ## [0.5.0](https://github.com/terror/just-lsp/releases/tag/0.5.0) - 2026-07-24
 
 ### Added
 
-- Validate `minimum-version` setting values (#499)
-- Add `invalid-setting-value` rule (#498)
-- Add support for `len` and `style` builtin functions (#479)
-- Mark `windows-shell` setting as deprecated (#464)
-- Allow `dotenv-command` list setting (#489)
-- Support multiple `continue` attribute signals (#488)
-- Recognize current syntax in semantic highlighting (#487)
-- Add support for `cache` attribute arguments (#477)
-- Allow attributes on settings (#471)
-- Allow const expressions in attributes (#470)
-- Allow platform attributes on all items (#469)
-- Add support for `num_jobs` builtin function (#468)
+- Validate `minimum-version` setting values ([#499](https://github.com/terror/just-lsp/pull/499) by [terror](https://github.com/terror))
+- Add `invalid-setting-value` rule ([#498](https://github.com/terror/just-lsp/pull/498) by [terror](https://github.com/terror))
+- Add support for `len` and `style` builtin functions ([#479](https://github.com/terror/just-lsp/pull/479) by [terror](https://github.com/terror))
+- Mark `windows-shell` setting as deprecated ([#464](https://github.com/terror/just-lsp/pull/464) by [terror](https://github.com/terror))
+- Allow `dotenv-command` list setting ([#489](https://github.com/terror/just-lsp/pull/489) by [terror](https://github.com/terror))
+- Support multiple `continue` attribute signals ([#488](https://github.com/terror/just-lsp/pull/488) by [terror](https://github.com/terror))
+- Recognize current syntax in semantic highlighting ([#487](https://github.com/terror/just-lsp/pull/487) by [terror](https://github.com/terror))
+- Add support for `cache` attribute arguments ([#477](https://github.com/terror/just-lsp/pull/477) by [terror](https://github.com/terror))
+- Allow attributes on settings ([#471](https://github.com/terror/just-lsp/pull/471) by [terror](https://github.com/terror))
+- Allow const expressions in attributes ([#470](https://github.com/terror/just-lsp/pull/470) by [terror](https://github.com/terror))
+- Allow platform attributes on all items ([#469](https://github.com/terror/just-lsp/pull/469) by [terror](https://github.com/terror))
+- Add support for `num_jobs` builtin function ([#468](https://github.com/terror/just-lsp/pull/468) by [terror](https://github.com/terror))
 
 ### Fixed
 
-- Match `just` module resolution (#491)
-- Recognize implicit `.justfile` modules (#490)
-- Recognize effective script mode for cache (#480)
+- Match `just` module resolution ([#491](https://github.com/terror/just-lsp/pull/491) by [terror](https://github.com/terror))
+- Recognize implicit `.justfile` modules ([#490](https://github.com/terror/just-lsp/pull/490) by [terror](https://github.com/terror))
+- Recognize effective script mode for cache ([#480](https://github.com/terror/just-lsp/pull/480) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Retain parsed setting values (#497)
-- Bump cc from 1.2.67 to 1.3.0 (#485)
-- Bump serde from 1.0.228 to 1.0.229 (#482)
-- Bump serde_json from 1.0.150 to 1.0.151 (#486)
-- Bump anyhow from 1.0.102 to 1.0.104 (#484)
-- Bump regex from 1.13.0 to 1.13.1 (#483)
-- Parse attributes on settings (#478)
-- Bump tree-sitter-highlight from 0.26.9 to 0.26.10 (#475)
-- Bump regex from 1.12.4 to 1.13.0 (#474)
-- Bump cc from 1.2.66 to 1.2.67 (#473)
-- Bump tree-sitter from 0.26.10 to 0.26.11 (#472)
-- Add diagnostic type to web playground (#334)
+- Retain parsed setting values ([#497](https://github.com/terror/just-lsp/pull/497) by [terror](https://github.com/terror))
+- Bump cc from 1.2.67 to 1.3.0 ([#485](https://github.com/terror/just-lsp/pull/485) by [app/dependabot](https://github.com/app/dependabot))
+- Bump serde from 1.0.228 to 1.0.229 ([#482](https://github.com/terror/just-lsp/pull/482) by [app/dependabot](https://github.com/app/dependabot))
+- Bump serde_json from 1.0.150 to 1.0.151 ([#486](https://github.com/terror/just-lsp/pull/486) by [app/dependabot](https://github.com/app/dependabot))
+- Bump anyhow from 1.0.102 to 1.0.104 ([#484](https://github.com/terror/just-lsp/pull/484) by [app/dependabot](https://github.com/app/dependabot))
+- Bump regex from 1.13.0 to 1.13.1 ([#483](https://github.com/terror/just-lsp/pull/483) by [app/dependabot](https://github.com/app/dependabot))
+- Parse attributes on settings ([#478](https://github.com/terror/just-lsp/pull/478) by [terror](https://github.com/terror))
+- Bump tree-sitter-highlight from 0.26.9 to 0.26.10 ([#475](https://github.com/terror/just-lsp/pull/475) by [app/dependabot](https://github.com/app/dependabot))
+- Bump regex from 1.12.4 to 1.13.0 ([#474](https://github.com/terror/just-lsp/pull/474) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.66 to 1.2.67 ([#473](https://github.com/terror/just-lsp/pull/473) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.10 to 0.26.11 ([#472](https://github.com/terror/just-lsp/pull/472) by [app/dependabot](https://github.com/app/dependabot))
+- Add diagnostic type to web playground ([#334](https://github.com/terror/just-lsp/pull/334) by [terror](https://github.com/terror))
 
 ## [0.4.8](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-07-09
 
 ### Added
 
-- Add support for `min`, `max`, and `multiple` `arg` attribute keyword arguments (#465)
-- Add support for `cache` attribute (#463)
-- Add support for `continue` attribute (#462)
-- Add support for `dotenv-command` setting (#461)
-- Add support for `just_version` builtin function (#460)
-- Add support for `minimum-version` setting (#459)
-- Add support for `indentation` setting (#458)
-- Add quickfix to remove unnecessary `parallel` attributes (#445)
-- Refresh builtin hover documentation for lists (#443)
-- Set completion item deprecation metadata (#442)
-- Track dependency phases for duplicate checks (#441)
-- Add rule for list feature gating (#439)
-- Allow attribute shorthand expressions (#437)
-- Allow trailing function call commas (#436)
-- Add list expression operators (#434)
-- Allow optional `assert` message (#433)
-- Allow optional `split` function separator (#432)
-- Add guard recipe line prefixes (#431)
-- Allow `arg` attribute value expressions (#430)
-- Add support for `split` builtin function (#427)
-- Add support for `arg` flag attribute (#429)
-- Add support for optional `join_list` separator (#428)
-- Allow dotenv list settings (#426)
+- Add support for `min`, `max`, and `multiple` `arg` attribute keyword arguments ([#465](https://github.com/terror/just-lsp/pull/465) by [terror](https://github.com/terror))
+- Add support for `cache` attribute ([#463](https://github.com/terror/just-lsp/pull/463) by [terror](https://github.com/terror))
+- Add support for `continue` attribute ([#462](https://github.com/terror/just-lsp/pull/462) by [terror](https://github.com/terror))
+- Add support for `dotenv-command` setting ([#461](https://github.com/terror/just-lsp/pull/461) by [terror](https://github.com/terror))
+- Add support for `just_version` builtin function ([#460](https://github.com/terror/just-lsp/pull/460) by [terror](https://github.com/terror))
+- Add support for `minimum-version` setting ([#459](https://github.com/terror/just-lsp/pull/459) by [terror](https://github.com/terror))
+- Add support for `indentation` setting ([#458](https://github.com/terror/just-lsp/pull/458) by [terror](https://github.com/terror))
+- Add quickfix to remove unnecessary `parallel` attributes ([#445](https://github.com/terror/just-lsp/pull/445) by [terror](https://github.com/terror))
+- Refresh builtin hover documentation for lists ([#443](https://github.com/terror/just-lsp/pull/443) by [terror](https://github.com/terror))
+- Set completion item deprecation metadata ([#442](https://github.com/terror/just-lsp/pull/442) by [terror](https://github.com/terror))
+- Track dependency phases for duplicate checks ([#441](https://github.com/terror/just-lsp/pull/441) by [terror](https://github.com/terror))
+- Add rule for list feature gating ([#439](https://github.com/terror/just-lsp/pull/439) by [terror](https://github.com/terror))
+- Allow attribute shorthand expressions ([#437](https://github.com/terror/just-lsp/pull/437) by [terror](https://github.com/terror))
+- Allow trailing function call commas ([#436](https://github.com/terror/just-lsp/pull/436) by [terror](https://github.com/terror))
+- Add list expression operators ([#434](https://github.com/terror/just-lsp/pull/434) by [terror](https://github.com/terror))
+- Allow optional `assert` message ([#433](https://github.com/terror/just-lsp/pull/433) by [terror](https://github.com/terror))
+- Allow optional `split` function separator ([#432](https://github.com/terror/just-lsp/pull/432) by [terror](https://github.com/terror))
+- Add guard recipe line prefixes ([#431](https://github.com/terror/just-lsp/pull/431) by [terror](https://github.com/terror))
+- Allow `arg` attribute value expressions ([#430](https://github.com/terror/just-lsp/pull/430) by [terror](https://github.com/terror))
+- Add support for `split` builtin function ([#427](https://github.com/terror/just-lsp/pull/427) by [terror](https://github.com/terror))
+- Add support for `arg` flag attribute ([#429](https://github.com/terror/just-lsp/pull/429) by [terror](https://github.com/terror))
+- Add support for optional `join_list` separator ([#428](https://github.com/terror/just-lsp/pull/428) by [terror](https://github.com/terror))
+- Allow dotenv list settings ([#426](https://github.com/terror/just-lsp/pull/426) by [terror](https://github.com/terror))
 
 ### Fixed
 
-- Fix attribute duplicate diagnostics (#438)
-- Fix unexport parsing (#435)
+- Fix attribute duplicate diagnostics ([#438](https://github.com/terror/just-lsp/pull/438) by [terror](https://github.com/terror))
+- Fix unexport parsing ([#435](https://github.com/terror/just-lsp/pull/435) by [terror](https://github.com/terror))
 
 ### Misc
 
-- Bump tree-sitter from 0.26.9 to 0.26.10 (#456)
-- Bump cc from 1.2.65 to 1.2.66 (#455)
-- Add github sponsors funding configuration (#450)
-- Bump cc from 1.2.64 to 1.2.65 (#449)
-- Bump log from 0.4.32 to 0.4.33 (#448)
-- Refactor quickfix tests with ergonomic builder (#446)
-- Refresh diagnostics documentation (#444)
-- Integrate quickfix generation into lint rules (#440)
+- Bump tree-sitter from 0.26.9 to 0.26.10 ([#456](https://github.com/terror/just-lsp/pull/456) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.2.65 to 1.2.66 ([#455](https://github.com/terror/just-lsp/pull/455) by [app/dependabot](https://github.com/app/dependabot))
+- Add github sponsors funding configuration ([#450](https://github.com/terror/just-lsp/pull/450) by [terror](https://github.com/terror))
+- Bump cc from 1.2.64 to 1.2.65 ([#449](https://github.com/terror/just-lsp/pull/449) by [app/dependabot](https://github.com/app/dependabot))
+- Bump log from 0.4.32 to 0.4.33 ([#448](https://github.com/terror/just-lsp/pull/448) by [app/dependabot](https://github.com/app/dependabot))
+- Refactor quickfix tests with ergonomic builder ([#446](https://github.com/terror/just-lsp/pull/446) by [terror](https://github.com/terror))
+- Refresh diagnostics documentation ([#444](https://github.com/terror/just-lsp/pull/444) by [terror](https://github.com/terror))
+- Integrate quickfix generation into lint rules ([#440](https://github.com/terror/just-lsp/pull/440) by [terror](https://github.com/terror))
 
 ## [0.4.7](https://github.com/terror/just-lsp/releases/tag/0.4.7) - 2026-06-16
 
