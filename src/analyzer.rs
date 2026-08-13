@@ -1227,7 +1227,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[cache]` keyword `foo`, expected one of extra, inputs, outputs",
+      "Unknown `[cache]` keyword `foo`, expected one of environment, extra, inputs, outputs",
       lsp::Range::at(1, 7, 1, 16),
     )
     .error(
@@ -1241,8 +1241,12 @@ mod tests {
   fn cache_attribute_kwargs() {
     Test::new(indoc! {
       "
+      set lists
+
+      environment := 'PATH'
+
       [script]
-      [cache(inputs='Cargo.lock', outputs='target', extra=arch())]
+      [cache(environment=[environment], inputs='Cargo.lock', outputs='target', extra=arch())]
       build:
         cargo build
       "
