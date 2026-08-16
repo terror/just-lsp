@@ -25,7 +25,8 @@ define_rule! {
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
               UnusedParameterRule::positional_argument_indices(recipe),
-              UnusedParameterRule::uses_all_positional_arguments(recipe),
+              recipe.shebang.is_some()
+                || UnusedParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {
             (HashSet::new(), false)
@@ -35,7 +36,7 @@ define_rule! {
             let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
             let is_unused = !identifiers.contains(&parameter.name)
-              && parameter.kind != ParameterKind::Export
+              && !parameter.export
               && !exported
               && !used_via_position;
 
@@ -131,12 +132,33 @@ mod tests {
   }
 
   #[test]
-  fn positional_argument_indices_detects_unbraced_arguments() {
+  fn parse_positional_rejects_incomplete_braced() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"{56", true), None);
+  }
+
+  #[test]
+  fn parse_positional_rejects_missing_digits() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"rest", false), None);
+  }
+
+  #[test]
+  fn parse_positional_rejects_zero() {
+    assert_eq!(UnusedParameterRule::parse_positional(b"0", false), None);
+  }
+
+  #[test]
+  fn parse_positional_with_braces_extracts_number() {
     assert_eq!(
-      UnusedParameterRule::positional_argument_indices(&recipe(
-        "graph log:\n  ./bin/graph $1 $2 text"
-      )),
-      HashSet::from([1, 2])
+      UnusedParameterRule::parse_positional(b"{34}", true),
+      Some(34)
+    );
+  }
+
+  #[test]
+  fn parse_positional_without_braces_extracts_number() {
+    assert_eq!(
+      UnusedParameterRule::parse_positional(b"12", false),
+      Some(12)
     );
   }
 
@@ -151,6 +173,16 @@ mod tests {
   }
 
   #[test]
+  fn positional_argument_indices_detects_unbraced_arguments() {
+    assert_eq!(
+      UnusedParameterRule::positional_argument_indices(&recipe(
+        "graph log:\n  ./bin/graph $1 $2 text"
+      )),
+      HashSet::from([1, 2])
+    );
+  }
+
+  #[test]
   fn positional_argument_indices_ignores_invalid_variants() {
     assert_eq!(
       UnusedParameterRule::positional_argument_indices(&recipe(
@@ -158,51 +190,6 @@ mod tests {
       )),
       HashSet::from([5])
     );
-  }
-
-  #[test]
-  fn parse_positional_without_braces_extracts_number() {
-    assert_eq!(
-      UnusedParameterRule::parse_positional(b"12", false),
-      Some(12)
-    );
-  }
-
-  #[test]
-  fn parse_positional_with_braces_extracts_number() {
-    assert_eq!(
-      UnusedParameterRule::parse_positional(b"{34}", true),
-      Some(34)
-    );
-  }
-
-  #[test]
-  fn parse_positional_rejects_missing_digits() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"rest", false), None);
-  }
-
-  #[test]
-  fn parse_positional_rejects_incomplete_braced() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"{56", true), None);
-  }
-
-  #[test]
-  fn parse_positional_rejects_zero() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"0", false), None);
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_detects_dollar_at() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo \"$@\""
-    )));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_detects_dollar_star() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo $*"
-    )));
   }
 
   #[test]
@@ -216,6 +203,20 @@ mod tests {
   fn uses_all_positional_arguments_detects_braced_star() {
     assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
       "run *args:\n  echo ${*}"
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_dollar_at() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo \"$@\""
+    )));
+  }
+
+  #[test]
+  fn uses_all_positional_arguments_detects_dollar_star() {
+    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
+      "run *args:\n  echo $*"
     )));
   }
 

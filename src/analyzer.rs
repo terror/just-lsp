@@ -2,20 +2,12 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Analyzer<'a> {
-  config: Option<&'a Config>,
-  document: &'a Document,
+  pub config: Option<&'a Config>,
+  pub document: &'a Document,
+  pub imported_documents: Vec<&'a Document>,
 }
 
-impl<'a> From<&'a Document> for Analyzer<'a> {
-  fn from(document: &'a Document) -> Self {
-    Self {
-      config: None,
-      document,
-    }
-  }
-}
-
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
   /// Run all registered rules against the document.
   ///
   /// Rules that return `None` from `severity()` are filtered out, so
@@ -23,7 +15,8 @@ impl<'a> Analyzer<'a> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    let context = RuleContext::new(self.document);
+    let context =
+      RuleContext::new(self.document, self.imported_documents.iter().copied());
 
     let default = Config::default();
 
@@ -32,12 +25,16 @@ impl<'a> Analyzer<'a> {
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
       .flat_map(|rule| {
+        let rule_config = config.rule_config(rule.id());
+
+        if !rule.enabled(&rule_config) {
+          return Vec::new();
+        }
+
         rule
           .run(&context)
           .into_iter()
           .filter_map(move |diagnostic| {
-            let rule_config = config.rule_config(rule.id());
-
             Some(Diagnostic {
               id: rule.id().to_string(),
               display: rule.message().to_string(),
@@ -45,6 +42,7 @@ impl<'a> Analyzer<'a> {
               ..diagnostic
             })
           })
+          .collect()
       })
       .collect::<Vec<_>>();
 
@@ -59,35 +57,21 @@ impl<'a> Analyzer<'a> {
 
     diagnostics
   }
-
-  /// Set the config for rule severity overrides.
-  ///
-  /// When no config is set, `Config::default()` is used, which leaves
-  /// all rule severities at their built-in defaults.
-  #[must_use]
-  pub fn config(self, config: &'a Config) -> Self {
-    Self {
-      config: Some(config),
-      ..self
-    }
-  }
 }
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
-
-  #[derive(Debug)]
-  enum Message<'a> {
-    Scoped { text: &'a str, range: lsp::Range },
-    Text(&'a str),
-  }
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[derive(Debug)]
   struct Test {
     config: Config,
     document: Document,
-    messages: Vec<(Message<'static>, Option<lsp::DiagnosticSeverity>)>,
+    messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
   }
 
   impl Test {
@@ -95,12 +79,12 @@ mod tests {
       Self { config, ..self }
     }
 
-    fn error(self, message: Message<'static>) -> Self {
+    fn error(self, message: &'static str, range: lsp::Range) -> Self {
       Self {
         messages: self
           .messages
           .into_iter()
-          .chain([(message, Some(lsp::DiagnosticSeverity::ERROR))])
+          .chain([(message, range, Some(lsp::DiagnosticSeverity::ERROR))])
           .collect(),
         ..self
       }
@@ -135,7 +119,11 @@ mod tests {
         messages,
       } = self;
 
-      let analyzer = Analyzer::from(&document).config(&config);
+      let analyzer = Analyzer {
+        config: Some(&config),
+        document: &document,
+        imported_documents: Vec::new(),
+      };
 
       let diagnostics = analyzer
         .analyze()
@@ -151,27 +139,21 @@ mod tests {
         diagnostics,
       );
 
-      for (diagnostic, (expected_message, expected_severity)) in
+      for (diagnostic, (expected_message, expected_range, expected_severity)) in
         diagnostics.into_iter().zip(messages)
       {
         assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
-
-        match expected_message {
-          Message::Text(expected) => assert_eq!(diagnostic.message, *expected),
-          Message::Scoped { text, range } => {
-            assert_eq!(diagnostic.message, *text);
-            assert_eq!(diagnostic.range, range);
-          }
-        }
+        assert_eq!(diagnostic.message, expected_message);
+        assert_eq!(diagnostic.range, expected_range);
       }
     }
 
-    fn warning(self, message: Message<'static>) -> Self {
+    fn warning(self, message: &'static str, range: lsp::Range) -> Self {
       Self {
         messages: self
           .messages
           .into_iter()
-          .chain([(message, Some(lsp::DiagnosticSeverity::WARNING))])
+          .chain([(message, range, Some(lsp::DiagnosticSeverity::WARNING))])
           .collect(),
         ..self
       }
@@ -179,15 +161,72 @@ mod tests {
   }
 
   #[test]
-  fn assert_accepts_condition_operators() {
+  fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "
-      foo name:
-        {{ assert(name == \"bar\", \"msg\") }}
-        {{ assert(name != \"bar\", \"msg\") }}
-        {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+      set lists
+
+      foo := '' || 'bar'
+      bar := 'foo' && 'bar'
+
+      baz:
+        echo {{ foo }}
+        echo {{ bar }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn accepts_unary_negation_with_lists() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_alias_then_recipe() {
+    Test::new(indoc! {
+      "
+      alias t := other
+
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+      "
+    })
+    .error(
+      "Alias `t` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_recipe_then_alias() {
+    Test::new(indoc! {
+      "
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+
+      alias t := other
+      "
+    })
+    .error(
+      "Recipe `t` is redefined as an alias",
+      lsp::Range::at(6, 6, 6, 7),
+    )
     .run();
   }
 
@@ -216,14 +255,8 @@ mod tests {
       alias bar := foo
       "
     })
-    .error(Message::Scoped {
-      text: "Duplicate alias `bar`",
-      range: lsp::Range::at(4, 0, 4, 16),
-    })
-    .error(Message::Scoped {
-      text: "Duplicate alias `bar`",
-      range: lsp::Range::at(5, 0, 5, 16),
-    })
+    .error("Duplicate alias `bar`", lsp::Range::at(4, 0, 4, 16))
+    .error("Duplicate alias `bar`", lsp::Range::at(5, 0, 5, 16))
     .run();
   }
 
@@ -237,7 +270,7 @@ mod tests {
       alias bar := baz
       "
     })
-    .error(Message::Text("Recipe `baz` not found"))
+    .error("Recipe `baz` not found", lsp::Range::at(3, 13, 3, 16))
     .run();
   }
 
@@ -248,2048 +281,23 @@ mod tests {
       alias foo :=
       "
     })
-    .error(Message::Text("Missing identifier in alias"))
-    .error(Message::Text("Recipe `` not found"))
+    .error("Missing identifier in alias", lsp::Range::at(0, 12, 0, 12))
+    .error("Recipe `` not found", lsp::Range::at(0, 12, 0, 12))
     .run();
   }
 
   #[test]
-  fn parallel_without_dependencies_warns() {
-    Test::new(indoc! {
-      "
-      [parallel]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .warning(Message::Text(
-      "Recipe `foo` has no dependencies, so `[parallel]` has no effect",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn parallel_with_single_dependency_warns() {
-    Test::new(indoc! {
-      "
-      [parallel]
-      foo: bar
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-      "
-    })
-    .warning(Message::Text(
-      "Recipe `foo` has only one dependency, so `[parallel]` has no effect",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn alias_recipe_conflict_recipe_then_alias() {
-    Test::new(indoc! {
-      "
-      other:
-        echo \"other\"
-
-      t:
-        echo \"recipe\"
-
-      alias t := other
-      "
-    })
-    .error(Message::Text("Recipe `t` is redefined as an alias"))
-    .run();
-  }
-
-  #[test]
-  fn alias_recipe_conflict_alias_then_recipe() {
-    Test::new(indoc! {
-      "
-      alias t := other
-
-      other:
-        echo \"other\"
-
-      t:
-        echo \"recipe\"
-      "
-    })
-    .error(Message::Text("Alias `t` is redefined as a recipe"))
-    .run();
-  }
-
-  #[test]
-  fn analyze_complete() {
+  fn aliases_platform_specific() {
     Test::new(indoc! {
       "
       foo:
         echo \"foo\"
-
-      bar: missing
-        echo \"bar\"
-
-      alias baz := nonexistent
-      "
-    })
-    .error(Message::Text("Recipe `missing` not found"))
-    .error(Message::Text("Recipe `nonexistent` not found"))
-    .run();
-  }
-
-  #[test]
-  fn attributes_correct() {
-    Test::new(indoc! {
-      "
-      [no-cd]
-      [linux]
-      [macos]
-      foo:
-        echo \"foo\"
-
-      [doc('Recipe documentation')]
-      bar:
-        echo \"bar\"
-
-      [default]
-      baz:
-        echo \"baz\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_duplicate_default_between_recipes() {
-    Test::new(indoc! {
-      "
-      [default]
-      check:
-        echo \"check\"
-
-      [default]
-      ci:
-        echo \"ci\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module"),
-    )
-    .run();
-  }
-
-  #[test]
-  fn attributes_duplicate_default_on_same_recipe() {
-    Test::new(indoc! {
-      "
-      [default]
-      [default]
-      build:
-        echo \"build\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module"),
-    )
-    .run();
-  }
-
-  #[test]
-  fn attributes_duplicate_recipe_attribute() {
-    Test::new(indoc! {
-      "
-      [script]
-      [script]
-      build:
-        echo \"build\"
-      "
-    })
-    .error(Message::Text("Recipe attribute `script` is duplicated"))
-    .run();
-  }
-
-  #[test]
-  fn attributes_duplicate_working_directory_attribute() {
-    Test::new(indoc! {
-      "
-      [working-directory: 'foo']
-      [working-directory: 'bar']
-      build:
-        echo \"build\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe attribute `working-directory` is duplicated",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_working_directory_conflicts_with_no_cd() {
-    Test::new(indoc! {
-      "
-      [no-cd]
-      [working-directory: '/tmp']
-      build:
-        echo \"build\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `build` can't combine `[working-directory]` with `[no-cd]`",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_no_cd_allowed_with_global_working_directory() {
-    Test::new(indoc! {
-      "
-      set working-directory := '/tmp'
-
-      [no-cd]
-      build:
-        echo \"build\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_multiple_group_attributes_allowed() {
-    Test::new(indoc! {
-      "
-      [group('lint')]
-      [group('rust')]
-      build:
-        echo \"build\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_duplicate_group_attribute() {
-    Test::new(indoc! {
-      "
-      [group('dev')]
-      [group('dev')]
-      build:
-        echo \"build\"
-      "
-    })
-    .error(Message::Text("Recipe attribute `group` is duplicated"))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_unknown_parameter() {
-    Test::new(indoc! {
-      "
-      [arg('missing', help='nope')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .error(Message::Text(
-      "`[arg]` references unknown parameter `missing`",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_unknown_kwarg() {
-    Test::new(indoc! {
-      "
-      [arg('name', bogus='x')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .error(Message::Text(
-      "Unknown `[arg]` keyword `bogus`, expected one of help, long, short, value, pattern",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_value_requires_long_or_short() {
-    Test::new(indoc! {
-      "
-      [arg('name', value='hi')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .error(Message::Text(
-      "`[arg]` `value=` requires `long=` or `short=`",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_value_with_long_ok() {
-    Test::new(indoc! {
-      "
-      [arg('name', long='name', value='hi')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_extra_arguments() {
-    Test::new(indoc! {
-      "
-      [linux('invalid')]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `linux` got 1 argument but takes 0 arguments",
-    ))
-    .run();
-
-    Test::new(indoc! {
-      "
-      [default('invalid')]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `default` got 1 argument but takes 0 arguments",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_missing_arguments() {
-    Test::new(indoc! {
-      "
-      [extension]
-      foo:
-        #!/usr/bin/env bash
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `extension` got 0 arguments but takes 1 argument",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn escaped_braces_are_treated_as_literal_text() {
-    Test::new(indoc! {
-      "
-      test:
-        echo \"{{{{hello}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_no_parameters_needed() {
-    Test::new(indoc! {
-      "
-      [script]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-
-    Test::new(indoc! {
-      "
-      [confirm]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-
-    Test::new(indoc! {
-      "
-      [default]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_unknown() {
-    Test::new(indoc! {
-      "
-      [unknown_attribute]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Unknown attribute `unknown_attribute`"))
-    .run();
-  }
-
-  #[test]
-  fn script_attribute_with_shebang_conflict() {
-    Test::new(indoc! {
-      "
-      [script]
-      publish:
-        #!/usr/bin/env bash
-        echo \"publish\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `publish` has both shebang line and `[script]` attribute",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn script_attribute_without_shebang_is_allowed() {
-    Test::new(indoc! {
-      "
-      [script]
-      publish:
-        echo \"publish\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn extension_without_script_or_shebang() {
-    Test::new(indoc! {
-      "
-      [extension: '.sh']
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `foo` uses `[extension]` without `[script]` or a shebang",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn extension_with_script_is_allowed() {
-    Test::new(indoc! {
-      "
-      [script]
-      [extension: '.sh']
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn extension_with_shebang_is_allowed() {
-    Test::new(indoc! {
-      "
-      [extension: '.sh']
-      foo:
-        #!/usr/bin/env bash
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_wrong_target() {
-    Test::new(indoc! {
-      "
-      [group: 'foo']
-      alias f := foo
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `group` cannot be applied to alias target",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_invalid_inline() {
-    Test::new(indoc! {
-      "
-      [group: 'foo', foo]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Unknown attribute `foo`"))
-    .run();
-  }
-
-  #[test]
-  fn attributes_inline_parameters_focused() {
-    Test::new(indoc! {
-      "
-      [group: 'foo', no-cd]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn module_attributes_group() {
-    Test::new(indoc! {
-      "
-      [group: 'tools']
-      mod foo
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_more_arguments_than_required() {
-    Test::new(indoc! {
-      "
-      [group('foo', 'bar')]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `group` got 2 arguments but takes 1 argument",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_metadata_multiple_arguments() {
-    Test::new(indoc! {
-      "
-      [metadata('foo', 'bar')]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_multiple_metadata_allowed() {
-    Test::new(indoc! {
-      "
-      [metadata('foo', 'bar')]
-      [metadata('baz', 'qux')]
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_valid() {
-    Test::new(indoc! {
-      "
-      [env('FOO', 'bar')]
-      foo:
-        echo \"$FOO\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_multiple_vars_allowed() {
-    Test::new(indoc! {
-      "
-      [env('FOO', 'bar')]
-      [env('BAZ', 'qux')]
-      foo:
-        echo \"$FOO $BAZ\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_duplicate_var_name() {
-    Test::new(indoc! {
-      "
-      [env('FOO', 'bar')]
-      [env('FOO', 'baz')]
-      foo:
-        echo \"$FOO\"
-      "
-    })
-    .error(Message::Text("Recipe attribute `env` is duplicated"))
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_missing_value() {
-    Test::new(indoc! {
-      "
-      [env('FOO')]
-      foo:
-        echo \"$FOO\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `env` got 1 argument but takes 2 arguments",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_too_many_arguments() {
-    Test::new(indoc! {
-      "
-      [env('FOO', 'bar', 'extra')]
-      foo:
-        echo \"$FOO\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `env` got 3 arguments but takes 2 arguments",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn env_attribute_wrong_target() {
-    Test::new(indoc! {
-      "
-      [env('FOO', 'bar')]
-      alias baz := foo
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Attribute `env` cannot be applied to alias target",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn attributes_on_assignments() {
-    Test::new(indoc! {
-      "
-      [private]
-      secret := \"secret value\"
-
-      [private]
-      _db_url := \"postgres://user:pass@host:port/db\"
-
-      public_var := \"public value\"
-
-      test:
-        echo {{ secret }}
-        echo {{ _db_url }}
-        echo {{ public_var }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn attributes_on_exported_assignments() {
-    Test::new(indoc! {
-      "
-      [private]
-      export PATH := '/usr/local/bin'
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn function_calls_correct() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ arch() }}
-        echo {{ join(\"a\", \"b\", \"c\") }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn function_calls_too_few_args() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ replace() }}
-      "
-    })
-    .error(Message::Text(
-      "Function `replace` requires at least 3 arguments, but 0 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn function_calls_too_many_args() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ uppercase(\"hello\", \"extra\") }}
-      "
-    })
-    .error(Message::Text(
-      "Function `uppercase` accepts 1 argument, but 2 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn function_calls_unknown() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ unknown_function() }}
-      "
-    })
-    .error(Message::Text("Unknown function `unknown_function`"))
-    .run();
-  }
-
-  #[test]
-  fn dir_aliases_recognized() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ home_dir() }}
-        echo {{ cache_dir() }}
-        echo {{ config_dir() }}
-        echo {{ config_local_dir() }}
-        echo {{ data_dir() }}
-        echo {{ data_local_dir() }}
-        echo {{ executable_dir() }}
-        echo {{ invocation_dir() }}
-        echo {{ invocation_dir_native() }}
-        echo {{ justfile_dir() }}
-        echo {{ source_dir() }}
-        echo {{ parent_dir('~/.config') }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn function_calls_nested() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parser_errors_invalid() {
-    Test::new(indoc! {
-      "
-      foo
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Syntax error near `foo echo \"foo\"`"))
-    .run();
-  }
-
-  #[test]
-  fn recipe_mixed_indentation_between_lines() {
-    Test::new(indoc! {
-      "
-      foo:
-      \techo \"foo\"
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `foo` mixes tabs and spaces for indentation",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_mixed_indentation_single_line_mix() {
-    Test::new(indoc! {
-      "
-      foo:
-   \t  echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `foo` mixes tabs and spaces for indentation",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_inconsistent_indentation_between_lines() {
-    Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
-    .error(Message::Text(
-      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`"),
-    )
-    .run();
-  }
-
-  #[test]
-  fn recipe_consistent_indentation() {
-    Test::new("foo:\n  echo \"foo\"\n  echo \"bar\"\n").run();
-  }
-
-  #[test]
-  fn recipe_line_continuations_allow_extra_indentation() {
-    Test::new(indoc! {
-      "
-      update-mdbook-theme:
-        curl \\
-          https://example.com/resource \\
-          > docs/theme/index.hbs
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn shebang_recipe_is_exempt_from_inconsistent_indentation() {
-    Test::new(indoc! {
-      "
-      build-docs:
-        #!/usr/bin/env bash
-        mdbook build docs -d build
-        for language in ar de; do
-          echo $language
-        done
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parser_errors_valid() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parser_errors_valid_with_shell_expanded_strings() {
-    Test::new(indoc! {
-      r#"
-      import x'~/.config/just/common.just'
-
-      greeting := x"~/$USER/${GREETING:-hello}"
-
-      foo:
-        echo {{greeting}}
-      "#
-    })
-    .run();
-  }
-
-  #[test]
-  fn import_invalid_path() {
-    let expected = if cfg!(windows) {
-      "Import path does not exist: `C:\\nonexistent.just`"
-    } else {
-      "Import path does not exist: `/nonexistent.just`"
-    };
-
-    Test::new(indoc! {
-      "
-      import 'nonexistent.just'
-      "
-    })
-    .error(Message::Text(expected))
-    .run();
-  }
-
-  #[test]
-  fn import_optional_invalid_path() {
-    Test::new(indoc! {
-      "
-      import? 'nonexistent.just'
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn import_format_string_skipped() {
-    Test::new(indoc! {
-      r#"
-      import f"{'nonexistent.just'}"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
-  fn import_shell_expanded_string_skipped() {
-    Test::new(indoc! {
-      "
-      import x'nonexistent.just'
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_correct() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar: foo
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_missing() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar: baz
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text("Recipe `baz` not found"))
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_multiple_missing() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar: missing1 missing2
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text("Recipe `missing1` not found"))
-    .error(Message::Text("Recipe `missing2` not found"))
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_duplicate_warns() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar: foo foo
-        echo \"bar\"
-      "
-    })
-    .warning(Message::Text(
-      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_duplicate_with_arguments_warns() {
-    Test::new(indoc! {
-      "
-      foo arg1:
-        echo \"{{arg1}}\"
-
-      bar: (foo `a`) (foo `a`)
-        echo \"bar\"
-      "
-    })
-    .warning(Message::Text(
-      "Recipe `bar` lists dependency `foo` with the same arguments more than once; just only runs it once, so it's redundant",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_with_different_arguments_no_warning() {
-    Test::new(indoc! {
-      "
-      foo arg1:
-        echo \"{{arg1}}\"
-
-      bar: (foo `a`) (foo `b`)
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_argument_count_correct() {
-    Test::new(indoc! {
-      "
-      foo arg1 arg2=\"default\":
-        echo \"{{arg1}} {{arg2}}\"
-
-      bar: (foo `value1`)
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_missing_args() {
-    Test::new(indoc! {
-      "
-      foo arg1 arg2:
-        echo \"{{arg1}} {{arg2}}\"
-
-      bar: (foo)
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text(
-      "Dependency `foo` requires 2 arguments, but 0 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_too_few_args() {
-    Test::new(indoc! {
-      "
-      foo arg1 arg2:
-        echo \"{{arg1}} {{arg2}}\"
-
-      bar: (foo `value1`)
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text(
-      "Dependency `foo` requires 2 arguments, but 1 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_too_many_args() {
-    Test::new(indoc! {
-      "
-      foo arg1:
-        echo \"{{arg1}}\"
-
-      bar: (foo `value1` `value2` `value3`)
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text(
-      "Dependency `foo` accepts 1 argument, but 3 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_unknown_variable() {
-    Test::new(indoc! {
-      "
-      foo arg1:
-        echo {{ arg1 }}
-
-      bar: (foo wow)
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text("Variable `wow` not found"))
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_valid_variable() {
-    Test::new(indoc! {
-      "
-      wow := `foo`
-
-      foo arg1:
-        echo \"{{arg1}}\"
-
-      bar: (foo wow)
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_variadic_params() {
-    Test::new(indoc! {
-      "
-      foo arg1 +args:
-        echo \"{{arg1}} {{args}}\"
-
-      bar: (foo 'value1' 'value2' 'value3')
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_one_or_more_variadic_requires_argument() {
-    Test::new(indoc! {
-      "
-      foo +args:
-        echo \"{{args}}\"
-
-      bar: (foo)
-        echo \"bar\"
-      "
-    })
-    .error(Message::Text(
-      "Dependency `foo` requires 1 argument, but 0 provided",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_invocation_zero_or_more_variadic_accepts_no_arguments() {
-    Test::new(indoc! {
-      "
-      foo *args:
-        echo \"{{args}}\"
-
-      bar: (foo)
-        echo \"bar\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_with_expressions() {
-    Test::new(indoc! {
-      "
-      recipe-a param:
-        echo {{param}}
-
-      recipe-b param: (recipe-a (\"##\" + param + \"##\"))
-        echo \"recipe-b called with {{param}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_dependencies_with_multiple_expression_arguments() {
-    Test::new(indoc! {
-      "
-      recipe-a a b:
-        echo {{a}} {{b}}
-
-      recipe-b param: (recipe-a (\"1\") (\"2\"))
-        echo \"recipe-b called with {{param}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameters_defaults_all() {
-    Test::new(indoc! {
-      "
-      recipe_with_defaults arg1=\"first\" arg2=\"second\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameters_duplicate() {
-    Test::new(indoc! {
-      "
-      recipe_with_duplicate_param arg1 arg1:
-        echo \"{{arg1}}\"
-      "
-    })
-    .error(Message::Text("Duplicate parameter `arg1`"))
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameters_order() {
-    Test::new(indoc! {
-      "
-      recipe_with_param_order arg1=\"default\" arg2:
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    })
-    .error(Message::Text(
-      "Required parameter `arg2` follows a parameter with a default value",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameters_valid() {
-    Test::new(indoc! {
-      "
-      valid_recipe arg1 arg2=\"default\":
-        echo \"{{arg1}} {{arg2}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn recipe_parameters_variadic() {
-    Test::new(indoc! {
-      "
-      recipe_with_variadic arg1=\"default\" +args:
-        echo \"{{arg1}} {{args}}\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_boolean_shorthand() {
-    Test::new(indoc! {
-      "
-      set export
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_boolean_type_correct() {
-    Test::new(indoc! {
-      "
-      set export := true
-      set dotenv-load := false
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_boolean_type_error() {
-    Test::new(indoc! {
-      "
-      set export := 'foo'
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Setting `export` expects a boolean value"))
-    .run();
-  }
-
-  #[test]
-  fn settings_duplicate() {
-    Test::new(indoc! {
-      "
-      set export := true
-      set shell := [\"bash\", \"-c\"]
-      set export := false
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Duplicate setting `export`"))
-    .run();
-  }
-
-  #[test]
-  fn settings_multiple_errors() {
-    Test::new(indoc! {
-      "
-      set unknown-setting := true
-      set export := false
-      set shell := ['bash']
-      set export := false
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Unknown setting `unknown-setting`"))
-    .error(Message::Text("Duplicate setting `export`"))
-    .run();
-  }
-
-  #[test]
-  fn settings_string_type_correct() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := \".env.development\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_string_type_correct_with_shell_expanded_string() {
-    Test::new(indoc! {
-      r#"
-      set dotenv-path := x"~/.env.${JUST_ENV:-development}"
-
-      foo:
-        echo "foo"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_shell_array_accepts_shell_expanded_strings() {
-    Test::new(indoc! {
-      r#"
-      set shell := [x"${SHELL_BIN:-bash}", x"-c"]
-
-      foo:
-        echo "foo"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_string_type_error() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := true
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text(
-      "Setting `dotenv-path` expects a string value",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn settings_unknown() {
-    Test::new(indoc! {
-      "
-      set unknown-setting := true
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .error(Message::Text("Unknown setting `unknown-setting`"))
-    .run();
-  }
-
-  #[test]
-  fn settings_guards_recognized() {
-    Test::new(indoc! {
-      "
-      set guards
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn settings_lazy_recognized() {
-    Test::new(indoc! {
-      "
-      set lazy
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn should_recognize_recipe_parameters_in_dependency_arguments() {
-    Test::new(indoc! {
-      "
-      other-recipe var=\"else\":
-        echo {{ var }}
-
-      test var=\"something\": (other-recipe var)
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn unreferenced_variable_in_expression() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo {{ var }}
-      "
-    })
-    .error(Message::Text("Variable `var` not found"))
-    .run();
-  }
-
-  #[test]
-  fn warn_for_unused_non_exported_recipe_parameters() {
-    Test::new(indoc! {
-      "
-      foo bar:
-        echo foo
-      "
-    })
-    .warning(Message::Text("Parameter `bar` appears unused"))
-    .run();
-
-    Test::new(indoc! {
-      "
-      foo $bar:
-        echo foo
-      "
-    })
-    .run();
-
-    Test::new(indoc! {
-      "
-      set export := false
-
-      foo bar:
-        echo foo
-      "
-    })
-    .warning(Message::Text("Parameter `bar` appears unused"))
-    .run();
-
-    Test::new(indoc! {
-      "
-      set export
-
-      foo bar:
-        echo foo
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_setting_marks_parameters_as_used() {
-    Test::new(indoc! {
-      "
-      set positional-arguments := true
-
-      graph log:
-        ./bin/graph $1
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_attribute_marks_parameters_as_used() {
-    Test::new(indoc! {
-      "
-      [positional-arguments]
-      graph log:
-        ./bin/graph $1
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_dollar_at_marks_all_as_used() {
-    Test::new(indoc! {
-      r#"
-      [positional-arguments]
-      run *args:
-        #!/usr/bin/env bash
-        exec "$@"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_disabled_still_warns() {
-    Test::new(indoc! {
-      "
-      graph log:
-        ./bin/graph $1
-      "
-    })
-    .warning(Message::Text("Parameter `log` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_only_mark_used_indices() {
-    Test::new(indoc! {
-      "
-      set positional-arguments := true
-
-      graph first second:
-        ./bin/graph $2
-      "
-    })
-    .warning(Message::Text("Parameter `first` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_setting_handles_multiple_parameters() {
-    Test::new(indoc! {
-      "
-      set positional-arguments := true
-
-      graph first second third:
-        ./bin/graph $1 ${2} $3
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_setting_handles_multiple_parameters_unused() {
-    Test::new(indoc! {
-      "
-      set positional-arguments := true
-
-      graph first second third fourth:
-        ./bin/graph $1 ${2} $3
-      "
-    })
-    .warning(Message::Scoped {
-      text: "Parameter `fourth` appears unused",
-      range: lsp::Range::at(2, 25, 2, 31),
-    })
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_attribute_scope_is_limited() {
-    Test::new(indoc! {
-      "
-      [positional-arguments]
-      graph log:
-        ./bin/graph $1
-
-      other data:
-        ./bin/graph $1
-      "
-    })
-    .warning(Message::Text("Parameter `data` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn duplicate_recipe_names() {
-    Test::new(indoc! {
-      "
-      foo:
-        echo foo
-
-      foo:
-        echo foo
-
-      foo:
-        echo foo
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `foo`"))
-    .error(Message::Text("Duplicate recipe name `foo`"))
-    .run();
-  }
-
-  #[test]
-  fn warn_for_unused_variables() {
-    Test::new(indoc! {
-      "
-      foo := \"unused value\"
-      bar := \"used value\"
-
-      recipe:
-        echo {{ bar }}
-      "
-    })
-    .warning(Message::Text("Variable `foo` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn duplicate_variable_assignments() {
-    Test::new(indoc! {
-      "
-      foo := \"one\"
-      foo := \"two\"
-
-      recipe:
-        echo {{ foo }}
-      "
-    })
-    .error(Message::Text("Duplicate variable `foo`"))
-    .run();
-  }
-
-  #[test]
-  fn duplicate_variable_assignments_allowed_via_setting() {
-    Test::new(indoc! {
-      "
-      set allow-duplicate-variables := true
-
-      foo := \"one\"
-      foo := \"two\"
-
-      recipe:
-        echo {{ foo }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn duplicate_recipe_names_allowed_via_setting() {
-    Test::new(indoc! {
-      "
-      set allow-duplicate-recipes := true
-
-      foo:
-        echo foo
-
-      [linux]
-      foo:
-        echo foo on linux
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn used_variables_no_warnings() {
-    Test::new(indoc! {
-      "
-      foo := \"used in recipe\"
-      bar := \"used as dependency arg\"
-
-      another arg:
-        echo {{ arg }}
-
-      recipe: (another bar)
-        echo {{ foo }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn variables_used_in_recipe_dependencies() {
-    Test::new(indoc! {
-      "
-      param_value := \"value\"
-      unused := \"unused\"
-
-      recipe arg=\"default\": (another param_value)
-        echo {{ arg }}
-
-      another arg:
-        echo {{ arg }}
-      "
-    })
-    .warning(Message::Text("Variable `unused` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn variables_used_after_hash_in_command() {
-    Test::new(indoc! {
-      "
-      flake := \"testflake\"
-      output := \"testoutput\"
-
-      test:
-        darwin-rebuild switch --flake {{ flake }}#{{ output }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn variables_used_in_recipe_default_parameters() {
-    Test::new(indoc! {
-      "
-      param_value := \"value\"
-
-      recipe arg=param_value:
-        echo {{ arg }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn default_parameter_expression_functions() {
-    Test::new(indoc! {
-      "
-      build version=uppercase(\"1.0.0\"):
-        echo {{ version }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn default_parameter_expression_with_env_call() {
-    Test::new(indoc! {
-      "
-      build target=(env('TARGET', 'debug')):
-        echo {{ target }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn unknown_default_recipe_parameter_reference() {
-    Test::new(indoc! {
-      "
-      recipe arg=foo:
-        echo {{ arg }}
-      "
-    })
-    .error(Message::Text("Variable `foo` not found"))
-    .run();
-  }
-
-  #[test]
-  fn shadowed_parameter_default_uses_global_variable() {
-    Test::new(indoc! {
-      "
-      a := 'default a'
-
-      b a=a:
-        echo {{ a }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn cross_parameter_default_references_preceding_parameter() {
-    Test::new(indoc! {
-      "
-      a := 'foo'
-
-      foo a b=a:
-        echo {{ a }} {{ b }}
-      "
-    })
-    .warning(Message::Text("Variable `a` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn parameter_default_references_preceding_parameter() {
-    Test::new(indoc! {
-      "
-      @binstall crate bin=crate:
-        which {{bin}} 2>&1 >/dev/null || cargo binstall -y {{crate}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parenthesized_expression_default_uses_global_variable() {
-    Test::new(indoc! {
-      "
-      foo := 'foo'
-      bar := 'bar'
-
-      recipe x=(foo + bar):
-        echo {{ x }}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn variables_used_in_dependency_args() {
-    Test::new(indoc! {
-      "
-      used_arg := \"value\"
-      unused_var := \"not used\"
-
-      recipe: (another used_arg)
-        echo \"something\"
-
-      another arg:
-        echo {{ arg }}
-      "
-    })
-    .warning(Message::Text("Variable `unused_var` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn variables_and_parameters_same_name() {
-    Test::new(indoc! {
-      "
-      param := \"variable value\"
-      other := \"other value\"
-
-      recipe param:
-        # This should reference the parameter, not the variable
-        echo {{ param }}
-        echo {{ other }}
-      "
-    })
-    .warning(Message::Text("Variable `param` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn variables_used_in_multiple_recipes() {
-    Test::new(indoc! {
-      "
-      shared := \"shared value\"
-      only_in_first := \"first value\"
-      only_in_second := \"second value\"
-      never_used := \"unused\"
-
-      first:
-        echo {{ shared }}
-        echo {{ only_in_first }}
-
-      second:
-        echo {{ shared }}
-        echo {{ only_in_second }}
-      "
-    })
-    .warning(Message::Text("Variable `never_used` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn exported_variables_not_warned() {
-    Test::new(indoc! {
-      "
-      foo := \"unused value\"
-      export bar := \"exported but unused\"
-      baz := \"used value\"
-
-      recipe:
-        echo {{ baz }}
-      "
-    })
-    .warning(Message::Text("Variable `foo` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn unexported_variables_warned() {
-    Test::new(indoc! {
-      "
-      foo := \"unused value\"
-      unexport BAR := \"unexported but unused\"
-      baz := \"used value\"
-
-      recipe:
-        echo {{ baz }}
-      "
-    })
-    .warning(Message::Text("Variable `foo` appears unused"))
-    .warning(Message::Text("Variable `BAR` appears unused"))
-    .run();
-  }
-
-  #[test]
-  fn set_export_suppresses_unused_variable_warnings() {
-    Test::new(indoc! {
-      "
-      set export
-
-      foo := 'bar'
-      baz := 'qux'
-
-      recipe:
-        echo $foo
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn os_specific_duplicate_recipes() {
-    Test::new(indoc! {
-      "
-      [linux]
-      build:
-        echo \"Building on Linux\"
-
-      [windows]
-      build:
-        echo \"Building on Windows\"
-
-      [macos]
-      build:
-        echo \"Building on macOS\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn duplicate_recipes_with_same_os_attribute() {
-    Test::new(indoc! {
-      "
-      [linux]
-      build:
-        echo \"Building on Linux version 1\"
-
-      [linux]
-      build:
-        echo \"Building on Linux version 2\"
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `build`"))
-    .run();
-  }
-
-  #[test]
-  fn mixed_os_specific_and_regular_recipe() {
-    Test::new(indoc! {
-      "
-      [linux]
-      build:
-        echo \"Building on Linux\"
-
-      build:
-        echo \"Building on any OS\"
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `build`"))
-    .run();
-  }
-
-  #[test]
-  fn windows_recipe_conflicts_with_default() {
-    Test::new(indoc! {
-      "
-      [windows]
-      build:
-        echo \"Building on Windows\"
-
-      build:
-        echo \"Building on every OS\"
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `build`"))
-    .run();
-  }
-
-  #[test]
-  fn unix_macos_conflicts() {
-    Test::new(indoc! {
-      "
-      [unix]
-      build:
-        echo \"Building on Unix systems\"
-
-      [macos]
-      build:
-        echo \"Building on macOS specifically\"
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `build`"))
-    .run();
-  }
-
-  #[test]
-  fn linux_openbsd_no_conflict() {
-    Test::new(indoc! {
-      "
-      [linux]
-      build:
-        echo \"Building on Linux\"
-
-      [openbsd]
-      build:
-        echo \"Building on OpenBSD\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn linux_unix_conflict() {
-    Test::new(indoc! {
-      "
-      [linux]
-      build:
-        echo \"Building on Linux\"
 
       [unix]
-      build:
-        echo \"Building on Unix systems\"
-      "
-    })
-    .error(Message::Text("Duplicate recipe name `build`"))
-    .run();
-  }
+      alias bar := foo
 
-  #[test]
-  fn openbsd_macos_no_conflict() {
-    Test::new(indoc! {
-      "
-      [openbsd]
-      build:
-        echo \"Building on OpenBSD\"
-
-      [macos]
-      build:
-        echo \"Building on macOS\"
+      [windows]
+      alias bar := foo
       "
     })
     .run();
@@ -2332,64 +340,1208 @@ mod tests {
   }
 
   #[test]
-  fn recipe_with_multiple_os_attributes() {
+  fn analyze_complete() {
     Test::new(indoc! {
       "
-      [windows]
-      [linux]
-      build:
-        echo \"Building on Linux or Windows\"
+      foo:
+        echo \"foo\"
 
-      [linux]
-      build:
-        echo \"Building on macOS\"
+      bar: missing
+        echo \"bar\"
 
-      [macos]
-      build:
-        echo \"Building on macOS\"
+      alias baz := nonexistent
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .error("Recipe `missing` not found", lsp::Range::at(3, 5, 3, 12))
+    .error(
+      "Recipe `nonexistent` not found",
+      lsp::Range::at(6, 13, 6, 24),
+    )
     .run();
   }
 
   #[test]
-  fn recipe_with_conflicting_multiple_os_attributes() {
+  fn arg_attribute_const_expression_kwargs() {
     Test::new(indoc! {
       "
-      [linux]
-      [openbsd]
-      build:
-        echo \"Building on Linux and OpenBSD\"
+      help := 'help'
+      pattern := '[a-z]+'
 
-      [linux]
-      build:
-        echo \"Building on Linux again\"
+      [arg('bar', help=help, pattern=pattern)]
+      foo bar:
+        echo {{ bar }}
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
   #[test]
-  fn recipe_with_all_os_attributes() {
+  fn arg_attribute_duplicate_parameter() {
     Test::new(indoc! {
       "
+      [arg('foo', help='bar')]
+      [arg('foo', long='foo')]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`[arg]` attribute for parameter `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_empty_parens() {
+    Test::new(indoc! {
+      "
+      [arg()]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_missing_parameter_name() {
+    Test::new(indoc! {
+      "
+      [arg]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_string_kwargs_reject_expressions() {
+    #[track_caller]
+    fn case(keyword: &'static str) {
+      let content = formatdoc! {
+        "
+        foo := 'foo'
+
+        [arg('bar', {keyword}=foo)]
+        bar bar:
+          echo {{{{bar}}}}
+        "
+      };
+
+      let start = u32::try_from(13 + keyword.len()).unwrap();
+
+      Test::new(&content)
+        .error(
+          "Attribute `arg` arguments must be string literals",
+          lsp::Range::at(2, start, 2, start + 3),
+        )
+        .run();
+    }
+
+    case("long");
+    case("short");
+  }
+
+  #[test]
+  fn arg_attribute_unknown_kwarg() {
+    Test::new(indoc! {
+      "
+      [arg('name', bogus='x')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(
+      "Unknown `[arg]` keyword `bogus`, expected one of flag, help, long, max, min, multiple, pattern, short, value",
+    lsp::Range::at(0, 13, 0, 22))
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_unknown_parameter() {
+    Test::new(indoc! {
+      "
+      [arg('missing', help='nope')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(
+      "`[arg]` references unknown parameter `missing`",
+      lsp::Range::at(0, 5, 0, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_valid() {
+    Test::new(indoc! {
+      "
+      [arg('foo', help=\"Help text\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_accepts_expression() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+
+      [arg('bar', long='bar', value=foo / 'baz')]
+      bar bar:
+        echo {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_requires_long_or_short() {
+    Test::new(indoc! {
+      "
+      [arg('name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(
+      "`[arg]` `value=` requires `long=` or `short=`",
+      lsp::Range::at(0, 13, 0, 23),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_with_long_ok() {
+    Test::new(indoc! {
+      "
+      [arg('name', long='name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [arg('foo', flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag_requires_lists() {
+    Test::new(indoc! {
+      "
+      [arg('foo', flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`flag` arguments require `set lists`",
+      lsp::Range::at(0, 12, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_long_option() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_multiple_options() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\", short=\"f\", value=\"default\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_pattern() {
+    Test::new(indoc! {
+      "
+      [arg('version', pattern=\"[0-9]+\\\\.[0-9]+\\\\.[0-9]+\")]
+      release version:
+        echo {{version}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_short_option() {
+    Test::new(indoc! {
+      "
+      [arg('foo', short=\"f\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_min_max_kwargs_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_multiple_kwarg_accepted() {
+    Test::new(indoc! {
+      "
+      [arg('foo', long, multiple)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn assert_accepts_condition_operators() {
+    Test::new(indoc! {
+      "
+      foo name:
+        {{ assert(name == \"bar\") }}
+        {{ assert(name == \"bar\", \"msg\") }}
+        {{ assert(name != \"bar\", \"msg\") }}
+        {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+        {{ assert(name !~ \"^[a-z]+$\", \"msg\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attribute_expression_requires_support() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+      bar := 'bar'
+
+      [group(foo)]
+      [group: bar]
+      [group(f'baz')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(3, 7, 3, 10),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(4, 8, 4, 11),
+    )
+    .error(
+      "Attribute `group` arguments must be string literals",
+      lsp::Range::at(5, 7, 5, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attribute_string_literal_expression() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      [metadata(x'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_correct() {
+    Test::new(indoc! {
+      "
+      [no-cd]
       [linux]
-      [windows]
-      [unix]
       [macos]
-      [dragonfly]
-      [freebsd]
-      [netbsd]
-      [openbsd]
+      foo:
+        echo \"foo\"
+
+      [doc('Recipe documentation')]
+      bar:
+        echo \"bar\"
+
+      [default]
+      baz:
+        echo \"baz\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_between_recipes() {
+    Test::new(indoc! {
+      "
+      [default]
+      check:
+        echo \"check\"
+
+      [default]
+      ci:
+        echo \"ci\"
+      "
+    })
+    .error(
+      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(4, 0, 5, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_on_same_recipe() {
+    Test::new(indoc! {
+      "
+      [default]
+      [default]
       build:
-        echo \"Building everywhere\"
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(1, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_attribute_allowed() {
+    Test::new(indoc! {
+      "
+      [group('dev')]
+      [group('dev')]
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_non_repeatable_outside_recipes() {
+    #[track_caller]
+    fn case(content: &'static str, message: &'static str) {
+      Test::new(content)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        alias f := foo
+
+        foo:
+        "
+      },
+      "Alias attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        foo := 'bar'
+
+        bar:
+          echo {{foo}}
+        "
+      },
+      "Assignment attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [doc('foo')]
+        [doc('bar')]
+        mod foo
+        "
+      },
+      "Module attribute `doc` is duplicated",
+    );
+  }
+
+  #[test]
+  fn attributes_duplicate_recipe_attribute() {
+    Test::new(indoc! {
+      "
+      [script]
+      [script]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `script` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_shell_attribute() {
+    Test::new(indoc! {
+      "
+      [shell]
+      [shell]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `shell` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_working_directory_attribute() {
+    Test::new(indoc! {
+      "
+      [working-directory: 'foo']
+      [working-directory: 'bar']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `working-directory` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_exit_message_conflicts_with_no_exit_message() {
+    Test::new(indoc! {
+      "
+      [exit-message]
+      [no-exit-message]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` can't combine `[exit-message]` with `[no-exit-message]`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_extra_arguments() {
+    Test::new(indoc! {
+      "
+      [linux('invalid')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `linux` got 1 argument but takes 0 arguments",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [default('invalid')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `default` got 1 argument but takes 0 arguments",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_inline_parameters_focused() {
+    Test::new(indoc! {
+      "
+      [group: 'foo', no-cd]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_invalid_inline() {
+    Test::new(indoc! {
+      "
+      [group: 'foo', foo]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error("Unknown attribute `foo`", lsp::Range::at(0, 15, 0, 18))
+    .run();
+  }
+
+  #[test]
+  fn attributes_invalid_target() {
+    Test::new(indoc! {
+      "
+      [private]
+      "
+    })
+    .error(
+      "Attribute `private` applied to invalid target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_metadata_multiple_arguments() {
+    Test::new(indoc! {
+      "
+      [metadata('foo', 'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_missing_arguments() {
+    Test::new(indoc! {
+      "
+      [extension]
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `extension` got 0 arguments but takes 1 argument",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_more_arguments_than_required() {
+    Test::new(indoc! {
+      "
+      [group('foo', 'bar')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `group` got 2 arguments but takes 1 argument",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_multiple_group_attributes_allowed() {
+    Test::new(indoc! {
+      "
+      [group('lint')]
+      [group('rust')]
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_multiple_metadata_allowed() {
+    Test::new(indoc! {
+      "
+      [metadata('foo', 'bar')]
+      [metadata('baz', 'qux')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_no_cd_allowed_with_global_working_directory() {
+    Test::new(indoc! {
+      "
+      set working-directory := '/tmp'
+
+      [no-cd]
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_no_parameters_needed() {
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      [confirm]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      [default]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_on_assignments() {
+    Test::new(indoc! {
+      "
+      [private]
+      secret := \"secret value\"
+
+      [private]
+      _db_url := \"postgres://user:pass@host:port/db\"
+
+      public_var := \"public value\"
 
       test:
-        echo \"Testing\"
+        echo {{ secret }}
+        echo {{ _db_url }}
+        echo {{ public_var }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn attributes_on_exported_assignments() {
+    Test::new(indoc! {
+      "
+      [private]
+      export PATH := '/usr/local/bin'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_platform_specific_defaults() {
+    Test::new(indoc! {
+      "
+      [unix]
+      [default]
+      foo:
+        echo \"foo\"
+
+      [windows]
+      [default]
+      bar:
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_shell_recognized() {
+    Test::new(indoc! {
+      "
+      [shell]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_unknown() {
+    Test::new(indoc! {
+      "
+      [unknown_attribute]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown attribute `unknown_attribute`",
+      lsp::Range::at(0, 1, 0, 18),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_working_directory_allowed_with_global_no_cd() {
+    Test::new(indoc! {
+      "
+      set no-cd
+
+      [working-directory: '/tmp']
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_working_directory_conflicts_with_no_cd() {
+    Test::new(indoc! {
+      "
+      [no-cd]
+      [working-directory: '/tmp']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` can't combine `[working-directory]` with `[no-cd]`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_wrong_target() {
+    Test::new(indoc! {
+      "
+      [group: 'foo']
+      alias f := foo
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `group` cannot be applied to alias target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn bsd_os_specific_no_conflict() {
+    Test::new(indoc! {
+      "
+      [dragonfly]
+      build:
+        echo \"Building on DragonFly BSD\"
+
+      [freebsd]
+      build:
+        echo \"Building on FreeBSD\"
+
+      [netbsd]
+      build:
+        echo \"Building on NetBSD\"
+
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_attribute_invalid_keyword_and_missing_value() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache(foo='bar', inputs)]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Unknown `[cache]` keyword `foo`, expected one of environment, extra, inputs, outputs",
+      lsp::Range::at(1, 7, 1, 16),
+    )
+    .error(
+      "`[cache]` keyword `inputs` requires a value",
+      lsp::Range::at(1, 18, 1, 24),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_attribute_kwargs() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      environment := 'PATH'
+
+      [script]
+      [cache(environment=[environment], inputs='Cargo.lock', outputs='target', extra=arch())]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_attribute_rejects_positional_arguments() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache('foo')]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Attribute `cache` only accepts keyword arguments",
+      lsp::Range::at(1, 7, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_default_script() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_default_script_and_shell() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      [shell]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without script mode",
+      lsp::Range::at(3, 0, 4, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_explicit_script() {
+    Test::new(indoc! {
+      "
+      [script]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_script_and_shell() {
+    Test::new(indoc! {
+      "
+      [script]
+      [shell]
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` can't combine `[script]` with `[shell]`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shebang() {
+    Test::new(indoc! {
+      "
+      [cache]
+      build:
+        #!/usr/bin/env sh
+        cargo build
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shebang_and_shell() {
+    Test::new(indoc! {
+      "
+      [shell]
+      [cache]
+      build:
+        #!/usr/bin/env sh
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without script mode",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cache_with_shell() {
+    Test::new(indoc! {
+      "
+      [cache]
+      build:
+        cargo build
+      "
+    })
+    .error(
+      "Recipe `build` uses `[cache]` without script mode",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_long_chain() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+
+      baz: foo
+        echo \"baz\"
+      "
+    })
+    .error(
+      "Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`",
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
+      "Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`",
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
+      "Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`",
+      lsp::Range::at(6, 0, 8, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_multiple_cycles() {
+    Test::new(indoc! {
+      "
+      a: b
+        echo \"a\"
+
+      b: a
+        echo \"b\"
+
+      x: y
+        echo \"x\"
+
+      y: z
+        echo \"y\"
+
+      z: x
+        echo \"z\"
+      "
+    })
+    .error(
+      "Recipe `a` has circular dependency `a -> b -> a`",
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
+      "Recipe `b` has circular dependency `b -> a -> b`",
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
+      "Recipe `x` has circular dependency `x -> y -> z -> x`",
+      lsp::Range::at(6, 0, 9, 0),
+    )
+    .error(
+      "Recipe `y` has circular dependency `y -> z -> x -> y`",
+      lsp::Range::at(9, 0, 12, 0),
+    )
+    .error(
+      "Recipe `z` has circular dependency `z -> x -> y -> z`",
+      lsp::Range::at(12, 0, 14, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_only_flags_cycle_members() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+
+      baz: bar
+        echo \"baz\"
+      "
+    })
+    .error(
+      "Recipe `bar` has circular dependency `bar -> baz -> bar`",
+      lsp::Range::at(3, 0, 6, 0),
+    )
+    .error(
+      "Recipe `baz` has circular dependency `baz -> bar -> baz`",
+      lsp::Range::at(6, 0, 8, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_self() {
+    Test::new(indoc! {
+      "
+      foo: foo
+        echo \"foo\"
+      "
+    })
+    .error("Recipe `foo` depends on itself", lsp::Range::at(0, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_simple() {
+    Test::new(indoc! {
+      "
+      foo: bar
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Recipe `foo` has circular dependency `foo -> bar -> foo`",
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
+      "Recipe `bar` has circular dependency `bar -> foo -> bar`",
+      lsp::Range::at(3, 0, 5, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_with_multiple_dependencies() {
+    Test::new(indoc! {
+      "
+      foo: bar baz
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: qux
+        echo \"baz\"
+
+      qux: foo
+        echo \"qux\"
+      "
+    })
+    .error(
+      "Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`",
+      lsp::Range::at(0, 0, 3, 0),
+    )
+    .error(
+      "Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`",
+      lsp::Range::at(6, 0, 9, 0),
+    )
+    .error(
+      "Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`",
+      lsp::Range::at(9, 0, 11, 0),
+    )
     .run();
   }
 
@@ -2422,7 +1574,7 @@ mod tests {
         @echo 'hello on linux again'
       "
     })
-    .error(Message::Text("Duplicate recipe name `hello`"))
+    .error("Duplicate recipe name `hello`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
@@ -2444,77 +1596,318 @@ mod tests {
   }
 
   #[test]
-  fn bsd_os_specific_no_conflict() {
+  fn conditional_attributes_on_all_top_level_items() {
     Test::new(indoc! {
       "
-      [dragonfly]
-      build:
-        echo \"Building on DragonFly BSD\"
+      [windows]
+      foo() := 'bar'
 
-      [freebsd]
-      build:
-        echo \"Building on FreeBSD\"
+      [unix]
+      import? 'foo.just'
 
-      [netbsd]
-      build:
-        echo \"Building on NetBSD\"
-
-      [openbsd]
-      build:
-        echo \"Building on OpenBSD\"
+      [windows]
+      unexport FOO
       "
     })
     .run();
   }
 
   #[test]
-  fn unix_dragonfly_conflict() {
+  fn confirm_attribute_accepts_expression() {
     Test::new(indoc! {
-      "
-      [unix]
-      build:
-        echo \"Building on Unix systems\"
-
-      [dragonfly]
-      build:
-        echo \"Building on DragonFly BSD\"
-      "
+      r#"
+      [confirm("Deploy to " + env + "?")]
+      deploy env:
+        echo {{env}}
+      "#
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
   #[test]
-  fn unix_freebsd_conflict() {
+  fn continue_attribute_accepts_multiple_arguments() {
     Test::new(indoc! {
       "
-      [unix]
-      build:
-        echo \"Building on Unix systems\"
-
-      [freebsd]
-      build:
-        echo \"Building on FreeBSD\"
+      [continue(\"SIGHUP\", \"SIGINT\", \"SIGQUIT\")]
+      foo:
+        echo foo
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
     .run();
   }
 
   #[test]
-  fn unix_netbsd_conflict() {
+  fn continue_attribute_accepts_one_argument() {
     Test::new(indoc! {
       "
-      [unix]
-      build:
-        echo \"Building on Unix systems\"
-
-      [netbsd]
-      build:
-        echo \"Building on NetBSD\"
+      [continue(\"SIGINT\")]
+      foo:
+        echo foo
       "
     })
-    .error(Message::Text("Duplicate recipe name `build`"))
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_accepts_zero_arguments() {
+    Test::new(indoc! {
+      "
+      [continue]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unknown_signals() {
+    Test::new(indoc! {
+      "
+      [continue(\"SIGTERM\", \"sigint\")]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 10, 0, 19),
+    )
+    .error(
+      "Invalid signal `sigint`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 21, 0, 29),
+    )
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unsupported_target() {
+    Test::new(indoc! {
+      "
+      [continue]
+      alias bar := foo
+
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `continue` cannot be applied to alias target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn cross_parameter_default_references_preceding_parameter() {
+    Test::new(indoc! {
+      "
+      a := 'foo'
+
+      foo a b=a:
+        echo {{ a }} {{ b }}
+      "
+    })
+    .warning("Variable `a` appears unused", lsp::Range::at(0, 0, 0, 1))
+    .run();
+  }
+
+  #[test]
+  fn default_parameter_expression_functions() {
+    Test::new(indoc! {
+      "
+      build version=uppercase(\"1.0.0\"):
+        echo {{ version }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn default_parameter_expression_with_env_call() {
+    Test::new(indoc! {
+      "
+      build target=(env('TARGET', 'debug')):
+        echo {{ target }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dir_aliases_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ home_dir() }}
+        echo {{ cache_dir() }}
+        echo {{ config_dir() }}
+        echo {{ config_local_dir() }}
+        echo {{ data_dir() }}
+        echo {{ data_local_dir() }}
+        echo {{ executable_dir() }}
+        echo {{ invocation_dir() }}
+        echo {{ invocation_dir_native() }}
+        echo {{ justfile_dir() }}
+        echo {{ source_dir() }}
+        echo {{ parent_dir('~/.config') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn disjoint_dotenv_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn doc_attribute_rejects_non_const_expression() {
+    Test::new(indoc! {
+      "
+      [doc(error('message'))]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `doc` arguments must be const expressions",
+      lsp::Range::at(0, 5, 0, 21),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_allows_disabled_loading_and_override() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-load := false
+      set dotenv-override
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_deduplicates_identical_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-command := 'bar'
+
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_preserves_distinct_locations() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+
+      [linux]
+      set dotenv-path := 'bar'
+
+      [windows]
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(2, 0, 4, 0),
+    )
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(5, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflicts_with_loading_settings() {
+    #[track_caller]
+    fn case(justfile: &str, message: &'static str) {
+      Test::new(justfile)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
+      "`dotenv-command` is incompatible with `dotenv-filename`",
+    );
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-load\n",
+      "`dotenv-command` is incompatible with `dotenv-load`",
+    );
+
+    case(
+      "set dotenv-required\nset dotenv-command := 'foo'\n",
+      "`dotenv-required` is incompatible with `dotenv-command`",
+    );
+  }
+
+  #[test]
+  fn dotenv_filename_without_path_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_and_filename_conflict() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+      set dotenv-filename := \".env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "`dotenv-path` overrides `dotenv-filename`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_path_without_filename_is_ok() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.production\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
     .run();
   }
 
@@ -2528,7 +1921,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `dragonfly` is duplicated"))
+    .error(
+      "Recipe attribute `dragonfly` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -2542,7 +1938,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `freebsd` is duplicated"))
+    .error(
+      "Recipe attribute `freebsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -2556,284 +1955,383 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error(Message::Text("Recipe attribute `netbsd` is duplicated"))
+    .error(
+      "Recipe attribute `netbsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
   #[test]
-  fn circular_dependencies_self() {
+  fn duplicate_recipe_names() {
     Test::new(indoc! {
       "
-      foo: foo
-        echo \"foo\"
+      foo:
+        echo foo
+
+      foo:
+        echo foo
+
+      foo:
+        echo foo
       "
     })
-    .error(Message::Text("Recipe `foo` depends on itself"))
+    .error("Duplicate recipe name `foo`", lsp::Range::at(3, 0, 6, 0))
+    .error("Duplicate recipe name `foo`", lsp::Range::at(6, 0, 8, 0))
     .run();
   }
 
   #[test]
-  fn circular_dependencies_simple() {
+  fn duplicate_recipe_names_allowed_via_setting() {
     Test::new(indoc! {
       "
-      foo: bar
-        echo \"foo\"
+      set allow-duplicate-recipes := true
 
-      bar: foo
-        echo \"bar\"
+      foo:
+        echo foo
+
+      [linux]
+      foo:
+        echo foo on linux
       "
     })
-    .error(Message::Text(
-      "Recipe `foo` has circular dependency `foo -> bar -> foo`",
-    ))
-    .error(Message::Text(
-      "Recipe `bar` has circular dependency `bar -> foo -> bar`",
-    ))
     .run();
   }
 
   #[test]
-  fn circular_dependencies_long_chain() {
+  fn duplicate_recipes_with_same_os_attribute() {
     Test::new(indoc! {
       "
-      foo: bar
-        echo \"foo\"
+      [linux]
+      build:
+        echo \"Building on Linux version 1\"
 
-      bar: baz
-        echo \"bar\"
-
-      baz: foo
-        echo \"baz\"
+      [linux]
+      build:
+        echo \"Building on Linux version 2\"
       "
     })
-    .error(Message::Text(
-      "Recipe `foo` has circular dependency `foo -> bar -> baz -> foo`",
-    ))
-    .error(Message::Text(
-      "Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`",
-    ))
-    .error(Message::Text(
-      "Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`",
-    ))
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
     .run();
   }
 
   #[test]
-  fn circular_dependencies_only_flags_cycle_members() {
+  fn duplicate_unexports_are_rejected() {
     Test::new(indoc! {
       "
-      foo: bar
-        echo \"foo\"
-
-      bar: baz
-        echo \"bar\"
-
-      baz: bar
-        echo \"baz\"
+      unexport FOO
+      unexport FOO
       "
     })
-    .error(Message::Text(
-      "Recipe `bar` has circular dependency `bar -> baz -> bar`",
-    ))
-    .error(Message::Text(
-      "Recipe `baz` has circular dependency `baz -> bar -> baz`",
-    ))
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(1, 9, 1, 12),
+    )
     .run();
   }
 
   #[test]
-  fn circular_dependencies_with_multiple_dependencies() {
+  fn duplicate_unexports_only_conflict_on_overlapping_platforms() {
     Test::new(indoc! {
       "
-      foo: bar baz
-        echo \"foo\"
+      [linux]
+      unexport FOO
+      [windows]
+      unexport FOO
+      [windows]
+      unexport FOO
+      "
+    })
+    .error(
+      "Variable `FOO` is unexported multiple times",
+      lsp::Range::at(5, 9, 5, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments() {
+    Test::new(indoc! {
+      "
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
+    .error("Duplicate variable `foo`", lsp::Range::at(1, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_allowed_via_setting() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-variables := true
+
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_platform_specific() {
+    Test::new(indoc! {
+      "
+      [unix]
+      foo := \"foo\"
+
+      [windows]
+      foo := \"bar\"
 
       bar:
-        echo \"bar\"
-
-      baz: qux
-        echo \"baz\"
-
-      qux: foo
-        echo \"qux\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `foo` has circular dependency `foo -> baz -> qux -> foo`",
-    ))
-    .error(Message::Text(
-      "Recipe `baz` has circular dependency `baz -> qux -> foo -> baz`",
-    ))
-    .error(Message::Text(
-      "Recipe `qux` has circular dependency `qux -> foo -> baz -> qux`",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_valid() {
-    Test::new(indoc! {
-      "
-      [arg('foo', help=\"Help text\")]
-      bar foo:
-        echo {{foo}}
+        echo {{ foo }}
       "
     })
     .run();
   }
 
   #[test]
-  fn arg_attribute_with_long_option() {
+  fn env_attribute_duplicate_var_name_allowed() {
     Test::new(indoc! {
       "
-      [arg('foo', long=\"foo-opt\")]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_with_short_option() {
-    Test::new(indoc! {
-      "
-      [arg('foo', short=\"f\")]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_with_pattern() {
-    Test::new(indoc! {
-      "
-      [arg('version', pattern=\"[0-9]+\\\\.[0-9]+\\\\.[0-9]+\")]
-      release version:
-        echo {{version}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_with_multiple_options() {
-    Test::new(indoc! {
-      "
-      [arg('foo', long=\"foo-opt\", short=\"f\", value=\"default\")]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_missing_parameter_name() {
-    Test::new(indoc! {
-      "
-      [arg]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .error(Message::Text(
-      "Attribute `arg` got 0 arguments but takes at least 1 argument",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn arg_attribute_empty_parens() {
-    Test::new(indoc! {
-      "
-      [arg()]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .error(Message::Text(
-      "Attribute `arg` got 0 arguments but takes at least 1 argument",
-    ))
-    .error(Message::Text("Missing identifier in attribute named param"))
-    .run();
-  }
-
-  #[test]
-  fn circular_dependencies_multiple_cycles() {
-    Test::new(indoc! {
-      "
-      a: b
-        echo \"a\"
-
-      b: a
-        echo \"b\"
-
-      x: y
-        echo \"x\"
-
-      y: z
-        echo \"y\"
-
-      z: x
-        echo \"z\"
-      "
-    })
-    .error(Message::Text(
-      "Recipe `a` has circular dependency `a -> b -> a`",
-    ))
-    .error(Message::Text(
-      "Recipe `b` has circular dependency `b -> a -> b`",
-    ))
-    .error(Message::Text(
-      "Recipe `x` has circular dependency `x -> y -> z -> x`",
-    ))
-    .error(Message::Text(
-      "Recipe `y` has circular dependency `y -> z -> x -> y`",
-    ))
-    .error(Message::Text(
-      "Recipe `z` has circular dependency `z -> x -> y -> z`",
-    ))
-    .run();
-  }
-
-  #[test]
-  fn format_strings_with_valid_variables() {
-    Test::new(indoc! {
-      r#"
-      name := "world"
-      greeting := f'Hello, {{name}}!'
+      [env('FOO', 'bar')]
+      [env('FOO', 'baz')]
       foo:
-        echo {{greeting}}
-      "#
+        echo \"$FOO\"
+      "
     })
     .run();
   }
 
   #[test]
-  fn format_strings_with_undefined_variables() {
+  fn env_attribute_missing_value() {
     Test::new(indoc! {
-      r"
-      greeting := f'Hello, {{undefined_var}}!'
+      "
+      [env('FOO')]
       foo:
-        echo {{greeting}}
+        echo \"$FOO\"
       "
     })
-    .error(Message::Text("Variable `undefined_var` not found"))
+    .error(
+      "Attribute `env` got 1 argument but takes 2 arguments",
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
   #[test]
-  fn format_strings_with_function_calls() {
+  fn env_attribute_multiple_vars_allowed() {
     Test::new(indoc! {
-      r"
-      info := f'arch: {{arch()}}'
+      "
+      [env('FOO', 'bar')]
+      [env('BAZ', 'qux')]
       foo:
-        echo {{info}}
+        echo \"$FOO $BAZ\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_shorthand_reports_argument_count() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+
+      [env: foo]
+      recipe:
+        echo foo
+      "
+    })
+    .error(
+      "Attribute `env` got 1 argument but takes 2 arguments",
+      lsp::Range::at(2, 0, 3, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_too_many_arguments() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar', 'extra')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .error(
+      "Attribute `env` got 3 arguments but takes 2 arguments",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_valid() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_wrong_target() {
+    Test::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      alias baz := foo
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Attribute `env` cannot be applied to alias target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn escaped_braces_are_treated_as_literal_text() {
+    Test::new(indoc! {
+      "
+      test:
+        echo \"{{{{hello}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_conflict_is_rejected() {
+    Test::new(indoc! {
+      "
+      unexport FOO
+      export FOO := \"bar\"
+      "
+    })
+    .error(
+      "Variable FOO is both exported and unexported",
+      lsp::Range::at(1, 7, 1, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_do_not_conflict_across_platforms() {
+    Test::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      export FOO := \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn exported_variables_not_warned() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      export bar := \"exported but unused\"
+      baz := \"used value\"
+
+      recipe:
+        echo {{ baz }}
+      "
+    })
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .run();
+  }
+
+  #[test]
+  fn exported_variadic_recipe_parameters_are_not_unused() {
+    Test::new(indoc! {
+      "
+      foo +$args:
+        echo foo
+
+      bar *$args:
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn expression_attribute_arguments() {
+    Test::new(indoc! {
+      "
+      bar := 'bar'
+
+      [confirm('foo' / bar)]
+      [env('FOO', bar)]
+      [working-directory('foo' / bar)]
+      foo:
+        echo \"foo\"
+
+      [confirm: 'foo' / bar]
+      [working-directory: 'foo' / bar]
+      baz:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_with_script_is_allowed() {
+    Test::new(indoc! {
+      "
+      [script]
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_with_shebang_is_allowed() {
+    Test::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_without_script_or_shebang() {
+    Test::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe `foo` uses `[extension]` without `[script]` or a shebang",
+      lsp::Range::at(0, 0, 1, 0),
+    )
     .run();
   }
 
@@ -2851,6 +2349,1475 @@ mod tests {
   }
 
   #[test]
+  fn format_strings_with_function_calls() {
+    Test::new(indoc! {
+      r#"
+      info := f'arch: {{arch()}}'
+      more := f'upper: {{uppercase("foo",)}}'
+      foo:
+        echo {{info}}
+        echo {{more}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn format_strings_with_undefined_variables() {
+    Test::new(indoc! {
+      r"
+      greeting := f'Hello, {{undefined_var}}!'
+      foo:
+        echo {{greeting}}
+      "
+    })
+    .error(
+      "Variable `undefined_var` not found",
+      lsp::Range::at(0, 23, 0, 36),
+    )
+    .run();
+  }
+
+  #[test]
+  fn format_strings_with_valid_variables() {
+    Test::new(indoc! {
+      r#"
+      name := "world"
+      greeting := f'Hello, {{name}}!'
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_correct() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+        echo {{ join(\"a\", \"b\", \"c\") }}
+        echo {{ uppercase(\"foo\",) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_accepts_optional_separator() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_rejects_extra_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',', ';') }}
+      "
+    })
+    .error(
+      "Function `join_list` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(3, 10, 3, 45),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_len() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo {{ len(['foo', 'bar']) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_nested() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_recipe_name_recognized() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ recipe_name() }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split() {
+    #[track_caller]
+    fn case(expression: &str) {
+      Test::new(&formatdoc! {
+        "
+        set lists
+
+        foo := {expression}
+
+        bar:
+          echo {{{{ foo }}}}
+        "
+      })
+      .run();
+    }
+
+    case("split(\"foo bar\")");
+    case("split(\"foo,bar\", \",\")");
+  }
+
+  #[test]
+  fn function_calls_split_rejects_missing_argument() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(2, 7, 2, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split_too_many_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := split(\"foo,bar\", \",\", \"bar\")
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(2, 7, 2, 35),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_style_accepts_optional_text() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ style('error') }}
+        echo {{ style('warning', 'careful') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_few_args() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ replace() }}
+      "
+    })
+    .error(
+      "Function `replace` requires at least 3 arguments, but 0 provided",
+      lsp::Range::at(1, 10, 1, 19),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_many_args() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ uppercase(\"hello\", \"extra\") }}
+      "
+    })
+    .error(
+      "Function `uppercase` accepts 1 argument, but 2 provided",
+      lsp::Range::at(1, 10, 1, 37),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_unknown() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ unknown_function() }}
+      "
+    })
+    .error(
+      "Unknown function `unknown_function`",
+      lsp::Range::at(1, 10, 1, 26),
+    )
+    .run();
+  }
+
+  #[test]
+  fn import_format_string_skipped() {
+    Test::new(indoc! {
+      r#"
+      import f"{'nonexistent.just'}"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn import_invalid_path() {
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\nonexistent.just`"
+    } else {
+      "Import path does not exist: `/nonexistent.just`"
+    };
+
+    Test::new(indoc! {
+      "
+      import 'nonexistent.just'
+      "
+    })
+    .error(expected, lsp::Range::at(0, 7, 0, 25))
+    .run();
+  }
+
+  #[test]
+  fn import_optional_invalid_path() {
+    Test::new(indoc! {
+      "
+      import? 'nonexistent.just'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn import_shell_expanded_string_skipped() {
+    Test::new(indoc! {
+      "
+      import x'nonexistent.just'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn linux_openbsd_no_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn linux_unix_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
+    .run();
+  }
+
+  #[test]
+  fn list_features_allow_shadowed_functions_without_lists() {
+    Test::new(indoc! {
+      "
+      bool(value) := value
+      join_list(value) := value
+      len(value) := value
+      num_jobs() := 'qux'
+      show(value) := value
+      split(value) := value
+      which(value) := value
+
+      foo := bool('foo')
+      bar := join_list('bar')
+      baz := len('baz')
+      qux := num_jobs()
+      quux := show('quux')
+      corge := split('corge')
+      grault := which('grault')
+
+      recipe:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+        echo {{ qux }}
+        echo {{ quux }}
+        echo {{ corge }}
+        echo {{ grault }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_features_bool_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := bool('true')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `bool()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_comparison_as_value_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' == 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "comparison operators require `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_if_without_else_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' == 'b' { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` without `else` requires `set lists`",
+      lsp::Range::at(0, 7, 0, 9),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_join_list_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := join_list('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `join_list()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_len_function_accepts_scalar_without_lists() {
+    Test::new(indoc! {
+      "
+      foo := len('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_concatenation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'a' ++ 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list concatenation operator `++` requires `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_list_literals_require_lists() {
+    Test::new(indoc! {
+      "
+      foo := ['bar']
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list literals require `set lists`",
+      lsp::Range::at(0, 7, 0, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_and_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := 'foo' && 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 13, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_logical_or_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := '' || 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 10, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_negation_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .error(
+      "negation operator requires `set lists`",
+      lsp::Range::at(1, 10, 1, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_assert_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar') }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(1, 17, 1, 22),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_non_comparison_if_condition_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := if 'a' { 'b' } else { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_num_jobs_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := num_jobs()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `num_jobs()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_show_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := show('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `show()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_split_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := split('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `split()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_which_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := which('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `which()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn mixed_os_specific_and_regular_recipe() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      build:
+        echo \"Building on any OS\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 6, 0))
+    .run();
+  }
+
+  #[test]
+  fn module_attributes_group() {
+    Test::new(indoc! {
+      "
+      [group: 'tools']
+      mod foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn openbsd_macos_no_conflict() {
+    Test::new(indoc! {
+      "
+      [openbsd]
+      build:
+        echo \"Building on OpenBSD\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn os_specific_duplicate_recipes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      build:
+        echo \"Building on Linux\"
+
+      [windows]
+      build:
+        echo \"Building on Windows\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `foo` has only one dependency, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parallel_without_dependencies_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "Recipe `foo` has no dependencies, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parameter_default_references_preceding_parameter() {
+    Test::new(indoc! {
+      "
+      @binstall crate bin=crate:
+        which {{bin}} 2>&1 >/dev/null || cargo binstall -y {{crate}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parenthesized_expression_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      foo := 'foo'
+      bar := 'bar'
+
+      recipe x=(foo + bar):
+        echo {{ x }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid() {
+    Test::new(indoc! {
+      "
+      foo
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Syntax error near `foo echo \"foo\"`",
+      lsp::Range::at(0, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_attribute_on_wrapped_assignment() {
+    Test::new(indoc! {
+      "
+      export [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `export`", lsp::Range::at(0, 0, 0, 6))
+    .run();
+
+    Test::new(indoc! {
+      "
+      eager [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `eager`", lsp::Range::at(0, 0, 0, 5))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_guard_prefixes() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?guard
+        @?quiet_guard
+        ?@guard_quiet
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_list_expressions() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo := ['foo'] ++ ['bar']
+      bar := 'foo' == 'foo'
+      baz := 'foo' =~ '^f'
+
+      qux:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
+    Test::new(indoc! {
+      r#"
+      foo bar="baz" qux="quux":
+        #!/usr/bin/env bash
+        cat <<'JSON'
+        {
+          "foo": "bar",
+          "{{ bar }}": "{{ qux }}"
+        }
+        JSON
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_shell_expanded_strings() {
+    Test::new(indoc! {
+      r#"
+      import x'~/.config/just/common.just'
+
+      greeting := x"~/$USER/${GREETING:-hello}"
+
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_scope_is_limited() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+
+      other data:
+        ./bin/graph $1
+      "
+    })
+    .warning(
+      "Parameter `data` appears unused",
+      lsp::Range::at(4, 6, 4, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_disabled_still_warns() {
+    Test::new(indoc! {
+      "
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .warning("Parameter `log` appears unused", lsp::Range::at(0, 6, 0, 9))
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_dollar_at_marks_all_as_used() {
+    Test::new(indoc! {
+      r#"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env bash
+        exec "$@"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_only_mark_used_indices() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second:
+        ./bin/graph $2
+      "
+    })
+    .warning(
+      "Parameter `first` appears unused",
+      lsp::Range::at(2, 6, 2, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_handles_multiple_parameters() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_handles_multiple_parameters_unused() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third fourth:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .warning(
+      "Parameter `fourth` appears unused",
+      lsp::Range::at(2, 25, 2, 31),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_marks_parameters_as_used() {
+    Test::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_shebang_marks_all_as_used() {
+    Test::new(indoc! {
+      r"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env -S deno run
+        console.log(Deno.args)
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_consistent_indentation() {
+    Test::new("foo:\n  echo \"foo\"\n  echo \"bar\"\n").run();
+  }
+
+  #[test]
+  fn recipe_dependencies_correct() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_subsequents_warns() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 16, 3, 19))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_warns() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 9, 3, 12))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_with_arguments_warns() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `a`)
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` with the same arguments more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 15, 3, 24))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg:
+        echo {{arg}}
+
+      bar *args: (foo args) *(foo *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_reject_multiple_starred_arguments() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg other:
+        echo {{arg}} {{other}}
+
+      foo *args: *(bar *args *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies may not include multiple starred arguments",
+      lsp::Range::at(5, 23, 5, 24),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_lists() {
+    Test::new(indoc! {
+      "
+      bar arg:
+        echo {{arg}}
+
+      foo *args: *(bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies require `set lists`",
+      lsp::Range::at(3, 11, 3, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_require_starred_argument() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo args: *(bar args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Mapped dependencies must include a starred argument",
+      lsp::Range::at(5, 10, 5, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_missing() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: baz
+        echo \"bar\"
+      "
+    })
+    .error("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_multiple_missing() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: missing1 missing2
+        echo \"bar\"
+      "
+    })
+    .error("Recipe `missing1` not found", lsp::Range::at(3, 5, 3, 13))
+    .error("Recipe `missing2` not found", lsp::Range::at(3, 14, 3, 22))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_prior_and_subsequent_not_duplicate() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      bar arg:
+        echo {{arg}}
+
+      foo *args: (bar *args)
+        echo {{args}}
+      "
+    })
+    .error(
+      "Starred dependency arguments require mapped dependencies",
+      lsp::Range::at(5, 16, 5, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_with_different_arguments_no_warning() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `b`)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_with_expressions() {
+    Test::new(indoc! {
+      "
+      recipe-a param:
+        echo {{param}}
+
+      recipe-b param: (recipe-a (\"##\" + param + \"##\"))
+        echo \"recipe-b called with {{param}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_with_multiple_expression_arguments() {
+    Test::new(indoc! {
+      "
+      recipe-a a b:
+        echo {{a}} {{b}}
+
+      recipe-b param: (recipe-a (\"1\") (\"2\"))
+        echo \"recipe-b called with {{param}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_between_lines() {
+    Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(2, 0, 2, 2))
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_argument_count_correct() {
+    Test::new(indoc! {
+      "
+      foo arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo `value1`)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_missing_args() {
+    Test::new(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` requires 2 arguments, but 0 provided",
+      lsp::Range::at(3, 5, 3, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_one_or_more_variadic_requires_argument() {
+    Test::new(indoc! {
+      "
+      foo +args:
+        echo \"{{args}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` requires 1 argument, but 0 provided",
+      lsp::Range::at(3, 5, 3, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_too_few_args() {
+    Test::new(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo `value1`)
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` requires 2 arguments, but 1 provided",
+      lsp::Range::at(3, 5, 3, 19),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_too_many_args() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `value1` `value2` `value3`)
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` accepts 1 argument, but 3 provided",
+      lsp::Range::at(3, 5, 3, 37),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_unknown_variable() {
+    Test::new(indoc! {
+      "
+      foo arg1:
+        echo {{ arg1 }}
+
+      bar: (foo wow)
+        echo \"bar\"
+      "
+    })
+    .error("Variable `wow` not found", lsp::Range::at(3, 10, 3, 13))
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_valid_variable() {
+    Test::new(indoc! {
+      "
+      wow := `foo`
+
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo wow)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_variadic_params() {
+    Test::new(indoc! {
+      "
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_variadic_params_reject_extra_arguments_with_lists() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo arg1 +args:
+        echo \"{{arg1}} {{args}}\"
+
+      bar: (foo 'value1' 'value2' 'value3')
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Dependency `foo` accepts 2 arguments, but 3 provided",
+      lsp::Range::at(5, 5, 5, 37),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_zero_or_more_variadic_accepts_no_arguments() {
+    Test::new(indoc! {
+      "
+      foo *args:
+        echo \"{{args}}\"
+
+      bar: (foo)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_line_continuations_allow_extra_indentation() {
+    Test::new(indoc! {
+      "
+      update-mdbook-theme:
+        curl \\
+          https://example.com/resource \\
+          > docs/theme/index.hbs
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_between_lines() {
+    Test::new(indoc! {
+      "
+      foo:
+      \techo \"foo\"
+        echo \"bar\"
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_single_line_mix() {
+    Test::new(indoc! {
+      "
+      foo:
+   \t  echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(1, 0, 1, 3),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_named_import() {
     Test::new(indoc! {
       r"
@@ -2860,6 +3827,128 @@ mod tests {
         body
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_defaults_all() {
+    Test::new(indoc! {
+      "
+      recipe_with_defaults arg1=\"first\" arg2=\"second\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_duplicate() {
+    Test::new(indoc! {
+      "
+      recipe_with_duplicate_param arg1 arg1:
+        echo \"{{arg1}}\"
+      "
+    })
+    .error("Duplicate parameter `arg1`", lsp::Range::at(0, 33, 0, 37))
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_order() {
+    Test::new(indoc! {
+      "
+      recipe_with_param_order arg1=\"default\" arg2:
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .error(
+      "Required parameter `arg2` follows a parameter with a default value",
+      lsp::Range::at(0, 39, 0, 43),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_valid() {
+    Test::new(indoc! {
+      "
+      valid_recipe arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_variadic() {
+    Test::new(indoc! {
+      "
+      recipe_with_variadic arg1=\"default\" +args:
+        echo \"{{arg1}} {{args}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_with_all_os_attributes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      [windows]
+      [unix]
+      [macos]
+      [dragonfly]
+      [freebsd]
+      [netbsd]
+      [openbsd]
+      build:
+        echo \"Building everywhere\"
+
+      test:
+        echo \"Testing\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_with_conflicting_multiple_os_attributes() {
+    Test::new(indoc! {
+      "
+      [linux]
+      [openbsd]
+      build:
+        echo \"Building on Linux and OpenBSD\"
+
+      [linux]
+      build:
+        echo \"Building on Linux again\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(5, 0, 8, 0))
+    .run();
+  }
+
+  #[test]
+  fn recipe_with_multiple_os_attributes() {
+    Test::new(indoc! {
+      "
+      [windows]
+      [linux]
+      build:
+        echo \"Building on Linux or Windows\"
+
+      [linux]
+      build:
+        echo \"Building on macOS\"
+
+      [macos]
+      build:
+        echo \"Building on macOS\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(5, 0, 9, 0))
     .run();
   }
 
@@ -2902,7 +3991,7 @@ mod tests {
       "
     })
     .config(config)
-    .error(Message::Text("Variable `foo` appears unused"))
+    .error("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
     .run();
   }
 
@@ -2925,60 +4014,795 @@ mod tests {
       "
     })
     .config(config)
-    .warning(Message::Text("Recipe `baz` not found"))
+    .warning("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
     .run();
   }
 
   #[test]
-  fn user_defined_function_not_flagged_as_unknown() {
+  fn script_attribute_with_shebang_is_allowed() {
     Test::new(indoc! {
       "
-      foo(x) := x + \"!\"
-
-      bar:
-        echo {{ foo(\"baz\") }}
+      [script]
+      publish:
+        #!/usr/bin/env bash
+        echo \"publish\"
       "
     })
     .run();
   }
 
   #[test]
-  fn user_defined_function_wrong_arity() {
+  fn script_attribute_without_shebang_is_allowed() {
     Test::new(indoc! {
       "
-      foo(x) := x + \"!\"
-
-      bar:
-        echo {{ foo(\"a\", \"b\") }}
+      [script]
+      publish:
+        echo \"publish\"
       "
     })
-    .error(Message::Text(
-      "Function `foo` accepts 1 argument, but 2 provided",
-    ))
     .run();
   }
 
   #[test]
-  fn user_defined_function_too_few_args() {
+  fn set_export_suppresses_unused_variable_warnings() {
     Test::new(indoc! {
       "
-      foo(a, b) := a + b
+      set export
 
-      bar:
-        echo {{ foo(\"a\") }}
+      foo := 'bar'
+      baz := 'qux'
+
+      recipe:
+        echo $foo
       "
     })
-    .error(Message::Text(
-      "Function `foo` accepts 2 arguments, but 1 provided",
-    ))
     .run();
   }
 
   #[test]
-  fn user_defined_function_parameters_not_unresolved() {
+  fn settings_array_type_error() {
     Test::new(indoc! {
       "
-      foo(x) := x + \"!\"
+      set windows-shell := \"bash\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `windows-shell` expects an array value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(0, 4, 0, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_array_type_error_with_nested_list() {
+    Test::new(indoc! {
+      "
+      set lists
+      set shell := show(['foo'])
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `shell` expects an array value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_boolean_shorthand() {
+    Test::new(indoc! {
+      "
+      set export
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_boolean_type_correct() {
+    Test::new(indoc! {
+      "
+      set export := true
+      set dotenv-load := false
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_boolean_type_error() {
+    Test::new(indoc! {
+      "
+      set export := 'foo'
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `export` expects a boolean value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_boolean_type_error_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'true'
+      set export := env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `export` expects a boolean value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_default_list_recognized() {
+    Test::new(indoc! {
+      "
+      set default-list
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_default_script_recognized() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_disjoint_directory_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_dotenv_command_duplicate() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := \"foo\"
+      set dotenv-command := \"bar\"
+      "
+    })
+    .error(
+      "Duplicate setting `dotenv-command`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_dotenv_command_string_type_correct() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := \"sops -d .enc.env\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_dotenv_lists_require_lists() {
+    #[track_caller]
+    fn case(setting: &str, range: lsp::Range) {
+      Test::new(&formatdoc! {
+        r#"
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .error("list literals require `set lists`", range)
+      .run();
+    }
+
+    case("dotenv-filename", lsp::Range::at(0, 23, 0, 37));
+    case("dotenv-path", lsp::Range::at(0, 19, 0, 33));
+    case("dotenv-command", lsp::Range::at(0, 22, 0, 36));
+  }
+
+  #[test]
+  fn settings_dotenv_lists_type_correct() {
+    #[track_caller]
+    fn case(setting: &str) {
+      Test::new(&formatdoc! {
+        r#"
+        set lists
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .run();
+    }
+
+    case("dotenv-filename");
+    case("dotenv-path");
+    case("dotenv-command");
+  }
+
+  #[test]
+  fn settings_duplicate() {
+    Test::new(indoc! {
+      "
+      set export := true
+      set shell := [\"bash\", \"-c\"]
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error("Duplicate setting `export`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_false_no_cd_allows_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd := false
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_guards_recognized() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_indentation_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set indentation := {value}\n");
+
+      let test = Test::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `indentation` must be a non-empty whitespace string literal",
+          lsp::Range::at(0, 19, 0, 19 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""  ""#, true);
+    case(r#""\t""#, true);
+    case(r#""\n""#, true);
+    case(r#""\u{2003}""#, true);
+    case("'  '", true);
+    case(r#""""#, false);
+    case(r#""foo""#, false);
+    case(r#"" " + " ""#, false);
+  }
+
+  #[test]
+  fn settings_lazy_recognized() {
+    Test::new(indoc! {
+      "
+      set lazy
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_lists_recognized() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_minimum_version_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set minimum-version := {value}\n");
+
+      let test = Test::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `minimum-version` must be a valid `MAJOR.MINOR.PATCH` version",
+          lsp::Range::at(0, 23, 0, 23 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""0.0.0""#, true);
+    case(r#""1.55.0""#, true);
+    case(r#""999999999.0.0""#, true);
+    case("'1.2.3'", true);
+    case(r#""""#, false);
+    case(r#""01.2.3""#, false);
+    case(r#""1.2""#, false);
+    case(r#""1.2.3.4""#, false);
+    case(r#""1000000000.0.0""#, false);
+    case(r#""1.2.3-pre""#, false);
+    case(r#""1.2.3+build""#, false);
+    case(r#""1" + ".2.3""#, false);
+  }
+
+  #[test]
+  fn settings_multiple_errors() {
+    Test::new(indoc! {
+      "
+      set unknown-setting := true
+      set export := false
+      set shell := ['bash']
+      set export := false
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error("Duplicate setting `export`", lsp::Range::at(3, 0, 4, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_no_cd_conflicts_with_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_shell_array_accepts_shell_expanded_strings() {
+    Test::new(indoc! {
+      r#"
+      set shell := [x"${SHELL_BIN:-bash}", x"-c"]
+
+      foo:
+        echo "foo"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_string_type_correct() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := \".env.development\"
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_string_type_correct_with_expression() {
+    Test::new(indoc! {
+      "
+      env := 'development'
+      set dotenv-path := '.env.' + env
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_string_type_correct_with_shell_expanded_string() {
+    Test::new(indoc! {
+      r#"
+      set dotenv-path := x"~/.env.${JUST_ENV:-development}"
+
+      foo:
+        echo "foo"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_string_type_error() {
+    Test::new(indoc! {
+      "
+      set dotenv-path := true
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `dotenv-path` expects a string or array value",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_unknown() {
+    Test::new(indoc! {
+      "
+      set unknown-setting := true
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_unknown_with_expression() {
+    Test::new(indoc! {
+      "
+      value := 'bar'
+      set unknown-setting := value
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown setting `unknown-setting`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_array_correct() {
+    Test::new(indoc! {
+      "
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(0, 4, 0, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_replacement() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      "
+    })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(4, 4, 4, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_with_platform_attributes() {
+    Test::new(indoc! {
+      "
+      [unix]
+      set shell := ['sh', '-cu']
+
+      [windows]
+      set shell := ['cmd', '/c']
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn settings_working_directory_conflict_deduplicates_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set no-cd
+
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn shadowed_parameter_default_uses_global_variable() {
+    Test::new(indoc! {
+      "
+      a := 'default a'
+
+      b a=a:
+        echo {{ a }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn shebang_recipe_is_exempt_from_inconsistent_indentation() {
+    Test::new(indoc! {
+      "
+      build-docs:
+        #!/usr/bin/env bash
+        mdbook build docs -d build
+        for language in ar de; do
+          echo $language
+        done
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn should_recognize_recipe_parameters_in_dependency_arguments() {
+    Test::new(indoc! {
+      "
+      other-recipe var=\"else\":
+        echo {{ var }}
+
+      test var=\"something\": (other-recipe var)
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn timestamp_attribute_accepts_optional_expression() {
+    Test::new(indoc! {
+      "
+      format := '%H:%M:%S'
+
+      [timestamp]
+      foo:
+        echo foo
+
+      [timestamp(format)]
+      bar:
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn underscore_suppresses_unused_variable_warnings() {
+    Test::new(indoc! {
+      "
+      _ := 'foo'
+      _bar := 'baz'
+
+      recipe:
+        echo 'Hello!'
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unexported_names_are_not_variables() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      unexport BAR
+      baz := \"used value\"
+
+      recipe:
+        echo {{ baz }}
+      "
+    })
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .run();
+  }
+
+  #[test]
+  fn unix_dragonfly_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [dragonfly]
+      build:
+        echo \"Building on DragonFly BSD\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
+    .run();
+  }
+
+  #[test]
+  fn unix_freebsd_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [freebsd]
+      build:
+        echo \"Building on FreeBSD\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
+    .run();
+  }
+
+  #[test]
+  fn unix_macos_conflicts() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [macos]
+      build:
+        echo \"Building on macOS specifically\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
+    .run();
+  }
+
+  #[test]
+  fn unix_netbsd_conflict() {
+    Test::new(indoc! {
+      "
+      [unix]
+      build:
+        echo \"Building on Unix systems\"
+
+      [netbsd]
+      build:
+        echo \"Building on NetBSD\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 7, 0))
+    .run();
+  }
+
+  #[test]
+  fn unknown_default_recipe_parameter_reference() {
+    Test::new(indoc! {
+      "
+      recipe arg=foo:
+        echo {{ arg }}
+      "
+    })
+    .error("Variable `foo` not found", lsp::Range::at(0, 11, 0, 14))
+    .run();
+  }
+
+  #[test]
+  fn unreferenced_variable_in_expression() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ var }}
+      "
+    })
+    .error("Variable `var` not found", lsp::Range::at(1, 10, 1, 13))
+    .run();
+  }
+
+  #[test]
+  fn used_variables_no_warnings() {
+    Test::new(indoc! {
+      "
+      foo := \"used in recipe\"
+      bar := \"used as dependency arg\"
+
+      another arg:
+        echo {{ arg }}
+
+      recipe: (another bar)
+        echo {{ foo }}
       "
     })
     .run();
@@ -3003,7 +4827,46 @@ mod tests {
       foo(x) := x + unknown
       "
     })
-    .error(Message::Text("Variable `unknown` not found"))
+    .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicate_parameters() {
+    Test::new(indoc! {
+      "
+      foo(bar, bar) := bar
+      "
+    })
+    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicates() {
+    Test::new(indoc! {
+      "
+      foo() := \"bar\"
+      foo() := \"baz\"
+      foo() := \"bat\"
+      "
+    })
+    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicates_platform_specific() {
+    Test::new(indoc! {
+      "
+      [unix]
+      foo() := \"foo\"
+
+      [windows]
+      foo() := \"bar\"
+      "
+    })
     .run();
   }
 
@@ -3017,6 +4880,272 @@ mod tests {
         echo {{ foo() }}
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_not_flagged_as_unknown() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_parameters_not_unresolved() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_too_few_args() {
+    Test::new(indoc! {
+      "
+      foo(a, b) := a + b
+
+      bar:
+        echo {{ foo(\"a\") }}
+      "
+    })
+    .error(
+      "Function `foo` accepts 2 arguments, but 1 provided",
+      lsp::Range::at(3, 10, 3, 18),
+    )
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_wrong_arity() {
+    Test::new(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"a\", \"b\") }}
+      "
+    })
+    .error(
+      "Function `foo` accepts 1 argument, but 2 provided",
+      lsp::Range::at(3, 10, 3, 23),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_and_parameters_same_name() {
+    Test::new(indoc! {
+      "
+      param := \"variable value\"
+      other := \"other value\"
+
+      recipe param:
+        # This should reference the parameter, not the variable
+        echo {{ param }}
+        echo {{ other }}
+      "
+    })
+    .warning(
+      "Variable `param` appears unused",
+      lsp::Range::at(0, 0, 0, 5),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_after_hash_in_command() {
+    Test::new(indoc! {
+      "
+      flake := \"testflake\"
+      output := \"testoutput\"
+
+      test:
+        darwin-rebuild switch --flake {{ flake }}#{{ output }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_dependency_args() {
+    Test::new(indoc! {
+      "
+      used_arg := \"value\"
+      unused_var := \"not used\"
+
+      recipe: (another used_arg)
+        echo \"something\"
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning(
+      "Variable `unused_var` appears unused",
+      lsp::Range::at(1, 0, 1, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_multiple_recipes() {
+    Test::new(indoc! {
+      "
+      shared := \"shared value\"
+      only_in_first := \"first value\"
+      only_in_second := \"second value\"
+      never_used := \"unused\"
+
+      first:
+        echo {{ shared }}
+        echo {{ only_in_first }}
+
+      second:
+        echo {{ shared }}
+        echo {{ only_in_second }}
+      "
+    })
+    .warning(
+      "Variable `never_used` appears unused",
+      lsp::Range::at(3, 0, 3, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_recipe_default_parameters() {
+    Test::new(indoc! {
+      "
+      param_value := \"value\"
+
+      recipe arg=param_value:
+        echo {{ arg }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_recipe_dependencies() {
+    Test::new(indoc! {
+      "
+      param_value := \"value\"
+      unused := \"unused\"
+
+      recipe arg=\"default\": (another param_value)
+        echo {{ arg }}
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning(
+      "Variable `unused` appears unused",
+      lsp::Range::at(1, 0, 1, 6),
+    )
+    .run();
+  }
+
+  #[test]
+  fn variables_used_in_starred_dependency_args() {
+    Test::new(indoc! {
+      "
+      set lists
+
+      used := \"value\"
+      unused := \"not used\"
+
+      recipe: *(another *used)
+        echo \"foo\"
+
+      another arg:
+        echo {{ arg }}
+      "
+    })
+    .warning(
+      "Variable `unused` appears unused",
+      lsp::Range::at(3, 0, 3, 6),
+    )
+    .run();
+  }
+
+  #[test]
+  fn warn_for_unused_non_exported_recipe_parameters() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(0, 4, 0, 7))
+    .run();
+
+    Test::new(indoc! {
+      "
+      foo $bar:
+        echo foo
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      set export := false
+
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .run();
+
+    Test::new(indoc! {
+      "
+      set export
+
+      foo bar:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn warn_for_unused_variables() {
+    Test::new(indoc! {
+      "
+      foo := \"unused value\"
+      bar := \"used value\"
+
+      recipe:
+        echo {{ bar }}
+      "
+    })
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .run();
+  }
+
+  #[test]
+  fn windows_recipe_conflicts_with_default() {
+    Test::new(indoc! {
+      "
+      [windows]
+      build:
+        echo \"Building on Windows\"
+
+      build:
+        echo \"Building on every OS\"
+      "
+    })
+    .error("Duplicate recipe name `build`", lsp::Range::at(4, 0, 6, 0))
     .run();
   }
 }

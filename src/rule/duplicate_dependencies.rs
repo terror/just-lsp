@@ -1,9 +1,17 @@
 use super::*;
 
 #[derive(Hash, Eq, PartialEq)]
+struct DependencyArgumentKey {
+  starred: bool,
+  value: String,
+}
+
+#[derive(Hash, Eq, PartialEq)]
 struct DependencyKey {
-  arguments: Vec<String>,
+  arguments: Vec<DependencyArgumentKey>,
+  mapped: bool,
   name: String,
+  phase: DependencyPhase,
 }
 
 define_rule! {
@@ -21,10 +29,15 @@ define_rule! {
         for dependency in &recipe.dependencies {
           let key = DependencyKey {
             name: dependency.name.clone(),
+            mapped: dependency.mapped.is_some(),
+            phase: dependency.phase,
             arguments: dependency
               .arguments
               .iter()
-              .map(|argument| argument.value.clone())
+              .map(|argument| DependencyArgumentKey {
+                starred: argument.starred.is_some(),
+                value: argument.value.clone(),
+              })
               .collect(),
           };
 

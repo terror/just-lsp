@@ -3,6 +3,8 @@ use super::*;
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct Config {
   #[serde(default)]
+  pub formatting: FormattingConfig,
+  #[serde(default)]
   pub rules: HashMap<String, RuleConfig>,
 }
 
@@ -11,6 +13,11 @@ impl Config {
   pub fn rule_config(&self, id: &str) -> RuleConfig {
     self.rules.get(id).cloned().unwrap_or_default()
   }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct FormattingConfig {
+  pub indentation: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -78,6 +85,57 @@ mod tests {
   use {super::*, serde_json::json};
 
   #[test]
+  fn info_alias_parses() {
+    let config: Config = serde_json::from_value(json!({
+      "rules": {
+        "foo": "info"
+      }
+    }))
+    .unwrap();
+
+    assert_eq!(
+      config.rule_config("foo").level(),
+      Some(RuleLevel::Information)
+    );
+  }
+
+  #[test]
+  fn missing_rule_config_returns_default() {
+    let config = Config::default();
+
+    assert_eq!(config.rule_config("foo").level(), None);
+  }
+
+  #[test]
+  fn missing_rule_config_uses_default_severity() {
+    let config = Config::default();
+
+    assert_eq!(
+      config
+        .rule_config("foo")
+        .severity(lsp::DiagnosticSeverity::ERROR),
+      Some(lsp::DiagnosticSeverity::ERROR)
+    );
+  }
+
+  #[test]
+  fn off_level_produces_none_severity() {
+    let config: Config = serde_json::from_value(json!({
+      "rules": {
+        "foo": "off"
+      }
+    }))
+    .unwrap();
+
+    assert_eq!(
+      config
+        .rule_config("foo")
+        .severity(lsp::DiagnosticSeverity::ERROR),
+      None
+    );
+  }
+
+  #[test]
   fn parses_rule_config_from_string() {
     let config: Config = serde_json::from_value(json!({
       "rules": {
@@ -102,30 +160,6 @@ mod tests {
   }
 
   #[test]
-  fn missing_rule_config_returns_default() {
-    let config = Config::default();
-
-    assert_eq!(config.rule_config("foo").level(), None);
-  }
-
-  #[test]
-  fn off_level_produces_none_severity() {
-    let config: Config = serde_json::from_value(json!({
-      "rules": {
-        "foo": "off"
-      }
-    }))
-    .unwrap();
-
-    assert_eq!(
-      config
-        .rule_config("foo")
-        .severity(lsp::DiagnosticSeverity::ERROR),
-      None
-    );
-  }
-
-  #[test]
   fn rule_config_overrides_default_severity() {
     let config: Config = serde_json::from_value(json!({
       "rules": {
@@ -139,33 +173,6 @@ mod tests {
         .rule_config("foo")
         .severity(lsp::DiagnosticSeverity::ERROR),
       Some(lsp::DiagnosticSeverity::WARNING)
-    );
-  }
-
-  #[test]
-  fn missing_rule_config_uses_default_severity() {
-    let config = Config::default();
-
-    assert_eq!(
-      config
-        .rule_config("foo")
-        .severity(lsp::DiagnosticSeverity::ERROR),
-      Some(lsp::DiagnosticSeverity::ERROR)
-    );
-  }
-
-  #[test]
-  fn info_alias_parses() {
-    let config: Config = serde_json::from_value(json!({
-      "rules": {
-        "foo": "info"
-      }
-    }))
-    .unwrap();
-
-    assert_eq!(
-      config.rule_config("foo").level(),
-      Some(RuleLevel::Information)
     );
   }
 }

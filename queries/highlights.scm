@@ -5,6 +5,7 @@
 [
   "eager"
   "export"
+  "unexport"
   "import"
 ] @keyword.import
 
@@ -13,7 +14,6 @@
 [
   "alias"
   "set"
-  "shell"
 ] @keyword
 
 [
@@ -67,15 +67,29 @@
 [
   ":="
   "?"
+  "@-?"
+  "@?-"
+  "-@?"
+  "-?@"
+  "?@-"
+  "?-@"
+  "@?"
+  "-?"
+  "?@"
+  "?-"
   "=="
   "!="
   "=~"
+  "!"
+  "!~"
   "@"
   "="
   "$"
   "*"
   "+"
+  "++"
   "&&"
+  "||"
   "@-"
   "-@"
   "-"
@@ -124,17 +138,30 @@
   (#any-of? @keyword
     "allow-duplicate-recipes"
     "allow-duplicate-variables"
+    "default-list"
+    "default-script"
+    "dotenv-command"
     "dotenv-filename"
     "dotenv-load"
+    "dotenv-override"
     "dotenv-path"
     "dotenv-required"
     "export"
     "fallback"
+    "guards"
     "ignore-comments"
+    "indentation"
+    "lazy"
+    "lists"
+    "minimum-version"
+    "no-cd"
+    "no-exit-message"
     "positional-arguments"
+    "quiet"
+    "script-interpreter"
     "shell"
-    "shell-interpreter"
     "tempdir"
+    "unstable"
     "windows-powershell"
     "windows-shell"
     "working-directory"))
@@ -143,20 +170,35 @@
 (attribute
   (identifier) @attribute
   (#any-of? @attribute
+    "android"
+    "arg"
+    "cache"
     "confirm"
+    "continue"
+    "default"
     "doc"
+    "dragonfly"
+    "env"
+    "exit-message"
     "extension"
+    "freebsd"
     "group"
     "linux"
     "macos"
+    "metadata"
+    "netbsd"
     "no-cd"
     "no-exit-message"
     "no-quiet"
+    "openbsd"
+    "parallel"
     "positional-arguments"
     "private"
     "script"
+    "shell"
     "unix"
-    "windows"))
+    "windows"
+    "working-directory"))
 
 ; Numbers are part of the syntax tree, even if disallowed
 (numeric_error) @error

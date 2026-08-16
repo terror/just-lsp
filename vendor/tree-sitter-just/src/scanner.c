@@ -231,7 +231,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
   if (valid_symbols[TEXT]) {
     if (lexer->get_column(lexer) == scanner->prev_indent &&
         (lexer->lookahead == '\n' || lexer->lookahead == '@' ||
-         lexer->lookahead == '-')) {
+         lexer->lookahead == '-' || lexer->lookahead == '?')) {
       return false;
     }
 
@@ -284,7 +284,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
             lexer->lookahead == '\n') { // EOF without anything after {
           lexer->mark_end(lexer);
           lexer->result_symbol = TEXT;
-          return advanced_once;
+          return true;
         }
 
         if (lexer->lookahead == '{') {

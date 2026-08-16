@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@/lib/types';
+import type { SyntaxNode } from '@/lib/syntax-node';
 import { Text } from '@codemirror/state';
 import { useMemo } from 'react';
 

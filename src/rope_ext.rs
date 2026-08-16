@@ -169,24 +169,24 @@ mod tests {
   }
 
   #[test]
-  fn apply_insert_into_empty_document() {
-    let mut rope = Rope::from_str("");
+  fn append_beyond_eof_updates_point() {
+    let mut rope = Rope::from_str("hi");
 
-    let change = change("🧪\nnew", lsp::Range::at(0, 0, 0, 0));
+    let change = change("🧪\nnew", lsp::Range::at(0, 2, 0, 2));
 
     let edit = rope.build_edit(&change);
 
     assert_eq!(
       edit,
       Edit {
-        start_char: 0,
-        end_char: 0,
+        start_char: 2,
+        end_char: 2,
         input_edit: InputEdit {
-          start_byte: 0,
-          old_end_byte: 0,
-          new_end_byte: "🧪\nnew".len(),
-          start_position: Point::new(0, 0),
-          old_end_position: Point::new(0, 0),
+          start_byte: 2,
+          old_end_byte: 2,
+          new_end_byte: 10,
+          start_position: Point::new(0, 2),
+          old_end_position: Point::new(0, 2),
           new_end_position: Point::new(1, 3),
         },
         text: "🧪\nnew",
@@ -195,37 +195,37 @@ mod tests {
 
     rope.apply_edit(&edit);
 
-    assert_eq!(rope.to_string(), "🧪\nnew");
+    assert_eq!(rope.to_string(), "hi🧪\nnew");
   }
 
   #[test]
-  fn apply_insert_edit_updates_rope_contents() {
-    let mut rope = Rope::from_str("hello world");
+  fn apply_delete_edit_respects_utf16_columns() {
+    let mut rope = Rope::from_str("a😊b");
 
-    let change = change("rope", lsp::Range::at(0, 6, 0, 11));
+    let change = change("", lsp::Range::at(0, 1, 0, 3));
 
     let edit = rope.build_edit(&change);
 
     assert_eq!(
       edit,
       Edit {
-        start_char: 6,
-        end_char: 11,
+        start_char: 1,
+        end_char: 2,
         input_edit: InputEdit {
-          new_end_byte: 10,
-          new_end_position: Point::new(0, 10),
-          old_end_byte: 11,
-          old_end_position: Point::new(0, 11),
-          start_byte: 6,
-          start_position: Point::new(0, 6),
+          new_end_byte: 1,
+          new_end_position: Point::new(0, 1),
+          old_end_byte: 5,
+          old_end_position: Point::new(0, 5),
+          start_byte: 1,
+          start_position: Point::new(0, 1),
         },
-        text: "rope",
+        text: "",
       }
     );
 
     rope.apply_edit(&edit);
 
-    assert_eq!(rope.to_string(), "hello rope");
+    assert_eq!(rope.to_string(), "ab");
   }
 
   #[test]
@@ -259,33 +259,63 @@ mod tests {
   }
 
   #[test]
-  fn apply_delete_edit_respects_utf16_columns() {
-    let mut rope = Rope::from_str("a😊b");
+  fn apply_insert_edit_updates_rope_contents() {
+    let mut rope = Rope::from_str("hello world");
 
-    let change = change("", lsp::Range::at(0, 1, 0, 3));
+    let change = change("rope", lsp::Range::at(0, 6, 0, 11));
 
     let edit = rope.build_edit(&change);
 
     assert_eq!(
       edit,
       Edit {
-        start_char: 1,
-        end_char: 2,
+        start_char: 6,
+        end_char: 11,
         input_edit: InputEdit {
-          new_end_byte: 1,
-          new_end_position: Point::new(0, 1),
-          old_end_byte: 5,
-          old_end_position: Point::new(0, 5),
-          start_byte: 1,
-          start_position: Point::new(0, 1),
+          new_end_byte: 10,
+          new_end_position: Point::new(0, 10),
+          old_end_byte: 11,
+          old_end_position: Point::new(0, 11),
+          start_byte: 6,
+          start_position: Point::new(0, 6),
         },
-        text: "",
+        text: "rope",
       }
     );
 
     rope.apply_edit(&edit);
 
-    assert_eq!(rope.to_string(), "ab");
+    assert_eq!(rope.to_string(), "hello rope");
+  }
+
+  #[test]
+  fn apply_insert_into_empty_document() {
+    let mut rope = Rope::from_str("");
+
+    let change = change("🧪\nnew", lsp::Range::at(0, 0, 0, 0));
+
+    let edit = rope.build_edit(&change);
+
+    assert_eq!(
+      edit,
+      Edit {
+        start_char: 0,
+        end_char: 0,
+        input_edit: InputEdit {
+          start_byte: 0,
+          old_end_byte: 0,
+          new_end_byte: "🧪\nnew".len(),
+          start_position: Point::new(0, 0),
+          old_end_position: Point::new(0, 0),
+          new_end_position: Point::new(1, 3),
+        },
+        text: "🧪\nnew",
+      }
+    );
+
+    rope.apply_edit(&edit);
+
+    assert_eq!(rope.to_string(), "🧪\nnew");
   }
 
   #[test]
@@ -325,36 +355,6 @@ mod tests {
   }
 
   #[test]
-  fn replacement_across_surrogates_is_consistent() {
-    let mut rope = Rope::from_str("foo😊bar");
-
-    let change = change("🧪", lsp::Range::at(0, 3, 0, 5));
-
-    let edit = rope.build_edit(&change);
-
-    assert_eq!(
-      edit,
-      Edit {
-        start_char: 3,
-        end_char: 4,
-        input_edit: InputEdit {
-          start_byte: 3,
-          old_end_byte: 7,
-          new_end_byte: 7,
-          start_position: Point::new(0, 3),
-          old_end_position: Point::new(0, 7),
-          new_end_position: Point::new(0, 7),
-        },
-        text: "🧪",
-      }
-    );
-
-    rope.apply_edit(&edit);
-
-    assert_eq!(rope.to_string(), "foo🧪bar");
-  }
-
-  #[test]
   fn multiline_edit_handles_utf16_offsets() {
     let mut rope = Rope::from_str("foo😊\nbar");
 
@@ -382,36 +382,6 @@ mod tests {
     rope.apply_edit(&edit);
 
     assert_eq!(rope.to_string(), "foXXar");
-  }
-
-  #[test]
-  fn append_beyond_eof_updates_point() {
-    let mut rope = Rope::from_str("hi");
-
-    let change = change("🧪\nnew", lsp::Range::at(0, 2, 0, 2));
-
-    let edit = rope.build_edit(&change);
-
-    assert_eq!(
-      edit,
-      Edit {
-        start_char: 2,
-        end_char: 2,
-        input_edit: InputEdit {
-          start_byte: 2,
-          old_end_byte: 2,
-          new_end_byte: 10,
-          start_position: Point::new(0, 2),
-          old_end_position: Point::new(0, 2),
-          new_end_position: Point::new(1, 3),
-        },
-        text: "🧪\nnew",
-      }
-    );
-
-    rope.apply_edit(&edit);
-
-    assert_eq!(rope.to_string(), "hi🧪\nnew");
   }
 
   #[test]
@@ -446,5 +416,35 @@ mod tests {
     rope.apply_edit(&edit);
 
     assert_eq!(rope.to_string(), "🧪baz");
+  }
+
+  #[test]
+  fn replacement_across_surrogates_is_consistent() {
+    let mut rope = Rope::from_str("foo😊bar");
+
+    let change = change("🧪", lsp::Range::at(0, 3, 0, 5));
+
+    let edit = rope.build_edit(&change);
+
+    assert_eq!(
+      edit,
+      Edit {
+        start_char: 3,
+        end_char: 4,
+        input_edit: InputEdit {
+          start_byte: 3,
+          old_end_byte: 7,
+          new_end_byte: 7,
+          start_position: Point::new(0, 3),
+          old_end_position: Point::new(0, 7),
+          new_end_position: Point::new(0, 7),
+        },
+        text: "🧪",
+      }
+    );
+
+    rope.apply_edit(&edit);
+
+    assert_eq!(rope.to_string(), "foo🧪bar");
   }
 }

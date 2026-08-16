@@ -14,19 +14,6 @@ pub struct Diagnostic {
   pub severity: lsp::DiagnosticSeverity,
 }
 
-impl From<Diagnostic> for lsp::Diagnostic {
-  fn from(value: Diagnostic) -> lsp::Diagnostic {
-    lsp::Diagnostic {
-      code: Some(lsp::NumberOrString::String(value.id)),
-      message: value.message,
-      range: value.range,
-      severity: Some(value.severity),
-      source: Some("just-lsp".to_string()),
-      ..Default::default()
-    }
-  }
-}
-
 impl Diagnostic {
   pub fn error(message: impl Into<String>, range: lsp::Range) -> Self {
     Self::new(message, range, lsp::DiagnosticSeverity::ERROR)
@@ -48,5 +35,18 @@ impl Diagnostic {
 
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
     Self::new(message, range, lsp::DiagnosticSeverity::WARNING)
+  }
+}
+
+impl From<Diagnostic> for lsp::Diagnostic {
+  fn from(value: Diagnostic) -> lsp::Diagnostic {
+    lsp::Diagnostic {
+      code: Some(lsp::NumberOrString::String(value.id)),
+      message: value.message,
+      range: value.range,
+      severity: Some(value.severity),
+      source: Some("just-lsp".to_string()),
+      ..Default::default()
+    }
   }
 }

@@ -3,6 +3,7 @@ use super::*;
 pub trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
+  fn get_function(&self, document: &Document) -> Option<Function>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn get_range(&self, document: &Document) -> lsp::Range;
   fn get_recipe(&self, document: &Document) -> Option<Recipe>;
@@ -152,6 +153,14 @@ impl NodeExt for Node<'_> {
     collect_nodes_by_kind(*self, selector)
   }
 
+  fn get_function(&self, document: &Document) -> Option<Function> {
+    let function_node = self.get_parent("function_definition")?;
+
+    document.find_function(
+      &document.get_node_text(&function_node.child_by_field_name("name")?),
+    )
+  }
+
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
     let mut current = *self;
 
@@ -234,87 +243,6 @@ mod tests {
   }
 
   #[test]
-  fn find_indexed_nodes() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz:
-        echo \"baz\"
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let selectors = ["recipe[0]", "recipe[1]", "recipe[2]"];
-
-    let recipe_texts = selectors
-      .iter()
-      .map(|selector| {
-        document
-          .get_node_text(&root.find(selector).unwrap())
-          .trim()
-          .to_string()
-      })
-      .collect::<Vec<_>>();
-
-    assert_eq!(
-      recipe_texts,
-      vec![
-        "foo:\n  echo \"foo\"".to_string(),
-        "bar:\n  echo \"bar\"".to_string(),
-        "baz:\n  echo \"baz\"".to_string()
-      ]
-    );
-
-    assert!(root.find("recipe[10]").is_none());
-  }
-
-  #[test]
-  fn find_direct_child() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar arg1 arg2:
-        echo \"bar\"
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let identifiers = root.find_all("recipe_header > identifier");
-
-    let identifier_texts = identifiers
-      .iter()
-      .map(|node| document.get_node_text(node))
-      .collect::<Vec<_>>();
-
-    assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
-
-    let second_recipe = root.find("recipe[1]").unwrap();
-
-    let recipe_header = second_recipe.find("recipe_header").unwrap();
-
-    let parameters = recipe_header.find_all("parameters > parameter");
-
-    let parameter_texts = parameters
-      .iter()
-      .map(|node| document.get_node_text(node))
-      .collect::<Vec<_>>();
-
-    assert_eq!(
-      parameter_texts,
-      vec!["arg1".to_string(), "arg2".to_string()]
-    );
-  }
-
-  #[test]
   fn find_descendant() {
     let document = Document::from(indoc! {
       "
@@ -371,6 +299,181 @@ mod tests {
   }
 
   #[test]
+  fn find_direct_child() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar arg1 arg2:
+        echo \"bar\"
+      "
+    });
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifiers = root.find_all("recipe_header > identifier");
+
+    let identifier_texts = identifiers
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
+
+    let second_recipe = root.find("recipe[1]").unwrap();
+
+    let recipe_header = second_recipe.find("recipe_header").unwrap();
+
+    let parameters = recipe_header.find_all("parameters > parameter");
+
+    let parameter_texts = parameters
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      parameter_texts,
+      vec!["arg1".to_string(), "arg2".to_string()]
+    );
+  }
+
+  #[test]
+  fn find_direct_child_marker() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar arg1 arg2:
+        echo \"{{ arch() }}\"
+      "
+    });
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let second_recipe = root.find("recipe[1]").unwrap();
+
+    let recipe_header = second_recipe.find("recipe_header").unwrap();
+    let parameters_node = recipe_header.find("parameters").unwrap();
+
+    let direct_parameters = parameters_node.find_all("^parameter");
+
+    assert_eq!(direct_parameters.len(), 2);
+
+    let parameter_texts = direct_parameters
+      .iter()
+      .map(|node| document.get_node_text(node))
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      parameter_texts,
+      vec!["arg1".to_string(), "arg2".to_string()]
+    );
+  }
+
+  #[test]
+  fn find_indexed_nodes() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz:
+        echo \"baz\"
+      "
+    });
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let selectors = ["recipe[0]", "recipe[1]", "recipe[2]"];
+
+    let recipe_texts = selectors
+      .iter()
+      .map(|selector| {
+        document
+          .get_node_text(&root.find(selector).unwrap())
+          .trim()
+          .to_string()
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      recipe_texts,
+      vec![
+        "foo:\n  echo \"foo\"".to_string(),
+        "bar:\n  echo \"bar\"".to_string(),
+        "baz:\n  echo \"baz\"".to_string()
+      ]
+    );
+
+    assert!(root.find("recipe[10]").is_none());
+  }
+
+  #[test]
+  fn find_nested_child() {
+    let document = Document::from(indoc! {
+      "
+      foo: (bar baz):
+        echo foo
+      "
+    });
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier =
+      root.find("dependency_expression > expression > value > identifier");
+
+    let identifier = identifier.unwrap();
+
+    assert_eq!(document.get_node_text(&identifier), "baz");
+  }
+
+  #[test]
+  fn find_nonexistent() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let tree = document.tree.as_ref().unwrap();
+    let root = tree.root_node();
+
+    let nonexistent = root.find("nonexistent_kind");
+    assert!(nonexistent.is_none());
+
+    let empty_results = root.find_all("nonexistent_kind");
+    assert_eq!(empty_results.len(), 0);
+
+    let no_function_calls = root.find_all("function_call");
+    assert_eq!(no_function_calls.len(), 0);
+  }
+
+  #[test]
+  fn find_nth_occurrence() {
+    let document = Document::from(indoc! {
+      "
+      alias foo := bar
+      "
+    });
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let alias = root.find("alias").unwrap();
+
+    let first_identifier = alias.find("identifier[0]").unwrap();
+    let second_identifier = alias.find("identifier[1]").unwrap();
+
+    assert_eq!(document.get_node_text(&first_identifier), "foo");
+    assert_eq!(document.get_node_text(&second_identifier), "bar");
+  }
+
+  #[test]
   fn find_union() {
     let document = Document::from(indoc! {
       "
@@ -416,99 +519,5 @@ mod tests {
       .collect::<Vec<_>>();
 
     assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
-  }
-
-  #[test]
-  fn find_direct_child_marker() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar arg1 arg2:
-        echo \"{{ arch() }}\"
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let second_recipe = root.find("recipe[1]").unwrap();
-
-    let recipe_header = second_recipe.find("recipe_header").unwrap();
-    let parameters_node = recipe_header.find("parameters").unwrap();
-
-    let direct_parameters = parameters_node.find_all("^parameter");
-
-    assert_eq!(direct_parameters.len(), 2);
-
-    let parameter_texts = direct_parameters
-      .iter()
-      .map(|node| document.get_node_text(node))
-      .collect::<Vec<_>>();
-
-    assert_eq!(
-      parameter_texts,
-      vec!["arg1".to_string(), "arg2".to_string()]
-    );
-  }
-
-  #[test]
-  fn find_nonexistent() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let tree = document.tree.as_ref().unwrap();
-    let root = tree.root_node();
-
-    let nonexistent = root.find("nonexistent_kind");
-    assert!(nonexistent.is_none());
-
-    let empty_results = root.find_all("nonexistent_kind");
-    assert_eq!(empty_results.len(), 0);
-
-    let no_function_calls = root.find_all("function_call");
-    assert_eq!(no_function_calls.len(), 0);
-  }
-
-  #[test]
-  fn find_nth_occurrence() {
-    let document = Document::from(indoc! {
-      "
-      alias foo := bar
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let alias = root.find("alias").unwrap();
-
-    let first_identifier = alias.find("identifier[0]").unwrap();
-    let second_identifier = alias.find("identifier[1]").unwrap();
-
-    assert_eq!(document.get_node_text(&first_identifier), "foo");
-    assert_eq!(document.get_node_text(&second_identifier), "bar");
-  }
-
-  #[test]
-  fn find_nested_child() {
-    let document = Document::from(indoc! {
-      "
-      foo: (bar baz):
-        echo foo
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let identifier =
-      root.find("dependency_expression > expression > value > identifier");
-
-    let identifier = identifier.unwrap();
-
-    assert_eq!(document.get_node_text(&identifier), "baz");
   }
 }

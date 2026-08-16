@@ -2,8 +2,9 @@ use super::*;
 
 pub(crate) enum Symbol {
   Builtin(&'static Builtin<'static>),
-  Function(Function),
+  Function(Located<Function>),
+  FunctionParameter(TextNode),
   Parameter(Parameter),
-  Recipe(Recipe),
-  Variable(Variable),
+  Recipe(Located<Recipe>),
+  Variable(Located<Variable>),
 }

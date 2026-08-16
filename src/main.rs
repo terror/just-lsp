@@ -2,19 +2,21 @@ use {
   anyhow::{Error, anyhow, bail},
   arguments::Arguments,
   ariadne::{Color, Label, Report, ReportKind, sources},
-  clap::Parser as Clap,
+  clap::{Parser, builder::styling},
   command::Command,
-  env_logger::Env,
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
+  serde::Serialize,
+  serde_json::Value,
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
+    io::{self, stderr},
     path::PathBuf,
     process,
     sync::{Arc, LazyLock, atomic::AtomicBool},
@@ -26,6 +28,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
+  tracing::{Level, info, warn},
   tree_sitter::Node,
   tree_sitter_highlight::{
     Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
@@ -44,17 +47,28 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 #[tokio::main]
 async fn main() {
-  let env = Env::default().default_filter_or("info");
+  use yansi::Paint;
 
-  env_logger::Builder::from_env(env).init();
+  if env::var_os("NO_COLOR").is_some() {
+    yansi::disable();
+  }
+
+  tracing_subscriber::fmt()
+    .with_writer(stderr)
+    .with_env_filter(
+      tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(Level::INFO.into())
+        .from_env_lossy(),
+    )
+    .init();
 
   if let Err(error) = Arguments::parse().run().await {
-    eprintln!("error: {error}");
+    eprintln!("{} {error}", "error:".red().bold());
 
     for (i, error) in error.chain().skip(1).enumerate() {
       if i == 0 {
         eprintln!();
-        eprintln!("because:");
+        eprintln!("{}", "because:".bold());
       }
 
       eprintln!("- {error}");
@@ -63,7 +77,7 @@ async fn main() {
     let backtrace = error.backtrace();
 
     if backtrace.status() == BacktraceStatus::Captured {
-      eprintln!("backtrace:");
+      eprintln!("{}", "backtrace:".bold());
       eprintln!("{backtrace}");
     }
 

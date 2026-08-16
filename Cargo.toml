@@ -1,13 +1,12 @@
 [package]
 name = "just-lsp"
-version = "0.4.2"
+version = "0.6.2"
 description = "A language server for just"
 authors = ["Liam <liam@scalzulli.com>"]
 license = "CC0-1.0"
 homepage = "https://github.com/terror/just-lsp"
 repository = "https://github.com/terror/just-lsp"
 edition = "2024"
-exclude = ["/screenshot.png", "/www"]
 categories = ["development-tools"]
 keywords = ["productivity", "compilers", "language-servers", "just", "tree-sitter"]
 resolver = "2"
@@ -22,6 +21,22 @@ include = [
   "/vendor/*-src/**/**.h"
 ]
 
+[workspace]
+members = [".", "crates/*"]
+
+[workspace.dependencies]
+tower-lsp = "0.20.0"
+
+[workspace.lints.rust]
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+arbitrary-source-item-ordering = "deny"
+pedantic = { level = "deny", priority = -1 }
+too_many_lines = "allow"
+wildcard_imports = "allow"
+
 [lints]
 workspace = true
 
@@ -29,55 +44,32 @@ workspace = true
 codegen-units = 1
 lto = true
 
-[workspace]
-members = [".", "crates/*"]
-
-[workspace.lints.rust]
-mismatched_lifetime_syntaxes = "allow"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
-
-[workspace.lints.clippy]
-all = { level = "deny", priority = -1 }
-arbitrary-source-item-ordering = "deny"
-enum_glob_use = "allow"
-ignore_without_reason = "allow"
-needless_pass_by_value = "allow"
-pedantic = { level = "deny", priority = -1 }
-similar_names = "allow"
-struct_excessive_bools = "allow"
-struct_field_names = "allow"
-too_many_arguments = "allow"
-too_many_lines = "allow"
-type_complexity = "allow"
-undocumented_unsafe_blocks = "deny"
-unnecessary_wraps = "allow"
-wildcard_imports = "allow"
-
 [dependencies]
 anyhow = "1.0.102"
 ariadne = "0.6.0"
 clap = { version = "4.6.1", features = ["derive"] }
 dirs = "6.0.0"
-env_logger = "0.11.10"
 indoc = "2.0.7"
 inventory = "0.3"
-log = "0.4.29"
+lexiclean = "0.0.2"
 ropey = "1.6.1"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-target = "2.1.0"
+serde_json = "1.0.150"
 tempfile = "3.27.0"
 thiserror = "2"
-tokio = { version = "1.52.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.18", features = ["io-util"] }
-tower-lsp = "0.20.0"
-tree-sitter = "0.26.8"
-tree-sitter-highlight = "0.26.8"
+tower-lsp = { workspace = true }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tree-sitter = "0.26.9"
+tree-sitter-highlight = "0.26.9"
+yansi = "1.0.1"
 
 [dev-dependencies]
+executable-path = "1.0.1"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.149"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.60"
+cc = "1.2.62"

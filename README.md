@@ -71,8 +71,13 @@ Otherwise, see below for the complete package list:
     </tr>
     <tr>
       <td><a href=https://brew.sh>Homebrew</a></td>
-      <td><a href=https://github.com/terror/homebrew-tap>terror/tap/just-lsp</a></td>
-      <td><code>brew install terror/tap/just-lsp</code></td>
+      <td><a href=https://formulae.brew.sh/formula/just-lsp>just-lsp</a></td>
+      <td><code>brew install just-lsp</code></td>
+    </tr>
+    <tr>
+      <td><a href=https://nixos.org/nix/>Nix</a></td>
+      <td><a href=https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/ju/just-lsp/package.nix>just-lsp</a></td>
+      <td><code>nix-env -iA nixpkgs.just-lsp</code></td>
     </tr>
   </tbody>
 </table>
@@ -90,10 +95,22 @@ Otherwise, see below for the complete package list:
   </thead>
   <tbody>
     <tr>
+      <td><a href=https://alpinelinux.org>Alpine</a></td>
+      <td><a href=https://wiki.alpinelinux.org/wiki/Alpine_Linux_package_management>apk-tools</a></td>
+      <td><a href=https://pkgs.alpinelinux.org/package/edge/testing/x86_64/just-lsp>just-lsp</a></td>
+      <td><code>apk add just-lsp</code></td>
+    </tr>
+    <tr>
       <td><a href=https://www.archlinux.org>Arch</a></td>
       <td><a href=https://wiki.archlinux.org/title/Pacman>pacman</a></td>
       <td><a href=https://archlinux.org/packages/extra/x86_64/just-lsp/>just-lsp</a></td>
       <td><code>pacman -S just-lsp</code></td>
+    </tr>
+    <tr>
+      <td><a href=https://voidlinux.org>Void</a></td>
+      <td><a href=https://wiki.voidlinux.org/XBPS>XBPS</a></td>
+      <td><a href=https://github.com/void-linux/void-packages/tree/master/srcpkgs/just-lsp>just-lsp</a></td>
+      <td><code>xbps-install -S just-lsp</code></td>
     </tr>
   </tbody>
 </table>
@@ -192,7 +209,37 @@ that repository to get it setup on your system.
 ## Configuration
 
 `just-lsp` accepts configuration through the LSP `initializationOptions` object,
-sent from your editor when the server starts.
+sent from your editor when the server starts. The object is optional; omitted
+keys keep their default behavior.
+
+```json
+{
+  "formatting": {
+    "indentation": "\t"
+  },
+  "rules": {
+    "unused-variables": "off",
+    "unused-parameters": { "level": "warning" }
+  }
+}
+```
+
+### Formatting
+
+Formatting is delegated to `just --fmt --unstable --quiet`. By default,
+`just-lsp` lets `just` choose its normal indentation. Set
+`formatting.indentation` to pass a custom indentation string through
+`--indentation`:
+
+```json
+{
+  "formatting": {
+    "indentation": "  "
+  }
+}
+```
+
+Common values are `"\t"` for tabs and `"  "` for two spaces.
 
 ### Rules
 
@@ -209,18 +256,30 @@ accepts either a level string or a table with a `level` field:
 }
 ```
 
-Supported levels are `error`, `warning`, `information` (or `info`), `hint`, and
-`off`. Setting a rule to `off` suppresses it entirely; any other level overrides
-the rule's default severity. Rules that are not listed retain their default
-behavior.
+Rule codes are listed in [`docs/diagnostics.md`](docs/diagnostics.md).
+Supported levels are:
 
-#### Neovim
+| Level                 | Behavior                                  |
+| --------------------- | ----------------------------------------- |
+| `error`               | Report the rule as an error.              |
+| `warning`             | Report the rule as a warning.             |
+| `information`, `info` | Report the rule as informational.         |
+| `hint`                | Report the rule as a hint.                |
+| `off`                 | Suppress diagnostics from the rule.       |
 
-Pass the configuration table via the `init_options` field:
+Rules that are not listed keep their default severity.
+
+### Neovim
+
+With Neovim's builtin LSP client, pass the same configuration through
+`init_options`:
 
 ```lua
 vim.lsp.config('just', {
   init_options = {
+    formatting = {
+      indentation = '\t',
+    },
     rules = {
       ['unused-variables'] = 'off',
       ['unused-parameters'] = { level = 'warning' },
@@ -305,9 +364,9 @@ parser in `vendor/tree-sitter-just`. After changing the grammar or query files,
 rebuild and test the parser with the following commands:
 
 ```bash
-`cd vendor/tree-sitter-just && npx tree-sitter generate`
-`cd vendor/tree-sitter-just && npx tree-sitter test`
-`cargo test`
+just -f vendor/tree-sitter-just/justfile gen
+cd vendor/tree-sitter-just && tree-sitter test
+cargo test
 ```
 
 **n.b.** `just update-parser` will run all of the above for you.

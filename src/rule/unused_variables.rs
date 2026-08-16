@@ -16,7 +16,7 @@ define_rule! {
       let exported = context.setting_enabled("export");
 
       for (variable_name, is_used) in &context.scope().variable_usage {
-        if *is_used {
+        if variable_name.starts_with('_') || *is_used {
           continue;
         }
 

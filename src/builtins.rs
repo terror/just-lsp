@@ -2,6 +2,27 @@ use super::*;
 
 pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
+    name: "android",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Enable the recipe on Android.
+
+      Part of the platform-gating family of attributes
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
+      the BSDs). When any platform attribute is present, the recipe is
+      only enabled when one of the active platforms matches.
+
+      ```just
+      [android]
+      install:
+        adb install app.apk
+      ```
+      "
+    },
+    targets: AttributeTarget::ALL,
+  },
+  Builtin::Attribute {
     name: "arg",
     kind: AttributeKind::UnaryPlus,
     description: indoc! {
@@ -20,33 +41,54 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       - `pattern=\"PATTERN\"` requires the value to match a regular
         expression. Patterns are full-match; `just` rejects the
         invocation if the supplied value does not match.
+      - `multiple` allows an option or flag to be passed more than
+        once, assigning the list of passed values to the parameter.
+      - `min=MIN` requires at least `MIN` values. Requires `multiple`
+        or a variadic parameter.
+      - `max=MAX` allows at most `MAX` values. Requires `multiple` or
+        a variadic parameter.
 
       Multiple keys may be combined in a single `[arg(...)]`.
 
       ```just
+      set unstable
+      set lists
+
       [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
       greet NAME:
         @echo Hello, {{NAME}}
+
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
       ```
       "
     },
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
-    name: "env",
-    kind: AttributeKind::Binary,
+    name: "cache",
+    kind: AttributeKind::Variadic,
     description: indoc! {
       "
-      Set environment variable `ENV_VAR` to `VALUE` for the recipe.
+      Skip recipe invocations when a matching entry exists in the
+      cache.
 
-      The variable is exported to the recipe's shell and to any commands
-      run from backticks within it. Does not affect variables outside
-      the recipe.
+      Currently unstable. The `[cache]` attribute may only be used
+      with script recipes. The `environment`, `inputs`, `outputs`, and
+      `extra` keyword arguments customize the cache key.
+
+      By default, the cache key includes environment variables exported
+      or unexported in the justfile. Pass a list of names to `environment`
+      to select the environment variables included in the key.
 
       ```just
-      [env(\"RUST_LOG\", \"debug\")]
-      test:
-        cargo test
+      set unstable
+
+      [script]
+      [cache(environment=['PATH'], inputs='Cargo.lock', outputs='target', extra=arch())]
+      build:
+        cargo build
       ```
       "
     },
@@ -78,6 +120,31 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       [confirm(\"Are you sure you want to delete everything?\")]
       delete-everything:
         rm -rf *
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "continue",
+    kind: AttributeKind::Variadic,
+    description: indoc! {
+      "
+      Continue execution normally if a command is interrupted by any
+      of `SIGNALS` and exits successfully.
+
+      With no argument, handles `SIGINT` (`ctrl-c`) so that `SIGQUIT`
+      still aborts. Pass one or more signal names to customize which
+      signals are handled.
+
+      ```just
+      [continue]
+      test:
+        cargo test
+
+      [continue(\"SIGHUP\", \"SIGINT\")]
+      serve:
+        ./serve.sh
       ```
       "
     },
@@ -130,6 +197,62 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "dragonfly",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Enable the recipe on DragonFly BSD.
+
+      Part of the platform-gating family of attributes
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`,
+      `[freebsd]`, `[openbsd]`, `[netbsd]`, `[dragonfly]`). When any
+      platform attribute is present, the recipe is only enabled when
+      one of the active platforms matches.
+
+      ```just
+      [dragonfly]
+      install:
+        pkg install myapp
+      ```
+      "
+    },
+    targets: AttributeTarget::ALL,
+  },
+  Builtin::Attribute {
+    name: "env",
+    kind: AttributeKind::Binary,
+    description: indoc! {
+      "
+      Set environment variable `ENV_VAR` to `VALUE` for the recipe.
+
+      The variable is exported to the recipe's shell and to any commands
+      run from backticks within it. Does not affect variables outside
+      the recipe.
+
+      ```just
+      [env(\"RUST_LOG\", \"debug\")]
+      test:
+        cargo test
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "exit-message",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Print an error message if the recipe fails.
+
+      The inverse of `[no-exit-message]`: forces `just` to emit its
+      standard failure message even if `set no-exit-message` is active
+      globally.
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "extension",
     kind: AttributeKind::Unary,
     description: indoc! {
@@ -150,6 +273,26 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
     },
     targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "freebsd",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Enable the recipe on FreeBSD.
+
+      Part of the platform-gating family of attributes. When any
+      platform attribute is present, the recipe is only enabled when
+      one of the active platforms matches.
+
+      ```just
+      [freebsd]
+      install:
+        pkg install myapp
+      ```
+      "
+    },
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "group",
@@ -177,68 +320,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Module, AttributeTarget::Recipe],
   },
   Builtin::Attribute {
-    name: "metadata",
-    kind: AttributeKind::UnaryPlus,
-    description: indoc! {
-      "
-      Attach arbitrary metadata `METADATA` to the recipe.
-
-      The attribute accepts any number of arguments. `just` does not
-      interpret them; they are surfaced via `just --dump --dump-format
-      json` and intended for consumption by external tooling.
-
-      ```just
-      [metadata(\"key1=value1\", \"key2=value2\")]
-      build:
-        cargo build
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-  },
-  Builtin::Attribute {
-    name: "dragonfly",
-    kind: AttributeKind::Nullary,
-    description: indoc! {
-      "
-      Enable the recipe on DragonFly BSD.
-
-      Part of the platform-gating family of attributes
-      (`[linux]`, `[macos]`, `[unix]`, `[windows]`, `[freebsd]`,
-      `[openbsd]`, `[netbsd]`, `[dragonfly]`). When any platform
-      attribute is present, the recipe is only enabled when one of the
-      active platforms matches.
-
-      ```just
-      [dragonfly]
-      install:
-        pkg install myapp
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-  },
-  Builtin::Attribute {
-    name: "freebsd",
-    kind: AttributeKind::Nullary,
-    description: indoc! {
-      "
-      Enable the recipe on FreeBSD.
-
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
-
-      ```just
-      [freebsd]
-      install:
-        pkg install myapp
-      ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-  },
-  Builtin::Attribute {
     name: "linux",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -246,9 +327,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Enable the recipe on Linux.
 
       Part of the platform-gating family of attributes
-      (`[linux]`, `[macos]`, `[unix]`, `[windows]`, and the BSDs). When
-      any platform attribute is present, the recipe is only enabled
-      when one of the active platforms matches. Useful for writing
+      (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
+      the BSDs). When any platform attribute is present, the recipe is
+      only enabled when one of the active platforms matches. Useful for writing
       cross-platform justfiles that dispatch on the host OS.
 
       ```just
@@ -262,7 +343,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "macos",
@@ -284,7 +365,41 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
+    targets: AttributeTarget::ALL,
+  },
+  Builtin::Attribute {
+    name: "metadata",
+    kind: AttributeKind::UnaryPlus,
+    description: indoc! {
+      "
+      Attach arbitrary metadata `METADATA` to the recipe.
+
+      The attribute accepts any number of arguments. `just` does not
+      interpret them; they are surfaced via `just --dump --dump-format
+      json` and intended for consumption by external tooling.
+
+      ```just
+      [metadata(\"key1=value1\", \"key2=value2\")]
+      build:
+        cargo build
+      ```
+      "
+    },
     targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "netbsd",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Enable the recipe on NetBSD.
+
+      Part of the platform-gating family of attributes. When any
+      platform attribute is present, the recipe is only enabled when
+      one of the active platforms matches.
+      "
+    },
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "no-cd",
@@ -305,20 +420,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
         git add {{file}}
         git commit
       ```
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-  },
-  Builtin::Attribute {
-    name: "exit-message",
-    kind: AttributeKind::Nullary,
-    description: indoc! {
-      "
-      Print an error message if the recipe fails.
-
-      The inverse of `[no-exit-message]`: forces `just` to emit its
-      standard failure message even if `set no-exit-message` is active
-      globally.
       "
     },
     targets: &[AttributeTarget::Recipe],
@@ -368,20 +469,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
-    name: "netbsd",
-    kind: AttributeKind::Nullary,
-    description: indoc! {
-      "
-      Enable the recipe on NetBSD.
-
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
-      "
-    },
-    targets: &[AttributeTarget::Recipe],
-  },
-  Builtin::Attribute {
     name: "openbsd",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -393,7 +480,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "parallel",
@@ -503,6 +590,50 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "shell",
+    kind: AttributeKind::Nullary,
+    description: indoc! {
+      "
+      Execute the recipe as a shell recipe.
+
+      This overrides `set default-script`, which otherwise makes
+      recipes default to script recipes.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "timestamp",
+    kind: AttributeKind::Optional,
+    description: indoc! {
+      "
+      Print timestamps before commands in this recipe.
+
+      With no argument, timestamps are formatted as `HH:MM:SS`. Pass a
+      `strftime`-style format string to customize the output.
+
+      ```just
+      [timestamp]
+      build:
+        cargo build
+
+      [timestamp(\"%H:%M:%S%.3f %Z\")]
+      test:
+        cargo test
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "unix",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -511,8 +642,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       Part of the platform-gating family of attributes. When any
       platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches. `[unix]` matches Linux,
-      macOS, and the BSDs.
+      one of the active platforms matches. `[unix]` matches Android,
+      Linux, macOS, and the BSDs.
 
       ```just
       [unix]
@@ -521,18 +652,19 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "windows",
     kind: AttributeKind::Nullary,
     description: indoc! {
       "
-      Enable the recipe on Windows.
+      Enable a recipe or setting on Windows.
 
       Part of the platform-gating family of attributes. When any
       platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      one of the active platforms matches. It can also specialize
+      `set shell` for Windows.
 
       ```just
       [windows]
@@ -541,7 +673,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "working-directory",
@@ -562,6 +694,129 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
     },
     targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Constant {
+    name: "BG_BLACK",
+    description: indoc! {
+      "
+      ANSI escape sequence for black background: `\\e[40m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_BLUE",
+    description: indoc! {
+      "
+      ANSI escape sequence for blue background: `\\e[44m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_CYAN",
+    description: indoc! {
+      "
+      ANSI escape sequence for cyan background: `\\e[46m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_GREEN",
+    description: indoc! {
+      "
+      ANSI escape sequence for green background: `\\e[42m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_MAGENTA",
+    description: indoc! {
+      "
+      ANSI escape sequence for magenta background: `\\e[45m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_RED",
+    description: indoc! {
+      "
+      ANSI escape sequence for red background: `\\e[41m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_WHITE",
+    description: indoc! {
+      "
+      ANSI escape sequence for white background: `\\e[47m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BG_YELLOW",
+    description: indoc! {
+      "
+      ANSI escape sequence for yellow background: `\\e[43m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BLACK",
+    description: indoc! {
+      "
+      ANSI escape sequence for black foreground text: `\\e[30m`.
+
+      Terminate styled output with `NORMAL` to reset.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BLUE",
+    description: indoc! {
+      "
+      ANSI escape sequence for blue foreground text: `\\e[34m`.
+
+      Terminate styled output with `NORMAL` to reset.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "BOLD",
+    description: indoc! {
+      "
+      ANSI escape sequence for bold text: `\\e[1m`.
+
+      Combine with color constants and terminate with `NORMAL`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "CLEAR",
+    description: indoc! {
+      "
+      ANSI escape sequence that clears the terminal screen, similar to
+      the `clear` command: `\\ec`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "CYAN",
+    description: indoc! {
+      "
+      ANSI escape sequence for cyan foreground text: `\\e[36m`.
+
+      Terminate styled output with `NORMAL` to reset.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "GREEN",
+    description: indoc! {
+      "
+      ANSI escape sequence for green foreground text: `\\e[32m`.
+
+      Terminate styled output with `NORMAL` to reset.
+      "
+    },
   },
   Builtin::Constant {
     name: "HEX",
@@ -602,6 +857,63 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
   },
   Builtin::Constant {
+    name: "HIDE",
+    description: indoc! {
+      "
+      ANSI escape sequence for hidden (concealed) text: `\\e[8m`.
+
+      Useful for sensitive output like passwords, though not a
+      substitute for proper secret handling.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "INVERT",
+    description: indoc! {
+      "
+      ANSI escape sequence that swaps foreground and background colors:
+      `\\e[7m`.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "ITALIC",
+    description: indoc! {
+      "
+      ANSI escape sequence for italic text: `\\e[3m`.
+
+      Support for italic rendering varies by terminal.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "MAGENTA",
+    description: indoc! {
+      "
+      ANSI escape sequence for magenta foreground text: `\\e[35m`.
+
+      Terminate styled output with `NORMAL` to reset.
+      "
+    },
+  },
+  Builtin::Constant {
+    name: "NORMAL",
+    description: indoc! {
+      "
+      ANSI escape sequence that resets all terminal display attributes:
+      `\\e[0m`.
+
+      Use at the end of a styled segment to return the terminal to its
+      default colors and weights.
+
+      ```just
+      @greet:
+        echo '{{BOLD}}{{RED}}danger{{NORMAL}}'
+      ```
+      "
+    },
+  },
+  Builtin::Constant {
     name: "PATH_SEP",
     description: indoc! {
       "
@@ -625,76 +937,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
   },
   Builtin::Constant {
-    name: "CLEAR",
+    name: "RED",
     description: indoc! {
       "
-      ANSI escape sequence that clears the terminal screen, similar to
-      the `clear` command: `\\ec`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "NORMAL",
-    description: indoc! {
-      "
-      ANSI escape sequence that resets all terminal display attributes:
-      `\\e[0m`.
+      ANSI escape sequence for red foreground text: `\\e[31m`.
 
-      Use at the end of a styled segment to return the terminal to its
-      default colors and weights.
-
-      ```just
-      @greet:
-        echo '{{BOLD}}{{RED}}danger{{NORMAL}}'
-      ```
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BOLD",
-    description: indoc! {
-      "
-      ANSI escape sequence for bold text: `\\e[1m`.
-
-      Combine with color constants and terminate with `NORMAL`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "ITALIC",
-    description: indoc! {
-      "
-      ANSI escape sequence for italic text: `\\e[3m`.
-
-      Support for italic rendering varies by terminal.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "UNDERLINE",
-    description: indoc! {
-      "
-      ANSI escape sequence for underlined text: `\\e[4m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "INVERT",
-    description: indoc! {
-      "
-      ANSI escape sequence that swaps foreground and background colors:
-      `\\e[7m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "HIDE",
-    description: indoc! {
-      "
-      ANSI escape sequence for hidden (concealed) text: `\\e[8m`.
-
-      Useful for sensitive output like passwords, though not a
-      substitute for proper secret handling.
+      Terminate styled output with `NORMAL` to reset.
       "
     },
   },
@@ -707,30 +955,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
   },
   Builtin::Constant {
-    name: "BLACK",
+    name: "UNDERLINE",
     description: indoc! {
       "
-      ANSI escape sequence for black foreground text: `\\e[30m`.
-
-      Terminate styled output with `NORMAL` to reset.
+      ANSI escape sequence for underlined text: `\\e[4m`.
       "
     },
   },
   Builtin::Constant {
-    name: "RED",
+    name: "WHITE",
     description: indoc! {
       "
-      ANSI escape sequence for red foreground text: `\\e[31m`.
-
-      Terminate styled output with `NORMAL` to reset.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "GREEN",
-    description: indoc! {
-      "
-      ANSI escape sequence for green foreground text: `\\e[32m`.
+      ANSI escape sequence for white foreground text: `\\e[37m`.
 
       Terminate styled output with `NORMAL` to reset.
       "
@@ -746,110 +982,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
     },
   },
-  Builtin::Constant {
-    name: "BLUE",
-    description: indoc! {
-      "
-      ANSI escape sequence for blue foreground text: `\\e[34m`.
-
-      Terminate styled output with `NORMAL` to reset.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "MAGENTA",
-    description: indoc! {
-      "
-      ANSI escape sequence for magenta foreground text: `\\e[35m`.
-
-      Terminate styled output with `NORMAL` to reset.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "CYAN",
-    description: indoc! {
-      "
-      ANSI escape sequence for cyan foreground text: `\\e[36m`.
-
-      Terminate styled output with `NORMAL` to reset.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "WHITE",
-    description: indoc! {
-      "
-      ANSI escape sequence for white foreground text: `\\e[37m`.
-
-      Terminate styled output with `NORMAL` to reset.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_BLACK",
-    description: indoc! {
-      "
-      ANSI escape sequence for black background: `\\e[40m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_RED",
-    description: indoc! {
-      "
-      ANSI escape sequence for red background: `\\e[41m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_GREEN",
-    description: indoc! {
-      "
-      ANSI escape sequence for green background: `\\e[42m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_YELLOW",
-    description: indoc! {
-      "
-      ANSI escape sequence for yellow background: `\\e[43m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_BLUE",
-    description: indoc! {
-      "
-      ANSI escape sequence for blue background: `\\e[44m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_MAGENTA",
-    description: indoc! {
-      "
-      ANSI escape sequence for magenta background: `\\e[45m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_CYAN",
-    description: indoc! {
-      "
-      ANSI escape sequence for cyan background: `\\e[46m`.
-      "
-    },
-  },
-  Builtin::Constant {
-    name: "BG_WHITE",
-    description: indoc! {
-      "
-      ANSI escape sequence for white background: `\\e[47m`.
-      "
-    },
-  },
   Builtin::Function {
     name: "absolute_path",
     aliases: &[],
@@ -859,6 +991,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Return the absolute form of `path`, resolved against the current
       working directory. Does not follow symlinks or canonicalize. For
       that, use `canonicalize()`.
+
+      With `set lists`, applies to each list element individually.
 
       ```just
       absolute_path(\"./bar.txt\")  # in /foo -> \"/foo/bar.txt\"
@@ -874,6 +1008,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       append(\"/src\", \"foo bar baz\")  # => \"foo/src bar/src baz/src\"
@@ -903,6 +1040,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "assert",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Abort execution with `message` if `condition` is false, or the
+      condition source if `message` is not provided.
+
+      ```just
+      foo version:
+        echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "blake3",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -925,6 +1079,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
       string. Aborts if the file cannot be read.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "bool",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` to a canonical boolean value.
+
+      Returns `[]` when `value` is `\"\"`, `\"0\"`, `\"false\"`, or
+      `[]`, and `\"true\"` when `value` is `\"1\"` or `\"true\"`.
+      All other values are errors.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1137,6 +1308,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       unset. Called with two arguments, returns `default` when the
       variable is unset.
 
+      With `set lists`, `key` may be a list of names, checked in
+      order. The first set variable is returned; if none are set,
+      `default` is returned or execution aborts if no default is
+      provided.
+
       A default can be substituted for an *empty* value (not just an
       unset one) with the `||` operator, currently unstable:
 
@@ -1160,7 +1336,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "env_var_or_default",
@@ -1174,7 +1350,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       `default` when the variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "error",
@@ -1315,9 +1491,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Nullary,
     description: indoc! {
       "
-      Return the string `\"true\"` if the current recipe is being run
-      as a dependency of another recipe, and `\"false\"` if it was
-      invoked directly from the command line.
+      Return whether the current recipe is being run as a dependency
+      of another recipe.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
       "
     },
     deprecated: None,
@@ -1338,6 +1516,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```just
       join(\"foo/bar\", \"baz\")  # => \"foo/bar/baz\"
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "join_list",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Join the elements of `value` into a string separated by
+      `separator`, or spaces if `separator` is not provided.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1365,6 +1557,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Process ID of the running `just` executable, as a decimal string.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "just_version",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Version of the `just` executable.
+
+      ```just
+      just-info:
+        @echo The version is: {{ just_version() }}
+      ```
       "
     },
     deprecated: None,
@@ -1416,16 +1624,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
-    name: "lowercase",
+    name: "len",
     aliases: &[],
     kind: FunctionKind::Unary,
     description: indoc! {
       "
-      Convert `s` to lowercase.
-
-      ```just
-      lowercase(\"Hello\")  # => \"hello\"
-      ```
+      Return the number of elements in `value`.
       "
     },
     deprecated: None,
@@ -1446,6 +1650,62 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "lowercase",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `s` to lowercase.
+
+      ```just
+      lowercase(\"Hello\")  # => \"hello\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_directory",
+    aliases: &["module_dir"],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Directory of the current module file. Behaves like
+      `justfile_directory()` in the root justfile, but resolves to the
+      directory of the current `mod` source file inside submodules.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_file",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Path of the current module file. Behaves like `justfile()` in
+      the root justfile, but resolves to the current `mod` source
+      file inside submodules.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "module_path",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      `::`-separated path to the current module.
+
+      In the root justfile this returns the empty string. Inside a
+      submodule, it returns the module path used to address recipes in
+      that module.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "num_cpus",
     aliases: &[],
     kind: FunctionKind::Nullary,
@@ -1457,6 +1717,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       build:
         make -j{{num_cpus()}}
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "num_jobs",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the value passed to `just` with `--jobs`, or an empty
+      list if `--jobs` was not passed.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1516,11 +1790,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Unary,
     description: indoc! {
       "
-      Return `\"true\"` if `path` points at an existing filesystem
-      entity, `\"false\"` otherwise.
+      Return whether `path` points at an existing filesystem entity.
 
-      Symbolic links are traversed. Returns `\"false\"` for broken
-      symlinks or when the path is inaccessible.
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise. Symbolic links are
+      traversed; broken symlinks and inaccessible paths are false.
       "
     },
     deprecated: None,
@@ -1532,6 +1806,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       prepend(\"src/\", \"foo bar baz\")  # => \"src/foo src/bar src/baz\"
@@ -1547,6 +1824,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
+
+      With `set lists`, applies to each list element individually.
 
       Replaces every single quote with `'\\''` and surrounds the
       result in single quotes. Sufficient for `sh` and most
@@ -1567,6 +1846,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the contents of the file at `path` as a string. Aborts if
       the file cannot be read.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "recipe_name",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the name of the current recipe.
+
+      ```just
+      foo:
+        echo {{ recipe_name() }}
+      ```
       "
     },
     deprecated: None,
@@ -1649,7 +1944,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
-      `requirement`, returning `\"true\"` or `\"false\"`.
+      `requirement`.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
 
       ```just
       semver_matches(\"1.2.3\", \">=1.0.0\")  # => \"true\"
@@ -1736,6 +2034,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "show",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` into a string containing its literal
+      representation.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "snakecase",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -1746,32 +2058,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```just
       snakecase(\"helloWorld\")  # => \"hello_world\"
       ```
-      "
-    },
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "module_directory",
-    aliases: &["module_dir"],
-    kind: FunctionKind::Nullary,
-    description: indoc! {
-      "
-      Directory of the current module file. Behaves like
-      `justfile_directory()` in the root justfile, but resolves to the
-      directory of the current `mod` source file inside submodules.
-      "
-    },
-    deprecated: None,
-  },
-  Builtin::Function {
-    name: "module_file",
-    aliases: &[],
-    kind: FunctionKind::Nullary,
-    description: indoc! {
-      "
-      Path of the current module file. Behaves like `justfile()` in
-      the root justfile, but resolves to the current `mod` source
-      file inside submodules.
       "
     },
     deprecated: None,
@@ -1805,23 +2091,39 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "split",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Split `string` on `separator`, or whitespace if `separator` is
+      not provided, returning a list.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "style",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
-      `just` itself for styled output.
+      `just` itself for styled output. With `text`, return the styled
+      text followed by a reset sequence.
 
-      Unlike the plain color constants, `style(name)` produces the
-      exact sequence `just` uses, so recipe output can match
-      `just`'s own styling.
+      Unlike the plain color constants, `style(styles)` produces the
+      exact sequence `just` uses, so recipe output can match `just`'s
+      own styling.
 
-      Recognized values of `name`: `'command'` (echoed recipe lines),
-      `'error'`, and `'warning'`.
+      The `'command'`, `'error'`, and `'warning'` styles match `just`'s
+      echoed recipe lines and messages.
 
       ```just
       scary:
+        @echo '{{ style(\"warning\", \"careful!\") }}'
         @echo '{{ style(\"error\") }}OH NO{{ NORMAL }}'
       ```
       "
@@ -2007,15 +2309,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
-      `name` and return its full path, or the empty string if no such
-      executable is found.
+      `name` and return its full path, or `[]` if no such executable
+      is found.
 
       Unlike `require()`, does not abort on missing executables, so
-      this is useful for optional tooling. Currently unstable; requires
-      `set unstable`.
+      this is useful for optional tooling.
+
+      Requires `set lists`.
 
       ```just
-      set unstable
+      set lists
 
       bosh := which(\"bosh\")
       ```
@@ -2083,8 +2386,71 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "default-list",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      List available recipes instead of running the default recipe
+      when `just` is invoked without a recipe name.
+
+      ```just
+      set default-list
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "default-script",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Run recipes as script recipes by default instead of shell
+      recipes.
+
+      Recipes can opt back into shell execution with the `[shell]`
+      attribute.
+
+      ```just
+      set default-script
+
+      [shell]
+      list:
+        ls
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "dotenv-command",
+    kind: SettingKind::StringOrArray,
+    description: indoc! {
+      "
+      Run one or more commands and load their output as environment files.
+
+      `just` runs the command with the configured `shell` and parses
+      its stdout as an environment file. With `set lists`, the value
+      may be a list of commands. Commands run in list order, and
+      variables from later commands take precedence over variables from
+      earlier commands.
+
+      Unlike `set dotenv-command`, the `--dotenv-command` command-line
+      option may be passed multiple times to set or override the
+      setting at runtime. Its values run in option order with the same
+      precedence rules.
+
+      ```just
+      set lists
+      set dotenv-command := [\"sops -d .enc.env\", \"vault dotenv\"]
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "dotenv-filename",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file with a custom name.
@@ -2139,7 +2505,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Setting {
     name: "dotenv-path",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file from a specific path. Errors if the file is
@@ -2211,19 +2577,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
-    name: "no-exit-message",
-    kind: SettingKind::Boolean(false),
-    description: indoc! {
-      "
-      Suppress the trailing `error: Recipe \\\"foo\\\" failed with exit
-      code N` message for failed recipes, globally. Individual
-      recipes can still opt back in with the `[exit-message]`
-      attribute.
-      "
-    },
-    deprecated: None,
-  },
-  Builtin::Setting {
     name: "guards",
     kind: SettingKind::Boolean(false),
     description: indoc! {
@@ -2249,6 +2602,24 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "indentation",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Set recipe body indentation used when formatting with `--fmt` or
+      `--dump`.
+
+      Accepts any string of whitespace characters. The default is four
+      spaces.
+
+      ```just
+      set indentation := \"  \"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "lazy",
     kind: SettingKind::Boolean(false),
     description: indoc! {
@@ -2260,6 +2631,69 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       referenced by the recipe being run. Useful when some assignments
       involve expensive backticks or `shell()` calls that only a subset
       of recipes need.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "lists",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Allow values to be lists of strings instead of only strings.
+
+      Currently unstable.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "minimum-version",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Error if `just` is older than `minimum-version`.
+
+      Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g.
+      `\"1.55.0\"`. The setting should be placed at the top of the
+      `justfile`, before any other content, so that `just` rejects the
+      file before evaluating anything else.
+
+      ```just
+      set minimum-version := \"1.55.0\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "no-cd",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Don't change directory before executing recipes in the current
+      module.
+
+      By default, `just` executes recipes with the current directory set
+      to the directory containing the justfile. This setting leaves the
+      current directory unchanged for every recipe in the module.
+
+      Individual recipes can also opt in with `[no-cd]`, and
+      `[working-directory(PATH)]` can override the working directory for a
+      specific recipe.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "no-exit-message",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Suppress the trailing `error: Recipe \\\"foo\\\" failed with exit
+      code N` message for failed recipes, globally. Individual
+      recipes can still opt back in with the `[exit-message]`
+      attribute.
       "
     },
     deprecated: None,
@@ -2376,13 +2810,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       for a more flexible, version-agnostic alternative.
       "
     },
-    deprecated: Some("windows-shell"),
+    deprecated: Some(Deprecation::Replacement("windows-shell")),
   },
   Builtin::Setting {
     name: "windows-shell",
     kind: SettingKind::Array,
     description: indoc! {
       "
+      **Deprecated**: use the `[windows]` attribute on `set shell`
+      instead.
+
       Set the command used to invoke recipes and evaluate backticks
       on Windows.
 
@@ -2397,7 +2834,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    deprecated: None,
+    deprecated: Some(Deprecation::SettingAttribute {
+      attribute: "windows",
+      setting: "shell",
+    }),
   },
   Builtin::Setting {
     name: "working-directory",
@@ -2422,6 +2862,55 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn alphabetical_by_kind() {
+    #[track_caller]
+    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
+      let names = names.into_iter().collect::<Vec<_>>();
+
+      for window in names.windows(2) {
+        assert!(
+          window[0] < window[1],
+          "{kind} names out of order in BUILTINS: {:?} before {:?}",
+          window[0],
+          window[1],
+        );
+      }
+    }
+
+    case(
+      "attribute",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Attribute { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "constant",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Constant { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "function",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Function { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "setting",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Setting { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+  }
 
   #[test]
   fn no_duplicate_names() {

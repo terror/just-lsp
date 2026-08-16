@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub(crate) struct Analyze {
   #[arg(
     value_name = "PATH",
@@ -17,7 +17,9 @@ impl Analyze {
       None => Subcommand::find_justfile()?,
     };
 
-    let content = fs::read_to_string(&path)?;
+    if path.is_dir() {
+      bail!("could not read `{}`: path is a directory", path.display());
+    }
 
     let absolute_path = if path.is_absolute() {
       path.clone()
@@ -29,16 +31,41 @@ impl Analyze {
       anyhow!("failed to convert `{}` to file url", path.display())
     })?;
 
-    let document = Document::try_from(lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem {
-        language_id: "just".to_string(),
-        text: content.clone(),
-        uri,
-        version: 1,
-      },
-    })?;
+    let mut workspace = Workspace::default();
 
-    let analyzer = Analyzer::from(&document);
+    workspace
+      .documents
+      .load(&uri)
+      .map_err(|error| match error {
+        just_lsp::Error::Io(error) => match error.kind() {
+          io::ErrorKind::NotFound => {
+            anyhow!("could not read `{}`: file not found", path.display())
+          }
+          io::ErrorKind::PermissionDenied => {
+            anyhow!("could not read `{}`: permission denied", path.display())
+          }
+          _ => anyhow!("could not read `{}`: {error}", path.display()),
+        },
+        error => anyhow!(error),
+      })?;
+
+    workspace.load_project(uri.clone())?;
+
+    let document = workspace.documents.get(&uri).unwrap();
+
+    let content = document.content.to_string();
+
+    let imported_documents = workspace
+      .projects
+      .get(&uri)
+      .into_iter()
+      .flat_map(|project| project.imported_documents(&workspace.documents));
+
+    let analyzer = Analyzer {
+      config: None,
+      document,
+      imported_documents: imported_documents.collect(),
+    };
 
     let diagnostics = analyzer.analyze();
 

@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@/lib/types';
+import type { SyntaxNode } from '@/lib/syntax-node';
 import { parse } from '@/lib/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';

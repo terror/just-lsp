@@ -28,6 +28,19 @@ define_rule! {
           Some(Diagnostic::warning(message, attribute.range))
         })
         .collect()
+    },
+    quickfixes(context) {
+      context
+        .recipes()
+        .iter()
+        .filter_map(|recipe| {
+          let attribute = recipe.find_attribute("parallel")?;
+
+          (recipe.dependencies.len() < 2).then(|| {
+            Quickfix::removal(attribute.range, "Remove `[parallel]`")
+          })
+        })
+        .collect()
     }
   }
 }
