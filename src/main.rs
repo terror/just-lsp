@@ -4,6 +4,7 @@ use {
   ariadne::{Color, Label, Report, ReportKind, sources},
   clap::{Parser, builder::styling},
   command::Command,
+  executor::Executor,
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
@@ -37,6 +38,7 @@ use {
 
 mod arguments;
 mod command;
+mod executor;
 mod resolver;
 mod server;
 mod subcommand;
