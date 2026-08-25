@@ -16,7 +16,7 @@ use {
     collections::{BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs,
+    fs, future,
     io::{self, stderr},
     path::PathBuf,
     process,

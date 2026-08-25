@@ -230,7 +230,7 @@ impl LanguageServer for Server {
 
   #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.shutdown().await
+    Inner::shutdown().await
   }
 }
 
@@ -1041,9 +1041,8 @@ impl Inner {
     Ok(None)
   }
 
-  #[allow(clippy::unused_async)]
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    Ok(())
+  fn shutdown() -> impl future::Future<Output = Result<(), jsonrpc::Error>> {
+    future::ready(Ok(()))
   }
 }
 
