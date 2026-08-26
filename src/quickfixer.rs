@@ -120,7 +120,7 @@ mod tests {
         document: &document,
         imported_documents: Vec::new(),
       }
-      .analyze();
+      .quickfixes();
 
       let actions = Quickfixer {
         diagnostics: &diagnostics,

@@ -6,6 +6,7 @@ define_rule! {
   ParallelDependenciesRule {
     id: "parallel-dependencies",
     message: "unnecessary parallel attribute",
+    provides_quickfixes: true,
     run(context) {
       context
         .recipes()

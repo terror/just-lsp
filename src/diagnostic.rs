@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Diagnostic {
   /// A short header summarizing the diagnostic.
   pub display: String,

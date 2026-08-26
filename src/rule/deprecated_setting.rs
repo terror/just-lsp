@@ -5,6 +5,7 @@ define_rule! {
   DeprecatedSettingRule {
     id: "deprecated-setting",
     message: "deprecated setting",
+    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 

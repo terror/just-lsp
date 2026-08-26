@@ -299,7 +299,7 @@ impl Inner {
       document,
       imported_documents: imported_documents.collect(),
     }
-    .analyze();
+    .quickfixes();
 
     actions.extend(
       Quickfixer {
@@ -1980,16 +1980,7 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env(\"BAR\")\n",
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///test.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(0, 7, 0, 10)),
-          range_length: None,
-          text: "env_var".into(),
-        }],
+        text: "foo := env_var(\"BAR\")\n",
       })
       .request(CodeActionRequest {
         id: 2,
@@ -2012,7 +2003,16 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
+        text: "foo := env(\"BAR\")\n",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 10)),
+          range_length: None,
+          text: "env_var".into(),
+        }],
       })
       .request(CodeActionRequest {
         id: 2,
@@ -2041,6 +2041,25 @@ mod tests {
             }
           }
         ]
+      }))
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 3,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 14)),
+          range_length: None,
+          text: "env".into(),
+        }],
+      })
+      .request(CodeActionRequest {
+        id: 3,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 8, 0, 8),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": []
       }))
       .run()
       .await
