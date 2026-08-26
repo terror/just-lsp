@@ -173,10 +173,57 @@ mod tests {
   }
 
   #[test]
+  fn ignores_imported_recipes() {
+    let document = Document::from("import 'dep.just'\n");
+    let imported = Document::from("[parallel]\nfoo:\n");
+
+    assert_eq!(
+      Analyzer {
+        config: None,
+        document: &document,
+        imported_documents: vec![&imported],
+      }
+      .quickfixes(),
+      Vec::new(),
+    );
+  }
+
+  #[test]
   fn ignores_setting_outside_range() {
     Test::new("set windows-powershell := true\nset export := true\n")
       .range(lsp::Range::at(1, 4, 1, 4))
       .run();
+  }
+
+  #[test]
+  fn only_runs_providers() {
+    let document = Document::from("foo := unknown\nbar := env_var(\"BAR\")\n");
+
+    let diagnostics = Analyzer {
+      config: None,
+      document: &document,
+      imported_documents: Vec::new(),
+    }
+    .quickfixes();
+
+    assert_eq!(
+      diagnostics,
+      vec![Diagnostic {
+        display: "deprecated function".into(),
+        id: "deprecated-function".into(),
+        message: "`env_var` is deprecated, use `env` instead".into(),
+        quickfix: Some(Quickfix {
+          edits: vec![lsp::TextEdit {
+            range: lsp::Range::at(1, 7, 1, 14),
+            new_text: "env".into(),
+          }],
+          range: lsp::Range::at(1, 7, 1, 14),
+          title: "Replace `env_var` with `env`".into(),
+        }),
+        range: lsp::Range::at(1, 7, 1, 14),
+        severity: lsp::DiagnosticSeverity::WARNING,
+      }],
+    );
   }
 
   #[test]
