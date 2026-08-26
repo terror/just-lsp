@@ -3348,6 +3348,22 @@ mod tests {
   }
 
   #[test]
+  fn quickfixes_ignore_imported_recipes() {
+    let document = Document::from("import 'dep.just'\n");
+    let imported = Document::from("[parallel]\nfoo:\n");
+
+    assert_eq!(
+      Analyzer {
+        config: None,
+        document: &document,
+        imported_documents: vec![&imported],
+      }
+      .quickfixes(),
+      Vec::new(),
+    );
+  }
+
+  #[test]
   fn quickfixes_only_runs_providers() {
     let document = Document::from("foo := unknown\nbar := env_var(\"BAR\")\n");
 
