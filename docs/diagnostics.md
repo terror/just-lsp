@@ -13,6 +13,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `unknown-attribute`               | Unknown Attribute               | Attribute name is not part of the builtin catalog.                                                                            |
 | `attribute-arguments`             | Attribute Arguments             | Attribute invocation uses the wrong number of arguments.                                                                      |
 | `attribute-argument-expressions`  | Attribute Argument Expressions  | Attribute invocation uses an expression where just requires a string literal.                                                 |
+| `continue-signals`                | Continue Signals                | `[continue]` arguments must be `SIGHUP`, `SIGINT`, or `SIGQUIT`.                                                               |
 | `arg-attribute`                   | Arg Attribute                   | `[arg(NAME, ...)]` references an unknown parameter, duplicates a parameter config, or contains invalid keywords or keyword values. |
 | `attribute-invalid-target`        | Attribute Invalid Target        | Attribute is attached to a syntax element that cannot take attributes.                                                        |
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind.                                                                              |
@@ -30,7 +31,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `dependency-arguments`            | Dependency Arguments            | Dependency invocation provides the wrong number of arguments.                                                                 |
 | `mapped-dependencies`             | Mapped Dependencies             | Mapped dependencies require `set lists`, at least one starred argument, and at most one starred argument.                      |
 | `parallel-dependencies`           | Parallel Dependencies           | Warning: `[parallel]` is applied to a recipe with fewer than two dependencies, so it has no effect.                           |
-| `working-directory-conflict`      | Working Directory Conflict      | Recipe combines mutually exclusive `[no-cd]` and `[working-directory]` attributes.                                            |
+| `working-directory-conflict`      | Working Directory Conflict      | Recipe attributes or global settings combine mutually exclusive `no-cd` and `working-directory` behavior.                     |
 | `mixed-recipe-indentation`        | Mixed Recipe Indentation        | Recipe body mixes tabs and spaces for indentation.                                                                            |
 | `inconsistent-recipe-indentation` | Inconsistent Recipe Indentation | Recipe indentation width changes after the first indented line.                                                               |
 | `unknown-function`                | Unknown Function                | Call targets a function that isn't a builtin or user-defined function.                                                        |
@@ -50,5 +51,6 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `undefined-identifiers`           | Undefined Identifiers           | Expression identifier cannot be resolved to a parameter, variable, builtin, or user-defined function.                         |
 | `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
+| `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
 | `invalid-import-path`             | Invalid Import Path             | Literal non-optional import path points to a path that does not exist on disk.                                                |

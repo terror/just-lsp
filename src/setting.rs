@@ -55,7 +55,12 @@ impl Setting {
         },
       );
 
-    let kind = if node.find("list_literal").is_some() {
+    let kind = if expression_child.is_some_and(|expression| {
+      expression
+        .named_child(0)
+        .and_then(|value| value.named_child(0))
+        .is_some_and(|child| child.kind() == "list_literal")
+    }) {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
@@ -82,5 +87,16 @@ impl Setting {
       .attributes
       .iter()
       .any(|attribute| attribute.name.value == name)
+  }
+
+  #[must_use]
+  pub fn loads_dotenv(&self) -> bool {
+    match self.name.value.as_str() {
+      "dotenv-filename" | "dotenv-path" => true,
+      "dotenv-load" | "dotenv-required" => {
+        matches!(self.kind, SettingKind::Boolean(true))
+      }
+      _ => false,
+    }
   }
 }

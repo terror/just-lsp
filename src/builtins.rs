@@ -75,14 +75,18 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       cache.
 
       Currently unstable. The `[cache]` attribute may only be used
-      with script recipes. `inputs`, `outputs`, and `extra` keyword
-      arguments customize the cache key.
+      with script recipes. The `environment`, `inputs`, `outputs`, and
+      `extra` keyword arguments customize the cache key.
+
+      By default, the cache key includes environment variables exported
+      or unexported in the justfile. Pass a list of names to `environment`
+      to select the environment variables included in the key.
 
       ```just
       set unstable
 
       [script]
-      [cache(inputs='Cargo.lock', outputs='target', extra=arch())]
+      [cache(environment=['PATH'], inputs='Cargo.lock', outputs='target', extra=arch())]
       build:
         cargo build
       ```
@@ -1626,8 +1630,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Return the number of elements in `value`.
-
-      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1727,6 +1729,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the value passed to `just` with `--jobs`, or an empty
       list if `--jobs` was not passed.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,

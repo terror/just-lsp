@@ -1144,6 +1144,20 @@ mod tests {
   }
 
   #[test]
+  fn attributes_working_directory_allowed_with_global_no_cd() {
+    Test::new(indoc! {
+      "
+      set no-cd
+
+      [working-directory: '/tmp']
+      build:
+        echo \"build\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attributes_working_directory_conflicts_with_no_cd() {
     Test::new(indoc! {
       "
@@ -1213,7 +1227,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown `[cache]` keyword `foo`, expected one of extra, inputs, outputs",
+      "Unknown `[cache]` keyword `foo`, expected one of environment, extra, inputs, outputs",
       lsp::Range::at(1, 7, 1, 16),
     )
     .error(
@@ -1227,8 +1241,12 @@ mod tests {
   fn cache_attribute_kwargs() {
     Test::new(indoc! {
       "
+      set lists
+
+      environment := 'PATH'
+
       [script]
-      [cache(inputs='Cargo.lock', outputs='target', extra=arch())]
+      [cache(environment=[environment], inputs='Cargo.lock', outputs='target', extra=arch())]
       build:
         cargo build
       "
@@ -1610,7 +1628,7 @@ mod tests {
   fn continue_attribute_accepts_multiple_arguments() {
     Test::new(indoc! {
       "
-      [continue(\"SIGHUP\", \"SIGINT\")]
+      [continue(\"SIGHUP\", \"SIGINT\", \"SIGQUIT\")]
       foo:
         echo foo
       "
@@ -1639,6 +1657,26 @@ mod tests {
         echo foo
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unknown_signals() {
+    Test::new(indoc! {
+      "
+      [continue(\"SIGTERM\", \"sigint\")]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 10, 0, 19),
+    )
+    .error(
+      "Invalid signal `sigint`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 21, 0, 29),
+    )
     .run();
   }
 
@@ -1719,6 +1757,20 @@ mod tests {
   }
 
   #[test]
+  fn disjoint_dotenv_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-path := 'bar'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn doc_attribute_rejects_non_const_expression() {
     Test::new(indoc! {
       "
@@ -1732,6 +1784,87 @@ mod tests {
       lsp::Range::at(0, 5, 0, 21),
     )
     .run();
+  }
+
+  #[test]
+  fn dotenv_command_allows_disabled_loading_and_override() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+      set dotenv-load := false
+      set dotenv-override
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_deduplicates_identical_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set dotenv-command := 'foo'
+
+      [windows]
+      set dotenv-command := 'bar'
+
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflict_preserves_distinct_locations() {
+    Test::new(indoc! {
+      "
+      set dotenv-command := 'foo'
+
+      [linux]
+      set dotenv-path := 'bar'
+
+      [windows]
+      set dotenv-path := 'baz'
+      "
+    })
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(2, 0, 4, 0),
+    )
+    .error(
+      "`dotenv-command` is incompatible with `dotenv-path`",
+      lsp::Range::at(5, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn dotenv_command_conflicts_with_loading_settings() {
+    #[track_caller]
+    fn case(justfile: &str, message: &'static str) {
+      Test::new(justfile)
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-filename := 'bar'\n",
+      "`dotenv-command` is incompatible with `dotenv-filename`",
+    );
+
+    case(
+      "set dotenv-command := 'foo'\nset dotenv-load\n",
+      "`dotenv-command` is incompatible with `dotenv-load`",
+    );
+
+    case(
+      "set dotenv-required\nset dotenv-command := 'foo'\n",
+      "`dotenv-required` is incompatible with `dotenv-command`",
+    );
   }
 
   #[test]
@@ -2122,6 +2255,20 @@ mod tests {
       "
     })
     .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .run();
+  }
+
+  #[test]
+  fn exported_variadic_recipe_parameters_are_not_unused() {
+    Test::new(indoc! {
+      "
+      foo +$args:
+        echo foo
+
+      bar *$args:
+        echo bar
+      "
+    })
     .run();
   }
 
@@ -2525,6 +2672,7 @@ mod tests {
       bool(value) := value
       join_list(value) := value
       len(value) := value
+      num_jobs() := 'qux'
       show(value) := value
       split(value) := value
       which(value) := value
@@ -2532,9 +2680,10 @@ mod tests {
       foo := bool('foo')
       bar := join_list('bar')
       baz := len('baz')
-      qux := show('qux')
-      quux := split('quux')
-      corge := which('corge')
+      qux := num_jobs()
+      quux := show('quux')
+      corge := split('corge')
+      grault := which('grault')
 
       recipe:
         echo {{ foo }}
@@ -2543,6 +2692,7 @@ mod tests {
         echo {{ qux }}
         echo {{ quux }}
         echo {{ corge }}
+        echo {{ grault }}
       "
     })
     .run();
@@ -2617,7 +2767,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_len_function_requires_lists() {
+  fn list_features_len_function_accepts_scalar_without_lists() {
     Test::new(indoc! {
       "
       foo := len('bar')
@@ -2626,10 +2776,6 @@ mod tests {
         echo {{ foo }}
       "
     })
-    .error(
-      "the `len()` function requires `set lists`",
-      lsp::Range::at(0, 7, 0, 10),
-    )
     .run();
   }
 
@@ -2744,6 +2890,23 @@ mod tests {
     .error(
       "`if` and `assert` conditions other than comparisons require `set lists`",
       lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_features_num_jobs_function_requires_lists() {
+    Test::new(indoc! {
+      "
+      foo := num_jobs()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `num_jobs()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 15),
     )
     .run();
   }
@@ -3441,7 +3604,7 @@ mod tests {
   fn recipe_inconsistent_indentation_between_lines() {
     Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
     .error(
-      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(3, 0, 3, 2))
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(2, 0, 2, 2))
     .run();
   }
 
@@ -3634,7 +3797,7 @@ mod tests {
     })
     .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-      lsp::Range::at(3, 0, 3, 2),
+      lsp::Range::at(2, 0, 2, 2),
     )
     .run();
   }
@@ -3649,7 +3812,7 @@ mod tests {
     })
     .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
-      lsp::Range::at(2, 0, 2, 3),
+      lsp::Range::at(1, 0, 1, 3),
     )
     .run();
   }
@@ -3918,6 +4081,24 @@ mod tests {
   }
 
   #[test]
+  fn settings_array_type_error_with_nested_list() {
+    Test::new(indoc! {
+      "
+      set lists
+      set shell := show(['foo'])
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Setting `shell` expects an array value",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn settings_boolean_shorthand() {
     Test::new(indoc! {
       "
@@ -4006,6 +4187,20 @@ mod tests {
   }
 
   #[test]
+  fn settings_disjoint_directory_settings_do_not_conflict() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set working-directory := 'foo'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn settings_dotenv_command_duplicate() {
     Test::new(indoc! {
       "
@@ -4088,6 +4283,17 @@ mod tests {
       "
     })
     .error("Duplicate setting `export`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_false_no_cd_allows_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd := false
+      set working-directory := 'foo'
+      "
+    })
     .run();
   }
 
@@ -4212,6 +4418,21 @@ mod tests {
       lsp::Range::at(0, 0, 1, 0),
     )
     .error("Duplicate setting `export`", lsp::Range::at(3, 0, 4, 0))
+    .run();
+  }
+
+  #[test]
+  fn settings_no_cd_conflicts_with_working_directory() {
+    Test::new(indoc! {
+      "
+      set no-cd
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -4370,6 +4591,26 @@ mod tests {
   }
 
   #[test]
+  fn settings_working_directory_conflict_deduplicates_diagnostics() {
+    Test::new(indoc! {
+      "
+      [linux]
+      set no-cd
+
+      [windows]
+      set no-cd
+
+      set working-directory := 'foo'
+      "
+    })
+    .error(
+      "`no-cd` is incompatible with `working-directory`",
+      lsp::Range::at(6, 0, 7, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn shadowed_parameter_default_uses_global_variable() {
     Test::new(indoc! {
       "
@@ -4423,6 +4664,20 @@ mod tests {
       [timestamp(format)]
       bar:
         echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn underscore_suppresses_unused_variable_warnings() {
+    Test::new(indoc! {
+      "
+      _ := 'foo'
+      _bar := 'baz'
+
+      recipe:
+        echo 'Hello!'
       "
     })
     .run();

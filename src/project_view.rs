@@ -38,9 +38,8 @@ impl<'a> ProjectView<'a> {
           declaration_position(declaration),
         )
       })
-      .map(|(document, value)| Located {
-        uri: document.document.uri.clone(),
-        value,
+      .map(|(document, value)| {
+        Located::new(document.document.uri.clone(), value)
       })
   }
 
@@ -248,20 +247,9 @@ mod tests {
 
     let view = ProjectView::from(&root);
 
-    assert_eq!(
-      view.find_recipe("foo").unwrap().value.content,
-      "foo:\n  echo bar",
-    );
-
-    assert_eq!(
-      view.find_variable("foo").unwrap().value.content,
-      "foo := 'bar'",
-    );
-
-    assert_eq!(
-      view.find_function("foo").unwrap().value.content,
-      "foo() := 'bar'",
-    );
+    assert_eq!(view.find_recipe("foo").unwrap().content, "foo:\n  echo bar",);
+    assert_eq!(view.find_variable("foo").unwrap().content, "foo := 'bar'",);
+    assert_eq!(view.find_function("foo").unwrap().content, "foo() := 'bar'",);
   }
 
   #[test]
