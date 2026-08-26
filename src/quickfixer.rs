@@ -139,22 +139,24 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let actual_diagnostics = Analyzer {
+      let analyzer = Analyzer {
         config: Some(&config),
         document: &document,
         imported_documents: imported_documents.iter().collect(),
-      }
-      .quickfixes();
+      };
+
+      let actual_diagnostics = analyzer.quickfixes();
 
       if let Some(diagnostics) = diagnostics {
         assert_eq!(actual_diagnostics, diagnostics);
       }
 
-      let actions = Quickfixer {
+      let quickfixer = Quickfixer {
         diagnostics: &actual_diagnostics,
         parameters: &parameters,
-      }
-      .collect();
+      };
+
+      let actions = quickfixer.collect();
 
       assert_eq!(actions.len(), quickfixes.len());
 
