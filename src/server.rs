@@ -294,20 +294,18 @@ impl Inner {
       .into_iter()
       .flat_map(|project| project.imported_documents(&workspace.documents));
 
-    let diagnostics = Analyzer {
+    let analyzer = Analyzer {
       config: Some(&config),
       document,
       imported_documents: imported_documents.collect(),
-    }
-    .quickfixes();
+    };
 
-    actions.extend(
-      Quickfixer {
-        diagnostics: &diagnostics,
-        parameters: &params,
-      }
-      .collect(),
-    );
+    let quickfixer = Quickfixer {
+      diagnostics: &analyzer.quickfixes(),
+      parameters: &params,
+    };
+
+    actions.extend(quickfixer.collect());
 
     Ok(Some(actions))
   }
