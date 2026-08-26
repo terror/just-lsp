@@ -5,40 +5,27 @@ define_rule! {
   DeprecatedSettingRule {
     id: "deprecated-setting",
     message: "deprecated setting",
+    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.document().settings() {
         if let Some(Builtin::Setting {
           deprecated: Some(deprecation),
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
-          diagnostics.push(Diagnostic::warning(
+          let diagnostic = Diagnostic::warning(
             format!(
               "`{}` is deprecated, use {deprecation} instead",
               setting.name.value
             ),
             setting.name.range,
-          ));
-        }
-      }
+          );
 
-      diagnostics
-    },
-    quickfixes(context) {
-      let mut quickfixes = Vec::new();
-      for setting in context.settings() {
-        if let Some(Builtin::Setting {
-          deprecated: Some(deprecation),
-          ..
-        }) = context.builtin_setting(&setting.name.value)
-        {
-          let deprecation = *deprecation;
-
-          let quickfix = match deprecation {
+          let diagnostic = match *deprecation {
             Deprecation::Replacement(replacement) => {
-              Quickfix::replacement(&setting.name, replacement)
+              diagnostic.quickfix(Quickfix::replacement(&setting.name, replacement))
             }
             Deprecation::SettingAttribute {
               attribute,
@@ -48,23 +35,23 @@ define_rule! {
                 replacement_setting.name.value == replacement
                   && replacement_setting.has_attribute(attribute)
               }) {
-                continue;
+                diagnostic
+              } else {
+                diagnostic.quickfix(Quickfix::setting_attribute(
+                  &setting,
+                  context.document(),
+                  attribute,
+                  replacement,
+                ))
               }
-
-              Quickfix::setting_attribute(
-                setting,
-                context.document(),
-                attribute,
-                replacement,
-              )
             }
           };
 
-          quickfixes.push(quickfix);
+          diagnostics.push(diagnostic);
         }
       }
 
-      quickfixes
+      diagnostics
     }
   }
 }

@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Diagnostic {
   /// A short header summarizing the diagnostic.
   pub display: String,
@@ -8,6 +8,8 @@ pub struct Diagnostic {
   pub id: String,
   /// A detailed message describing the diagnostic.
   pub message: String,
+  /// An optional quickfix that can be applied to resolve the diagnostic.
+  pub quickfix: Option<Quickfix>,
   /// The range in the source code where the diagnostic applies.
   pub range: lsp::Range,
   /// The severity level of the diagnostic.
@@ -28,8 +30,17 @@ impl Diagnostic {
       display: String::new(),
       id: String::new(),
       message: message.into(),
+      quickfix: None,
       range,
       severity,
+    }
+  }
+
+  #[must_use]
+  pub fn quickfix(self, quickfix: Quickfix) -> Self {
+    Self {
+      quickfix: Some(quickfix),
+      ..self
     }
   }
 

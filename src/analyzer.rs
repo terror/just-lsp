@@ -15,6 +15,13 @@ impl Analyzer<'_> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
+    self.analyze_rules(|_| true)
+  }
+
+  fn analyze_rules(
+    &self,
+    predicate: impl Fn(&dyn Rule) -> bool,
+  ) -> Vec<Diagnostic> {
     let context =
       RuleContext::new(self.document, self.imported_documents.iter().copied());
 
@@ -24,6 +31,7 @@ impl Analyzer<'_> {
 
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
+      .filter(|rule| predicate(**rule))
       .flat_map(|rule| {
         let rule_config = config.rule_config(rule.id());
 
@@ -56,6 +64,12 @@ impl Analyzer<'_> {
     });
 
     diagnostics
+  }
+
+  /// Run rules that can produce quickfixes against the document.
+  #[must_use]
+  pub fn quickfixes(&self) -> Vec<Diagnostic> {
+    self.analyze_rules(|rule| rule.provides_quickfixes())
   }
 }
 
@@ -3331,6 +3345,37 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn quickfixes_only_runs_providers() {
+    let document = Document::from("foo := unknown\nbar := env_var(\"BAR\")\n");
+
+    let diagnostics = Analyzer {
+      config: None,
+      document: &document,
+      imported_documents: Vec::new(),
+    }
+    .quickfixes();
+
+    assert_eq!(
+      diagnostics,
+      vec![Diagnostic {
+        display: "deprecated function".into(),
+        id: "deprecated-function".into(),
+        message: "`env_var` is deprecated, use `env` instead".into(),
+        quickfix: Some(Quickfix {
+          edits: vec![lsp::TextEdit {
+            range: lsp::Range::at(1, 7, 1, 14),
+            new_text: "env".into(),
+          }],
+          range: lsp::Range::at(1, 7, 1, 14),
+          title: "Replace `env_var` with `env`".into(),
+        }),
+        range: lsp::Range::at(1, 7, 1, 14),
+        severity: lsp::DiagnosticSeverity::WARNING,
+      }],
+    );
   }
 
   #[test]

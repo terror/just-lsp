@@ -6,8 +6,8 @@ macro_rules! define_rule {
     $name:ident {
       id: $id:literal,
       message: $message:literal,
+      $(provides_quickfixes: $provides_quickfixes:literal,)?
       run($context:ident) $body:block
-      $(, quickfixes($quickfix_context:ident) $quickfix_body:block)?
       $(,)?
     }
   ) => {
@@ -24,11 +24,8 @@ macro_rules! define_rule {
       }
 
       $(
-        fn quickfixes(
-          &self,
-          $quickfix_context: &RuleContext<'_>,
-        ) -> Vec<Quickfix> {
-          $quickfix_body
+        fn provides_quickfixes(&self) -> bool {
+          $provides_quickfixes
         }
       )?
 
@@ -104,9 +101,9 @@ pub trait Rule: Sync {
   /// What to show the user in the header of the diagnostics.
   fn message(&self) -> &'static str;
 
-  /// Return quickfixes that can be applied for diagnostics produced by this rule.
-  fn quickfixes(&self, _context: &RuleContext<'_>) -> Vec<Quickfix> {
-    Vec::new()
+  /// Whether this rule can produce diagnostics with quickfixes.
+  fn provides_quickfixes(&self) -> bool {
+    false
   }
 
   /// Execute the rule and return diagnostics.
