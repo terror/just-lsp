@@ -64,6 +64,7 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
+    diagnostics: Option<Vec<Diagnostic>>,
     document: Document,
     imported_documents: Vec<Document>,
     quickfixes: Vec<Quickfix>,
@@ -73,6 +74,13 @@ mod tests {
   impl Test {
     fn config(self, config: Config) -> Self {
       Self { config, ..self }
+    }
+
+    fn diagnostics(self, diagnostics: Vec<Diagnostic>) -> Self {
+      Self {
+        diagnostics: Some(diagnostics),
+        ..self
+      }
     }
 
     fn imported_document(self, content: &str) -> Self {
@@ -89,6 +97,7 @@ mod tests {
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
+        diagnostics: None,
         document: Document::from(content),
         imported_documents: Vec::new(),
         quickfixes: Vec::new(),
@@ -110,6 +119,7 @@ mod tests {
     fn run(self) {
       let Test {
         config,
+        diagnostics,
         document,
         imported_documents,
         quickfixes,
@@ -129,15 +139,19 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let diagnostics = Analyzer {
+      let actual_diagnostics = Analyzer {
         config: Some(&config),
         document: &document,
         imported_documents: imported_documents.iter().collect(),
       }
       .quickfixes();
 
+      if let Some(diagnostics) = diagnostics {
+        assert_eq!(actual_diagnostics, diagnostics);
+      }
+
       let actions = Quickfixer {
-        diagnostics: &diagnostics,
+        diagnostics: &actual_diagnostics,
         parameters: &parameters,
       }
       .collect();
@@ -202,18 +216,8 @@ mod tests {
 
   #[test]
   fn only_runs_providers() {
-    let document = Document::from("foo := unknown\nbar := env_var(\"BAR\")\n");
-
-    let diagnostics = Analyzer {
-      config: None,
-      document: &document,
-      imported_documents: Vec::new(),
-    }
-    .quickfixes();
-
-    assert_eq!(
-      diagnostics,
-      vec![Diagnostic {
+    Test::new("foo := unknown\nbar := env_var(\"BAR\")\n")
+      .diagnostics(vec![Diagnostic {
         display: "deprecated function".into(),
         id: "deprecated-function".into(),
         message: "`env_var` is deprecated, use `env` instead".into(),
@@ -227,8 +231,8 @@ mod tests {
         }),
         range: lsp::Range::at(1, 7, 1, 14),
         severity: lsp::DiagnosticSeverity::WARNING,
-      }],
-    );
+      }])
+      .run();
   }
 
   #[test]
