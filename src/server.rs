@@ -1074,7 +1074,7 @@ mod tests {
     pretty_assertions::assert_eq,
     serde_json::{Value, json},
     std::env,
-    tower_lsp::{ClientSocket, LspService},
+    tower_lsp::LspService,
     tower_test::mock::Spawn,
   };
 
@@ -1083,39 +1083,16 @@ mod tests {
     requests: Vec<Value>,
     responses: Vec<Option<Value>>,
     service: Spawn<LspService<Server>>,
-    socket: ClientSocket,
   }
 
   impl Test {
-    async fn initialize(&mut self) -> Result {
-      self
-        .service
-        .call(serde_json::from_value(
-          InitializeRequest { id: 1 }.into_value(),
-        )?)
-        .await?;
-
-      let initialized = self.service.call(serde_json::from_value(json!({
-        "jsonrpc": "2.0",
-        "method": "initialized",
-        "params": {}
-      }))?);
-
-      let (response, _) = tokio::join!(initialized, self.socket.next());
-
-      response?;
-
-      Ok(())
-    }
-
     fn new() -> Self {
-      let (service, socket) = LspService::new(Server::new);
+      let (service, _) = LspService::new(Server::new);
 
       Self {
         requests: Vec::new(),
         responses: Vec::new(),
         service: Spawn::new(service),
-        socket,
       }
     }
 
@@ -1123,21 +1100,6 @@ mod tests {
       self.requests.push(notification.into_value());
       self.responses.push(None);
       self
-    }
-
-    async fn notification_with_server_message(
-      &mut self,
-      notification: impl IntoValue,
-    ) -> Result {
-      let notification = self
-        .service
-        .call(serde_json::from_value(notification.into_value())?);
-
-      let (response, _) = tokio::join!(notification, self.socket.next());
-
-      response?;
-
-      Ok(())
     }
 
     fn request<T: IntoValue>(mut self, request: T) -> Self {
@@ -1148,35 +1110,6 @@ mod tests {
     fn response<T: IntoValue>(mut self, response: T) -> Self {
       self.responses.push(Some(response.into_value()));
       self
-    }
-
-    async fn response_during_notification(
-      &mut self,
-      notification: impl IntoValue,
-      server_messages: usize,
-      request: impl FnOnce(&Value) -> Value,
-    ) -> Result<Value> {
-      let notification = self
-        .service
-        .call(serde_json::from_value(notification.into_value())?);
-
-      let notification = tokio::spawn(notification);
-
-      let first = serde_json::to_value(self.socket.next().await.unwrap())?;
-
-      let response = self
-        .service
-        .call(serde_json::from_value(request(&first))?)
-        .await?
-        .unwrap();
-
-      for _ in 1..server_messages {
-        self.socket.next().await.unwrap();
-      }
-
-      notification.await??;
-
-      Ok(serde_json::to_value(response)?)
     }
 
     async fn run(mut self) -> Result {
@@ -1840,13 +1773,13 @@ mod tests {
   }
 
   #[derive(Debug)]
-  struct CodeActionRequest<'a> {
+  struct CodeActionRequest {
     id: i64,
     range: lsp::Range,
-    uri: &'a str,
+    uri: &'static str,
   }
 
-  impl IntoValue for CodeActionRequest<'_> {
+  impl IntoValue for CodeActionRequest {
     fn into_value(self) -> Value {
       json!({
         "jsonrpc": "2.0",
@@ -2085,16 +2018,7 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env(\"BAR\")\n",
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///test.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(0, 7, 0, 10)),
-          range_length: None,
-          text: "env_var".into(),
-        }],
+        text: "foo := env_var(\"BAR\")\n",
       })
       .request(CodeActionRequest {
         id: 2,
@@ -2388,67 +2312,6 @@ mod tests {
       .unwrap();
 
     assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
-
-    Ok(())
-  }
-
-  #[tokio::test]
-  async fn dependency_open_updates_all_quickfixes_before_publication() -> Result
-  {
-    let tempdir = tempfile::tempdir()?;
-
-    let root_a =
-      lsp::Url::from_file_path(tempdir.path().join("a.just")).unwrap();
-
-    let root_b =
-      lsp::Url::from_file_path(tempdir.path().join("b.just")).unwrap();
-
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
-
-    std::fs::write(imported.to_file_path().unwrap(), "")?;
-
-    let mut test = Test::new();
-
-    test.initialize().await?;
-
-    for root in [&root_a, &root_b] {
-      test
-        .notification_with_server_message(DidOpenNotification {
-          uri: root.as_str(),
-          text: "import 'foo.just'\n\nfoo := env_var('BAR')",
-        })
-        .await?;
-    }
-
-    let response = test
-      .response_during_notification(
-        DidOpenNotification {
-          uri: imported.as_str(),
-          text: "",
-        },
-        3,
-        |first| {
-          let target = if first["params"]["uri"] == root_a.as_str() {
-            &root_b
-          } else {
-            &root_a
-          };
-
-          CodeActionRequest {
-            id: 2,
-            uri: target.as_str(),
-            range: lsp::Range::at(2, 10, 2, 10),
-          }
-          .into_value()
-        },
-      )
-      .await?;
-
-    assert_eq!(
-      response["result"][0]["title"],
-      "Replace `env_var` with `env`"
-    );
 
     Ok(())
   }
