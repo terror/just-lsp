@@ -65,6 +65,7 @@ mod tests {
   struct Test {
     config: Config,
     document: Document,
+    imported_documents: Vec<Document>,
     quickfixes: Vec<Quickfix>,
     range: lsp::Range,
   }
@@ -74,10 +75,22 @@ mod tests {
       Self { config, ..self }
     }
 
+    fn imported_document(self, content: &str) -> Self {
+      Self {
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([Document::from(content)])
+          .collect(),
+        ..self
+      }
+    }
+
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
         document: Document::from(content),
+        imported_documents: Vec::new(),
         quickfixes: Vec::new(),
         range: lsp::Range::at(0, 0, 0, 0),
       }
@@ -98,6 +111,7 @@ mod tests {
       let Test {
         config,
         document,
+        imported_documents,
         quickfixes,
         range,
       } = self;
@@ -118,7 +132,7 @@ mod tests {
       let diagnostics = Analyzer {
         config: Some(&config),
         document: &document,
-        imported_documents: Vec::new(),
+        imported_documents: imported_documents.iter().collect(),
       }
       .quickfixes();
 
@@ -174,18 +188,9 @@ mod tests {
 
   #[test]
   fn ignores_imported_recipes() {
-    let document = Document::from("import 'dep.just'\n");
-    let imported = Document::from("[parallel]\nfoo:\n");
-
-    assert_eq!(
-      Analyzer {
-        config: None,
-        document: &document,
-        imported_documents: vec![&imported],
-      }
-      .quickfixes(),
-      Vec::new(),
-    );
+    Test::new("import 'dep.just'\n")
+      .imported_document("[parallel]\nfoo:\n")
+      .run();
   }
 
   #[test]
