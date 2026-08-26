@@ -251,6 +251,8 @@ impl Inner {
       serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
     }
 
+    let config = self.config.read().await;
+
     let workspace = self.workspace.read().await;
 
     let Some(document) =
@@ -286,17 +288,26 @@ impl Inner {
       }));
     }
 
-    let diagnostics = workspace
-      .diagnostics
+    let imported_documents = workspace
+      .projects
       .get(&params.text_document.uri)
-      .map_or::<&[Diagnostic], _>(&[], Vec::as_slice);
+      .into_iter()
+      .flat_map(|project| project.imported_documents(&workspace.documents));
 
-    let quickfixer = Quickfixer {
-      diagnostics,
-      parameters: &params,
-    };
+    let diagnostics = Analyzer {
+      config: Some(&config),
+      document,
+      imported_documents: imported_documents.collect(),
+    }
+    .analyze();
 
-    actions.extend(quickfixer.collect());
+    actions.extend(
+      Quickfixer {
+        diagnostics: &diagnostics,
+        parameters: &params,
+      }
+      .collect(),
+    );
 
     Ok(Some(actions))
   }
@@ -432,9 +443,7 @@ impl Inner {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let diagnostics = {
-      let config = self.config.read().await;
-
+    let roots = {
       let mut workspace = self.workspace.write().await;
 
       if !workspace.documents.is_open(&uri) {
@@ -443,17 +452,15 @@ impl Inner {
 
       let roots = workspace.affected_roots(&uri);
 
-      for root in &roots {
-        workspace.diagnostics.remove(root);
-      }
-
       workspace.documents.change(params)?;
       workspace.load_projects(roots.iter().cloned())?;
 
-      Self::update_diagnostics(&config, &mut workspace, roots)
+      roots
     };
 
-    self.publish_diagnostics(diagnostics).await;
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
 
     Ok(())
   }
@@ -461,9 +468,7 @@ impl Inner {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let diagnostics = {
-      let config = self.config.read().await;
-
+    let roots = {
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
@@ -476,46 +481,38 @@ impl Inner {
         return;
       }
 
-      workspace.diagnostics.remove(&uri);
-
-      for root in &roots {
-        workspace.diagnostics.remove(root);
-      }
-
       if let Err(error) = workspace.load_projects(roots.iter().cloned()) {
         warn!(%error, "failed to rebuild affected projects");
       }
 
-      Self::update_diagnostics(&config, &mut workspace, roots)
+      roots
     };
 
     self.client.publish_diagnostics(uri, vec![], None).await;
 
-    self.publish_diagnostics(diagnostics).await;
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let diagnostics = {
-      let config = self.config.read().await;
-
+    let roots = {
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
       roots.insert(uri.clone());
 
-      for root in &roots {
-        workspace.diagnostics.remove(root);
-      }
-
       workspace.documents.open(params)?;
       workspace.load_projects(roots.iter().cloned())?;
 
-      Self::update_diagnostics(&config, &mut workspace, roots)
+      roots
     };
 
-    self.publish_diagnostics(diagnostics).await;
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
 
     Ok(())
   }
@@ -916,20 +913,45 @@ impl Inner {
     }))
   }
 
-  async fn publish_diagnostics(
-    &self,
-    diagnostics: Vec<(lsp::Url, Vec<lsp::Diagnostic>, i32)>,
-  ) {
-    if !self.initialized.load(Ordering::Relaxed) {
+  async fn publish_diagnostics(&self, uri: &lsp::Url) {
+    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
       return;
     }
 
-    for (uri, diagnostics, version) in diagnostics {
-      self
-        .client
-        .publish_diagnostics(uri, diagnostics, Some(version))
-        .await;
-    }
+    let (diagnostics, version) = {
+      let workspace = self.workspace.read().await;
+      let config = self.config.read().await;
+
+      match workspace.documents.get_open(uri) {
+        Some(document) => {
+          let imported_documents =
+            workspace.projects.get(uri).into_iter().flat_map(|project| {
+              project.imported_documents(&workspace.documents)
+            });
+
+          let analyzer = Analyzer {
+            config: Some(&config),
+            document,
+            imported_documents: imported_documents.collect(),
+          };
+
+          (
+            analyzer
+              .analyze()
+              .into_iter()
+              .map(lsp::Diagnostic::from)
+              .collect(),
+            document.version,
+          )
+        }
+        None => return,
+      }
+    };
+
+    self
+      .client
+      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .await;
   }
 
   async fn references(
@@ -1026,43 +1048,6 @@ impl Inner {
 
   fn shutdown() -> impl future::Future<Output = Result<(), jsonrpc::Error>> {
     future::ready(Ok(()))
-  }
-
-  fn update_diagnostics(
-    config: &Config,
-    workspace: &mut Workspace,
-    uris: impl IntoIterator<Item = lsp::Url>,
-  ) -> Vec<(lsp::Url, Vec<lsp::Diagnostic>, i32)> {
-    uris
-      .into_iter()
-      .filter_map(|uri| {
-        let (diagnostics, version) = {
-          let document = workspace.documents.get_open(&uri)?;
-
-          let imported_documents = workspace
-            .projects
-            .get(&uri)
-            .into_iter()
-            .flat_map(|project| {
-              project.imported_documents(&workspace.documents)
-            });
-
-          let analyzer = Analyzer {
-            config: Some(config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
-
-          (analyzer.analyze(), document.version)
-        };
-
-        let published = diagnostics.iter().map(lsp::Diagnostic::from).collect();
-
-        workspace.diagnostics.insert(uri.clone(), diagnostics);
-
-        Some((uri, published, version))
-      })
-      .collect()
   }
 }
 
@@ -1995,7 +1980,16 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
+        text: "foo := env(\"BAR\")\n",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 10)),
+          range_length: None,
+          text: "env_var".into(),
+        }],
       })
       .request(CodeActionRequest {
         id: 2,

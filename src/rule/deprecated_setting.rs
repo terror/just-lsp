@@ -8,7 +8,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.document().settings() {
         if let Some(Builtin::Setting {
           deprecated: Some(deprecation),
           ..
@@ -37,7 +37,7 @@ define_rule! {
                 diagnostic
               } else {
                 diagnostic.quickfix(Quickfix::setting_attribute(
-                  setting,
+                  &setting,
                   context.document(),
                   attribute,
                   replacement,

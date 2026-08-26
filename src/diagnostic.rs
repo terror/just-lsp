@@ -51,15 +51,9 @@ impl Diagnostic {
 
 impl From<Diagnostic> for lsp::Diagnostic {
   fn from(value: Diagnostic) -> lsp::Diagnostic {
-    (&value).into()
-  }
-}
-
-impl From<&Diagnostic> for lsp::Diagnostic {
-  fn from(value: &Diagnostic) -> lsp::Diagnostic {
     lsp::Diagnostic {
-      code: Some(lsp::NumberOrString::String(value.id.clone())),
-      message: value.message.clone(),
+      code: Some(lsp::NumberOrString::String(value.id)),
+      message: value.message,
       range: value.range,
       severity: Some(value.severity),
       source: Some("just-lsp".to_string()),

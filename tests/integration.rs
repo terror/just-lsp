@@ -227,6 +227,18 @@ fn analyze_accepts_imported_recipe() -> Result {
 }
 
 #[test]
+fn analyze_accepts_deprecated_setting_in_import() -> Result {
+  Test::new()?
+    .file(
+      "settings.just",
+      "\n\n\n\n\nset windows-shell := [\"powershell.exe\"]\n",
+    )
+    .file("justfile", "import 'settings.just'\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
