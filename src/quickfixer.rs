@@ -64,7 +64,9 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
+    diagnostics: Option<Vec<Diagnostic>>,
     document: Document,
+    imported_documents: Vec<Document>,
     quickfixes: Vec<Quickfix>,
     range: lsp::Range,
   }
@@ -74,10 +76,30 @@ mod tests {
       Self { config, ..self }
     }
 
+    fn diagnostics(self, diagnostics: Vec<Diagnostic>) -> Self {
+      Self {
+        diagnostics: Some(diagnostics),
+        ..self
+      }
+    }
+
+    fn imported_document(self, content: &str) -> Self {
+      Self {
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([Document::from(content)])
+          .collect(),
+        ..self
+      }
+    }
+
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
+        diagnostics: None,
         document: Document::from(content),
+        imported_documents: Vec::new(),
         quickfixes: Vec::new(),
         range: lsp::Range::at(0, 0, 0, 0),
       }
@@ -97,7 +119,9 @@ mod tests {
     fn run(self) {
       let Test {
         config,
+        diagnostics,
         document,
+        imported_documents,
         quickfixes,
         range,
       } = self;
@@ -115,18 +139,24 @@ mod tests {
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let diagnostics = Analyzer {
+      let analyzer = Analyzer {
         config: Some(&config),
         document: &document,
-        imported_documents: Vec::new(),
-      }
-      .quickfixes();
+        imported_documents: imported_documents.iter().collect(),
+      };
 
-      let actions = Quickfixer {
-        diagnostics: &diagnostics,
-        parameters: &parameters,
+      let actual_diagnostics = analyzer.quickfixes();
+
+      if let Some(diagnostics) = diagnostics {
+        assert_eq!(actual_diagnostics, diagnostics);
       }
-      .collect();
+
+      let quickfixer = Quickfixer {
+        diagnostics: &actual_diagnostics,
+        parameters: &parameters,
+      };
+
+      let actions = quickfixer.collect();
 
       assert_eq!(actions.len(), quickfixes.len());
 
@@ -173,9 +203,37 @@ mod tests {
   }
 
   #[test]
+  fn ignores_imported_recipes() {
+    Test::new("import 'dep.just'\n")
+      .imported_document("[parallel]\nfoo:\n")
+      .run();
+  }
+
+  #[test]
   fn ignores_setting_outside_range() {
     Test::new("set windows-powershell := true\nset export := true\n")
       .range(lsp::Range::at(1, 4, 1, 4))
+      .run();
+  }
+
+  #[test]
+  fn only_runs_providers() {
+    Test::new("foo := unknown\nbar := env_var(\"BAR\")\n")
+      .diagnostics(vec![Diagnostic {
+        display: "deprecated function".into(),
+        id: "deprecated-function".into(),
+        message: "`env_var` is deprecated, use `env` instead".into(),
+        quickfix: Some(Quickfix {
+          edits: vec![lsp::TextEdit {
+            range: lsp::Range::at(1, 7, 1, 14),
+            new_text: "env".into(),
+          }],
+          range: lsp::Range::at(1, 7, 1, 14),
+          title: "Replace `env_var` with `env`".into(),
+        }),
+        range: lsp::Range::at(1, 7, 1, 14),
+        severity: lsp::DiagnosticSeverity::WARNING,
+      }])
       .run();
   }
 
@@ -229,15 +287,6 @@ mod tests {
   }
 
   #[test]
-  fn skips_windows_shell_setting_when_replacement_exists() {
-    Test::new(
-      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
-    )
-    .range(lsp::Range::at(2, 4, 2, 4))
-    .run();
-  }
-
-  #[test]
   fn skips_disabled_rules() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
@@ -250,5 +299,14 @@ mod tests {
       .config(config)
       .range(lsp::Range::at(0, 10, 0, 10))
       .run();
+  }
+
+  #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    Test::new(
+      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
+    )
+    .range(lsp::Range::at(2, 4, 2, 4))
+    .run();
   }
 }

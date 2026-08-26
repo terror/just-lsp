@@ -9,8 +9,9 @@ define_rule! {
     provides_quickfixes: true,
     run(context) {
       context
+        .document()
         .recipes()
-        .iter()
+        .into_iter()
         .filter_map(|recipe| {
           let attribute = recipe.find_attribute("parallel")?;
 
