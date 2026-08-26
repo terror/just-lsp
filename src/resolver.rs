@@ -21,23 +21,21 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
-    let (uri, range) = match self.resolve_symbol(identifier)? {
-      Symbol::Builtin(_) => (
+    Some(match self.resolve_symbol(identifier)? {
+      Symbol::Builtin(_) => lsp::Location::new(
         self.view.document().uri.clone(),
         identifier.get_range(self.view.document()),
       ),
-      Symbol::Function(function) => (function.uri, function.value.name.range),
+      Symbol::Function(function) => function.location(function.name.range),
       Symbol::FunctionParameter(parameter) => {
-        (self.view.document().uri.clone(), parameter.range)
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
       }
       Symbol::Parameter(parameter) => {
-        (self.view.document().uri.clone(), parameter.range)
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
       }
-      Symbol::Recipe(recipe) => (recipe.uri, recipe.value.range),
-      Symbol::Variable(variable) => (variable.uri, variable.value.range),
-    };
-
-    Some(lsp::Location { uri, range })
+      Symbol::Recipe(recipe) => recipe.location(recipe.range),
+      Symbol::Variable(variable) => variable.location(variable.range),
+    })
   }
 
   /// Builds hover content for the symbol at `identifier`. User-defined
@@ -54,7 +52,7 @@ impl<'a> Resolver<'a> {
           Symbol::Builtin(builtin) => builtin.description(),
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: function.value.content,
+            value: function.into_inner().content,
           },
           Symbol::FunctionParameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
@@ -66,11 +64,11 @@ impl<'a> Resolver<'a> {
           },
           Symbol::Recipe(recipe) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: recipe.value.content,
+            value: recipe.into_inner().content,
           },
           Symbol::Variable(variable) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: variable.value.content,
+            value: variable.into_inner().content,
           },
         },
       ),

@@ -11,7 +11,7 @@ use {
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
-    ops::{ControlFlow, RangeInclusive},
+    ops::{ControlFlow, Deref, RangeInclusive},
     path::{Path, PathBuf},
     process,
     sync::OnceLock,
