@@ -59,7 +59,7 @@ impl Quickfixer<'_> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   #[derive(Debug)]
   struct Test {
@@ -187,9 +187,12 @@ mod tests {
 
   #[test]
   fn filters_multiple_calls_by_range() {
-    Test::new(
-      "foo := env_var(\"A\")\nbar := env_var_or_default(\"B\", \"C\")\n",
-    )
+    Test::new(indoc! {
+      "
+      foo := env_var(\"A\")
+      bar := env_var_or_default(\"B\", \"C\")
+      "
+    })
     .range(lsp::Range::at(0, 10, 0, 10))
     .quickfix(Quickfix {
       edits: vec![lsp::TextEdit {
@@ -205,51 +208,72 @@ mod tests {
   #[test]
   fn ignores_imported_recipes() {
     Test::new("import 'dep.just'\n")
-      .imported_document("[parallel]\nfoo:\n")
+      .imported_document(indoc! {
+        "
+        [parallel]
+        foo:
+        "
+      })
       .run();
   }
 
   #[test]
   fn ignores_setting_outside_range() {
-    Test::new("set windows-powershell := true\nset export := true\n")
-      .range(lsp::Range::at(1, 4, 1, 4))
-      .run();
+    Test::new(indoc! {
+      "
+      set windows-powershell := true
+      set export := true
+      "
+    })
+    .range(lsp::Range::at(1, 4, 1, 4))
+    .run();
   }
 
   #[test]
   fn only_runs_providers() {
-    Test::new("foo := unknown\nbar := env_var(\"BAR\")\n")
-      .diagnostics(vec![Diagnostic {
-        display: "deprecated function".into(),
-        id: "deprecated-function".into(),
-        message: "`env_var` is deprecated, use `env` instead".into(),
-        quickfix: Some(Quickfix {
-          edits: vec![lsp::TextEdit {
-            range: lsp::Range::at(1, 7, 1, 14),
-            new_text: "env".into(),
-          }],
+    Test::new(indoc! {
+      "
+      foo := unknown
+      bar := env_var(\"BAR\")
+      "
+    })
+    .diagnostics(vec![Diagnostic {
+      display: "deprecated function".into(),
+      id: "deprecated-function".into(),
+      message: "`env_var` is deprecated, use `env` instead".into(),
+      quickfix: Some(Quickfix {
+        edits: vec![lsp::TextEdit {
           range: lsp::Range::at(1, 7, 1, 14),
-          title: "Replace `env_var` with `env`".into(),
-        }),
+          new_text: "env".into(),
+        }],
         range: lsp::Range::at(1, 7, 1, 14),
-        severity: lsp::DiagnosticSeverity::WARNING,
-      }])
-      .run();
+        title: "Replace `env_var` with `env`".into(),
+      }),
+      range: lsp::Range::at(1, 7, 1, 14),
+      severity: lsp::DiagnosticSeverity::WARNING,
+    }])
+    .run();
   }
 
   #[test]
   fn removes_parallel_attribute() {
-    Test::new("[parallel]\nfoo: bar\nbar:\n")
-      .range(lsp::Range::at(0, 0, 1, 0))
-      .quickfix(Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(0, 0, 1, 0),
-          new_text: String::new(),
-        }],
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar
+      bar:
+      "
+    })
+    .range(lsp::Range::at(0, 0, 1, 0))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
         range: lsp::Range::at(0, 0, 1, 0),
-        title: "Remove `[parallel]`".to_string(),
-      })
-      .run();
+        new_text: String::new(),
+      }],
+      range: lsp::Range::at(0, 0, 1, 0),
+      title: "Remove `[parallel]`".to_string(),
+    })
+    .run();
   }
 
   #[test]
@@ -276,9 +300,13 @@ mod tests {
     .quickfix(Quickfix {
       edits: vec![lsp::TextEdit {
         range: lsp::Range::at(0, 0, 1, 0),
-        new_text:
-          "[windows]\nset shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
-            .to_string(),
+        new_text: indoc! {
+          "
+          [windows]
+          set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+          "
+        }
+        .to_string(),
       }],
       range: lsp::Range::at(0, 4, 0, 17),
       title: "Replace `windows-shell` with `[windows] set shell`".to_string(),
@@ -303,9 +331,13 @@ mod tests {
 
   #[test]
   fn skips_windows_shell_setting_when_replacement_exists() {
-    Test::new(
-      "[windows]\nset shell := [\"foo\"]\nset windows-shell := [\"bar\"]\n",
-    )
+    Test::new(indoc! {
+      "
+      [windows]
+      set shell := [\"foo\"]
+      set windows-shell := [\"bar\"]
+      "
+    })
     .range(lsp::Range::at(2, 4, 2, 4))
     .run();
   }
