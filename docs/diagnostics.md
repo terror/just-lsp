@@ -49,7 +49,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `duplicate-unexport`              | Duplicate Unexport              | Environment variable name is unexported more than once.                                                                       |
 | `export-unexport-conflict`        | Export/Unexport Conflict        | Variable is both assigned and unexported.                                                                                     |
 | `undefined-identifiers`           | Undefined Identifiers           | Expression identifier cannot be resolved to a parameter, variable, builtin, or user-defined function.                         |
-| `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
+| `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced in the document or its imports.                                      |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
 | `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |

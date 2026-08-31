@@ -85,6 +85,7 @@ mod tests {
   struct Test {
     config: Config,
     document: Document,
+    imported_documents: Vec<Document>,
     messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
   }
 
@@ -99,6 +100,17 @@ mod tests {
           .messages
           .into_iter()
           .chain([(message, range, Some(lsp::DiagnosticSeverity::ERROR))])
+          .collect(),
+        ..self
+      }
+    }
+
+    fn imported_document(self, content: &str) -> Self {
+      Self {
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([Document::from(content)])
           .collect(),
         ..self
       }
@@ -122,6 +134,7 @@ mod tests {
           },
         })
         .unwrap(),
+        imported_documents: Vec::new(),
         messages: Vec::new(),
       }
     }
@@ -130,13 +143,14 @@ mod tests {
       let Test {
         config,
         document,
+        imported_documents,
         messages,
       } = self;
 
       let analyzer = Analyzer {
         config: Some(&config),
         document: &document,
-        imported_documents: Vec::new(),
+        imported_documents: imported_documents.iter().collect(),
       };
 
       let diagnostics = analyzer
@@ -371,6 +385,44 @@ mod tests {
       "Recipe `nonexistent` not found",
       lsp::Range::at(6, 13, 6, 24),
     )
+    .run();
+  }
+
+  #[test]
+  fn analyzer_uses_imported_recipe_parameters() {
+    Test::new(indoc! {
+      "
+      import? 'foo.just'
+
+      bar: (use 'arg')
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use arg:
+        echo {{arg}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn analyzer_uses_imported_variable_usage() {
+    Test::new(indoc! {
+      "
+      import? 'foo.just'
+
+      lib_var := 'x'
+
+      foo: use
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use:
+        echo {{lib_var}}
+      "
+    })
     .run();
   }
 

@@ -6,6 +6,7 @@ pub struct Scope<'a> {
   globals: HashSet<String>,
   locals: HashSet<String>,
   pub recipe_identifier_usage: HashMap<String, HashSet<String>>,
+  root: bool,
   pub unresolved_identifiers: Vec<(String, lsp::Range)>,
   pub variable_usage: HashMap<String, bool>,
 }
@@ -14,26 +15,10 @@ impl<'a> Scope<'a> {
   pub fn analyze(context: &RuleContext<'a>) -> Self {
     let mut scope = Self::new(context);
 
-    let Some(tree) = context.tree() else {
-      return scope;
-    };
+    scope.walk_document(context.document(), true);
 
-    let root = tree.root_node();
-
-    for node in root.find_all("recipe") {
-      scope.walk_recipe(node);
-    }
-
-    for node in root.find_all("function_definition") {
-      scope.walk_function(node);
-    }
-
-    for identifier in root.find_all("value > identifier") {
-      if identifier.has_any_parent(&["function_definition", "recipe"]) {
-        continue;
-      }
-
-      scope.record(identifier);
+    for document in context.imported_documents() {
+      scope.walk_document(document, false);
     }
 
     scope
@@ -55,6 +40,7 @@ impl<'a> Scope<'a> {
         .iter()
         .map(|recipe| (recipe.name.value.clone(), HashSet::new()))
         .collect(),
+      root: true,
       unresolved_identifiers: Vec::new(),
       variable_usage: context
         .variables()
@@ -68,7 +54,10 @@ impl<'a> Scope<'a> {
   ///
   /// Recipe identifier usage is recorded unconditionally before resolution,
   /// so parameter self-references like `foo foo` still count as usage for the
-  /// `unused-parameters` rule.
+  /// `unused-parameters` rule. Unresolved identifiers are only recorded from
+  /// the analyzed document: usage in imported documents still counts, since
+  /// `just` imports are textual inclusions, but a range from an imported
+  /// document would not be valid in the analyzed document.
   fn record(&mut self, identifier: Node<'_>) {
     if identifier.is_missing() {
       return;
@@ -97,9 +86,44 @@ impl<'a> Scope<'a> {
       return;
     }
 
-    self
-      .unresolved_identifiers
-      .push((name, identifier.get_range(self.document)));
+    if self.root {
+      self
+        .unresolved_identifiers
+        .push((name, identifier.get_range(self.document)));
+    }
+  }
+
+  /// Walk one document's tree, recording the usage of its recipes, functions,
+  /// and top-level expressions.
+  fn walk_document(&mut self, document: &'a Document, root: bool) {
+    self.document = document;
+    self.root = root;
+
+    // Parameters of recipes and functions in one document are not in scope in
+    // any other, so each document starts with an empty local scope.
+    self.locals.clear();
+
+    let Some(tree) = document.tree.as_ref() else {
+      return;
+    };
+
+    let root_node = tree.root_node();
+
+    for node in root_node.find_all("recipe") {
+      self.walk_recipe(node);
+    }
+
+    for node in root_node.find_all("function_definition") {
+      self.walk_function(node);
+    }
+
+    for identifier in root_node.find_all("value > identifier") {
+      if identifier.has_any_parent(&["function_definition", "recipe"]) {
+        continue;
+      }
+
+      self.record(identifier);
+    }
   }
 
   /// Enter a function definition scope and record its body.
@@ -190,6 +214,7 @@ mod tests {
 
   struct Test {
     document: Document,
+    imported_documents: Vec<Document>,
     recipe_usage: Vec<(&'static str, Vec<&'static str>)>,
     unresolved: Vec<&'static str>,
     unused: Vec<&'static str>,
@@ -197,9 +222,21 @@ mod tests {
   }
 
   impl Test {
+    fn imported_document(self, content: &str) -> Self {
+      Self {
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([Document::from(content)])
+          .collect(),
+        ..self
+      }
+    }
+
     fn new(content: &str) -> Self {
       Self {
         document: Document::from(content),
+        imported_documents: Vec::new(),
         recipe_usage: Vec::new(),
         unresolved: Vec::new(),
         unused: Vec::new(),
@@ -223,7 +260,10 @@ mod tests {
     }
 
     fn run(self) {
-      let scope = Scope::analyze(&RuleContext::new(&self.document, []));
+      let scope = Scope::analyze(&RuleContext::new(
+        &self.document,
+        &self.imported_documents,
+      ));
 
       let mut actual_unresolved = scope
         .unresolved_identifiers
@@ -391,6 +431,100 @@ mod tests {
       add(a) := a + 'x'
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn imported_document_assignment_references_variable() {
+    Test::new(indoc! {
+      "
+      lib_var := 'x'
+      "
+    })
+    .imported_document(indoc! {
+      "
+      helper := lib_var
+      "
+    })
+    .used(&["lib_var"])
+    .unused(&["helper"])
+    .run();
+  }
+
+  #[test]
+  fn imported_document_function_body_references_variable() {
+    Test::new(indoc! {
+      "
+      set unstable
+
+      lib_var := 'x'
+      "
+    })
+    .imported_document(indoc! {
+      "
+      join(ext) := lib_var + ext
+      "
+    })
+    .used(&["lib_var"])
+    .run();
+  }
+
+  #[test]
+  fn imported_document_recipe_body_references_variable() {
+    Test::new(indoc! {
+      "
+      import 'lib.just'
+
+      lib_var := 'x'
+
+      foo: use
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use:
+        echo {{lib_var}}
+      "
+    })
+    .recipe_usage("use", &["lib_var"])
+    .used(&["lib_var"])
+    .run();
+  }
+
+  #[test]
+  fn imported_document_recipe_parameter_default_references_variable() {
+    Test::new(indoc! {
+      "
+      lib_var := 'x'
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use arg=lib_var:
+        echo {{arg}}
+      "
+    })
+    .recipe_usage("use", &["arg", "lib_var"])
+    .used(&["lib_var"])
+    .run();
+  }
+
+  #[test]
+  fn imported_document_recipe_parameter_usage() {
+    Test::new(indoc! {
+      "
+      import 'lib.just'
+
+      foo: use
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use arg:
+        echo {{arg}}
+      "
+    })
+    .recipe_usage("use", &["arg"])
     .run();
   }
 
@@ -596,6 +730,28 @@ mod tests {
   }
 
   #[test]
+  fn recipe_parameters_do_not_leak_across_documents() {
+    Test::new(indoc! {
+      "
+      import 'lib.just'
+
+      foo param:
+        echo {{param}}
+      "
+    })
+    .imported_document(indoc! {
+      "
+      param := 'x'
+
+      helper := param
+      "
+    })
+    .used(&["param"])
+    .unused(&["helper"])
+    .run();
+  }
+
+  #[test]
   fn recipe_with_no_parameters_or_body() {
     Test::new(indoc! {
       "
@@ -608,10 +764,14 @@ mod tests {
 
   #[test]
   fn undefined_identifier_in_assignment() {
-    Test::new("foo := bar\n")
-      .unresolved(&["bar"])
-      .unused(&["foo"])
-      .run();
+    Test::new(indoc! {
+      "
+      foo := bar
+      "
+    })
+    .unresolved(&["bar"])
+    .unused(&["foo"])
+    .run();
   }
 
   #[test]
@@ -623,6 +783,24 @@ mod tests {
       "
     })
     .unresolved(&["bar"])
+    .run();
+  }
+
+  #[test]
+  fn unresolved_identifiers_not_recorded_from_imports() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{missing}}
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use:
+        echo {{absent}}
+      "
+    })
+    .unresolved(&["missing"])
     .run();
   }
 
@@ -657,7 +835,13 @@ mod tests {
 
   #[test]
   fn variable_defined_and_unused() {
-    Test::new("foo := 'bar'\n").unused(&["foo"]).run();
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+      "
+    })
+    .unused(&["foo"])
+    .run();
   }
 
   #[test]
