@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Finds non-exported global variables that are never referenced anywhere in
-  /// the document.
+  /// Finds non-exported global variables that are never referenced in the
+  /// document or any of its imports.
   UnusedVariableRule {
     id: "unused-variables",
     message: "unused variable",

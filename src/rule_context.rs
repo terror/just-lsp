@@ -144,6 +144,10 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
+  pub fn imported_documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
+    self.imported_documents.iter().copied()
+  }
+
   #[must_use]
   pub fn new(
     document: &'a Document,
