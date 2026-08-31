@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 define_rule! {
   /// Emits diagnostics for `set` directives targeting settings that don't exist

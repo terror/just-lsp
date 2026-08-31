@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 define_rule! {
   /// Flags aliases that point to recipes which aren't defined.

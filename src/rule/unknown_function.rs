@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 define_rule! {
   /// Ensures every function call references a builtin function recognized by

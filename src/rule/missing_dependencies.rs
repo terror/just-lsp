@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 define_rule! {
   /// Reports recipe dependencies that reference recipes which don't exist in the

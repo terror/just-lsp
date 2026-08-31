@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 pub struct Scope<'a> {
   current_recipe: Option<String>,

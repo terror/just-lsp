@@ -1,4 +1,4 @@
-use {super::*, crate::suggestion::suggest};
+use super::*;
 
 define_rule! {
   /// Warns when an attribute name isn't part of the known builtin attribute set.
