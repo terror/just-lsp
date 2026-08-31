@@ -13,8 +13,7 @@ define_rule! {
         let attribute_name = &attribute.name.value;
 
         if context.builtin_attributes(attribute_name).is_empty() {
-          let suggestion = suggest(
-            attribute_name,
+          let suggestion = attribute_name.find_suggestion(
             BUILTINS.iter().filter_map(|builtin| match builtin {
               Builtin::Attribute { name, .. } => Some(*name),
               _ => None,

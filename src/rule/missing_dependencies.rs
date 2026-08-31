@@ -15,8 +15,7 @@ define_rule! {
       for recipe in context.document().recipes() {
         for dependency in &recipe.dependencies {
           if !recipe_names.contains(&dependency.name.value) {
-            let suggestion = suggest(
-              &dependency.name.value,
+            let suggestion = dependency.name.value.find_suggestion(
               recipe_names.iter().map(String::as_str),
             );
 

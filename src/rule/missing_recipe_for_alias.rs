@@ -13,8 +13,7 @@ define_rule! {
 
       for alias in context.document().aliases() {
         if !recipe_names.contains(&alias.value.value) {
-          let suggestion = suggest(
-            &alias.value.value,
+          let suggestion = alias.value.value.find_suggestion(
             recipe_names.iter().map(String::as_str),
           );
 

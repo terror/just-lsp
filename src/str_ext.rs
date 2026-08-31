@@ -1,6 +1,12 @@
 use super::*;
 
 pub trait StrExt {
+  /// Returns the closest candidate within two edits.
+  fn find_suggestion<'a>(
+    &self,
+    candidates: impl IntoIterator<Item = &'a str>,
+  ) -> Option<String>;
+
   /// Returns the decoded value of a plain string literal.
   fn literal(&self) -> Option<String>;
 
@@ -10,6 +16,22 @@ pub trait StrExt {
 }
 
 impl StrExt for str {
+  fn find_suggestion<'a>(
+    &self,
+    candidates: impl IntoIterator<Item = &'a str>,
+  ) -> Option<String> {
+    candidates
+      .into_iter()
+      .map(|candidate| (strsim::levenshtein(self, candidate), candidate))
+      .filter(|(distance, _)| *distance < 3)
+      .min_by(|(left_distance, left), (right_distance, right)| {
+        left_distance
+          .cmp(right_distance)
+          .then_with(|| left.cmp(right))
+      })
+      .map(|(_, candidate)| candidate.to_owned())
+  }
+
   fn literal(&self) -> Option<String> {
     let (quote, value) = if let Some(value) = self
       .strip_prefix('"')
@@ -134,6 +156,24 @@ mod tests {
   #[test]
   fn empty_string_produces_origin() {
     assert_eq!("".point_delta(), Point::new(0, 0));
+  }
+
+  #[test]
+  fn find_suggestion_finds_close_candidate() {
+    assert_eq!(
+      "shel".find_suggestion(["shell", "export"]),
+      Some("shell".into())
+    );
+  }
+
+  #[test]
+  fn find_suggestion_ignores_distant_candidates() {
+    assert_eq!("unknown".find_suggestion(["shell", "export"]), None);
+  }
+
+  #[test]
+  fn find_suggestion_resolves_ties_lexicographically() {
+    assert_eq!("cat".find_suggestion(["bat", "car"]), Some("bat".into()));
   }
 
   #[test]

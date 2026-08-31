@@ -87,8 +87,7 @@ impl<'a> Scope<'a> {
     }
 
     if self.root {
-      let suggestion = suggest(
-        &name,
+      let suggestion = name.find_suggestion(
         self.locals.iter().chain(&self.globals).map(String::as_str),
       );
 

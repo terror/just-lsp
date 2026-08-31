@@ -12,8 +12,7 @@ define_rule! {
 
       for setting in context.document().settings() {
         if context.builtin_setting(&setting.name.value).is_none() {
-          let suggestion = suggest(
-            &setting.name.value,
+          let suggestion = setting.name.value.find_suggestion(
             BUILTINS.iter().filter_map(|builtin| match builtin {
               Builtin::Setting { name, .. } => Some(*name),
               _ => None,

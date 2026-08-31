@@ -16,7 +16,6 @@ use {
     process,
     sync::OnceLock,
   },
-  suggestion::suggest,
   tower_lsp::lsp_types as lsp,
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
@@ -127,7 +126,6 @@ mod scope;
 mod setting;
 mod setting_kind;
 mod str_ext;
-mod suggestion;
 mod text_node;
 mod unexport;
 mod variable;

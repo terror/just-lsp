@@ -16,8 +16,7 @@ define_rule! {
         if context.builtin_function(function_name.as_str()).is_none()
           && !context.user_function_names().contains(function_name)
         {
-          let suggestion = suggest(
-            function_name,
+          let suggestion = function_name.find_suggestion(
             BUILTINS
               .iter()
               .filter_map(|builtin| match builtin {
