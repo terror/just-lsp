@@ -14,7 +14,7 @@ define_rule! {
         let mut diagnostic = Diagnostic::error(
           match suggestion {
             Some(suggestion) => format!(
-              "Variable `{}` not found\nDid you mean `{suggestion}`?",
+              "Variable `{}` not found. Did you mean `{suggestion}`?",
               identifier.value,
             ),
             None => format!("Variable `{}` not found", identifier.value),

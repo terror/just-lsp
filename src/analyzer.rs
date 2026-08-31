@@ -1002,7 +1002,7 @@ mod tests {
       "
     })
     .error(
-      "Unknown attribute `foo`\nDid you mean `doc`?",
+      "Unknown attribute `foo`. Did you mean `doc`?",
       lsp::Range::at(0, 15, 0, 18),
     )
     .run();
@@ -3578,7 +3578,7 @@ mod tests {
       "
     })
     .error(
-      "Recipe `baz` not found\nDid you mean `bar`?",
+      "Recipe `baz` not found. Did you mean `bar`?",
       lsp::Range::at(3, 5, 3, 8),
     )
     .run();
@@ -4091,7 +4091,7 @@ mod tests {
     })
     .config(config)
     .warning(
-      "Recipe `baz` not found\nDid you mean `bar`?",
+      "Recipe `baz` not found. Did you mean `bar`?",
       lsp::Range::at(3, 5, 3, 8),
     )
     .run();

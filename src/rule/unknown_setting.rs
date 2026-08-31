@@ -22,7 +22,7 @@ define_rule! {
           let mut diagnostic = Diagnostic::error(
             match &suggestion {
               Some(suggestion) => format!(
-                "Unknown setting `{}`\nDid you mean `{suggestion}`?",
+                "Unknown setting `{}`. Did you mean `{suggestion}`?",
                 setting.name.value,
               ),
               None => format!("Unknown setting `{}`", setting.name.value),

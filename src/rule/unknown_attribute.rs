@@ -23,7 +23,7 @@ define_rule! {
           let mut diagnostic = Diagnostic::error(
             match &suggestion {
               Some(suggestion) => format!(
-                "Unknown attribute `{attribute_name}`\nDid you mean `{suggestion}`?"
+                "Unknown attribute `{attribute_name}`. Did you mean `{suggestion}`?"
               ),
               None => format!("Unknown attribute `{attribute_name}`"),
             },

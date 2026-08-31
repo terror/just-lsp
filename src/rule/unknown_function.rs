@@ -32,7 +32,7 @@ define_rule! {
           let mut diagnostic = Diagnostic::error(
             match &suggestion {
               Some(suggestion) => format!(
-                "Unknown function `{function_name}`\nDid you mean `{suggestion}`?"
+                "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
               ),
               None => format!("Unknown function `{function_name}`"),
             },

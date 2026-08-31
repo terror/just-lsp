@@ -22,7 +22,7 @@ define_rule! {
             let mut diagnostic = Diagnostic::error(
               match &suggestion {
                 Some(suggestion) => format!(
-                  "Recipe `{}` not found\nDid you mean `{suggestion}`?",
+                  "Recipe `{}` not found. Did you mean `{suggestion}`?",
                   dependency.name.value,
                 ),
                 None => format!("Recipe `{}` not found", dependency.name.value),
