@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 define_rule! {
   /// Emits diagnostics for `set` directives targeting settings that don't exist
@@ -12,7 +12,7 @@ define_rule! {
 
       for setting in context.document().settings() {
         if context.builtin_setting(&setting.name.value).is_none() {
-          let suggestion = crate::suggestion::suggest(
+          let suggestion = suggest(
             &setting.name.value,
             BUILTINS.iter().filter_map(|builtin| match builtin {
               Builtin::Setting { name, .. } => Some(*name),

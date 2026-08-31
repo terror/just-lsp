@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 define_rule! {
   /// Reports recipe dependencies that reference recipes which don't exist in the
@@ -15,7 +15,7 @@ define_rule! {
       for recipe in context.document().recipes() {
         for dependency in &recipe.dependencies {
           if !recipe_names.contains(&dependency.name.value) {
-            let suggestion = crate::suggestion::suggest(
+            let suggestion = suggest(
               &dependency.name.value,
               recipe_names.iter().map(String::as_str),
             );

@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 define_rule! {
   /// Warns when an attribute name isn't part of the known builtin attribute set.
@@ -13,7 +13,7 @@ define_rule! {
         let attribute_name = &attribute.name.value;
 
         if context.builtin_attributes(attribute_name).is_empty() {
-          let suggestion = crate::suggestion::suggest(
+          let suggestion = suggest(
             attribute_name,
             BUILTINS.iter().filter_map(|builtin| match builtin {
               Builtin::Attribute { name, .. } => Some(*name),

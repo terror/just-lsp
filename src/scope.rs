@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 pub struct Scope<'a> {
   current_recipe: Option<String>,
@@ -87,7 +87,7 @@ impl<'a> Scope<'a> {
     }
 
     if self.root {
-      let suggestion = crate::suggestion::suggest(
+      let suggestion = suggest(
         &name,
         self.locals.iter().chain(&self.globals).map(String::as_str),
       );

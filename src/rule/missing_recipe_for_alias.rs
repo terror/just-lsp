@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 define_rule! {
   /// Flags aliases that point to recipes which aren't defined.
@@ -13,7 +13,7 @@ define_rule! {
 
       for alias in context.document().aliases() {
         if !recipe_names.contains(&alias.value.value) {
-          let suggestion = crate::suggestion::suggest(
+          let suggestion = suggest(
             &alias.value.value,
             recipe_names.iter().map(String::as_str),
           );

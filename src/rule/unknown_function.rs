@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::suggestion::suggest};
 
 define_rule! {
   /// Ensures every function call references a builtin function recognized by
@@ -16,7 +16,7 @@ define_rule! {
         if context.builtin_function(function_name.as_str()).is_none()
           && !context.user_function_names().contains(function_name)
         {
-          let suggestion = crate::suggestion::suggest(
+          let suggestion = suggest(
             function_name,
             BUILTINS
               .iter()

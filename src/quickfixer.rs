@@ -277,6 +277,21 @@ mod tests {
   }
 
   #[test]
+  fn replaces_deprecated_setting() {
+    Test::new("set windows-powershell := true\n")
+      .range(lsp::Range::at(0, 4, 0, 4))
+      .quickfix(Quickfix {
+        edits: vec![lsp::TextEdit {
+          range: lsp::Range::at(0, 4, 0, 22),
+          new_text: "windows-shell".to_string(),
+        }],
+        range: lsp::Range::at(0, 4, 0, 22),
+        title: "Replace `windows-powershell` with `windows-shell`".to_string(),
+      })
+      .run();
+  }
+
+  #[test]
   fn replaces_misspelled_alias_target() {
     Test::new(indoc! {
       "
@@ -385,21 +400,6 @@ mod tests {
         }],
         range: lsp::Range::at(0, 4, 0, 8),
         title: "Replace `shel` with `shell`".into(),
-      })
-      .run();
-  }
-
-  #[test]
-  fn replaces_deprecated_setting() {
-    Test::new("set windows-powershell := true\n")
-      .range(lsp::Range::at(0, 4, 0, 4))
-      .quickfix(Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(0, 4, 0, 22),
-          new_text: "windows-shell".to_string(),
-        }],
-        range: lsp::Range::at(0, 4, 0, 22),
-        title: "Replace `windows-powershell` with `windows-shell`".to_string(),
       })
       .run();
   }
