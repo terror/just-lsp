@@ -20,22 +20,21 @@ define_rule! {
             }),
           );
 
-          let mut diagnostic = Diagnostic::error(
-            match &suggestion {
-              Some(suggestion) => format!(
-                "Unknown attribute `{attribute_name}`. Did you mean `{suggestion}`?"
-              ),
-              None => format!("Unknown attribute `{attribute_name}`"),
-            },
-            attribute.name.range,
+          let message = match &suggestion {
+            Some(suggestion) => format!(
+              "Unknown attribute `{attribute_name}`. Did you mean `{suggestion}`?"
+            ),
+            None => format!("Unknown attribute `{attribute_name}`"),
+          };
+
+          let quickfix = suggestion.map(|suggestion| {
+            Quickfix::replacement(&attribute.name, suggestion)
+          });
+
+          diagnostics.push(
+            Diagnostic::error(message, attribute.name.range)
+              .quickfix(quickfix),
           );
-
-          if let Some(suggestion) = suggestion {
-            diagnostic = diagnostic
-              .quickfix(Quickfix::replacement(&attribute.name, suggestion));
-          }
-
-          diagnostics.push(diagnostic);
         }
       }
 

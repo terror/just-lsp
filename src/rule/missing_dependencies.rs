@@ -19,23 +19,21 @@ define_rule! {
               recipe_names.iter().map(String::as_str),
             );
 
-            let mut diagnostic = Diagnostic::error(
-              match &suggestion {
-                Some(suggestion) => format!(
-                  "Recipe `{}` not found. Did you mean `{suggestion}`?",
-                  dependency.name.value,
-                ),
-                None => format!("Recipe `{}` not found", dependency.name.value),
-              },
-              dependency.range,
+            let message = match &suggestion {
+              Some(suggestion) => format!(
+                "Recipe `{}` not found. Did you mean `{suggestion}`?",
+                dependency.name.value,
+              ),
+              None => format!("Recipe `{}` not found", dependency.name.value),
+            };
+
+            let quickfix = suggestion.map(|suggestion| {
+              Quickfix::replacement(&dependency.name, suggestion)
+            });
+
+            diagnostics.push(
+              Diagnostic::error(message, dependency.range).quickfix(quickfix),
             );
-
-            if let Some(suggestion) = suggestion {
-              diagnostic = diagnostic
-                .quickfix(Quickfix::replacement(&dependency.name, suggestion));
-            }
-
-            diagnostics.push(diagnostic);
           }
         }
       }

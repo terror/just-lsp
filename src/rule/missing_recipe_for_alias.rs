@@ -17,23 +17,21 @@ define_rule! {
             recipe_names.iter().map(String::as_str),
           );
 
-          let mut diagnostic = Diagnostic::error(
-            match &suggestion {
-              Some(suggestion) => format!(
-                "Recipe `{}` not found. Did you mean `{suggestion}`?",
-                alias.value.value,
-              ),
-              None => format!("Recipe `{}` not found", alias.value.value),
-            },
-            alias.value.range,
+          let message = match &suggestion {
+            Some(suggestion) => format!(
+              "Recipe `{}` not found. Did you mean `{suggestion}`?",
+              alias.value.value,
+            ),
+            None => format!("Recipe `{}` not found", alias.value.value),
+          };
+
+          let quickfix = suggestion.map(|suggestion| {
+            Quickfix::replacement(&alias.value, suggestion)
+          });
+
+          diagnostics.push(
+            Diagnostic::error(message, alias.value.range).quickfix(quickfix),
           );
-
-          if let Some(suggestion) = suggestion {
-            diagnostic = diagnostic
-              .quickfix(Quickfix::replacement(&alias.value, suggestion));
-          }
-
-          diagnostics.push(diagnostic);
         }
       }
 

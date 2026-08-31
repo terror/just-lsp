@@ -19,23 +19,21 @@ define_rule! {
             }),
           );
 
-          let mut diagnostic = Diagnostic::error(
-            match &suggestion {
-              Some(suggestion) => format!(
-                "Unknown setting `{}`. Did you mean `{suggestion}`?",
-                setting.name.value,
-              ),
-              None => format!("Unknown setting `{}`", setting.name.value),
-            },
-            setting.range,
+          let message = match &suggestion {
+            Some(suggestion) => format!(
+              "Unknown setting `{}`. Did you mean `{suggestion}`?",
+              setting.name.value,
+            ),
+            None => format!("Unknown setting `{}`", setting.name.value),
+          };
+
+          let quickfix = suggestion.map(|suggestion| {
+            Quickfix::replacement(&setting.name, suggestion)
+          });
+
+          diagnostics.push(
+            Diagnostic::error(message, setting.range).quickfix(quickfix),
           );
-
-          if let Some(suggestion) = suggestion {
-            diagnostic = diagnostic
-              .quickfix(Quickfix::replacement(&setting.name, suggestion));
-          }
-
-          diagnostics.push(diagnostic);
         }
       }
 

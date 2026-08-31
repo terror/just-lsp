@@ -11,23 +11,21 @@ define_rule! {
       let mut diagnostics = Vec::new();
 
       for (identifier, suggestion) in &context.scope().unresolved_identifiers {
-        let mut diagnostic = Diagnostic::error(
-          match suggestion {
-            Some(suggestion) => format!(
-              "Variable `{}` not found. Did you mean `{suggestion}`?",
-              identifier.value,
-            ),
-            None => format!("Variable `{}` not found", identifier.value),
-          },
-          identifier.range,
+        let message = match suggestion {
+          Some(suggestion) => format!(
+            "Variable `{}` not found. Did you mean `{suggestion}`?",
+            identifier.value,
+          ),
+          None => format!("Variable `{}` not found", identifier.value),
+        };
+
+        let quickfix = suggestion.as_deref().map(|suggestion| {
+          Quickfix::replacement(identifier, suggestion)
+        });
+
+        diagnostics.push(
+          Diagnostic::error(message, identifier.range).quickfix(quickfix),
         );
-
-        if let Some(suggestion) = suggestion {
-          diagnostic = diagnostic
-            .quickfix(Quickfix::replacement(identifier, suggestion));
-        }
-
-        diagnostics.push(diagnostic);
       }
 
       diagnostics

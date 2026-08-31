@@ -37,9 +37,9 @@ impl Diagnostic {
   }
 
   #[must_use]
-  pub fn quickfix(self, quickfix: Quickfix) -> Self {
+  pub fn quickfix(self, quickfix: impl Into<Option<Quickfix>>) -> Self {
     Self {
-      quickfix: Some(quickfix),
+      quickfix: quickfix.into(),
       ..self
     }
   }

@@ -29,24 +29,21 @@ define_rule! {
               .chain(context.user_function_names().iter().map(String::as_str)),
           );
 
-          let mut diagnostic = Diagnostic::error(
-            match &suggestion {
-              Some(suggestion) => format!(
-                "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
-              ),
-              None => format!("Unknown function `{function_name}`"),
-            },
-            function_call.name.range,
+          let message = match &suggestion {
+            Some(suggestion) => format!(
+              "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
+            ),
+            None => format!("Unknown function `{function_name}`"),
+          };
+
+          let quickfix = suggestion.map(|suggestion| {
+            Quickfix::replacement(&function_call.name, suggestion)
+          });
+
+          diagnostics.push(
+            Diagnostic::error(message, function_call.name.range)
+              .quickfix(quickfix),
           );
-
-          if let Some(suggestion) = suggestion {
-            diagnostic = diagnostic.quickfix(Quickfix::replacement(
-              &function_call.name,
-              suggestion,
-            ));
-          }
-
-          diagnostics.push(diagnostic);
         }
       }
 
