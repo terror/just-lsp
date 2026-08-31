@@ -16,7 +16,7 @@ define_rule! {
           recipe
             .dependencies
             .iter()
-            .map(|dep| dep.name.clone())
+            .map(|dep| dep.name.value.clone())
             .collect::<Vec<_>>(),
         );
       }

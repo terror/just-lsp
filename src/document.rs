@@ -470,17 +470,19 @@ impl Document {
                   "dependency" => {
                     let dependency_node = node;
 
-                    let Some(dependency_name) = dependency_node
+                    let Some(dependency_name_node) = dependency_node
                       .child_by_field_name("name")
                       .or_else(|| {
                         dependency_node
                           .find("dependency_expression")
                           .and_then(|node| node.child_by_field_name("name"))
                       })
-                      .map(|node| self.get_node_text(&node))
                     else {
                       continue;
                     };
+
+                    let dependency_name =
+                      self.get_node_text(&dependency_name_node);
 
                     let arguments = dependency_node
                       .find("dependency_expression")
@@ -524,7 +526,10 @@ impl Document {
                       });
 
                     dependencies.push(Dependency {
-                      name: dependency_name,
+                      name: TextNode {
+                        value: dependency_name,
+                        range: dependency_name_node.get_range(self),
+                      },
                       arguments,
                       mapped,
                       phase,
@@ -2309,7 +2314,10 @@ mod tests {
         },
         attributes: vec![],
         dependencies: vec![Dependency {
-          name: "foo".into(),
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(3, 5, 3, 8),
+          },
           arguments: vec![],
           mapped: None,
           phase: DependencyPhase::Prior,
@@ -2344,7 +2352,10 @@ mod tests {
         },
         attributes: vec![],
         dependencies: vec![Dependency {
-          name: "foo".into(),
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(3, 6, 3, 9),
+          },
           arguments: vec![
             DependencyArgument {
               value: "'value1'".into(),
@@ -2408,7 +2419,10 @@ mod tests {
         },
         attributes: vec![],
         dependencies: vec![Dependency {
-          name: "bar".into(),
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(3, 12, 3, 15),
+          },
           arguments: vec![
             DependencyArgument {
               value: "args".into(),
@@ -2464,7 +2478,10 @@ mod tests {
         },
         attributes: vec![],
         dependencies: vec![Dependency {
-          name: "tools::foo".into(),
+          name: TextNode {
+            value: "tools::foo".into(),
+            range: lsp::Range::at(6, 5, 6, 15),
+          },
           arguments: vec![],
           mapped: None,
           phase: DependencyPhase::Prior,
@@ -2503,14 +2520,20 @@ mod tests {
         attributes: vec![],
         dependencies: vec![
           Dependency {
-            name: "foo".into(),
+            name: TextNode {
+              value: "foo".into(),
+              range: lsp::Range::at(6, 5, 6, 8),
+            },
             arguments: vec![],
             mapped: None,
             phase: DependencyPhase::Prior,
             range: lsp::Range::at(6, 5, 6, 8),
           },
           Dependency {
-            name: "bar".into(),
+            name: TextNode {
+              value: "bar".into(),
+              range: lsp::Range::at(6, 9, 6, 12),
+            },
             arguments: vec![],
             mapped: None,
             phase: DependencyPhase::Prior,

@@ -69,7 +69,11 @@ impl Analyzer<'_> {
   /// Run rules that can produce quickfixes against the document.
   #[must_use]
   pub fn quickfixes(&self) -> Vec<Diagnostic> {
-    self.analyze_rules(|rule| rule.provides_quickfixes())
+    self
+      .analyze_rules(|rule| rule.provides_quickfixes())
+      .into_iter()
+      .filter(|diagnostic| diagnostic.quickfix.is_some())
+      .collect()
   }
 }
 
@@ -997,7 +1001,10 @@ mod tests {
         echo \"foo\"
       "
     })
-    .error("Unknown attribute `foo`", lsp::Range::at(0, 15, 0, 18))
+    .error(
+      "Unknown attribute `foo`. Did you mean `doc`?",
+      lsp::Range::at(0, 15, 0, 18),
+    )
     .run();
   }
 
@@ -3570,7 +3577,10 @@ mod tests {
         echo \"bar\"
       "
     })
-    .error("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
+    .error(
+      "Recipe `baz` not found. Did you mean `bar`?",
+      lsp::Range::at(3, 5, 3, 8),
+    )
     .run();
   }
 
@@ -4080,7 +4090,10 @@ mod tests {
       "
     })
     .config(config)
-    .warning("Recipe `baz` not found", lsp::Range::at(3, 5, 3, 8))
+    .warning(
+      "Recipe `baz` not found. Did you mean `bar`?",
+      lsp::Range::at(3, 5, 3, 8),
+    )
     .run();
   }
 

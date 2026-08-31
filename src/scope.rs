@@ -7,7 +7,7 @@ pub struct Scope<'a> {
   locals: HashSet<String>,
   pub recipe_identifier_usage: HashMap<String, HashSet<String>>,
   root: bool,
-  pub unresolved_identifiers: Vec<(String, lsp::Range)>,
+  pub unresolved_identifiers: Vec<(TextNode, Option<String>)>,
   pub variable_usage: HashMap<String, bool>,
 }
 
@@ -87,9 +87,17 @@ impl<'a> Scope<'a> {
     }
 
     if self.root {
-      self
-        .unresolved_identifiers
-        .push((name, identifier.get_range(self.document)));
+      let suggestion = name.find_suggestion(
+        self.locals.iter().chain(&self.globals).map(String::as_str),
+      );
+
+      self.unresolved_identifiers.push((
+        TextNode {
+          value: name,
+          range: identifier.get_range(self.document),
+        },
+        suggestion,
+      ));
     }
   }
 
@@ -268,7 +276,7 @@ mod tests {
       let mut actual_unresolved = scope
         .unresolved_identifiers
         .iter()
-        .map(|(name, _)| name.as_str())
+        .map(|(identifier, _)| identifier.value.as_str())
         .collect::<Vec<_>>();
 
       let mut expected_unresolved = self.unresolved.clone();
