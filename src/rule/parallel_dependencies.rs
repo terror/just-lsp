@@ -33,9 +33,9 @@ define_rule! {
             _ => return None,
           };
 
-          Some(diagnostic.quickfix(Quickfix::removal(
-            attribute.range,
-            "Remove `[parallel]`",
+          Some(diagnostic.quickfix(Quickfix::attribute_removal(
+            attribute,
+            context.document(),
           )))
         })
         .collect()
