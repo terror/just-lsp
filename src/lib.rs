@@ -126,6 +126,7 @@ mod scope;
 mod setting;
 mod setting_kind;
 mod str_ext;
+mod suggestion;
 mod text_node;
 mod unexport;
 mod variable;

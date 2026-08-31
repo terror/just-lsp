@@ -15,7 +15,7 @@ define_rule! {
 
       for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
-          if let Some(parameters) = recipe_parameters.get(&dependency.name) {
+          if let Some(parameters) = recipe_parameters.get(&dependency.name.value) {
             let required_parameters = parameters
               .iter()
               .filter(|parameter| {
@@ -37,7 +37,7 @@ define_rule! {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
-                  dependency.name,
+                  dependency.name.value,
                   Count("argument", required_parameters)
                 ),
                 dependency.range,
@@ -46,7 +46,7 @@ define_rule! {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
-                  dependency.name,
+                  dependency.name.value,
                   Count("argument", parameter_count)
                 ),
                 dependency.range,

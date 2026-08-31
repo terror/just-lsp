@@ -277,6 +277,119 @@ mod tests {
   }
 
   #[test]
+  fn replaces_misspelled_alias_target() {
+    Test::new(indoc! {
+      "
+      build:
+
+      alias b := biuld
+      "
+    })
+    .range(lsp::Range::at(2, 11, 2, 11))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(2, 11, 2, 16),
+        new_text: "build".into(),
+      }],
+      range: lsp::Range::at(2, 11, 2, 16),
+      title: "Replace `biuld` with `build`".into(),
+    })
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_attribute() {
+    Test::new(indoc! {
+      "
+      [prvate]
+      build:
+      "
+    })
+    .range(lsp::Range::at(0, 1, 0, 1))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(0, 1, 0, 7),
+        new_text: "private".into(),
+      }],
+      range: lsp::Range::at(0, 1, 0, 7),
+      title: "Replace `prvate` with `private`".into(),
+    })
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_dependency_name_only() {
+    Test::new(indoc! {
+      "
+      import 'dep.just'
+
+      test target: (biuld target)
+      "
+    })
+    .imported_document("build target:\n")
+    .range(lsp::Range::at(2, 14, 2, 14))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(2, 14, 2, 19),
+        new_text: "build".into(),
+      }],
+      range: lsp::Range::at(2, 14, 2, 19),
+      title: "Replace `biuld` with `build`".into(),
+    })
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_function() {
+    Test::new("jobs := num_jobz()\n")
+      .range(lsp::Range::at(0, 8, 0, 8))
+      .quickfix(Quickfix {
+        edits: vec![lsp::TextEdit {
+          range: lsp::Range::at(0, 8, 0, 16),
+          new_text: "num_jobs".into(),
+        }],
+        range: lsp::Range::at(0, 8, 0, 16),
+        title: "Replace `num_jobz` with `num_jobs`".into(),
+      })
+      .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_identifier_with_local_parameter() {
+    Test::new(indoc! {
+      "
+      build target:
+        echo {{targte}}
+      "
+    })
+    .range(lsp::Range::at(1, 9, 1, 9))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(1, 9, 1, 15),
+        new_text: "target".into(),
+      }],
+      range: lsp::Range::at(1, 9, 1, 15),
+      title: "Replace `targte` with `target`".into(),
+    })
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_setting() {
+    Test::new("set shel := ['bash']\n")
+      .range(lsp::Range::at(0, 4, 0, 4))
+      .quickfix(Quickfix {
+        edits: vec![lsp::TextEdit {
+          range: lsp::Range::at(0, 4, 0, 8),
+          new_text: "shell".into(),
+        }],
+        range: lsp::Range::at(0, 4, 0, 8),
+        title: "Replace `shel` with `shell`".into(),
+      })
+      .run();
+  }
+
+  #[test]
   fn replaces_deprecated_setting() {
     Test::new("set windows-powershell := true\n")
       .range(lsp::Range::at(0, 4, 0, 4))

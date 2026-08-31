@@ -6,15 +6,37 @@ define_rule! {
   UnknownSettingRule {
     id: "unknown-setting",
     message: "unknown setting",
+    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.document().settings() {
         if context.builtin_setting(&setting.name.value).is_none() {
-          diagnostics.push(Diagnostic::error(
-            format!("Unknown setting `{}`", setting.name.value),
+          let suggestion = crate::suggestion::suggest(
+            &setting.name.value,
+            BUILTINS.iter().filter_map(|builtin| match builtin {
+              Builtin::Setting { name, .. } => Some(*name),
+              _ => None,
+            }),
+          );
+
+          let mut diagnostic = Diagnostic::error(
+            match &suggestion {
+              Some(suggestion) => format!(
+                "Unknown setting `{}`\nDid you mean `{suggestion}`?",
+                setting.name.value,
+              ),
+              None => format!("Unknown setting `{}`", setting.name.value),
+            },
             setting.range,
-          ));
+          );
+
+          if let Some(suggestion) = suggestion {
+            diagnostic = diagnostic
+              .quickfix(Quickfix::replacement(&setting.name, suggestion));
+          }
+
+          diagnostics.push(diagnostic);
         }
       }
 

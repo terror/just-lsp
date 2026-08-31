@@ -654,6 +654,7 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
+ "strsim",
  "tempfile",
  "thiserror",
  "tokio",

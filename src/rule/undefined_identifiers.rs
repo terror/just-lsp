@@ -6,14 +6,28 @@ define_rule! {
   UndefinedIdentifierRule {
     id: "undefined-identifiers",
     message: "undefined identifier",
+    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for (name, range) in &context.scope().unresolved_identifiers {
-        diagnostics.push(Diagnostic::error(
-          format!("Variable `{name}` not found"),
-          *range,
-        ));
+      for (identifier, suggestion) in &context.scope().unresolved_identifiers {
+        let mut diagnostic = Diagnostic::error(
+          match suggestion {
+            Some(suggestion) => format!(
+              "Variable `{}` not found\nDid you mean `{suggestion}`?",
+              identifier.value,
+            ),
+            None => format!("Variable `{}` not found", identifier.value),
+          },
+          identifier.range,
+        );
+
+        if let Some(suggestion) = suggestion {
+          diagnostic = diagnostic
+            .quickfix(Quickfix::replacement(identifier, suggestion));
+        }
+
+        diagnostics.push(diagnostic);
       }
 
       diagnostics
