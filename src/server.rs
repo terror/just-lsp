@@ -300,8 +300,14 @@ impl Inner {
       imported_documents: imported_documents.collect(),
     };
 
+    let diagnostics = analyzer
+      .analyze()
+      .into_iter()
+      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
+      .collect::<Vec<_>>();
+
     let quickfixer = Quickfixer {
-      diagnostics: &analyzer.quickfixes(),
+      diagnostics: &diagnostics,
       parameters: &params,
     };
 

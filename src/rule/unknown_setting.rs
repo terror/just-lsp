@@ -6,7 +6,6 @@ define_rule! {
   UnknownSettingRule {
     id: "unknown-setting",
     message: "unknown setting",
-    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 

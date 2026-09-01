@@ -15,13 +15,6 @@ impl Analyzer<'_> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    self.analyze_rules(|_| true)
-  }
-
-  fn analyze_rules(
-    &self,
-    predicate: impl Fn(&dyn Rule) -> bool,
-  ) -> Vec<Diagnostic> {
     let context =
       RuleContext::new(self.document, self.imported_documents.iter().copied());
 
@@ -31,7 +24,6 @@ impl Analyzer<'_> {
 
     let mut diagnostics = inventory::iter::<&dyn Rule>
       .into_iter()
-      .filter(|rule| predicate(**rule))
       .flat_map(|rule| {
         let rule_config = config.rule_config(rule.id());
 
@@ -64,16 +56,6 @@ impl Analyzer<'_> {
     });
 
     diagnostics
-  }
-
-  /// Run rules that can produce quickfixes against the document.
-  #[must_use]
-  pub fn quickfixes(&self) -> Vec<Diagnostic> {
-    self
-      .analyze_rules(|rule| rule.provides_quickfixes())
-      .into_iter()
-      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
-      .collect()
   }
 }
 

@@ -145,7 +145,11 @@ mod tests {
         imported_documents: imported_documents.iter().collect(),
       };
 
-      let actual_diagnostics = analyzer.quickfixes();
+      let actual_diagnostics = analyzer
+        .analyze()
+        .into_iter()
+        .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
+        .collect::<Vec<_>>();
 
       if let Some(diagnostics) = diagnostics {
         assert_eq!(actual_diagnostics, diagnostics);
@@ -227,7 +231,7 @@ mod tests {
   }
 
   #[test]
-  fn only_runs_providers() {
+  fn only_returns_diagnostics_with_quickfixes() {
     Test::new(indoc! {
       "
       foo := unknown
