@@ -37,7 +37,7 @@ define_rule! {
               }) {
                 diagnostic
               } else {
-                diagnostic.quickfix(Quickfix::setting_attribute(
+                diagnostic.quickfix(DeprecatedSettingRule::setting_attribute(
                   &setting,
                   context.document(),
                   attribute,
@@ -53,5 +53,30 @@ define_rule! {
 
       diagnostics
     }
+  }
+}
+
+impl DeprecatedSettingRule {
+  fn setting_attribute(
+    setting: &Setting,
+    document: &Document,
+    attribute: &str,
+    replacement: &str,
+  ) -> Quickfix {
+    let line = document
+      .content
+      .line(setting.range.start.line as usize)
+      .to_string();
+
+    let line = line.replacen(&setting.name.value, replacement, 1);
+
+    Quickfix::edit(
+      format!(
+        "Replace `{}` with `[{attribute}] set {replacement}`",
+        setting.name.value
+      ),
+      setting.range,
+      format!("[{attribute}]\n{line}"),
+    )
   }
 }
