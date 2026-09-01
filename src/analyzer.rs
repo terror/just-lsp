@@ -57,16 +57,6 @@ impl Analyzer<'_> {
 
     diagnostics
   }
-
-  /// Return diagnostics with quickfixes for the document.
-  #[must_use]
-  pub fn quickfixes(&self) -> Vec<Diagnostic> {
-    self
-      .analyze()
-      .into_iter()
-      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
-      .collect()
-  }
 }
 
 #[cfg(test)]
