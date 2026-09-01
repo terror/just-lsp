@@ -229,7 +229,7 @@ mod tests {
   }
 
   #[test]
-  fn only_runs_providers() {
+  fn only_returns_diagnostics_with_quickfixes() {
     Test::new(indoc! {
       "
       foo := unknown

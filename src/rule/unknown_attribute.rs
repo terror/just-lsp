@@ -5,7 +5,6 @@ define_rule! {
   UnknownAttributeRule {
     id: "unknown-attribute",
     message: "unknown attribute",
-    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 

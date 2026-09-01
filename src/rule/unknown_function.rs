@@ -6,7 +6,6 @@ define_rule! {
   UnknownFunctionRule {
     id: "unknown-function",
     message: "unknown function",
-    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 

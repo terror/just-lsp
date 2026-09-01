@@ -5,7 +5,6 @@ define_rule! {
   MissingRecipeForAliasRule {
     id: "missing-recipe-for-alias",
     message: "alias target not found",
-    provides_quickfixes: true,
     run(context) {
       let mut diagnostics = Vec::new();
 
