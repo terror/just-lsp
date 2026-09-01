@@ -15,10 +15,6 @@ impl Analyzer<'_> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    self.analyze_rules()
-  }
-
-  fn analyze_rules(&self) -> Vec<Diagnostic> {
     let context =
       RuleContext::new(self.document, self.imported_documents.iter().copied());
 
