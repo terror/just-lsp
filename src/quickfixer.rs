@@ -47,11 +47,11 @@ impl Quickfixer<'_> {
       .diagnostics
       .iter()
       .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
-      .filter_map(|diagnostic| {
+      .flat_map(|diagnostic| {
         diagnostic
-          .quickfix
-          .as_ref()
-          .map(|quickfix| self.action(diagnostic, quickfix))
+          .quickfixes
+          .iter()
+          .map(move |quickfix| self.action(diagnostic, quickfix))
       })
       .collect()
   }
@@ -240,13 +240,13 @@ mod tests {
       display: "deprecated function".into(),
       id: "deprecated-function".into(),
       message: "`env_var` is deprecated, use `env` instead".into(),
-      quickfix: Some(Quickfix {
+      quickfixes: vec![Quickfix {
         edits: vec![lsp::TextEdit {
           range: lsp::Range::at(1, 7, 1, 14),
           new_text: "env".into(),
         }],
         title: "Replace `env_var` with `env`".into(),
-      }),
+      }],
       range: lsp::Range::at(1, 7, 1, 14),
       severity: lsp::DiagnosticSeverity::WARNING,
     }])

@@ -8,8 +8,8 @@ pub struct Diagnostic {
   pub id: String,
   /// A detailed message describing the diagnostic.
   pub message: String,
-  /// An optional quickfix that can be applied to resolve the diagnostic.
-  pub quickfix: Option<Quickfix>,
+  /// Quickfixes that can be applied to resolve the diagnostic.
+  pub quickfixes: Vec<Quickfix>,
   /// The range in the source code where the diagnostic applies.
   pub range: lsp::Range,
   /// The severity level of the diagnostic.
@@ -30,18 +30,16 @@ impl Diagnostic {
       display: String::new(),
       id: String::new(),
       message: message.into(),
-      quickfix: None,
+      quickfixes: Vec::new(),
       range,
       severity,
     }
   }
 
   #[must_use]
-  pub fn quickfix(self, quickfix: impl Into<Option<Quickfix>>) -> Self {
-    Self {
-      quickfix: quickfix.into(),
-      ..self
-    }
+  pub fn quickfix(mut self, quickfix: impl Into<Option<Quickfix>>) -> Self {
+    self.quickfixes.extend(quickfix.into());
+    self
   }
 
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
