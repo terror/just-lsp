@@ -33,7 +33,7 @@ define_rule! {
             _ => return None,
           };
 
-          Some(diagnostic.quickfix(ParallelDependenciesRule::attribute_removal(
+          Some(diagnostic.quickfix(Self::attribute_removal_quickfix(
             attribute,
             context.document(),
           )))
@@ -44,7 +44,7 @@ define_rule! {
 }
 
 impl ParallelDependenciesRule {
-  fn attribute_removal(
+  fn attribute_removal_quickfix(
     attribute: &Attribute,
     document: &Document,
   ) -> Option<Quickfix> {
