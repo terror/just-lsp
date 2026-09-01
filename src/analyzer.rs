@@ -72,7 +72,7 @@ impl Analyzer<'_> {
     self
       .analyze_rules(|rule| rule.provides_quickfixes())
       .into_iter()
-      .filter(|diagnostic| diagnostic.quickfix.is_some())
+      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
       .collect()
   }
 }

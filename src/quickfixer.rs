@@ -47,11 +47,11 @@ impl Quickfixer<'_> {
       .diagnostics
       .iter()
       .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
-      .filter_map(|diagnostic| {
+      .flat_map(|diagnostic| {
         diagnostic
-          .quickfix
-          .as_ref()
-          .map(|quickfix| self.action(diagnostic, quickfix))
+          .quickfixes
+          .iter()
+          .map(move |quickfix| self.action(diagnostic, quickfix))
       })
       .collect()
   }
@@ -186,6 +186,46 @@ mod tests {
   }
 
   #[test]
+  fn collects_multiple_quickfixes() {
+    let document = Document::from("foo\n");
+    let range = lsp::Range::at(0, 0, 0, 3);
+    let diagnostic = Diagnostic::warning("message", range)
+      .quickfix(Quickfix::removal(range, "Remove `foo`"))
+      .quickfix(Quickfix::replacement(
+        &TextNode {
+          range,
+          value: "foo".into(),
+        },
+        "bar",
+      ));
+    let parameters = lsp::CodeActionParams {
+      text_document: lsp::TextDocumentIdentifier { uri: document.uri },
+      range,
+      context: lsp::CodeActionContext::default(),
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+    let diagnostics = [diagnostic];
+    let quickfixer = Quickfixer {
+      diagnostics: &diagnostics,
+      parameters: &parameters,
+    };
+
+    let titles = quickfixer
+      .collect()
+      .into_iter()
+      .map(|action| match action {
+        lsp::CodeActionOrCommand::CodeAction(action) => action.title,
+        lsp::CodeActionOrCommand::Command(_) => {
+          unreachable!("expected CodeAction")
+        }
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(titles, ["Remove `foo`", "Replace `foo` with `bar`"]);
+  }
+
+  #[test]
   fn filters_multiple_calls_by_range() {
     Test::new(indoc! {
       "
@@ -240,13 +280,13 @@ mod tests {
       display: "deprecated function".into(),
       id: "deprecated-function".into(),
       message: "`env_var` is deprecated, use `env` instead".into(),
-      quickfix: Some(Quickfix {
+      quickfixes: vec![Quickfix {
         edits: vec![lsp::TextEdit {
           range: lsp::Range::at(1, 7, 1, 14),
           new_text: "env".into(),
         }],
         title: "Replace `env_var` with `env`".into(),
-      }),
+      }],
       range: lsp::Range::at(1, 7, 1, 14),
       severity: lsp::DiagnosticSeverity::WARNING,
     }])
