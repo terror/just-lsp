@@ -3,7 +3,6 @@ use super::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Quickfix {
   pub edits: Vec<lsp::TextEdit>,
-  pub range: lsp::Range,
   pub title: String,
 }
 
@@ -72,7 +71,6 @@ impl Quickfix {
         range,
         new_text: String::new(),
       }],
-      range,
       title: title.into(),
     }
   }
@@ -86,7 +84,6 @@ impl Quickfix {
         range: name.range,
         new_text: replacement.clone(),
       }],
-      range: name.range,
       title: format!("Replace `{}` with `{replacement}`", name.value),
     }
   }
@@ -110,7 +107,6 @@ impl Quickfix {
         range: setting.range,
         new_text: format!("[{attribute}]\n{line}"),
       }],
-      range: setting.name.range,
       title: format!(
         "Replace `{}` with `[{attribute}] set {replacement}`",
         setting.name.value

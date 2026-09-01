@@ -199,7 +199,6 @@ mod tests {
         range: lsp::Range::at(0, 7, 0, 14),
         new_text: "env".to_string(),
       }],
-      range: lsp::Range::at(0, 7, 0, 14),
       title: "Replace `env_var` with `env`".to_string(),
     })
     .run();
@@ -246,7 +245,6 @@ mod tests {
           range: lsp::Range::at(1, 7, 1, 14),
           new_text: "env".into(),
         }],
-        range: lsp::Range::at(1, 7, 1, 14),
         title: "Replace `env_var` with `env`".into(),
       }),
       range: lsp::Range::at(1, 7, 1, 14),
@@ -270,7 +268,6 @@ mod tests {
         range: lsp::Range::at(0, 0, 1, 0),
         new_text: String::new(),
       }],
-      range: lsp::Range::at(0, 0, 1, 0),
       title: "Remove `[parallel]`".to_string(),
     })
     .run();
@@ -291,7 +288,6 @@ mod tests {
         range: lsp::Range::at(0, 8, 0, 18),
         new_text: String::new(),
       }],
-      range: lsp::Range::at(0, 8, 0, 18),
       title: "Remove `[parallel]`".to_string(),
     })
     .run();
@@ -306,7 +302,6 @@ mod tests {
           range: lsp::Range::at(0, 4, 0, 22),
           new_text: "windows-shell".to_string(),
         }],
-        range: lsp::Range::at(0, 4, 0, 22),
         title: "Replace `windows-powershell` with `windows-shell`".to_string(),
       })
       .run();
@@ -327,7 +322,6 @@ mod tests {
         range: lsp::Range::at(2, 11, 2, 16),
         new_text: "build".into(),
       }],
-      range: lsp::Range::at(2, 11, 2, 16),
       title: "Replace `biuld` with `build`".into(),
     })
     .run();
@@ -347,7 +341,6 @@ mod tests {
         range: lsp::Range::at(0, 1, 0, 7),
         new_text: "private".into(),
       }],
-      range: lsp::Range::at(0, 1, 0, 7),
       title: "Replace `prvate` with `private`".into(),
     })
     .run();
@@ -369,7 +362,6 @@ mod tests {
         range: lsp::Range::at(2, 14, 2, 19),
         new_text: "build".into(),
       }],
-      range: lsp::Range::at(2, 14, 2, 19),
       title: "Replace `biuld` with `build`".into(),
     })
     .run();
@@ -384,7 +376,6 @@ mod tests {
           range: lsp::Range::at(0, 8, 0, 16),
           new_text: "num_jobs".into(),
         }],
-        range: lsp::Range::at(0, 8, 0, 16),
         title: "Replace `num_jobz` with `num_jobs`".into(),
       })
       .run();
@@ -404,7 +395,6 @@ mod tests {
         range: lsp::Range::at(1, 9, 1, 15),
         new_text: "target".into(),
       }],
-      range: lsp::Range::at(1, 9, 1, 15),
       title: "Replace `targte` with `target`".into(),
     })
     .run();
@@ -419,7 +409,6 @@ mod tests {
           range: lsp::Range::at(0, 4, 0, 8),
           new_text: "shell".into(),
         }],
-        range: lsp::Range::at(0, 4, 0, 8),
         title: "Replace `shel` with `shell`".into(),
       })
       .run();
@@ -442,7 +431,6 @@ mod tests {
         }
         .to_string(),
       }],
-      range: lsp::Range::at(0, 4, 0, 17),
       title: "Replace `windows-shell` with `[windows] set shell`".to_string(),
     })
     .run();
