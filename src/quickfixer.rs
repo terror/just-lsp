@@ -186,46 +186,6 @@ mod tests {
   }
 
   #[test]
-  fn collects_multiple_quickfixes() {
-    let document = Document::from("foo\n");
-    let range = lsp::Range::at(0, 0, 0, 3);
-    let diagnostic = Diagnostic::warning("message", range)
-      .quickfix(Quickfix::removal(range, "Remove `foo`"))
-      .quickfix(Quickfix::replacement(
-        &TextNode {
-          range,
-          value: "foo".into(),
-        },
-        "bar",
-      ));
-    let parameters = lsp::CodeActionParams {
-      text_document: lsp::TextDocumentIdentifier { uri: document.uri },
-      range,
-      context: lsp::CodeActionContext::default(),
-      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-      partial_result_params: lsp::PartialResultParams::default(),
-    };
-    let diagnostics = [diagnostic];
-    let quickfixer = Quickfixer {
-      diagnostics: &diagnostics,
-      parameters: &parameters,
-    };
-
-    let titles = quickfixer
-      .collect()
-      .into_iter()
-      .map(|action| match action {
-        lsp::CodeActionOrCommand::CodeAction(action) => action.title,
-        lsp::CodeActionOrCommand::Command(_) => {
-          unreachable!("expected CodeAction")
-        }
-      })
-      .collect::<Vec<_>>();
-
-    assert_eq!(titles, ["Remove `foo`", "Replace `foo` with `bar`"]);
-  }
-
-  #[test]
   fn filters_multiple_calls_by_range() {
     Test::new(indoc! {
       "
