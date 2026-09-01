@@ -37,12 +37,23 @@ define_rule! {
               }) {
                 diagnostic
               } else {
-                diagnostic.quickfix(Quickfix::setting_attribute(
-                  &setting,
-                  context.document(),
-                  attribute,
-                  replacement,
-                ))
+                let line = context.document()
+                  .content
+                  .line(setting.range.start.line as usize)
+                  .to_string();
+
+                let line = line.replacen(&setting.name.value, replacement, 1);
+
+                diagnostic.quickfix(
+                  Quickfix::edit(
+                    format!(
+                      "Replace `{}` with `[{attribute}] set {replacement}`",
+                      setting.name.value
+                    ),
+                    setting.range,
+                    format!("[{attribute}]\n{line}"),
+                  )
+                )
               }
             }
           };

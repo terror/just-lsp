@@ -27,13 +27,13 @@ impl Quickfixer<'_> {
       .collect::<Vec<_>>();
 
     lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: quickfix.title.clone(),
+      title: quickfix.title().to_string(),
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
       edit: Some(lsp::WorkspaceEdit {
         changes: Some(HashMap::from([(
           self.parameters.text_document.uri.clone(),
-          quickfix.edits.clone(),
+          quickfix.edits().to_vec(),
         )])),
         ..Default::default()
       }),
@@ -168,13 +168,13 @@ mod tests {
         assert_eq!(
           action,
           lsp::CodeAction {
-            title: quickfix.title,
+            title: quickfix.title().to_string(),
             kind: Some(lsp::CodeActionKind::QUICKFIX),
             diagnostics: None,
             edit: Some(lsp::WorkspaceEdit {
               changes: Some(HashMap::from([(
                 document.uri.clone(),
-                quickfix.edits,
+                quickfix.edits().to_vec(),
               )])),
               ..Default::default()
             }),
@@ -194,13 +194,11 @@ mod tests {
       "
     })
     .range(lsp::Range::at(0, 10, 0, 10))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 7, 0, 14),
-        new_text: "env".to_string(),
-      }],
-      title: "Replace `env_var` with `env`".to_string(),
-    })
+    .quickfix(Quickfix::edit(
+      "Replace `env_var` with `env`",
+      lsp::Range::at(0, 7, 0, 14),
+      "env",
+    ))
     .run();
   }
 
@@ -240,13 +238,11 @@ mod tests {
       display: "deprecated function".into(),
       id: "deprecated-function".into(),
       message: "`env_var` is deprecated, use `env` instead".into(),
-      quickfixes: vec![Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(1, 7, 1, 14),
-          new_text: "env".into(),
-        }],
-        title: "Replace `env_var` with `env`".into(),
-      }],
+      quickfixes: vec![Quickfix::edit(
+        "Replace `env_var` with `env`",
+        lsp::Range::at(1, 7, 1, 14),
+        "env",
+      )],
       range: lsp::Range::at(1, 7, 1, 14),
       severity: lsp::DiagnosticSeverity::WARNING,
     }])
@@ -263,13 +259,10 @@ mod tests {
       "
     })
     .range(lsp::Range::at(0, 0, 1, 0))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 0, 1, 0),
-        new_text: String::new(),
-      }],
-      title: "Remove `[parallel]`".to_string(),
-    })
+    .quickfix(Quickfix::removal(
+      lsp::Range::at(0, 0, 1, 0),
+      "Remove `[parallel]`",
+    ))
     .run();
   }
 
@@ -283,13 +276,10 @@ mod tests {
       "
     })
     .range(lsp::Range::at(0, 0, 1, 0))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 8, 0, 18),
-        new_text: String::new(),
-      }],
-      title: "Remove `[parallel]`".to_string(),
-    })
+    .quickfix(Quickfix::removal(
+      lsp::Range::at(0, 8, 0, 18),
+      "Remove `[parallel]`",
+    ))
     .run();
   }
 
@@ -297,13 +287,11 @@ mod tests {
   fn replaces_deprecated_setting() {
     Test::new("set windows-powershell := true\n")
       .range(lsp::Range::at(0, 4, 0, 4))
-      .quickfix(Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(0, 4, 0, 22),
-          new_text: "windows-shell".to_string(),
-        }],
-        title: "Replace `windows-powershell` with `windows-shell`".to_string(),
-      })
+      .quickfix(Quickfix::edit(
+        "Replace `windows-powershell` with `windows-shell`",
+        lsp::Range::at(0, 4, 0, 22),
+        "windows-shell",
+      ))
       .run();
   }
 
@@ -317,13 +305,11 @@ mod tests {
       "
     })
     .range(lsp::Range::at(2, 11, 2, 11))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(2, 11, 2, 16),
-        new_text: "build".into(),
-      }],
-      title: "Replace `biuld` with `build`".into(),
-    })
+    .quickfix(Quickfix::edit(
+      "Replace `biuld` with `build`",
+      lsp::Range::at(2, 11, 2, 16),
+      "build",
+    ))
     .run();
   }
 
@@ -336,13 +322,11 @@ mod tests {
       "
     })
     .range(lsp::Range::at(0, 1, 0, 1))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 1, 0, 7),
-        new_text: "private".into(),
-      }],
-      title: "Replace `prvate` with `private`".into(),
-    })
+    .quickfix(Quickfix::edit(
+      "Replace `prvate` with `private`",
+      lsp::Range::at(0, 1, 0, 7),
+      "private",
+    ))
     .run();
   }
 
@@ -357,13 +341,11 @@ mod tests {
     })
     .imported_document("build target:\n")
     .range(lsp::Range::at(2, 14, 2, 14))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(2, 14, 2, 19),
-        new_text: "build".into(),
-      }],
-      title: "Replace `biuld` with `build`".into(),
-    })
+    .quickfix(Quickfix::edit(
+      "Replace `biuld` with `build`",
+      lsp::Range::at(2, 14, 2, 19),
+      "build",
+    ))
     .run();
   }
 
@@ -371,13 +353,11 @@ mod tests {
   fn replaces_misspelled_function() {
     Test::new("jobs := num_jobz()\n")
       .range(lsp::Range::at(0, 8, 0, 8))
-      .quickfix(Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(0, 8, 0, 16),
-          new_text: "num_jobs".into(),
-        }],
-        title: "Replace `num_jobz` with `num_jobs`".into(),
-      })
+      .quickfix(Quickfix::edit(
+        "Replace `num_jobz` with `num_jobs`",
+        lsp::Range::at(0, 8, 0, 16),
+        "num_jobs",
+      ))
       .run();
   }
 
@@ -390,13 +370,11 @@ mod tests {
       "
     })
     .range(lsp::Range::at(1, 9, 1, 9))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(1, 9, 1, 15),
-        new_text: "target".into(),
-      }],
-      title: "Replace `targte` with `target`".into(),
-    })
+    .quickfix(Quickfix::edit(
+      "Replace `targte` with `target`",
+      lsp::Range::at(1, 9, 1, 15),
+      "target",
+    ))
     .run();
   }
 
@@ -404,13 +382,11 @@ mod tests {
   fn replaces_misspelled_setting() {
     Test::new("set shel := ['bash']\n")
       .range(lsp::Range::at(0, 4, 0, 4))
-      .quickfix(Quickfix {
-        edits: vec![lsp::TextEdit {
-          range: lsp::Range::at(0, 4, 0, 8),
-          new_text: "shell".into(),
-        }],
-        title: "Replace `shel` with `shell`".into(),
-      })
+      .quickfix(Quickfix::edit(
+        "Replace `shel` with `shell`",
+        lsp::Range::at(0, 4, 0, 8),
+        "shell",
+      ))
       .run();
   }
 
@@ -420,19 +396,16 @@ mod tests {
       "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
     )
     .range(lsp::Range::at(0, 4, 0, 4))
-    .quickfix(Quickfix {
-      edits: vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 0, 1, 0),
-        new_text: indoc! {
+    .quickfix(Quickfix::edit(
+      "Replace `windows-shell` with `[windows] set shell`",
+      lsp::Range::at(0, 0, 1, 0),
+      indoc! {
           "
           [windows]
           set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
           "
-        }
-        .to_string(),
-      }],
-      title: "Replace `windows-shell` with `[windows] set shell`".to_string(),
-    })
+      },
+    ))
     .run();
   }
 
