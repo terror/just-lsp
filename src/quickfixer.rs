@@ -277,6 +277,27 @@ mod tests {
   }
 
   #[test]
+  fn removes_parallel_attribute_item() {
+    Test::new(indoc! {
+      "
+      [private, parallel]
+      foo: bar
+      bar:
+      "
+    })
+    .range(lsp::Range::at(0, 0, 1, 0))
+    .quickfix(Quickfix {
+      edits: vec![lsp::TextEdit {
+        range: lsp::Range::at(0, 8, 0, 18),
+        new_text: String::new(),
+      }],
+      range: lsp::Range::at(0, 8, 0, 18),
+      title: "Remove `[parallel]`".to_string(),
+    })
+    .run();
+  }
+
+  #[test]
   fn replaces_deprecated_setting() {
     Test::new("set windows-powershell := true\n")
       .range(lsp::Range::at(0, 4, 0, 4))
