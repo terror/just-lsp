@@ -223,7 +223,8 @@ impl<'a> Resolver<'a> {
   /// assignment, or a parameter name in a recipe header) are looked up
   /// through the document so that callers receive a fully-populated
   /// [`Symbol`] rather than a raw range.
-  fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+  #[must_use]
+  pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     let name = self.view.document().get_node_text(identifier);
 
     let parent_kind = identifier.parent()?.kind();

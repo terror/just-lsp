@@ -905,9 +905,16 @@ impl Inner {
     let workspace = self.workspace.read().await;
 
     Ok(workspace.documents.get_open(uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(params.position)
         .filter(|node| node.kind() == "identifier")
+        .filter(|identifier| {
+          resolver
+            .resolve_symbol(identifier)
+            .is_some_and(|symbol| symbol.is_renameable())
+        })
         .map(
           |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
             range: identifier.get_range(document),
@@ -991,12 +998,17 @@ impl Inner {
     let workspace = self.workspace.read().await;
 
     Ok(workspace.documents.get_open(&uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
+        .filter(|identifier| {
+          resolver
+            .resolve_symbol(identifier)
+            .is_some_and(|symbol| symbol.is_renameable())
+        })
         .map(|identifier| {
-          let resolver = Resolver::new(document);
-
           let references = resolver.resolve_identifier_references(&identifier);
 
           let text_edits = references
@@ -3685,6 +3697,35 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn prepare_rename_builtin_function() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn prepare_rename_identifier() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3746,6 +3787,69 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn prepare_rename_undefined() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ missing }}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 13,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_variable() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          x := '1'
+
+          foo:
+            echo {{ x }}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 0,
+      })
+      .response(PrepareRenameResponse {
+        id: 2,
+        start_line: 0,
+        start_char: 0,
+        end_line: 0,
+        end_char: 1,
+        placeholder: "x",
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn recipe_references() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3797,6 +3901,36 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_builtin() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      })
+      .request(RenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+        new_name: "cpu",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
       .run()
       .await
   }
@@ -3854,6 +3988,36 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_undefined() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ missing }}
+          "
+        },
+      })
+      .request(RenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 13,
+        new_name: "defined",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
       .run()
       .await
   }
