@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.7.0](https://github.com/terror/just-lsp/releases/tag/0.7.0) - 2026-09-02
+
+### Added
+
+- Support multiple quickfixes per diagnostic ([#587](https://github.com/terror/just-lsp/pull/587) by [terror](https://github.com/terror))
+- Add typo suggestions and quick fixes ([#584](https://github.com/terror/just-lsp/pull/584) by [terror](https://github.com/terror))
+- Attach quickfix code actions to diagnostics ([#481](https://github.com/terror/just-lsp/pull/481) by [terror](https://github.com/terror))
+- Add support for `cache` environment argument ([#573](https://github.com/terror/just-lsp/pull/573) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Preserve sibling attributes in quickfixes ([#585](https://github.com/terror/just-lsp/pull/585) by [terror](https://github.com/terror))
+- Record usage from imported documents in scope analysis ([#583](https://github.com/terror/just-lsp/pull/583) by [terror](https://github.com/terror))
+- Fix imported parallel quickfixes ([#581](https://github.com/terror/just-lsp/pull/581) by [terror](https://github.com/terror))
+- Remove broken WSL bash workaround ([#574](https://github.com/terror/just-lsp/pull/574) by [terror](https://github.com/terror))
+
+### Misc
+
+- Bump tree-sitter from 0.26.12 to 0.26.13 ([#590](https://github.com/terror/just-lsp/pull/590) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.12 to 0.26.13 ([#591](https://github.com/terror/just-lsp/pull/591) by [app/dependabot](https://github.com/app/dependabot))
+- Remove quickfix provider flag ([#589](https://github.com/terror/just-lsp/pull/589) by [terror](https://github.com/terror))
+- Generalize quickfix construction ([#588](https://github.com/terror/just-lsp/pull/588) by [terror](https://github.com/terror))
+- Remove unused quickfix range ([#586](https://github.com/terror/just-lsp/pull/586) by [terror](https://github.com/terror))
+- Use `indoc` for multiline quickfixer test strings ([#582](https://github.com/terror/just-lsp/pull/582) by [terror](https://github.com/terror))
+- Refactor `Located` as a transparent wrapper ([#580](https://github.com/terror/just-lsp/pull/580) by [terror](https://github.com/terror))
+- Bump cc from 1.4.3 to 1.4.4 ([#579](https://github.com/terror/just-lsp/pull/579) by [app/dependabot](https://github.com/app/dependabot))
+- Extract command executor ([#578](https://github.com/terror/just-lsp/pull/578) by [terror](https://github.com/terror))
+- Bump cc from 1.4.2 to 1.4.3 ([#576](https://github.com/terror/just-lsp/pull/576) by [app/dependabot](https://github.com/app/dependabot))
+- Bump clap from 4.6.5 to 4.6.6 ([#568](https://github.com/terror/just-lsp/pull/568) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.26.11 to 0.26.12 ([#569](https://github.com/terror/just-lsp/pull/569) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.4.0 to 1.4.2 ([#570](https://github.com/terror/just-lsp/pull/570) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.26.11 to 0.26.12 ([#571](https://github.com/terror/just-lsp/pull/571) by [app/dependabot](https://github.com/app/dependabot))
+- Bump thiserror from 2.0.19 to 2.0.20 ([#572](https://github.com/terror/just-lsp/pull/572) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.6.2](https://github.com/terror/just-lsp/releases/tag/0.6.2) - 2026-08-09
 
 ### Fixed
