@@ -45,26 +45,26 @@ codegen-units = 1
 lto = true
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.104"
 ariadne = "0.6.0"
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 dirs = "6.0.0"
 indoc = "2.0.7"
 inventory = "0.3"
 lexiclean = "0.0.2"
 ropey = "1.6.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 strsim = "0.11.1"
 tempfile = "3.27.0"
 thiserror = "2"
-tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.18", features = ["io-util"] }
+tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.19", features = ["io-util"] }
 tower-lsp = { workspace = true }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tree-sitter = "0.26.9"
-tree-sitter-highlight = "0.26.9"
+tree-sitter = "0.26.13"
+tree-sitter-highlight = "0.26.13"
 yansi = "1.0.1"
 
 [dev-dependencies]
@@ -73,4 +73,4 @@ pretty_assertions = "1.4.1"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.62"
+cc = "1.4.4"

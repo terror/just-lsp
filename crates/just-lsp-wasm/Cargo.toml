@@ -12,8 +12,8 @@ workspace = true
 
 [dependencies]
 just-lsp = { path = "../.." }
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
 tower-lsp = { workspace = true }
 typeshare = "1.0.5"
-wasm-bindgen = "0.2.118"
+wasm-bindgen = "0.2.127"
