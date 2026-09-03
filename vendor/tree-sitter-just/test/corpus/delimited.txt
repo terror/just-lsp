@@ -185,6 +185,51 @@ bar := f"joined {{join("a", "b",)}}"
                           (string))))))))))))))
 
 ================================================================================
+format strings with escaped interpolation delimiters
+================================================================================
+
+foo := f'{{{{'
+bar := f"{{{{ {{name}}"
+baz := f'''{{{{'''
+qux := f"""{{{{ {{name}}"""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier)))))))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string
+            (interpolation
+              (expression
+                (value
+                  (identifier))))))))))
+
+================================================================================
 format strings with single braces
 ================================================================================
 
