@@ -514,7 +514,7 @@ module.exports = grammar({
     _backticked: ($) => seq("`", optional($.command_body), "`"),
     _indented_backticked: ($) => seq("```", optional($.command_body), "```"),
 
-    command_body: ($) => repeat1(choice($.interpolation, /./)),
+    command_body: (_) => repeat1(/./),
 
     // interpolation : '{{' expression '}}'
     interpolation: ($) => seq("{{", $.expression, "}}"),

@@ -2502,17 +2502,8 @@
     "command_body": {
       "type": "REPEAT1",
       "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "interpolation"
-          },
-          {
-            "type": "PATTERN",
-            "value": "."
-          }
-        ]
+        "type": "PATTERN",
+        "value": "."
       }
     },
     "interpolation": {

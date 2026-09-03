@@ -179,17 +179,7 @@
   {
     "type": "command_body",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "interpolation",
-          "named": true
-        }
-      ]
-    }
+    "fields": {}
   },
   {
     "type": "condition",

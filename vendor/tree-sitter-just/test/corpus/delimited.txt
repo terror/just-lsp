@@ -24,6 +24,29 @@ bar := `echo hi
           (command_body))))))
 
 ================================================================================
+backticks with double braces
+================================================================================
+
+foo := `echo "{{.Foo}}"`
+bar := `echo "{{ foo }}"`
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body))))))
+
+================================================================================
 basic strings
 ================================================================================
 
@@ -208,6 +231,24 @@ echo bye
       (value
         (external_command
           (command_body)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (external_command
+          (command_body))))))
+
+================================================================================
+indented backticks with double braces
+================================================================================
+
+foo := ```
+echo "{{.Foo}}"
+```
+
+--------------------------------------------------------------------------------
+
+(source_file
   (assignment
     (identifier)
     (expression

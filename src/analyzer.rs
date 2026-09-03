@@ -3183,6 +3183,18 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_double_braces_in_recipe() {
+    Test::new(indoc! {
+      r#"
+      foo:
+        echo "{{.Foo}}"
+      "#
+    })
+    .error("Syntax error near `{{`", lsp::Range::at(1, 8, 1, 10))
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid() {
     Test::new(indoc! {
       "
@@ -3204,6 +3216,19 @@ mod tests {
         @?quiet_guard
         ?@guard_quiet
       "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_double_braces_in_backticks() {
+    Test::new(indoc! {
+      r#"
+      foo := `echo "{{.Foo}}"`
+
+      bar baz=`echo "{{.Baz}}"` qux=```echo "{{.Qux}}"```:
+        echo {{ foo }} {{ baz }} {{ qux }}
+      "#
     })
     .run();
   }
