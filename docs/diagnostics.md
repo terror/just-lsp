@@ -7,6 +7,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | Code                              | Name                            | Description                                                                                                                   |
 | --------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `syntax-errors`                   | Syntax Errors                   | Parse tree contains errors or missing nodes.                                                                                  |
+| `backtick-shebang`                | Backtick Shebang                | Backtick expression begins with the reserved `#!` sequence.                                                                   |
 | `missing-recipe-for-alias`        | Missing Recipe for Alias        | Alias points to a recipe that doesn't exist.                                                                                  |
 | `duplicate-alias`                 | Duplicate Alias                 | Alias name is defined more than once.                                                                                         |
 | `alias-recipe-conflict`           | Alias/Recipe Conflict           | Alias and recipe share a name and would shadow each other.                                                                    |
