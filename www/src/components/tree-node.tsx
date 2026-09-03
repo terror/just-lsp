@@ -35,7 +35,7 @@ export const TreeNode: React.FC<TreeNodeProps> = ({
   return (
     <>
       <div
-        className='tree-node flex cursor-pointer items-center py-1 font-mono text-sm whitespace-nowrap hover:bg-blue-50'
+        className='tree-node hover:bg-accent flex cursor-pointer items-center py-1 font-mono text-sm whitespace-nowrap'
         style={{ paddingLeft: `${level * 16 + 4}px` }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => onHighlightChange(undefined)}
@@ -51,7 +51,7 @@ export const TreeNode: React.FC<TreeNodeProps> = ({
           ) : null}
         </span>
         <span>{node.type}</span>
-        <span className='ml-2 text-xs text-gray-500'>
+        <span className='text-muted-foreground ml-2 text-xs'>
           [{node.startPosition.row}: {node.startPosition.column}] [
           {node.endPosition.row}: {node.endPosition.column}]
         </span>

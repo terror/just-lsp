@@ -16,7 +16,7 @@ export const EditorPane = ({
 }: EditorPaneProps) => {
   return (
     <div className='flex h-full min-h-0 flex-col overflow-hidden'>
-      <div className='flex items-center justify-between border-b bg-gray-50 px-2 py-1'>
+      <div className='bg-muted/50 flex items-center justify-between border-b px-2 py-1'>
         <EditorSettingsDialog />
       </div>
       <div className='flex-1 overflow-hidden'>
