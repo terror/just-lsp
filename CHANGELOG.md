@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.1](https://github.com/terror/just-lsp/releases/tag/0.7.1) - 2026-09-03
+
+### Fixed
+
+- Treat double braces in expression backticks as literal ([#595](https://github.com/terror/just-lsp/pull/595) by [terror](https://github.com/terror))
+- Reject rename of non-renameable identifiers ([#593](https://github.com/terror/just-lsp/pull/593) by [terror](https://github.com/terror))
+
+### Misc
+
+- Update dependencies ([#596](https://github.com/terror/just-lsp/pull/596) by [terror](https://github.com/terror))
+
 ## [0.7.0](https://github.com/terror/just-lsp/releases/tag/0.7.0) - 2026-09-02
 
 ### Added
