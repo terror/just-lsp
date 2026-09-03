@@ -39,6 +39,7 @@ mod attribute_argument_expressions;
 mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;
+mod backtick_shebang;
 mod cache_attribute;
 mod cache_without_script;
 mod continue_signals;
