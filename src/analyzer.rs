@@ -3219,6 +3219,23 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_escaped_braces_in_format_strings() {
+    Test::new(indoc! {
+      r#"
+      name := "world"
+      foo := f'{{{{'
+      bar := f"{{{{ {{name}}"
+      baz := f'''{{{{'''
+      qux := f"""{{{{ {{name}}"""
+
+      recipe:
+        echo {{ foo }} {{ bar }} {{ baz }} {{ qux }}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_guard_prefixes() {
     Test::new(indoc! {
       "

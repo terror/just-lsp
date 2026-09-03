@@ -479,22 +479,34 @@ module.exports = grammar({
     _format_string: ($) =>
       seq(
         'f"',
-        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        repeat(
+          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+        ),
         '"',
       ),
 
     _format_string_indented: ($) =>
       seq(
         'f"""',
-        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        repeat(
+          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+        ),
         '"""',
       ),
 
     _format_raw_string: ($) =>
-      seq("f'", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'"),
+      seq(
+        "f'",
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        "'",
+      ),
 
     _format_raw_string_indented: ($) =>
-      seq("f'''", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'''"),
+      seq(
+        "f'''",
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        "'''",
+      ),
 
     _raw_string_indented: (_) => seq("'''", repeat(/./), "'''"),
     _string: ($) => seq('"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
