@@ -3206,6 +3206,19 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_double_braces_in_backticks() {
+    Test::new(indoc! {
+      r#"
+      foo := `echo "{{.Foo}}"`
+
+      bar baz=`echo "{{.Baz}}"` qux=```echo "{{.Qux}}"```:
+        echo {{ foo }} {{ baz }} {{ qux }}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_guard_prefixes() {
     Test::new(indoc! {
       "
@@ -3216,19 +3229,6 @@ mod tests {
         @?quiet_guard
         ?@guard_quiet
       "
-    })
-    .run();
-  }
-
-  #[test]
-  fn parser_errors_valid_with_double_braces_in_backticks() {
-    Test::new(indoc! {
-      r#"
-      foo := `echo "{{.Foo}}"`
-
-      bar baz=`echo "{{.Baz}}"` qux=```echo "{{.Qux}}"```:
-        echo {{ foo }} {{ baz }} {{ qux }}
-      "#
     })
     .run();
   }
