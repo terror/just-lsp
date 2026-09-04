@@ -108,7 +108,11 @@ impl<'a> ProjectLoader<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   struct Test {
     documents: DocumentStore,
@@ -301,6 +305,41 @@ mod tests {
         .map(|recipe| recipe.name.value)
         .collect::<Vec<_>>(),
       ["buffer"]
+    );
+  }
+
+  #[test]
+  fn platform_attributes_filter_import_scope() {
+    let (enabled, disabled) = if cfg!(windows) {
+      ("windows", "unix")
+    } else if cfg!(unix) {
+      ("unix", "windows")
+    } else {
+      return;
+    };
+
+    let mut test = Test::new(&formatdoc! {
+      "
+      [{enabled}]
+      import 'enabled.just'
+
+      [{disabled}]
+      import 'disabled.just'
+      "
+    })
+    .file("enabled.just", "")
+    .file("disabled.just", "");
+
+    let enabled = test.uri("enabled.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [enabled],
     );
   }
 

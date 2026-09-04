@@ -44,6 +44,22 @@ impl<'a> ProjectView<'a> {
   }
 
   #[must_use]
+  pub fn find_enabled_function(&self, name: &str) -> Option<Located<Function>> {
+    self.find(
+      name,
+      |document| {
+        document
+          .functions()
+          .into_iter()
+          .filter(Function::is_enabled)
+          .collect()
+      },
+      |function| &function.name.value,
+      |function| function.range.start,
+    )
+  }
+
+  #[must_use]
   pub fn find_function(&self, name: &str) -> Option<Located<Function>> {
     self.find(
       name,

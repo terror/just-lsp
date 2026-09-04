@@ -5076,6 +5076,78 @@ mod tests {
   }
 
   #[test]
+  fn user_defined_function_shadows_builtin_when_platform_enabled() {
+    let platform = if cfg!(windows) {
+      "windows"
+    } else if cfg!(unix) {
+      "unix"
+    } else {
+      return;
+    };
+
+    Test::new(&formatdoc! {
+      "
+      set unstable
+
+      [{platform}]
+      env_var() := 'ok'
+      x := env_var()
+
+      foo:
+        echo {{{{x}}}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_is_unknown_when_platform_disabled() {
+    let platform = if cfg!(windows) { "unix" } else { "windows" };
+
+    Test::new(&formatdoc! {
+      "
+      set unstable
+
+      [{platform}]
+      xyzzy() := 'ok'
+      x := xyzzy()
+
+      bar:
+        echo {{{{x}}}}
+      "
+    })
+    .error("Unknown function `xyzzy`", lsp::Range::at(4, 5, 4, 10))
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_yields_to_builtin_when_platform_disabled() {
+    let platform = if cfg!(windows) { "unix" } else { "windows" };
+
+    Test::new(&formatdoc! {
+      "
+      set unstable
+
+      [{platform}]
+      env_var() := 'ok'
+      x := env_var()
+
+      foo:
+        echo {{{{x}}}}
+      "
+    })
+    .error(
+      "Function `env_var` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(4, 5, 4, 14),
+    )
+    .warning(
+      "`env_var` is deprecated, use `env` instead",
+      lsp::Range::at(4, 5, 4, 12),
+    )
+    .run();
+  }
+
+  #[test]
   fn user_defined_function_too_few_args() {
     Test::new(indoc! {
       "

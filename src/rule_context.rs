@@ -134,7 +134,7 @@ impl<'a> RuleContext<'a> {
     self
       .functions()
       .iter()
-      .find(|function| function.name.value == name)
+      .find(|function| function.name.value == name && function.is_enabled())
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
@@ -251,6 +251,7 @@ impl<'a> RuleContext<'a> {
       self
         .functions()
         .iter()
+        .filter(|function| function.is_enabled())
         .map(|function| function.name.value.clone())
         .collect()
     })

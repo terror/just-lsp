@@ -35,7 +35,10 @@ impl From<&Project> for ImportScope {
 
       depths.insert(source.clone(), depth);
 
-      for dependency in project.dependencies(&source) {
+      for dependency in project
+        .dependencies(&source)
+        .filter(|dependency| dependency.is_enabled())
+      {
         if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
           stack.push((depth + 1, target.clone()));
         }
@@ -54,7 +57,10 @@ impl From<&Project> for ImportScope {
         uri: source.clone(),
       });
 
-      for dependency in project.dependencies(&source) {
+      for dependency in project
+        .dependencies(&source)
+        .filter(|dependency| dependency.is_enabled())
+      {
         let ProjectDependencyTarget::Resolved(target) = &dependency.target
         else {
           continue;
