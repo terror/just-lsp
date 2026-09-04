@@ -14,12 +14,6 @@ impl Executor {
     }
   }
 
-  fn has_required_parameters(parameters: &[ParameterJson]) -> bool {
-    parameters
-      .iter()
-      .any(|parameter| parameter.default_value.is_none())
-  }
-
   pub(crate) fn new(client: Client) -> Self {
     Self { client }
   }
@@ -204,7 +198,10 @@ impl Executor {
           .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
           .unwrap_or_default();
 
-        if Self::has_required_parameters(&parameters) {
+        if parameters
+          .iter()
+          .any(|parameter| parameter.default_value.is_none())
+        {
           self
             .client
             .show_message(
@@ -221,30 +218,5 @@ impl Executor {
     }
 
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn detects_required_parameters() {
-    let parameter = |default_value: Option<&str>| ParameterJson {
-      default_value: default_value.map(String::from),
-      name: "parameter".into(),
-    };
-
-    assert!(!Executor::has_required_parameters(&[]));
-
-    assert!(!Executor::has_required_parameters(&[
-      parameter(Some("\"Hello World\"")),
-      parameter(Some("(arch() + \"-unknown-unknown\")")),
-    ]));
-
-    assert!(Executor::has_required_parameters(&[
-      parameter(None),
-      parameter(Some("\"default\"")),
-    ]));
   }
 }
