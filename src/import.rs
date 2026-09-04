@@ -19,18 +19,23 @@ impl Import {
   /// Returns an error if a shell-expanded path references an environment
   /// variable that cannot be read.
   pub fn resolve(&self, base_uri: &lsp::Url) -> Result<Option<PathBuf>> {
-    let Some(literal) = StringLiteral::parse(&self.path.value) else {
+    let Some(StringLiteral {
+      cooked,
+      shell_expanded,
+      ..
+    }) = StringLiteral::parse(&self.path.value)
+    else {
       return Ok(None);
     };
 
-    let raw = if literal.shell_expanded {
-      shellexpand::full(&literal.cooked)
+    let raw = if shell_expanded {
+      shellexpand::full(&cooked)
         .map_err(|error| Error::ShellExpansion {
           message: error.to_string(),
         })?
         .into_owned()
     } else {
-      literal.cooked
+      cooked
     };
 
     if raw.is_empty() {

@@ -57,7 +57,9 @@ define_rule! {
         };
 
         let valid = StringLiteral::parse_plain(&setting.value.value)
-          .is_some_and(|literal| (validation.validate)(&literal.cooked));
+          .is_some_and(|StringLiteral { cooked, .. }| {
+            (validation.validate)(&cooked)
+          });
 
         if valid {
           continue;
