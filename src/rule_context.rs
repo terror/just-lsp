@@ -130,6 +130,13 @@ impl<'a> RuleContext<'a> {
     once(self.document).chain(self.imported_documents.iter().copied())
   }
 
+  pub fn function(&self, name: &str) -> Option<&Function> {
+    self
+      .functions()
+      .iter()
+      .find(|function| function.name.value == name)
+  }
+
   pub fn function_calls(&self) -> &[FunctionCall] {
     self
       .function_calls

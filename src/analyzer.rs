@@ -5060,6 +5060,22 @@ mod tests {
   }
 
   #[test]
+  fn user_defined_function_shadows_builtin() {
+    Test::new(indoc! {
+      "
+      set unstable
+
+      env_var() := 'ok'
+      x := env_var()
+
+      foo:
+        echo {{x}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn user_defined_function_too_few_args() {
     Test::new(indoc! {
       "
