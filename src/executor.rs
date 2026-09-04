@@ -18,6 +18,17 @@ impl Executor {
     Self { client }
   }
 
+  fn recipe_arguments(parameters: &[ParameterJson]) -> Option<Vec<String>> {
+    if parameters
+      .iter()
+      .all(|parameter| parameter.default_value.is_some())
+    {
+      Some(Vec::new())
+    } else {
+      None
+    }
+  }
+
   async fn run_recipe(
     &self,
     recipe_name: &str,
@@ -207,20 +218,63 @@ impl Executor {
           .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
           .unwrap_or_default();
 
-        if !parameters.is_empty() {
-          self.client.show_message(
-            lsp::MessageType::WARNING,
-            "Running a recipe code action with parameters is not yet supported."
-          )
-          .await;
+        let Some(recipe_arguments) = Self::recipe_arguments(&parameters) else {
+          self
+            .client
+            .show_message(
+              lsp::MessageType::WARNING,
+              "Running a recipe with required arguments is not yet supported.",
+            )
+            .await;
 
           return Ok(());
-        }
+        };
 
-        self.run_recipe(&recipe_name, Vec::new(), directory).await;
+        self
+          .run_recipe(&recipe_name, recipe_arguments, directory)
+          .await;
       }
     }
 
     Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn parameter(default_value: Option<&str>) -> ParameterJson {
+    ParameterJson {
+      default_value: default_value.map(String::from),
+      name: "parameter".into(),
+    }
+  }
+
+  #[test]
+  fn recipe_arguments_accepts_default_expressions() {
+    assert_eq!(
+      Executor::recipe_arguments(&[
+        parameter(Some("\"Hello World\"")),
+        parameter(Some("(arch() + \"-unknown-unknown\")")),
+      ]),
+      Some(Vec::new()),
+    );
+  }
+
+  #[test]
+  fn recipe_arguments_accepts_no_parameters() {
+    assert_eq!(Executor::recipe_arguments(&[]), Some(Vec::new()));
+  }
+
+  #[test]
+  fn recipe_arguments_rejects_required_parameters() {
+    assert_eq!(
+      Executor::recipe_arguments(&[
+        parameter(None),
+        parameter(Some("\"default\"")),
+      ]),
+      None,
+    );
   }
 }
