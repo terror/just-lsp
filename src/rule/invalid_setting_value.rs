@@ -56,11 +56,8 @@ define_rule! {
           continue;
         };
 
-        let valid = setting
-          .value
-          .value
-          .literal()
-          .is_some_and(|value| (validation.validate)(&value));
+        let valid = StringLiteral::parse_plain(&setting.value.value)
+          .is_some_and(|literal| (validation.validate)(&literal.cooked));
 
         if valid {
           continue;

@@ -10,21 +10,25 @@ define_rule! {
       let mut diagnostics = Vec::new();
 
       for import in document.imports() {
-        if import.optional {
+        if import.is_dynamic() {
           continue;
         }
 
-        let raw = &import.path.value;
+        let path = match import.resolve(&document.uri) {
+          Ok(Some(path)) => path,
+          Ok(None) => continue,
+          Err(Error::EmptyImportPath) if import.optional => continue,
+          Err(error) => {
+            diagnostics.push(Diagnostic::error(
+              error.to_string(),
+              import.path.range,
+            ));
 
-        if raw.starts_with('f') || raw.starts_with('x') {
-          continue;
-        }
-
-        let Some(path) = import.resolve(&document.uri) else {
-          continue;
+            continue;
+          }
         };
 
-        if !path.exists() {
+        if !import.optional && !path.exists() {
           diagnostics.push(Diagnostic::error(
             format!("Import path does not exist: `{}`", path.display()),
             import.path.range,

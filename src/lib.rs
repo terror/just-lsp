@@ -16,6 +16,9 @@ use {
     process,
     sync::OnceLock,
   },
+  string_delimiter::StringDelimiter,
+  string_kind::StringKind,
+  string_literal::StringLiteral,
   tower_lsp::lsp_types as lsp,
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
@@ -126,6 +129,9 @@ mod scope;
 mod setting;
 mod setting_kind;
 mod str_ext;
+mod string_delimiter;
+mod string_kind;
+mod string_literal;
 mod text_node;
 mod unexport;
 mod variable;

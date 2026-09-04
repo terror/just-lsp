@@ -57,8 +57,13 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Dynamic);
     }
 
-    let Some(path) = import.resolve(source) else {
-      return Ok(ProjectDependencyTarget::Missing);
+    let path = match import.resolve(source) {
+      Ok(Some(path)) => path,
+      Ok(None) => return Ok(ProjectDependencyTarget::Missing),
+      Err(Error::EmptyImportPath) => {
+        return Ok(ProjectDependencyTarget::Missing);
+      }
+      Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
     };
 
     let path = path.as_path().lexiclean();
@@ -179,6 +184,29 @@ mod tests {
       }
       .analyze()
       .is_empty()
+    );
+  }
+
+  #[test]
+  fn loads_shell_expanded_import() {
+    let mut test =
+      Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");
+
+    let imported = test.uri("foo.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.root][0].target,
+      ProjectDependencyTarget::Resolved(imported.clone()),
+    );
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [imported],
     );
   }
 
@@ -312,7 +340,7 @@ mod tests {
       import? 'missing.just'
       import 'required-missing.just'
       import 'bar.just'
-      import x'dynamic.just'
+      import f'dynamic.just'
 
       foo:
       "
