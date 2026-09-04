@@ -7,6 +7,8 @@ define_rule! {
     id: "unused-parameters",
     message: "unused parameter",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       let exported = context.setting_enabled("export");
 
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
@@ -25,7 +27,7 @@ define_rule! {
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
               UnusedParameterRule::positional_argument_indices(recipe),
-              recipe.shebang.is_some()
+              recipe.runs_as_script(default_script)
                 || UnusedParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {

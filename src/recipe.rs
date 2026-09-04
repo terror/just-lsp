@@ -32,6 +32,15 @@ impl Recipe {
       .iter()
       .any(|attribute| attribute.name.value == name)
   }
+
+  #[must_use]
+  pub fn runs_as_script(&self, default_script: bool) -> bool {
+    if self.has_attribute("shell") {
+      return false;
+    }
+
+    self.has_attribute("script") || self.shebang.is_some() || default_script
+  }
 }
 
 #[cfg(test)]
@@ -251,5 +260,50 @@ mod tests {
     };
 
     assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
+  }
+
+  #[test]
+  fn runs_as_script_with_default_script() {
+    let recipe = Document::from("foo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(!recipe.runs_as_script(false));
+    assert!(recipe.runs_as_script(true));
+  }
+
+  #[test]
+  fn runs_as_script_with_script_attribute() {
+    let recipe = Document::from("[script]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(recipe.runs_as_script(false));
+  }
+
+  #[test]
+  fn runs_as_script_with_shebang() {
+    let recipe = Document::from("foo:\n  #!/usr/bin/env sh\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(recipe.runs_as_script(false));
+  }
+
+  #[test]
+  fn shell_attribute_overrides_default_script() {
+    let recipe = Document::from("[shell]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(!recipe.runs_as_script(true));
   }
 }

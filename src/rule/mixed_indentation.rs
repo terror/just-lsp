@@ -50,10 +50,12 @@ define_rule! {
     id: "mixed-recipe-indentation",
     message: "mixed indentation",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       context
         .recipes()
         .iter()
-        .filter(|recipe| recipe.shebang.is_none())
+        .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(Self::find_mixed_indentation)
         .collect()
     }
