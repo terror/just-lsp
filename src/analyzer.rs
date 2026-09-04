@@ -1840,6 +1840,21 @@ mod tests {
   }
 
   #[test]
+  fn default_script_recipe_is_exempt_from_inconsistent_indentation() {
+    Test::new(indoc! {
+      "
+      set default-script
+
+      build-docs:
+        if true; then
+          echo docs
+        fi
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn dir_aliases_recognized() {
     Test::new(indoc! {
       "

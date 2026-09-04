@@ -218,26 +218,6 @@ fn analyze_accepts_clean_justfile() -> Result {
 }
 
 #[test]
-fn analyze_accepts_default_script_recipe_indentation() -> Result {
-  Test::new()?
-    .file(
-      "justfile",
-      indoc! {
-        "
-        set default-script
-
-        build-docs:
-          if true; then
-            echo docs
-          fi
-        "
-      },
-    )
-    .argument("justfile")
-    .run()
-}
-
-#[test]
 fn analyze_accepts_imported_recipe() -> Result {
   Test::new()?
     .file("foo.just", "foo:\n")

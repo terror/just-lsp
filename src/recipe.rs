@@ -45,7 +45,11 @@ impl Recipe {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc};
+  use super::*;
+
+  fn parse_recipe(source: &str) -> Recipe {
+    Document::from(source).recipes().into_iter().next().unwrap()
+  }
 
   #[test]
   fn recipe_groups_all_attributes() {
@@ -263,38 +267,31 @@ mod tests {
   }
 
   #[test]
-  fn runs_as_script_respects_recipe_configuration() {
-    let recipes = Document::from(indoc! {
-      "
-      plain:
-        echo plain
+  fn runs_as_script_with_default_script() {
+    let recipe = parse_recipe("foo:\n  echo foo");
 
-      [shell]
-      shell:
-        echo shell
+    assert!(!recipe.runs_as_script(false));
+    assert!(recipe.runs_as_script(true));
+  }
 
-      [script]
-      script:
-        echo script
+  #[test]
+  fn runs_as_script_with_script_attribute() {
+    let recipe = parse_recipe("[script]\nfoo:\n  echo foo");
 
-      shebang:
-        #!/usr/bin/env sh
-        echo shebang
-      "
-    })
-    .recipes();
+    assert!(recipe.runs_as_script(false));
+  }
 
-    let recipe = |name| {
-      recipes
-        .iter()
-        .find(|recipe| recipe.name.value == name)
-        .unwrap()
-    };
+  #[test]
+  fn runs_as_script_with_shebang() {
+    let recipe = parse_recipe("foo:\n  #!/usr/bin/env sh\n  echo foo");
 
-    assert!(!recipe("plain").runs_as_script(false));
-    assert!(recipe("plain").runs_as_script(true));
-    assert!(!recipe("shell").runs_as_script(true));
-    assert!(recipe("script").runs_as_script(false));
-    assert!(recipe("shebang").runs_as_script(false));
+    assert!(recipe.runs_as_script(false));
+  }
+
+  #[test]
+  fn shell_attribute_overrides_default_script() {
+    let recipe = parse_recipe("[shell]\nfoo:\n  echo foo");
+
+    assert!(!recipe.runs_as_script(true));
   }
 }
