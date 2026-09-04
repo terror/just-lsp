@@ -14,7 +14,6 @@ define_rule! {
           continue;
         };
 
-        // Script and shell conflicts are reported separately.
         if recipe.has_attribute("script")
           || recipe.runs_as_script(default_script)
         {
