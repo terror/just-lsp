@@ -47,10 +47,6 @@ impl Recipe {
 mod tests {
   use super::*;
 
-  fn parse_recipe(source: &str) -> Recipe {
-    Document::from(source).recipes().into_iter().next().unwrap()
-  }
-
   #[test]
   fn recipe_groups_all_attributes() {
     let recipe = Recipe {
@@ -268,7 +264,11 @@ mod tests {
 
   #[test]
   fn runs_as_script_with_default_script() {
-    let recipe = parse_recipe("foo:\n  echo foo");
+    let recipe = Document::from("foo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
 
     assert!(!recipe.runs_as_script(false));
     assert!(recipe.runs_as_script(true));
@@ -276,21 +276,33 @@ mod tests {
 
   #[test]
   fn runs_as_script_with_script_attribute() {
-    let recipe = parse_recipe("[script]\nfoo:\n  echo foo");
+    let recipe = Document::from("[script]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
 
     assert!(recipe.runs_as_script(false));
   }
 
   #[test]
   fn runs_as_script_with_shebang() {
-    let recipe = parse_recipe("foo:\n  #!/usr/bin/env sh\n  echo foo");
+    let recipe = Document::from("foo:\n  #!/usr/bin/env sh\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
 
     assert!(recipe.runs_as_script(false));
   }
 
   #[test]
   fn shell_attribute_overrides_default_script() {
-    let recipe = parse_recipe("[shell]\nfoo:\n  echo foo");
+    let recipe = Document::from("[shell]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
 
     assert!(!recipe.runs_as_script(true));
   }
