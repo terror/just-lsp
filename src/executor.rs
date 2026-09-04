@@ -14,27 +14,17 @@ impl Executor {
     }
   }
 
+  fn has_required_parameters(parameters: &[ParameterJson]) -> bool {
+    parameters
+      .iter()
+      .any(|parameter| parameter.default_value.is_none())
+  }
+
   pub(crate) fn new(client: Client) -> Self {
     Self { client }
   }
 
-  fn recipe_arguments(parameters: &[ParameterJson]) -> Option<Vec<String>> {
-    if parameters
-      .iter()
-      .all(|parameter| parameter.default_value.is_some())
-    {
-      Some(Vec::new())
-    } else {
-      None
-    }
-  }
-
-  async fn run_recipe(
-    &self,
-    recipe_name: &str,
-    recipe_arguments: Vec<String>,
-    directory: PathBuf,
-  ) {
+  async fn run_recipe(&self, recipe_name: &str, directory: PathBuf) {
     let document_uri = lsp::Url::parse(&format!(
       "just-recipe:/{}/{}",
       directory.display(),
@@ -45,10 +35,6 @@ impl Executor {
     let mut command = tokio::process::Command::new("just");
 
     command.arg(recipe_name);
-
-    for argument in recipe_arguments {
-      command.arg(argument);
-    }
 
     command
       .current_dir(directory.clone())
@@ -218,7 +204,7 @@ impl Executor {
           .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
           .unwrap_or_default();
 
-        let Some(recipe_arguments) = Self::recipe_arguments(&parameters) else {
+        if Self::has_required_parameters(&parameters) {
           self
             .client
             .show_message(
@@ -228,11 +214,9 @@ impl Executor {
             .await;
 
           return Ok(());
-        };
+        }
 
-        self
-          .run_recipe(&recipe_name, recipe_arguments, directory)
-          .await;
+        self.run_recipe(&recipe_name, directory).await;
       }
     }
 
@@ -244,37 +228,23 @@ impl Executor {
 mod tests {
   use super::*;
 
-  fn parameter(default_value: Option<&str>) -> ParameterJson {
-    ParameterJson {
+  #[test]
+  fn detects_required_parameters() {
+    let parameter = |default_value: Option<&str>| ParameterJson {
       default_value: default_value.map(String::from),
       name: "parameter".into(),
-    }
-  }
+    };
 
-  #[test]
-  fn recipe_arguments_accepts_default_expressions() {
-    assert_eq!(
-      Executor::recipe_arguments(&[
-        parameter(Some("\"Hello World\"")),
-        parameter(Some("(arch() + \"-unknown-unknown\")")),
-      ]),
-      Some(Vec::new()),
-    );
-  }
+    assert!(!Executor::has_required_parameters(&[]));
 
-  #[test]
-  fn recipe_arguments_accepts_no_parameters() {
-    assert_eq!(Executor::recipe_arguments(&[]), Some(Vec::new()));
-  }
+    assert!(!Executor::has_required_parameters(&[
+      parameter(Some("\"Hello World\"")),
+      parameter(Some("(arch() + \"-unknown-unknown\")")),
+    ]));
 
-  #[test]
-  fn recipe_arguments_rejects_required_parameters() {
-    assert_eq!(
-      Executor::recipe_arguments(&[
-        parameter(None),
-        parameter(Some("\"default\"")),
-      ]),
-      None,
-    );
+    assert!(Executor::has_required_parameters(&[
+      parameter(None),
+      parameter(Some("\"default\"")),
+    ]));
   }
 }
