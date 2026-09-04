@@ -18,12 +18,7 @@ impl Executor {
     Self { client }
   }
 
-  async fn run_recipe(
-    &self,
-    recipe_name: &str,
-    recipe_arguments: Vec<String>,
-    directory: PathBuf,
-  ) {
+  async fn run_recipe(&self, recipe_name: &str, directory: PathBuf) {
     let document_uri = lsp::Url::parse(&format!(
       "just-recipe:/{}/{}",
       directory.display(),
@@ -34,10 +29,6 @@ impl Executor {
     let mut command = tokio::process::Command::new("just");
 
     command.arg(recipe_name);
-
-    for argument in recipe_arguments {
-      command.arg(argument);
-    }
 
     command
       .current_dir(directory.clone())
@@ -207,17 +198,22 @@ impl Executor {
           .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
           .unwrap_or_default();
 
-        if !parameters.is_empty() {
-          self.client.show_message(
-            lsp::MessageType::WARNING,
-            "Running a recipe code action with parameters is not yet supported."
-          )
-          .await;
+        if parameters
+          .iter()
+          .any(|parameter| parameter.default_value.is_none())
+        {
+          self
+            .client
+            .show_message(
+              lsp::MessageType::WARNING,
+              "Running a recipe with required arguments is not yet supported.",
+            )
+            .await;
 
           return Ok(());
         }
 
-        self.run_recipe(&recipe_name, Vec::new(), directory).await;
+        self.run_recipe(&recipe_name, directory).await;
       }
     }
 
