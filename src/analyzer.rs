@@ -2743,12 +2743,19 @@ mod tests {
   }
 
   #[test]
-  fn import_shell_expanded_string_skipped() {
+  fn import_shell_expanded_string_path_is_checked() {
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\nonexistent.just`"
+    } else {
+      "Import path does not exist: `/nonexistent.just`"
+    };
+
     Test::new(indoc! {
       "
       import x'nonexistent.just'
       "
     })
+    .error(expected, lsp::Range::at(0, 7, 0, 26))
     .run();
   }
 
@@ -3355,7 +3362,7 @@ mod tests {
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
-      import x'~/.config/just/common.just'
+      import? x'~/.config/just/common.just'
 
       greeting := x"~/$USER/${GREETING:-hello}"
 

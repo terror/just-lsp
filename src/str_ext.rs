@@ -33,75 +33,15 @@ impl StrExt for str {
   }
 
   fn literal(&self) -> Option<String> {
-    let (quote, value) = if let Some(value) = self
-      .strip_prefix('"')
-      .and_then(|value| value.strip_suffix('"'))
-    {
-      ('"', value)
-    } else {
-      let value = self
-        .strip_prefix('\'')
-        .and_then(|value| value.strip_suffix('\''))?;
+    let quote = self.chars().next()?;
 
-      ('\'', value)
-    };
+    let value = self.strip_prefix(quote)?.strip_suffix(quote)?;
 
     if value.starts_with(quote) || value.ends_with(quote) {
       return None;
     }
 
-    if quote == '\'' {
-      return Some(value.to_string());
-    }
-
-    let mut cooked = String::new();
-
-    let mut characters = value.chars();
-
-    while let Some(character) = characters.next() {
-      if character != '\\' {
-        cooked.push(character);
-        continue;
-      }
-
-      match characters.next()? {
-        'n' => cooked.push('\n'),
-        'r' => cooked.push('\r'),
-        't' => cooked.push('\t'),
-        '"' => cooked.push('"'),
-        '\\' => cooked.push('\\'),
-        '\n' => {}
-        '\r' => {
-          if characters.next()? != '\n' {
-            return None;
-          }
-        }
-        'u' => {
-          if characters.next()? != '{' {
-            return None;
-          }
-
-          let mut codepoint = String::new();
-
-          loop {
-            match characters.next()? {
-              '}' => break,
-              character if character.is_ascii_hexdigit() => {
-                codepoint.push(character);
-              }
-              _ => return None,
-            }
-          }
-
-          let codepoint = u32::from_str_radix(&codepoint, 16).ok()?;
-
-          cooked.push(char::from_u32(codepoint)?);
-        }
-        _ => return None,
-      }
-    }
-
-    Some(cooked)
+    StringLiteral::parse(self).map(|StringLiteral { cooked, .. }| cooked)
   }
 
   fn point_delta(&self) -> Point {
@@ -190,6 +130,7 @@ mod tests {
     case(r#"f"foo""#, None);
     case(r#"x"foo""#, None);
     case(r#"""foo""""#, None);
+    case("'''foo'''", None);
   }
 
   #[test]

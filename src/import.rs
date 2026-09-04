@@ -11,24 +11,41 @@ pub struct Import {
 impl Import {
   #[must_use]
   pub fn is_dynamic(&self) -> bool {
-    self.path.value.starts_with(['f', 'x'])
+    self.path.value.starts_with('f')
   }
 
-  #[must_use]
-  pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
-    let raw = self.path.value.trim_matches(|c| c == '\'' || c == '"');
-
-    if raw.is_empty() {
-      return None;
-    }
-
-    let path = if let Some(rest) = raw.strip_prefix("~/") {
-      dirs::home_dir()?.join(rest)
-    } else {
-      base_uri.to_file_path().ok()?.parent()?.join(raw)
+  /// # Errors
+  ///
+  /// Returns an error if a shell-expanded path references an environment
+  /// variable that cannot be read.
+  pub fn resolve(&self, base_uri: &lsp::Url) -> Result<Option<PathBuf>> {
+    let Some(StringLiteral {
+      cooked,
+      shell_expanded,
+      ..
+    }) = StringLiteral::parse(&self.path.value)
+    else {
+      return Ok(None);
     };
 
-    Some(path)
+    let raw = if shell_expanded {
+      shellexpand::full(&cooked)?.into_owned()
+    } else {
+      cooked
+    };
+
+    if raw.is_empty() {
+      return Err(Error::EmptyImportPath);
+    }
+
+    Ok(if let Some(rest) = raw.strip_prefix("~/") {
+      dirs::home_dir().map(|home| home.join(rest))
+    } else {
+      base_uri
+        .to_file_path()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.join(raw)))
+    })
   }
 }
 
@@ -49,15 +66,23 @@ mod tests {
   }
 
   #[test]
-  fn empty_path_returns_none() {
+  fn empty_literal_returns_error() {
     let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(import("''").resolve(&base), None);
-    assert_eq!(import("\"\"").resolve(&base), None);
-    assert_eq!(import("").resolve(&base), None);
+    assert!(matches!(
+      import("''").resolve(&base),
+      Err(Error::EmptyImportPath),
+    ));
+
+    assert!(matches!(
+      import("\"\"").resolve(&base),
+      Err(Error::EmptyImportPath),
+    ));
+
+    assert_eq!(import("").resolve(&base).unwrap(), None);
   }
 
   #[test]
@@ -68,36 +93,31 @@ mod tests {
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
-      import("'~/bar.just'").resolve(&base).unwrap(),
+      import("'~/bar.just'").resolve(&base).unwrap().unwrap(),
       dirs::home_dir().unwrap().join("bar.just"),
     );
   }
 
   #[test]
   fn resolve() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str, expected: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(
-      import("'bar.just'").resolve(&base).unwrap(),
-      directory.path().join("bar.just")
-    );
+      assert_eq!(
+        import(source).resolve(&base).unwrap(),
+        Some(directory.path().join(expected)),
+      );
+    }
 
-    assert_eq!(
-      import("\"bar.just\"").resolve(&base).unwrap(),
-      directory.path().join("bar.just")
-    );
-
-    assert_eq!(
-      import("bar.just").resolve(&base).unwrap(),
-      directory.path().join("bar.just")
-    );
-
-    assert_eq!(
-      import("'sub/bar.just'").resolve(&base).unwrap(),
-      directory.path().join("sub/bar.just")
-    );
+    case("'foo.just'", "foo.just");
+    case("\"foo.just\"", "foo.just");
+    case("'foo/bar.just'", "foo/bar.just");
+    case("x'foo.just'", "foo.just");
+    case("x'''foo.just'''", "foo.just");
+    case("x\"\"\"foo.just\"\"\"", "foo.just");
   }
 }
