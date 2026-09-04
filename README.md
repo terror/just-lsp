@@ -292,11 +292,6 @@ vim.lsp.enable('just')
 
 ## Development
 
-I use [Neovim](https://neovim.io/) to work on this project, and I load the
-development build of this server to test out my changes instantly. This section
-describes a development setup using Neovim as the LSP client, for other clients
-you would need to look up their respective documentation.
-
 First, clone the repository and build the project:
 
 ```
@@ -305,7 +300,10 @@ cd just-lsp
 cargo build
 ```
 
-Add this to your editor configuration:
+### Neovim
+
+To use the development build as Neovim's language server, add this to your
+editor configuration:
 
 ```lua
 local dev_cmd = '/path/to/just-lsp/target/debug/just-lsp'
@@ -355,6 +353,39 @@ Swap in your own table if you use a different completion plugin.
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) plugin (and
 optionally [cmp-nvim-lsp](https://github.com/hrsh7th/cmp-nvim-lsp) for the
 capabilities helper).
+
+### Zed
+
+After installing the
+[Zed Justfile extension](https://github.com/jackTabsCode/zed-just), point its
+`just-lsp` adapter at the development binary in your Zed `settings.json`:
+
+```json
+{
+  "lsp": {
+    "just-lsp": {
+      "binary": {
+        "path": "/absolute/path/to/just-lsp/target/debug/just-lsp"
+      }
+    }
+  }
+}
+```
+
+The binary path must be absolute. After rebuilding the server, run
+`editor: restart language server` from the command palette. You can optionally
+add a shortcut for this action to `keymap.json`:
+
+```json
+[
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-r l": "editor::RestartLanguageServer"
+    }
+  }
+]
+```
 
 ### Extending the parser
 
