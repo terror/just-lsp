@@ -7,36 +7,22 @@ define_rule! {
     run(context) {
       let document = context.document();
 
-      let mut diagnostics = Vec::new();
+      document
+        .imports()
+        .into_iter()
+        .filter_map(|import| {
+          let message = match import.resolve(&document.uri) {
+            Ok(Some(path)) if !import.optional && !path.exists() => {
+              format!("Import path does not exist: `{}`", path.display())
+            }
+            Err(Error::EmptyImportPath) if import.optional => return None,
+            Err(error) => error.to_string(),
+            _ => return None,
+          };
 
-      for import in document.imports() {
-        if import.is_dynamic() {
-          continue;
-        }
-
-        let path = match import.resolve(&document.uri) {
-          Ok(Some(path)) => path,
-          Ok(None) => continue,
-          Err(Error::EmptyImportPath) if import.optional => continue,
-          Err(error) => {
-            diagnostics.push(Diagnostic::error(
-              error.to_string(),
-              import.path.range,
-            ));
-
-            continue;
-          }
-        };
-
-        if !import.optional && !path.exists() {
-          diagnostics.push(Diagnostic::error(
-            format!("Import path does not exist: `{}`", path.display()),
-            import.path.range,
-          ));
-        }
-      }
-
-      diagnostics
+          Some(Diagnostic::error(message, import.path.range))
+        })
+        .collect()
     }
   }
 }

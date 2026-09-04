@@ -13,8 +13,7 @@ define_rule! {
         .filter(|attribute| attribute.name.value == "continue")
         .flat_map(|attribute| &attribute.arguments)
         .filter_map(|argument| {
-          let StringLiteral { cooked: signal, .. } =
-            StringLiteral::parse_plain(&argument.value)?;
+          let signal = argument.value.literal()?;
 
           if SIGNALS.contains(&signal.as_str()) {
             None

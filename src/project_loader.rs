@@ -59,8 +59,7 @@ impl<'a> ProjectLoader<'a> {
 
     let path = match import.resolve(source) {
       Ok(Some(path)) => path,
-      Ok(None) => return Ok(ProjectDependencyTarget::Missing),
-      Err(Error::EmptyImportPath) => {
+      Ok(None) | Err(Error::EmptyImportPath) => {
         return Ok(ProjectDependencyTarget::Missing);
       }
       Err(_) => return Ok(ProjectDependencyTarget::Dynamic),

@@ -3,64 +3,87 @@ use super::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct StringLiteral {
   pub(crate) cooked: String,
-  kind: StringKind,
   pub(crate) shell_expanded: bool,
 }
 
 impl StringLiteral {
-  fn cook(source: &str) -> Option<String> {
+  fn cook_string(text: &str) -> Option<String> {
+    #[derive(PartialEq, Eq)]
+    enum State {
+      Backslash,
+      BackslashCarriageReturn,
+      Initial,
+      Unicode,
+      UnicodeValue { hex: String },
+    }
+
     let mut cooked = String::new();
 
-    let mut characters = source.chars();
+    let mut state = State::Initial;
 
-    while let Some(character) = characters.next() {
-      if character != '\\' {
-        cooked.push(character);
-        continue;
-      }
-
-      match characters.next()? {
-        'n' => cooked.push('\n'),
-        'r' => cooked.push('\r'),
-        't' => cooked.push('\t'),
-        '"' => cooked.push('"'),
-        '\\' => cooked.push('\\'),
-        '\n' => {}
-        '\r' => {
-          if characters.next()? != '\n' {
-            return None;
+    for c in text.chars() {
+      match state {
+        State::Initial => {
+          if c == '\\' {
+            state = State::Backslash;
+          } else {
+            cooked.push(c);
           }
         }
-        'u' => {
-          if characters.next()? != '{' {
-            return None;
+        State::Backslash if c == 'u' => {
+          state = State::Unicode;
+        }
+        State::Backslash => {
+          state = State::Initial;
+          match c {
+            'n' => cooked.push('\n'),
+            'r' => cooked.push('\r'),
+            't' => cooked.push('\t'),
+            '\\' => cooked.push('\\'),
+            '\n' => {}
+            '\r' => state = State::BackslashCarriageReturn,
+            '"' => cooked.push('"'),
+            _ => return None,
           }
+        }
+        State::BackslashCarriageReturn => match c {
+          '\n' => state = State::Initial,
+          _ => return None,
+        },
+        State::Unicode => match c {
+          '{' => {
+            state = State::UnicodeValue { hex: String::new() };
+          }
+          _ => return None,
+        },
+        State::UnicodeValue { ref mut hex } => match c {
+          '}' => {
+            if hex.is_empty() {
+              return None;
+            }
 
-          let mut codepoint = String::new();
+            let codepoint = u32::from_str_radix(hex, 16).unwrap();
 
-          loop {
-            match characters.next()? {
-              '}' => break,
-              character if character.is_ascii_hexdigit() => {
-                codepoint.push(character);
+            cooked.push(char::from_u32(codepoint)?);
 
-                if codepoint.len() > 6 {
-                  return None;
-                }
-              }
-              _ => return None,
+            state = State::Initial;
+          }
+          '0'..='9' | 'A'..='F' | 'a'..='f' => {
+            hex.push(c);
+
+            if hex.len() > 6 {
+              return None;
             }
           }
-
-          let codepoint = u32::from_str_radix(&codepoint, 16).ok()?;
-
-          cooked.push(char::from_u32(codepoint)?);
-        }
-        _ => return None,
+          _ => return None,
+        },
       }
     }
 
-    Some(cooked)
+    match state {
+      State::Initial => Some(cooked),
+      _ => None,
+    }
   }
 
   pub(crate) fn parse(source: &str) -> Option<Self> {
@@ -72,11 +95,7 @@ impl StringLiteral {
 
     let delimiter = kind.delimiter();
 
-    if source.len() < delimiter.len() * 2 || !source.ends_with(delimiter) {
-      return None;
-    }
-
-    let raw = &source[delimiter.len()..source.len() - delimiter.len()];
+    let raw = source.strip_prefix(delimiter)?.strip_suffix(delimiter)?;
 
     let uncooked = if kind.indented {
       Self::unindent(raw)
@@ -85,56 +104,34 @@ impl StringLiteral {
     };
 
     let cooked = if kind.processes_escape_sequences() {
-      Self::cook(&uncooked)?
+      Self::cook_string(&uncooked)?
     } else {
       uncooked
     };
 
     Some(Self {
       cooked,
-      kind,
       shell_expanded,
     })
   }
 
-  pub(crate) fn parse_plain(source: &str) -> Option<Self> {
-    let literal = Self::parse(source)?;
-
-    if literal.kind.indented || literal.shell_expanded {
-      None
-    } else {
-      Some(literal)
-    }
-  }
-
   fn unindent(source: &str) -> String {
     fn blank(line: &str) -> bool {
-      line
-        .chars()
-        .all(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+      line.trim_matches([' ', '\t', '\r', '\n']).is_empty()
     }
 
     fn common<'a>(left: &'a str, right: &str) -> &'a str {
       let length = left
-        .char_indices()
-        .zip(right.chars())
-        .take_while(|((_, left), right)| left == right)
-        .map(|((index, character), _)| index + character.len_utf8())
-        .last()
-        .unwrap_or(0);
+        .bytes()
+        .zip(right.bytes())
+        .take_while(|(left, right)| left == right)
+        .count();
 
       &left[..length]
     }
 
     fn indentation(line: &str) -> &str {
-      let length = line
-        .char_indices()
-        .take_while(|(_, character)| matches!(character, ' ' | '\t'))
-        .map(|(index, character)| index + character.len_utf8())
-        .last()
-        .unwrap_or(0);
-
-      &line[..length]
+      &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
     }
 
     let lines = source.split_inclusive('\n').collect::<Vec<_>>();
@@ -150,16 +147,13 @@ impl StringLiteral {
     let mut result = String::new();
 
     for (index, line) in lines.iter().enumerate() {
-      let replacement = match (
-        blank(line),
-        index == 0,
-        index == lines.len().saturating_sub(1),
-      ) {
-        (true, false, false) if line.ends_with("\r\n") => "\r\n",
-        (true, false, false) => "\n",
-        (true, _, _) => "",
-        (false, _, _) => &line[common_indentation.len()..],
-      };
+      let replacement =
+        match (blank(line), index == 0, index == lines.len() - 1) {
+          (true, false, false) if line.ends_with("\r\n") => "\r\n",
+          (true, false, false) => "\n",
+          (true, _, _) => "",
+          (false, _, _) => &line[common_indentation.len()..],
+        };
 
       result.push_str(replacement);
     }
@@ -173,29 +167,65 @@ mod tests {
   use super::*;
 
   #[test]
-  fn cooks_double_quoted_strings() {
-    assert_eq!(
-      StringLiteral::parse(r#""foo\t\u{2003}""#).unwrap().cooked,
-      "foo\t\u{2003}",
-    );
+  fn cook_string() {
+    #[track_caller]
+    fn case(source: &str, expected: Option<&str>) {
+      assert_eq!(StringLiteral::cook_string(source).as_deref(), expected);
+    }
+
+    case("", Some(""));
+    case(r#"foo\n\r\t\\\"bar"#, Some("foo\n\r\t\\\"bar"));
+    case("foo\\\n  bar", Some("foo  bar"));
+    case("foo\\\r\nbar", Some("foobar"));
+    case(r"\q", None);
+    case("\\\rfoo", None);
+    case("\\", None);
+    case("\\\r", None);
+    case(r"\u", None);
+    case(r"\u{000066}oo", Some("foo"));
+    case(r"\u{0000066}", None);
+    case(r"\u{+66}", None);
+    case(r"\u{D800}", None);
+    case(r"\u{66", None);
+    case(r"\u66", None);
+    case(r"\u{}", None);
   }
 
   #[test]
-  fn parses_indented_strings() {
-    assert_eq!(
-      StringLiteral::parse("\"\"\"\n  foo\n  bar\n\"\"\"")
-        .unwrap()
-        .cooked,
-      "foo\nbar\n",
+  fn parse() {
+    #[track_caller]
+    fn case(source: &str, expected: Option<&str>) {
+      assert_eq!(
+        StringLiteral::parse(source)
+          .map(|StringLiteral { cooked, .. }| cooked)
+          .as_deref(),
+        expected,
+      );
+    }
+
+    case("''", Some(""));
+    case("'''foo'''", Some("foo"));
+    case("'''  foo'''", Some("foo"));
+    case("'''foo\n  bar'''", Some("foo\n  bar"));
+    case("'''\u{2003}foo'''", Some("\u{2003}foo"));
+    case("\"\"\"\n  foo\n  bar\n\"\"\"", Some("foo\nbar\n"));
+    case("\"\"\"\n  foo\\\n  bar\n\"\"\"", Some("foobar\n"));
+    case("'''\n  foo\\t\n  bar\n'''", Some("foo\\t\nbar\n"));
+    case("''''''", Some(""));
+    case("''' \n\t'''", Some(""));
+    case("'''\n  foo\n \n  bar\n  '''", Some("foo\n\nbar\n"));
+    case(
+      "'''\n  foo\r\n \t\r\n  bar\r\n  '''",
+      Some("foo\r\n\r\nbar\r\n"),
     );
-
-    assert_eq!(StringLiteral::parse("'''foo'''").unwrap().cooked, "foo",);
-  }
-
-  #[test]
-  fn parses_plain_strings() {
-    assert_eq!(StringLiteral::parse("'foo'").unwrap().cooked, "foo");
-    assert_eq!(StringLiteral::parse(r#""foo""#).unwrap().cooked, "foo");
+    case("'''\n \tfoo\n  bar\n'''", Some("\tfoo\n bar\n"));
+    case("", None);
+    case("'", None);
+    case("'foo\"", None);
+    case("''''", None);
+    case(r#""foo\"""#, Some("foo\""));
+    case(r#""""foo"bar""""#, Some("foo\"bar"));
+    case("'''foo'bar'''", Some("foo'bar"));
   }
 
   #[test]
@@ -205,12 +235,5 @@ mod tests {
     assert!(literal.shell_expanded);
 
     assert_eq!(literal.cooked, "foo");
-  }
-
-  #[test]
-  fn plain_rejects_prefixed_and_indented_strings() {
-    assert!(StringLiteral::parse_plain("x'foo'").is_none());
-    assert!(StringLiteral::parse_plain("'''foo'''").is_none());
-    assert!(StringLiteral::parse_plain("f'foo'").is_none());
   }
 }

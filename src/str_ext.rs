@@ -7,6 +7,9 @@ pub trait StrExt {
     candidates: impl IntoIterator<Item = &'a str>,
   ) -> Option<String>;
 
+  /// Returns the decoded value of a plain string literal.
+  fn literal(&self) -> Option<String>;
+
   /// Returns a `Point` describing the tree-sitter point that would
   /// be reached after inserting this UTF-8 text.
   fn point_delta(&self) -> Point;
@@ -27,6 +30,18 @@ impl StrExt for str {
           .then_with(|| left.cmp(right))
       })
       .map(|(_, candidate)| candidate.to_owned())
+  }
+
+  fn literal(&self) -> Option<String> {
+    let quote = self.chars().next()?;
+
+    let value = self.strip_prefix(quote)?.strip_suffix(quote)?;
+
+    if value.starts_with(quote) || value.ends_with(quote) {
+      return None;
+    }
+
+    StringLiteral::parse(self).map(|StringLiteral { cooked, .. }| cooked)
   }
 
   fn point_delta(&self) -> Point {
@@ -99,6 +114,23 @@ mod tests {
   #[test]
   fn find_suggestion_resolves_ties_lexicographically() {
     assert_eq!("cat".find_suggestion(["bat", "car"]), Some("bat".into()));
+  }
+
+  #[test]
+  fn literal() {
+    #[track_caller]
+    fn case(source: &str, expected: Option<&str>) {
+      assert_eq!(source.literal().as_deref(), expected);
+    }
+
+    case(r#""foo""#, Some("foo"));
+    case(r#""\t""#, Some("\t"));
+    case(r#""\u{2003}""#, Some("\u{2003}"));
+    case(r"'\t'", Some("\\t"));
+    case(r#"f"foo""#, None);
+    case(r#"x"foo""#, None);
+    case(r#"""foo""""#, None);
+    case("'''foo'''", None);
   }
 
   #[test]

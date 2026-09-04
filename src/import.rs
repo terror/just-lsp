@@ -29,11 +29,7 @@ impl Import {
     };
 
     let raw = if shell_expanded {
-      shellexpand::full(&cooked)
-        .map_err(|error| Error::ShellExpansion {
-          message: error.to_string(),
-        })?
-        .into_owned()
+      shellexpand::full(&cooked)?.into_owned()
     } else {
       cooked
     };
@@ -42,25 +38,14 @@ impl Import {
       return Err(Error::EmptyImportPath);
     }
 
-    let path = if let Some(rest) = raw.strip_prefix("~/") {
-      let Some(home) = dirs::home_dir() else {
-        return Ok(None);
-      };
-
-      home.join(rest)
+    Ok(if let Some(rest) = raw.strip_prefix("~/") {
+      dirs::home_dir().map(|home| home.join(rest))
     } else {
-      let Ok(base_path) = base_uri.to_file_path() else {
-        return Ok(None);
-      };
-
-      let Some(parent) = base_path.parent() else {
-        return Ok(None);
-      };
-
-      parent.join(&raw)
-    };
-
-    Ok(Some(path))
+      base_uri
+        .to_file_path()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.join(raw)))
+    })
   }
 }
 
@@ -115,55 +100,24 @@ mod tests {
 
   #[test]
   fn resolve() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str, expected: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(
-      import("'bar.just'").resolve(&base).unwrap().unwrap(),
-      directory.path().join("bar.just")
-    );
+      assert_eq!(
+        import(source).resolve(&base).unwrap(),
+        Some(directory.path().join(expected)),
+      );
+    }
 
-    assert_eq!(
-      import("\"bar.just\"").resolve(&base).unwrap().unwrap(),
-      directory.path().join("bar.just")
-    );
-
-    assert_eq!(
-      import("'sub/bar.just'").resolve(&base).unwrap().unwrap(),
-      directory.path().join("sub/bar.just")
-    );
-  }
-
-  #[test]
-  fn shell_expanded() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
-
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
-
-    assert_eq!(
-      import("x'bar.just'").resolve(&base).unwrap(),
-      Some(directory.path().join("bar.just"))
-    );
-  }
-
-  #[test]
-  fn shell_expanded_indented() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
-
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
-
-    assert_eq!(
-      import("x'''bar.just'''").resolve(&base).unwrap(),
-      Some(directory.path().join("bar.just"))
-    );
-
-    assert_eq!(
-      import("x\"\"\"bar.just\"\"\"").resolve(&base).unwrap(),
-      Some(directory.path().join("bar.just"))
-    );
+    case("'foo.just'", "foo.just");
+    case("\"foo.just\"", "foo.just");
+    case("'foo/bar.just'", "foo/bar.just");
+    case("x'foo.just'", "foo.just");
+    case("x'''foo.just'''", "foo.just");
+    case("x\"\"\"foo.just\"\"\"", "foo.just");
   }
 }
