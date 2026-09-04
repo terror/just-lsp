@@ -6,6 +6,8 @@ define_rule! {
     id: "extension-without-script",
     message: "extension without script",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       let mut diagnostics = Vec::new();
 
       for recipe in context.recipes() {
@@ -13,7 +15,7 @@ define_rule! {
           continue;
         };
 
-        if context.recipe_runs_as_script(recipe) {
+        if recipe.runs_as_script(default_script) {
           continue;
         }
 

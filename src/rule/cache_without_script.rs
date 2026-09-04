@@ -5,6 +5,8 @@ define_rule! {
     id: "cache-without-script",
     message: "cache without script mode",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       let mut diagnostics = Vec::new();
 
       for recipe in context.recipes() {
@@ -12,10 +14,9 @@ define_rule! {
           continue;
         };
 
+        // Script and shell conflicts are reported separately.
         if recipe.has_attribute("script")
-          || (!recipe.has_attribute("shell")
-            && (recipe.shebang.is_some()
-              || context.setting_enabled("default-script")))
+          || recipe.runs_as_script(default_script)
         {
           continue;
         }

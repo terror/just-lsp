@@ -32,11 +32,20 @@ impl Recipe {
       .iter()
       .any(|attribute| attribute.name.value == name)
   }
+
+  #[must_use]
+  pub fn runs_as_script(&self, default_script: bool) -> bool {
+    if self.has_attribute("shell") {
+      return false;
+    }
+
+    self.has_attribute("script") || self.shebang.is_some() || default_script
+  }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, indoc::indoc};
 
   #[test]
   fn recipe_groups_all_attributes() {
@@ -251,5 +260,41 @@ mod tests {
     };
 
     assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
+  }
+
+  #[test]
+  fn runs_as_script_respects_recipe_configuration() {
+    let recipes = Document::from(indoc! {
+      "
+      plain:
+        echo plain
+
+      [shell]
+      shell:
+        echo shell
+
+      [script]
+      script:
+        echo script
+
+      shebang:
+        #!/usr/bin/env sh
+        echo shebang
+      "
+    })
+    .recipes();
+
+    let recipe = |name| {
+      recipes
+        .iter()
+        .find(|recipe| recipe.name.value == name)
+        .unwrap()
+    };
+
+    assert!(!recipe("plain").runs_as_script(false));
+    assert!(recipe("plain").runs_as_script(true));
+    assert!(!recipe("shell").runs_as_script(true));
+    assert!(recipe("script").runs_as_script(false));
+    assert!(recipe("shebang").runs_as_script(false));
   }
 }

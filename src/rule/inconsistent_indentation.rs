@@ -84,10 +84,12 @@ define_rule! {
     id: "inconsistent-recipe-indentation",
     message: "inconsistent indentation",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       context
         .recipes()
         .iter()
-        .filter(|recipe| !context.recipe_runs_as_script(recipe))
+        .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(Self::find_inconsistent_indentation)
         .collect()
     }
