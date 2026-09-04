@@ -23,26 +23,32 @@ struct Diagnostic {
 /// Returns a `JsError` if serialization of diagnostics fails.
 #[wasm_bindgen]
 pub fn analyze(source: &str) -> Result<JsValue, JsError> {
+  let document = Document::from(source);
+
   serde_wasm_bindgen::to_value(
-    &Analyzer::from(&Document::from(source))
-      .analyze()
-      .into_iter()
-      .map(|diagnostic| Diagnostic {
-        end_character: diagnostic.range.end.character,
-        end_line: diagnostic.range.end.line,
-        id: diagnostic.id,
-        message: diagnostic.message,
-        severity: match diagnostic.severity {
-          DiagnosticSeverity::ERROR => "error",
-          DiagnosticSeverity::HINT => "hint",
-          DiagnosticSeverity::INFORMATION => "information",
-          DiagnosticSeverity::WARNING => "warning",
-          _ => "unknown",
-        },
-        start_character: diagnostic.range.start.character,
-        start_line: diagnostic.range.start.line,
-      })
-      .collect::<Vec<_>>(),
+    &Analyzer {
+      config: None,
+      document: &document,
+      imported_documents: Vec::new(),
+    }
+    .analyze()
+    .into_iter()
+    .map(|diagnostic| Diagnostic {
+      end_character: diagnostic.range.end.character,
+      end_line: diagnostic.range.end.line,
+      id: diagnostic.id,
+      message: diagnostic.message,
+      severity: match diagnostic.severity {
+        DiagnosticSeverity::ERROR => "error",
+        DiagnosticSeverity::HINT => "hint",
+        DiagnosticSeverity::INFORMATION => "information",
+        DiagnosticSeverity::WARNING => "warning",
+        _ => "unknown",
+      },
+      start_character: diagnostic.range.start.character,
+      start_line: diagnostic.range.start.line,
+    })
+    .collect::<Vec<_>>(),
   )
   .map_err(|error| JsError::new(&error.to_string()))
 }

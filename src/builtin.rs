@@ -17,13 +17,13 @@ pub enum Builtin<'a> {
     aliases: &'a [&'a str],
     kind: FunctionKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
   Setting {
     name: &'a str,
     kind: SettingKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
 }
 
@@ -115,12 +115,13 @@ impl Builtin<'_> {
       "assert" => {
         format!("{name}(${{1:condition}}${{2:, message:string}})")
       }
-      "bool" | "show" => format!("{name}(${{1:value}})"),
+      "bool" | "len" | "show" => format!("{name}(${{1:value}})"),
       "join_list" => {
         format!("{name}(${{1:value}}${{2:, separator:string}})")
       }
       "arch"
       | "num_cpus"
+      | "num_jobs"
       | "os"
       | "os_family"
       | "is_dependency"
@@ -141,6 +142,7 @@ impl Builtin<'_> {
       | "source_dir"
       | "just_executable"
       | "just_pid"
+      | "just_version"
       | "uuid"
       | "runtime_directory"
       | "runtime_dir"
@@ -202,8 +204,11 @@ impl Builtin<'_> {
           "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})"
         )
       }
-      "require" | "style" | "which" => {
+      "require" | "which" => {
         format!("{name}(${{1:name:string}})")
+      }
+      "style" => {
+        format!("{name}(${{1:styles:string}}${{2:, text:string}})")
       }
       "semver_matches" => {
         format!("{name}(${{1:version:string}}, ${{2:requirement:string}})")
@@ -248,7 +253,7 @@ mod tests {
       aliases: &[],
       kind: FunctionKind::Nullary,
       description: "",
-      deprecated: Some("bar"),
+      deprecated: Some(Deprecation::Replacement("bar")),
     }
     .completion_items()
     .into_iter()

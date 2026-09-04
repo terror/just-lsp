@@ -13,11 +13,20 @@ define_rule! {
         return Vec::new();
       }
 
-      let mut diagnostics = Vec::new();
-      let mut seen = HashSet::new();
+      let (mut diagnostics, mut groups) = (Vec::new(), HashMap::<String, GroupSet>::new());
 
       for variable in context.variables() {
-        if !seen.insert(variable.name.value.clone()) {
+        let current = GroupSet::from_attributes(&variable.attributes);
+
+        let previous = groups
+          .entry(variable.name.value.clone())
+          .or_default();
+
+        let duplicate = previous.conflicts_with(&current);
+
+        previous.union_with(current);
+
+        if duplicate {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate variable `{}`", variable.name.value),
             variable.range,

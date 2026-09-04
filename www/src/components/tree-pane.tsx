@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@/lib/types';
+import type { SyntaxNode } from '@/lib/syntax-node';
 import { Text } from '@codemirror/state';
 import { useMemo } from 'react';
 
@@ -35,7 +35,7 @@ export const TreePane = ({
           />
         </div>
       ) : (
-        <p className='p-4 text-center text-gray-500'>
+        <p className='text-muted-foreground p-4 text-center'>
           No parsed tree available
         </p>
       )}

@@ -238,6 +238,27 @@ fn analyze_accepts_default_script_recipe_indentation() -> Result {
 }
 
 #[test]
+fn analyze_accepts_imported_recipe() -> Result {
+  Test::new()?
+    .file("foo.just", "foo:\n")
+    .file("justfile", "import 'foo.just'\n\nbar: foo\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_accepts_deprecated_setting_in_import() -> Result {
+  Test::new()?
+    .file(
+      "settings.just",
+      "\n\n\n\n\nset windows-shell := [\"powershell.exe\"]\n",
+    )
+    .file("justfile", "import 'settings.just'\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
@@ -269,6 +290,27 @@ fn analyze_errors_when_justfile_cannot_be_found() -> Result {
 }
 
 #[test]
+fn analyze_errors_when_multiple_justfiles_are_found() -> Result {
+  Test::new()?
+    .file("justfile", "")
+    .file(".justfile", "")
+    .expected_status(1)
+    .expected_stderr("error: multiple candidate justfiles found in `[ROOT]`\n")
+    .run()
+}
+
+#[test]
+fn analyze_finds_case_insensitive_justfiles() -> Result {
+  #[track_caller]
+  fn case(name: &str) -> Result {
+    Test::new()?.file(name, "foo:\n").directory("bar").run()
+  }
+
+  case("JuStFiLe")?;
+  case(".JuStFiLe")
+}
+
+#[test]
 fn analyze_finds_justfile_in_parent_directory() -> Result {
   Test::new()?
     .file(
@@ -280,6 +322,15 @@ fn analyze_finds_justfile_in_parent_directory() -> Result {
         "
       },
     )
+    .directory("foo/bar")
+    .run()
+}
+
+#[test]
+fn analyze_finds_nearest_dot_justfile() -> Result {
+  Test::new()?
+    .file("justfile", "foo:\n  echo {{bar()}}\n")
+    .file("foo/.justfile", "foo:\n")
     .directory("foo/bar")
     .run()
 }

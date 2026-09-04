@@ -2,12 +2,18 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Import {
+  pub attributes: Vec<Attribute>,
   pub optional: bool,
   pub path: TextNode,
   pub range: lsp::Range,
 }
 
 impl Import {
+  #[must_use]
+  pub fn is_dynamic(&self) -> bool {
+    self.path.value.starts_with(['f', 'x'])
+  }
+
   #[must_use]
   pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
     let raw = self.path.value.trim_matches(|c| c == '\'' || c == '"');
@@ -32,6 +38,7 @@ mod tests {
 
   fn import(path: &str) -> Import {
     Import {
+      attributes: Vec::new(),
       optional: false,
       path: TextNode {
         value: path.to_owned(),

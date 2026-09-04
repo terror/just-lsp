@@ -7,7 +7,6 @@ macro_rules! define_rule {
       id: $id:literal,
       message: $message:literal,
       run($context:ident) $body:block
-      $(, quickfixes($quickfix_context:ident) $quickfix_body:block)?
       $(,)?
     }
   ) => {
@@ -22,15 +21,6 @@ macro_rules! define_rule {
       fn message(&self) -> &'static str {
         $message
       }
-
-      $(
-        fn quickfixes(
-          &self,
-          $quickfix_context: &RuleContext<'_>,
-        ) -> Vec<Quickfix> {
-          $quickfix_body
-        }
-      )?
 
       fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
         $body
@@ -49,9 +39,14 @@ mod attribute_argument_expressions;
 mod attribute_arguments;
 mod attribute_invalid_target;
 mod attribute_target_support;
+mod backtick_shebang;
+mod cache_attribute;
+mod cache_without_script;
+mod continue_signals;
 mod dependency_arguments;
 mod deprecated_function;
 mod deprecated_setting;
+mod dotenv_command_conflict;
 mod dotenv_path_filename_conflict;
 mod duplicate_alias;
 mod duplicate_attribute;
@@ -69,6 +64,7 @@ mod function_parameters;
 mod inconsistent_indentation;
 mod invalid_import_path;
 mod invalid_setting_kind;
+mod invalid_setting_value;
 mod list_features;
 mod mapped_dependencies;
 mod missing_dependencies;
@@ -77,7 +73,7 @@ mod mixed_indentation;
 mod parallel_dependencies;
 mod recipe_dependency_cycles;
 mod recipe_parameters;
-mod script_shebang_conflict;
+mod script_shell_conflict;
 mod syntax;
 mod undefined_identifiers;
 mod unknown_attribute;
@@ -88,16 +84,16 @@ mod unused_variables;
 mod working_directory_conflict;
 
 pub trait Rule: Sync {
+  /// Whether the rule is enabled by its configuration.
+  fn enabled(&self, config: &RuleConfig) -> bool {
+    config.level() != Some(RuleLevel::Off)
+  }
+
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
 
   /// What to show the user in the header of the diagnostics.
   fn message(&self) -> &'static str;
-
-  /// Return quickfixes that can be applied for diagnostics produced by this rule.
-  fn quickfixes(&self, _context: &RuleContext<'_>) -> Vec<Quickfix> {
-    Vec::new()
-  }
 
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;

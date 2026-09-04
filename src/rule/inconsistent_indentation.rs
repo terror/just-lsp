@@ -96,11 +96,9 @@ define_rule! {
 
 impl InconsistentIndentationRule {
   fn find_inconsistent_indentation(recipe: &Recipe) -> Option<Diagnostic> {
-    let body_start_line = recipe.range.start.line + 1;
-
     Self::recipe_body_lines(&recipe.content)
       .try_fold(None, |state: Option<ScanState>, line| {
-        let absolute_line = body_start_line + line.relative_line;
+        let absolute_line = recipe.range.start.line + line.relative_line;
 
         match state {
           None => ControlFlow::Continue(Some(ScanState {

@@ -4,7 +4,7 @@ use {
   ariadne::{Color, Label, Report, ReportKind, sources},
   clap::{Parser, builder::styling},
   command::Command,
-  env_logger::Env,
+  executor::Executor,
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
@@ -13,10 +13,11 @@ use {
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs, io,
+    fs, future,
+    io::{self, stderr},
     path::PathBuf,
     process,
     sync::{Arc, LazyLock, atomic::AtomicBool},
@@ -28,6 +29,7 @@ use {
   tokio::{io::AsyncBufReadExt, sync::RwLock},
   tokio_stream::{StreamExt, wrappers::LinesStream},
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
+  tracing::{Level, info, warn},
   tree_sitter::Node,
   tree_sitter_highlight::{
     Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
@@ -36,6 +38,7 @@ use {
 
 mod arguments;
 mod command;
+mod executor;
 mod resolver;
 mod server;
 mod subcommand;
@@ -52,9 +55,14 @@ async fn main() {
     yansi::disable();
   }
 
-  let env = Env::default().default_filter_or("info");
-
-  env_logger::Builder::from_env(env).init();
+  tracing_subscriber::fmt()
+    .with_writer(stderr)
+    .with_env_filter(
+      tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(Level::INFO.into())
+        .from_env_lossy(),
+    )
+    .init();
 
   if let Err(error) = Arguments::parse().run().await {
     eprintln!("{} {error}", "error:".red().bold());

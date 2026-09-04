@@ -4,7 +4,7 @@ use super::*;
 pub struct Dependency {
   pub arguments: Vec<DependencyArgument>,
   pub mapped: Option<lsp::Range>,
-  pub name: String,
+  pub name: TextNode,
   pub phase: DependencyPhase,
   pub range: lsp::Range,
 }

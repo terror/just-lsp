@@ -86,6 +86,7 @@ module.exports = grammar({
     // function      : NAME '(' parameters? ')' ':=' expression
     function_definition: ($) =>
       seq(
+        repeat($.attribute),
         field("name", $.identifier),
         "(",
         optional(field("parameters", $.function_parameters)),
@@ -118,9 +119,10 @@ module.exports = grammar({
     _name: ($) => choice($.identifier, alias("unexport", $.identifier)),
 
     // assignment    : attribute* NAME ':=' expression _eol
-    assignment: ($) =>
+    assignment: ($) => seq(repeat($.attribute), $._assignment),
+
+    _assignment: ($) =>
       seq(
-        repeat($.attribute),
         field("left", $._name),
         ":=",
         field("right", $.expression),
@@ -128,16 +130,19 @@ module.exports = grammar({
       ),
 
     // eager         : attribute* 'eager' assignment
-    eager: ($) => seq(repeat($.attribute), "eager", $.assignment),
+    eager: ($) =>
+      seq(repeat($.attribute), "eager", alias($._assignment, $.assignment)),
 
     // export        : attribute* 'export' assignment
-    export: ($) => seq(repeat($.attribute), "export", $.assignment),
+    export: ($) =>
+      seq(repeat($.attribute), "export", alias($._assignment, $.assignment)),
 
     // unexport      : 'unexport' NAME _eol
-    unexport: ($) => seq("unexport", field("name", $._name), $._newline),
+    unexport: ($) =>
+      seq(repeat($.attribute), "unexport", field("name", $._name), $._newline),
 
     // import        : 'import' '?'? string?
-    import: ($) => seq("import", optional("?"), $.string),
+    import: ($) => seq(repeat($.attribute), "import", optional("?"), $.string),
 
     // module        : attribute* 'mod' '?'? string?
     module: ($) =>
@@ -152,6 +157,7 @@ module.exports = grammar({
     // setting       : 'set' identifier (':=' (boolean | string | expression))?
     setting: ($) =>
       seq(
+        repeat($.attribute),
         "set",
         field("left", $.identifier),
         field(
@@ -473,22 +479,34 @@ module.exports = grammar({
     _format_string: ($) =>
       seq(
         'f"',
-        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        repeat(
+          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+        ),
         '"',
       ),
 
     _format_string_indented: ($) =>
       seq(
         'f"""',
-        repeat(choice($.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/)),
+        repeat(
+          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+        ),
         '"""',
       ),
 
     _format_raw_string: ($) =>
-      seq("f'", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'"),
+      seq(
+        "f'",
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        "'",
+      ),
 
     _format_raw_string_indented: ($) =>
-      seq("f'''", repeat(choice($.interpolation, /[^'{]+/, /\{/)), "'''"),
+      seq(
+        "f'''",
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        "'''",
+      ),
 
     _raw_string_indented: (_) => seq("'''", repeat(/./), "'''"),
     _string: ($) => seq('"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
@@ -508,7 +526,7 @@ module.exports = grammar({
     _backticked: ($) => seq("`", optional($.command_body), "`"),
     _indented_backticked: ($) => seq("```", optional($.command_body), "```"),
 
-    command_body: ($) => repeat1(choice($.interpolation, /./)),
+    command_body: (_) => repeat1(/./),
 
     // interpolation : '{{' expression '}}'
     interpolation: ($) => seq("{{", $.expression, "}}"),

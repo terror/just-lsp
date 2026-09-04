@@ -8,42 +8,6 @@ pub struct Document {
   pub version: i32,
 }
 
-impl From<&str> for Document {
-  fn from(value: &str) -> Self {
-    let mut document = Self {
-      content: value.into(),
-      tree: None,
-      uri: lsp::Url::parse("file:///test.just").unwrap(),
-      version: 1,
-    };
-
-    document.parse().unwrap();
-
-    document
-  }
-}
-
-impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
-  type Error = Error;
-
-  fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
-    let lsp::TextDocumentItem {
-      text, uri, version, ..
-    } = params.text_document;
-
-    let mut document = Self {
-      content: Rope::from_str(&text),
-      tree: None,
-      uri,
-      version,
-    };
-
-    document.parse()?;
-
-    Ok(document)
-  }
-}
-
 impl Document {
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
@@ -57,6 +21,7 @@ impl Document {
           let right_node = alias_node.child_by_field_name("right")?;
 
           Some(Alias {
+            attributes: self.attributes_for_node(alias_node),
             name: TextNode {
               value: self.get_node_text(&left_node),
               range: left_node.get_range(self),
@@ -111,45 +76,62 @@ impl Document {
         .root_node()
         .find_all("attribute")
         .into_iter()
-        .flat_map(|attribute_node| {
-          let target = attribute_node
-            .parent()
-            .and_then(|parent| AttributeTarget::try_from_kind(parent.kind()));
-
-          attribute_node
-            .find_all("^identifier")
-            .into_iter()
-            .map(move |identifier_node| {
-              let arguments = identifier_node
-                .siblings()
-                .take_while(|sibling| sibling.kind() != "identifier")
-                .filter(|sibling| {
-                  sibling.start_byte() != sibling.end_byte()
-                    && matches!(
-                      sibling.kind(),
-                      "string" | "expression" | "attribute_named_param"
-                    )
-                })
-                .map(|argument_node| TextNode {
-                  value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(self),
-                })
-                .collect::<Vec<_>>();
-
-              Attribute {
-                name: TextNode {
-                  value: self.get_node_text(&identifier_node),
-                  range: identifier_node.get_range(self),
-                },
-                arguments,
-                target,
-                range: attribute_node.get_range(self),
-              }
-            })
-            .collect::<Vec<_>>()
-        })
+        .flat_map(|node| self.attributes_for_node(&node))
         .collect()
     })
+  }
+
+  pub(super) fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
+    let (attributes, target) = if node.kind() == "attribute" {
+      (
+        vec![*node],
+        node
+          .parent()
+          .and_then(|parent| AttributeTarget::try_from_kind(parent.kind())),
+      )
+    } else {
+      (
+        node.find_all("attribute"),
+        AttributeTarget::try_from_kind(node.kind()),
+      )
+    };
+
+    attributes
+      .into_iter()
+      .flat_map(|attribute| {
+        attribute
+          .find_all("^identifier")
+          .into_iter()
+          .map(move |identifier| {
+            let arguments = identifier
+              .siblings()
+              .take_while(|sibling| sibling.kind() != "identifier")
+              .filter(|sibling| {
+                sibling.start_byte() != sibling.end_byte()
+                  && matches!(
+                    sibling.kind(),
+                    "string" | "expression" | "attribute_named_param"
+                  )
+              })
+              .map(|argument| TextNode {
+                value: self.get_node_text(&argument),
+                range: argument.get_range(self),
+              })
+              .collect::<Vec<_>>();
+
+            Attribute {
+              name: TextNode {
+                value: self.get_node_text(&identifier),
+                range: identifier.get_range(self),
+              },
+              arguments,
+              target,
+              range: attribute.get_range(self),
+            }
+          })
+          .collect::<Vec<_>>()
+      })
+      .collect()
   }
 
   #[must_use]
@@ -285,6 +267,7 @@ impl Document {
             .unwrap_or_default();
 
           Some(Function {
+            attributes: self.attributes_for_node(function_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -323,6 +306,7 @@ impl Document {
           let content = self.get_node_text(import_node);
 
           Some(Import {
+            attributes: self.attributes_for_node(import_node),
             optional: content.contains('?'),
             path: TextNode {
               value: self.get_node_text(&path_node),
@@ -336,7 +320,6 @@ impl Document {
   }
 
   #[must_use]
-  #[allow(dead_code)]
   pub fn modules(&self) -> Vec<Module> {
     self.tree.as_ref().map_or(Vec::new(), |tree| {
       tree
@@ -354,6 +337,7 @@ impl Document {
           });
 
           Some(Module {
+            attributes: self.attributes_for_node(module_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -486,17 +470,19 @@ impl Document {
                   "dependency" => {
                     let dependency_node = node;
 
-                    let Some(dependency_name) = dependency_node
+                    let Some(dependency_name_node) = dependency_node
                       .child_by_field_name("name")
                       .or_else(|| {
                         dependency_node
                           .find("dependency_expression")
                           .and_then(|node| node.child_by_field_name("name"))
                       })
-                      .map(|node| self.get_node_text(&node))
                     else {
                       continue;
                     };
+
+                    let dependency_name =
+                      self.get_node_text(&dependency_name_node);
 
                     let arguments = dependency_node
                       .find("dependency_expression")
@@ -540,7 +526,10 @@ impl Document {
                       });
 
                     dependencies.push(Dependency {
-                      name: dependency_name,
+                      name: TextNode {
+                        value: dependency_name,
+                        range: dependency_name_node.get_range(self),
+                      },
                       arguments,
                       mapped,
                       phase,
@@ -612,6 +601,7 @@ impl Document {
           let name_node = unexport_node.child_by_field_name("name")?;
 
           Some(Unexport {
+            attributes: self.attributes_for_node(unexport_node),
             name: TextNode {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
@@ -633,7 +623,13 @@ impl Document {
         .filter_map(|assignment_node| {
           let identifier_node = assignment_node.child_by_field_name("left")?;
 
+          let attribute_node = assignment_node
+            .parent()
+            .filter(|parent| matches!(parent.kind(), "eager" | "export"))
+            .unwrap_or(*assignment_node);
+
           Some(Variable {
+            attributes: self.attributes_for_node(&attribute_node),
             name: TextNode {
               value: self.get_node_text(&identifier_node),
               range: identifier_node.get_range(self),
@@ -648,26 +644,48 @@ impl Document {
   }
 }
 
+impl From<&str> for Document {
+  fn from(value: &str) -> Self {
+    let mut document = Self {
+      content: value.into(),
+      tree: None,
+      uri: lsp::Url::parse("file:///test.just").unwrap(),
+      version: 1,
+    };
+
+    document.parse().unwrap();
+
+    document
+  }
+}
+
+impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
+  type Error = Error;
+
+  fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
+    let lsp::TextDocumentItem {
+      text, uri, version, ..
+    } = params.text_document;
+
+    let mut document = Self {
+      content: Rope::from_str(&text),
+      tree: None,
+      uri,
+      version,
+    };
+
+    document.parse()?;
+
+    Ok(document)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use {
     super::*, indoc::indoc, parameter::VariadicType,
     pretty_assertions::assert_eq,
   };
-
-  #[test]
-  fn create_document() {
-    let content = indoc! {"
-      foo:
-        echo foo
-    "};
-
-    let document = Document::from(content);
-
-    assert_eq!(document.content.to_string(), content);
-
-    assert!(document.tree.is_some());
-  }
 
   #[test]
   fn apply_change() {
@@ -696,6 +714,64 @@ mod tests {
 
     assert_ne!(document.content.to_string(), original_content);
     assert_eq!(document.content.to_string(), "foo:\n  echo \"bar\"");
+  }
+
+  #[test]
+  fn create_document() {
+    let content = indoc! {"
+      foo:
+        echo foo
+    "};
+
+    let document = Document::from(content);
+
+    assert_eq!(document.content.to_string(), content);
+
+    assert!(document.tree.is_some());
+  }
+
+  #[test]
+  fn eager_variable_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [private]
+      eager foo := 'bar'
+      "
+    });
+
+    assert_eq!(
+      document.variables(),
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 6, 1, 9),
+        },
+        export: false,
+        content: "foo := 'bar'".into(),
+        range: lsp::Range::at(1, 6, 2, 0),
+      }]
+    );
+  }
+
+  #[test]
+  fn find_function() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+      "
+    });
+
+    assert!(document.find_function("foo").is_some());
+    assert!(document.find_function("bar").is_none());
   }
 
   #[test]
@@ -758,35 +834,68 @@ mod tests {
   }
 
   #[test]
-  fn get_array_setting() {
+  fn function_no_parameters() {
     let document = Document::from(indoc! {
       "
-      set shell := ['foo']
+      foo() := \"bar\"
       "
     });
 
-    let settings = document.settings();
-
-    assert_eq!(settings.len(), 1);
-
     assert_eq!(
-      settings,
-      vec![Setting {
+      document.functions(),
+      vec![Function {
+        attributes: vec![],
         name: TextNode {
-          value: "shell".into(),
-          range: lsp::Range::at(0, 4, 0, 9),
+          value: "foo".into(),
+          range: lsp::Range::at(0, 0, 0, 3),
         },
-        kind: SettingKind::Array,
-        range: lsp::Range::at(0, 0, 1, 0)
-      }]
+        parameters: vec![],
+        body: "\"bar\"".into(),
+        content: "foo() := \"bar\"".into(),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
     );
   }
 
   #[test]
-  fn get_basic_alias() {
+  fn function_with_attributes() {
     let document = Document::from(indoc! {
       "
-      alias a1 := foo
+      [macos]
+      foo() := 'bar'
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![Function {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "macos".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Function),
+        }],
+        body: "'bar'".into(),
+        content: "[macos]\nfoo() := 'bar'".into(),
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        parameters: vec![],
+        range: lsp::Range::at(0, 0, 2, 0),
+      }],
+    );
+  }
+
+  #[test]
+  fn get_alias_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [linux]
+      alias foo := bar
       "
     });
 
@@ -797,15 +906,24 @@ mod tests {
     assert_eq!(
       aliases,
       vec![Alias {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Alias),
+        }],
         name: TextNode {
-          value: "a1".into(),
-          range: lsp::Range::at(0, 6, 0, 8)
-        },
-        value: TextNode {
           value: "foo".into(),
-          range: lsp::Range::at(0, 12, 0, 15)
+          range: lsp::Range::at(1, 6, 1, 9),
         },
-        range: lsp::Range::at(0, 0, 0, 15)
+        range: lsp::Range::at(0, 0, 1, 16),
+        value: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 13, 1, 16),
+        },
       }]
     );
   }
@@ -825,6 +943,7 @@ mod tests {
     assert_eq!(
       aliases,
       vec![Alias {
+        attributes: vec![],
         name: TextNode {
           value: "a1".into(),
           range: lsp::Range::at(0, 6, 0, 8)
@@ -834,6 +953,95 @@ mod tests {
           range: lsp::Range::at(0, 12, 0, 24)
         },
         range: lsp::Range::at(0, 0, 0, 24)
+      }]
+    );
+  }
+
+  #[test]
+  fn get_array_setting() {
+    let document = Document::from(indoc! {
+      "
+      set shell := ['foo']
+      "
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "shell".into(),
+          range: lsp::Range::at(0, 4, 0, 9),
+        },
+        kind: SettingKind::Array,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "['foo']".into(),
+          range: lsp::Range::at(0, 13, 0, 20),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_basic_alias() {
+    let document = Document::from(indoc! {
+      "
+      alias a1 := foo
+      "
+    });
+
+    let aliases = document.aliases();
+
+    assert_eq!(aliases.len(), 1);
+
+    assert_eq!(
+      aliases,
+      vec![Alias {
+        attributes: vec![],
+        name: TextNode {
+          value: "a1".into(),
+          range: lsp::Range::at(0, 6, 0, 8)
+        },
+        value: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 12, 0, 15)
+        },
+        range: lsp::Range::at(0, 0, 0, 15)
+      }]
+    );
+  }
+
+  #[test]
+  fn get_boolean_false_setting() {
+    let document = Document::from(indoc! {
+      "
+      set foo := false
+      "
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::Boolean(false),
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "false".into(),
+          range: lsp::Range::at(0, 11, 0, 16),
+        },
       }]
     );
   }
@@ -853,12 +1061,17 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "export".into(),
           range: lsp::Range::at(0, 4, 0, 10),
         },
         kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0)
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: String::new(),
+          range: lsp::Range::at(0, 10, 0, 10),
+        },
       }]
     );
   }
@@ -878,12 +1091,17 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "export".into(),
           range: lsp::Range::at(0, 4, 0, 10),
         },
         kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0)
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(0, 14, 0, 18),
+        },
       }]
     );
   }
@@ -905,6 +1123,7 @@ mod tests {
       aliases,
       vec![
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "duplicate".into(),
             range: lsp::Range::at(0, 6, 0, 15)
@@ -916,6 +1135,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 22)
         },
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "duplicate".into(),
             range: lsp::Range::at(1, 6, 1, 15)
@@ -927,6 +1147,66 @@ mod tests {
           range: lsp::Range::at(1, 0, 1, 22)
         }
       ]
+    );
+  }
+
+  #[test]
+  fn get_expression_setting() {
+    let document = Document::from(indoc! {
+      r#"
+      set foo := "bar" / baz
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar\" / baz".into(),
+          range: lsp::Range::at(0, 11, 0, 22),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_hyphenated_array_setting() {
+    let document = Document::from(indoc! {
+      r#"
+      set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "windows-shell".into(),
+          range: lsp::Range::at(0, 4, 0, 17),
+        },
+        kind: SettingKind::Array,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]".into(),
+          range: lsp::Range::at(0, 21, 0, 62),
+        },
+      }]
     );
   }
 
@@ -947,6 +1227,7 @@ mod tests {
       aliases,
       vec![
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "a1".into(),
             range: lsp::Range::at(0, 6, 0, 8),
@@ -958,6 +1239,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 0, 15),
         },
         Alias {
+          attributes: vec![],
           name: TextNode {
             value: "a2".into(),
             range: lsp::Range::at(1, 6, 1, 8),
@@ -990,30 +1272,87 @@ mod tests {
       settings,
       vec![
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "export".into(),
             range: lsp::Range::at(0, 4, 0, 10),
           },
           kind: SettingKind::Boolean(true),
           range: lsp::Range::at(0, 0, 1, 0),
+          value: TextNode {
+            value: "true".into(),
+            range: lsp::Range::at(0, 14, 0, 18),
+          },
         },
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "shell".into(),
             range: lsp::Range::at(1, 4, 1, 9),
           },
           kind: SettingKind::Array,
           range: lsp::Range::at(1, 0, 2, 0),
+          value: TextNode {
+            value: "['foo']".into(),
+            range: lsp::Range::at(1, 13, 1, 20),
+          },
         },
         Setting {
+          attributes: vec![],
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(2, 4, 2, 7),
           },
           kind: SettingKind::String,
           range: lsp::Range::at(2, 0, 3, 0),
+          value: TextNode {
+            value: "'wow!'".into(),
+            range: lsp::Range::at(2, 11, 2, 17),
+          },
         }
       ]
+    );
+  }
+
+  #[test]
+  fn get_setting_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [group(\"foo\")]
+      set bar := true
+      "
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![Attribute {
+          name: TextNode {
+            value: "group".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          arguments: vec![TextNode {
+            value: "\"foo\"".into(),
+            range: lsp::Range::at(0, 7, 0, 12),
+          }],
+          target: Some(AttributeTarget::Setting),
+          range: lsp::Range::at(0, 0, 1, 0),
+        }],
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(1, 4, 1, 7),
+        },
+        kind: SettingKind::Boolean(true),
+        range: lsp::Range::at(0, 0, 2, 0),
+        value: TextNode {
+          value: "true".into(),
+          range: lsp::Range::at(1, 11, 1, 15),
+        },
+      }]
     );
   }
 
@@ -1032,12 +1371,117 @@ mod tests {
     assert_eq!(
       settings,
       vec![Setting {
+        attributes: vec![],
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(0, 4, 0, 7),
         },
         kind: SettingKind::String,
         range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "'wow!'".into(),
+          range: lsp::Range::at(0, 11, 0, 17),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_string_setting_containing_walrus() {
+    let document = Document::from(indoc! {
+      r#"
+      set foo := "bar := baz"
+      "#
+    });
+
+    let settings = document.settings();
+
+    assert_eq!(settings.len(), 1);
+
+    assert_eq!(
+      settings,
+      vec![Setting {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        kind: SettingKind::String,
+        range: lsp::Range::at(0, 0, 1, 0),
+        value: TextNode {
+          value: "\"bar := baz\"".into(),
+          range: lsp::Range::at(0, 11, 0, 23),
+        },
+      }]
+    );
+  }
+
+  #[test]
+  fn get_unexports() {
+    let document = Document::from(indoc! {
+      "
+      [windows]
+      unexport FOO
+      "
+    });
+
+    let unexports = document.unexports();
+
+    assert_eq!(unexports.len(), 1);
+
+    assert_eq!(
+      unexports,
+      vec![Unexport {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Unexport),
+        }],
+        name: TextNode {
+          value: "FOO".into(),
+          range: lsp::Range::at(1, 9, 1, 12),
+        },
+        range: lsp::Range::at(0, 0, 2, 0),
+      }]
+    );
+  }
+
+  #[test]
+  fn get_variable_with_attributes() {
+    let document = Document::from(indoc! {
+      "
+      [windows]
+      foo := 'bar'
+      "
+    });
+
+    let variables = document.variables();
+
+    assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "windows".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
+        }],
+        content: "[windows]\nfoo := 'bar'".into(),
+        export: false,
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 0, 1, 3),
+        },
+        range: lsp::Range::at(0, 0, 2, 0),
       }]
     );
   }
@@ -1059,6 +1503,7 @@ mod tests {
       document.variables(),
       vec![
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tmpdir".into(),
             range: lsp::Range::at(0, 0, 0, 6),
@@ -1068,6 +1513,7 @@ mod tests {
           range: lsp::Range::at(0, 0, 1, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "version".into(),
             range: lsp::Range::at(1, 0, 1, 7),
@@ -1077,6 +1523,7 @@ mod tests {
           range: lsp::Range::at(1, 0, 2, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tardir".into(),
             range: lsp::Range::at(2, 0, 2, 6),
@@ -1086,6 +1533,7 @@ mod tests {
           range: lsp::Range::at(2, 0, 3, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "tarball".into(),
             range: lsp::Range::at(3, 0, 3, 7),
@@ -1095,6 +1543,7 @@ mod tests {
           range: lsp::Range::at(3, 0, 4, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "config".into(),
             range: lsp::Range::at(4, 0, 4, 6),
@@ -1105,6 +1554,7 @@ mod tests {
           range: lsp::Range::at(4, 0, 5, 0),
         },
         Variable {
+          attributes: vec![],
           name: TextNode {
             value: "EDITOR".into(),
             range: lsp::Range::at(5, 7, 5, 13),
@@ -1118,65 +1568,424 @@ mod tests {
   }
 
   #[test]
-  fn private_exported_variable_is_marked_exported() {
+  fn imports() {
     let document = Document::from(indoc! {
       "
-      [private]
-      export PATH := '/usr/local/bin'
+      [linux]
+      import 'foo/bar.just'
+
+      a: b
+        @echo A
       "
     });
 
-    let variables = document.variables();
-
-    assert_eq!(variables.len(), 1);
-
     assert_eq!(
-      variables,
-      vec![Variable {
-        name: TextNode {
-          value: "PATH".into(),
-          range: lsp::Range::at(1, 7, 1, 11),
+      document.imports(),
+      vec![Import {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "linux".into(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Import),
+        }],
+        optional: false,
+        path: TextNode {
+          value: "'foo/bar.just'".into(),
+          range: lsp::Range::at(1, 7, 1, 21),
         },
-        export: true,
-        content: "PATH := '/usr/local/bin'".into(),
-        range: lsp::Range::at(1, 7, 2, 0),
+        range: lsp::Range::at(0, 0, 1, 21),
       }]
     );
   }
 
   #[test]
-  fn get_unexports() {
+  fn list_document_attributes() {
     let document = Document::from(indoc! {
       "
+      [private, description: \"desc\"]
+      foo:
+        echo \"foo\"
+
+      [alias_attr]
+      alias build := foo
+
+      [var_attr(\"value\")]
+      bar := \"bar\"
+
+      [export_attr]
+      export baz := \"baz\"
+
+      [module_attr]
+      mod utils \"./utils.just\"
+
+      [function_attr]
+      function() := \"function\"
+
+      [import_attr]
+      import \"foo.just\"
+
+      [unexport_attr]
       unexport FOO
       "
     });
 
-    let unexports = document.unexports();
-
-    assert_eq!(unexports.len(), 1);
+    let attributes = document.attributes();
 
     assert_eq!(
-      unexports,
-      vec![Unexport {
+      attributes,
+      vec![
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Recipe),
+        },
+        Attribute {
+          arguments: vec![TextNode {
+            value: "\"desc\"".into(),
+            range: lsp::Range::at(0, 23, 0, 29),
+          }],
+          name: TextNode {
+            value: "description".into(),
+            range: lsp::Range::at(0, 10, 0, 21),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Recipe),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "alias_attr".into(),
+            range: lsp::Range::at(4, 1, 4, 11),
+          },
+          range: lsp::Range::at(4, 0, 5, 0),
+          target: Some(AttributeTarget::Alias),
+        },
+        Attribute {
+          arguments: vec![TextNode {
+            value: "\"value\"".into(),
+            range: lsp::Range::at(7, 10, 7, 17),
+          }],
+          name: TextNode {
+            value: "var_attr".into(),
+            range: lsp::Range::at(7, 1, 7, 9),
+          },
+          range: lsp::Range::at(7, 0, 8, 0),
+          target: Some(AttributeTarget::Assignment),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "export_attr".into(),
+            range: lsp::Range::at(10, 1, 10, 12),
+          },
+          range: lsp::Range::at(10, 0, 11, 0),
+          target: Some(AttributeTarget::Assignment),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "module_attr".into(),
+            range: lsp::Range::at(13, 1, 13, 12),
+          },
+          range: lsp::Range::at(13, 0, 14, 0),
+          target: Some(AttributeTarget::Module),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "function_attr".into(),
+            range: lsp::Range::at(16, 1, 16, 14),
+          },
+          range: lsp::Range::at(16, 0, 17, 0),
+          target: Some(AttributeTarget::Function),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "import_attr".into(),
+            range: lsp::Range::at(19, 1, 19, 12),
+          },
+          range: lsp::Range::at(19, 0, 20, 0),
+          target: Some(AttributeTarget::Import),
+        },
+        Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "unexport_attr".into(),
+            range: lsp::Range::at(22, 1, 22, 14),
+          },
+          range: lsp::Range::at(22, 0, 23, 0),
+          target: Some(AttributeTarget::Unexport),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn list_document_attributes_without_target() {
+    let document = Document::from(indoc! {
+      "
+      [private]
+      "
+    });
+
+    assert_eq!(
+      document.attributes(),
+      vec![Attribute {
+        arguments: vec![],
         name: TextNode {
-          value: "FOO".into(),
-          range: lsp::Range::at(0, 9, 0, 12),
+          value: "private".into(),
+          range: lsp::Range::at(0, 1, 0, 8),
         },
         range: lsp::Range::at(0, 0, 1, 0),
+        target: None,
       }]
     );
   }
 
   #[test]
-  fn eager_variable_is_parsed() {
+  fn list_function_calls() {
     let document = Document::from(indoc! {
       "
-      eager foo := 'bar'
+      foo:
+        echo {{arch()}}
+        echo {{env_var(\"HOME\", \"fallback\")}}
+        echo {{show(['foo', 'bar'])}}
       "
     });
 
-    assert_eq!(document.variables().len(), 1);
+    let calls = document.function_calls();
+
+    assert_eq!(
+      calls,
+      vec![
+        FunctionCall {
+          arguments: vec![],
+          name: TextNode {
+            value: "arch".into(),
+            range: lsp::Range::at(1, 9, 1, 13),
+          },
+          range: lsp::Range::at(1, 9, 1, 15),
+        },
+        FunctionCall {
+          arguments: vec![
+            TextNode {
+              value: "\"HOME\"".into(),
+              range: lsp::Range::at(2, 17, 2, 23),
+            },
+            TextNode {
+              value: "\"fallback\"".into(),
+              range: lsp::Range::at(2, 25, 2, 35),
+            },
+          ],
+          name: TextNode {
+            value: "env_var".into(),
+            range: lsp::Range::at(2, 9, 2, 16),
+          },
+          range: lsp::Range::at(2, 9, 2, 36),
+        },
+        FunctionCall {
+          arguments: vec![TextNode {
+            value: "['foo', 'bar']".into(),
+            range: lsp::Range::at(3, 14, 3, 28),
+          }],
+          name: TextNode {
+            value: "show".into(),
+            range: lsp::Range::at(3, 9, 3, 13),
+          },
+          range: lsp::Range::at(3, 9, 3, 29),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn list_functions() {
+    let document = Document::from(indoc! {
+      "
+      hello(name) := f\"Hello, \" + name
+
+      greet(a, b) := hello(a) + \" and \" + hello(b)
+      "
+    });
+
+    assert_eq!(
+      document.functions(),
+      vec![
+        Function {
+          attributes: vec![],
+          name: TextNode {
+            value: "hello".into(),
+            range: lsp::Range::at(0, 0, 0, 5),
+          },
+          parameters: vec![TextNode {
+            value: "name".into(),
+            range: lsp::Range::at(0, 6, 0, 10),
+          }],
+          body: "f\"Hello, \" + name".into(),
+          content: "hello(name) := f\"Hello, \" + name".into(),
+          range: lsp::Range::at(0, 0, 1, 0),
+        },
+        Function {
+          attributes: vec![],
+          name: TextNode {
+            value: "greet".into(),
+            range: lsp::Range::at(2, 0, 2, 5),
+          },
+          parameters: vec![
+            TextNode {
+              value: "a".into(),
+              range: lsp::Range::at(2, 6, 2, 7),
+            },
+            TextNode {
+              value: "b".into(),
+              range: lsp::Range::at(2, 9, 2, 10),
+            },
+          ],
+          body: "hello(a) + \" and \" + hello(b)".into(),
+          content: "greet(a, b) := hello(a) + \" and \" + hello(b)".into(),
+          range: lsp::Range::at(2, 0, 3, 0),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn module_with_path() {
+    let document = Document::from(indoc! {
+      r#"
+      [private]
+      mod foo "./utils.just"
+      "#
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Module),
+        }],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(1, 4, 1, 7),
+        },
+        optional: false,
+        path: Some(TextNode {
+          value: "\"./utils.just\"".into(),
+          range: lsp::Range::at(1, 8, 1, 22),
+        }),
+        range: lsp::Range::at(0, 0, 1, 22),
+      }]
+    );
+  }
+
+  #[test]
+  fn module_without_path() {
+    let document = Document::from(indoc! {
+      "
+      mod foo
+      "
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![Module {
+        attributes: vec![],
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(0, 4, 0, 7),
+        },
+        optional: false,
+        path: None,
+        range: lsp::Range::at(0, 0, 0, 7),
+      }]
+    );
+  }
+
+  #[test]
+  fn multiple_imports() {
+    let document = Document::from(indoc! {
+      "
+      import 'foo.just'
+      import? 'bar.just'
+      "
+    });
+
+    assert_eq!(
+      document.imports(),
+      vec![
+        Import {
+          attributes: vec![],
+          optional: false,
+          path: TextNode {
+            value: "'foo.just'".into(),
+            range: lsp::Range::at(0, 7, 0, 17),
+          },
+          range: lsp::Range::at(0, 0, 0, 17),
+        },
+        Import {
+          attributes: vec![],
+          optional: true,
+          path: TextNode {
+            value: "'bar.just'".into(),
+            range: lsp::Range::at(1, 8, 1, 18),
+          },
+          range: lsp::Range::at(1, 0, 1, 18),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn multiple_modules() {
+    let document = Document::from(indoc! {
+      r#"
+      mod foo
+      mod? bar "bar.just"
+      "#
+    });
+
+    assert_eq!(
+      document.modules(),
+      vec![
+        Module {
+          attributes: vec![],
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(0, 4, 0, 7),
+          },
+          optional: false,
+          path: None,
+          range: lsp::Range::at(0, 0, 0, 7),
+        },
+        Module {
+          attributes: vec![],
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(1, 5, 1, 8),
+          },
+          optional: true,
+          path: Some(TextNode {
+            value: "\"bar.just\"".into(),
+            range: lsp::Range::at(1, 9, 1, 19),
+          }),
+          range: lsp::Range::at(1, 0, 1, 19),
+        },
+      ]
+    );
   }
 
   #[test]
@@ -1276,421 +2085,83 @@ mod tests {
   }
 
   #[test]
-  fn recipe_with_default_parameter() {
+  fn optional_import() {
     let document = Document::from(indoc! {
       "
-      baz first second=\"default\":
-        echo \"{{first}} {{second}}\"
+      import? 'foo/bar.just'
       "
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
-        name: TextNode {
-          value: "baz".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
+      document.imports(),
+      vec![Import {
         attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![
-          Parameter {
-            name: "first".into(),
-            kind: ParameterKind::Normal,
-            default_value: None,
-            content: "first".into(),
-            range: lsp::Range::at(0, 4, 0, 9),
-          },
-          Parameter {
-            name: "second".into(),
-            kind: ParameterKind::Normal,
-            default_value: Some("\"default\"".into()),
-            content: "second=\"default\"".into(),
-            range: lsp::Range::at(0, 10, 0, 26),
-          }
-        ],
-        content:
-          "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
-            .into(),
-        range: lsp::Range::at(0, 0, 2, 0),
-        shebang: None,
-      })
+        optional: true,
+        path: TextNode {
+          value: "'foo/bar.just'".into(),
+          range: lsp::Range::at(0, 8, 0, 22),
+        },
+        range: lsp::Range::at(0, 0, 0, 22),
+      }]
     );
   }
 
   #[test]
-  fn recipe_with_dependency() {
+  fn optional_module() {
     let document = Document::from(indoc! {
       "
-      foo:
-        echo \"foo\"
-
-      bar: foo
-        echo \"bar\"
+      mod? foo
       "
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
+      document.modules(),
+      vec![Module {
         attributes: vec![],
-        dependencies: vec![Dependency {
-          name: "foo".into(),
-          arguments: vec![],
-          mapped: None,
-          phase: DependencyPhase::Prior,
-          range: lsp::Range::at(3, 5, 3, 8),
-        }],
-        parameters: vec![],
-        content: "bar: foo\n  echo \"bar\"".into(),
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_module_path_dependency() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz: tools::foo
-        echo \"baz\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
-        name: TextNode {
-          value: "baz".into(),
-          range: lsp::Range::at(6, 0, 6, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![Dependency {
-          name: "tools::foo".into(),
-          arguments: vec![],
-          mapped: None,
-          phase: DependencyPhase::Prior,
-          range: lsp::Range::at(6, 5, 6, 15),
-        }],
-        parameters: vec![],
-        content: "baz: tools::foo\n  echo \"baz\"".into(),
-        range: lsp::Range::at(6, 0, 8, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_dependency_arguments() {
-    let document = Document::from(indoc! {
-      "
-      foo arg1 arg2:
-        echo \"{{arg1}} {{arg2}}\"
-
-      bar: (foo 'value1' 'value2')
-        echo \"bar\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![Dependency {
-          name: "foo".into(),
-          arguments: vec![
-            DependencyArgument {
-              value: "'value1'".into(),
-              range: lsp::Range::at(3, 10, 3, 18),
-              starred: None,
-            },
-            DependencyArgument {
-              value: "'value2'".into(),
-              range: lsp::Range::at(3, 19, 3, 27),
-              starred: None,
-            }
-          ],
-          mapped: None,
-          phase: DependencyPhase::Prior,
-          range: lsp::Range::at(3, 5, 3, 28),
-        }],
-        parameters: vec![],
-        content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_mapped_dependency_arguments() {
-    let document = Document::from(indoc! {
-      "
-      bar arg *args:
-        echo \"{{arg}} {{args}}\"
-
-      foo args: *(bar args *args)
-        echo \"foo\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
         name: TextNode {
           value: "foo".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
+          range: lsp::Range::at(0, 5, 0, 8),
         },
-        attributes: vec![],
-        dependencies: vec![Dependency {
-          name: "bar".into(),
-          arguments: vec![
-            DependencyArgument {
-              value: "args".into(),
-              range: lsp::Range::at(3, 16, 3, 20),
-              starred: None,
-            },
-            DependencyArgument {
-              value: "args".into(),
-              range: lsp::Range::at(3, 22, 3, 26),
-              starred: Some(lsp::Range::at(3, 21, 3, 22)),
-            }
-          ],
-          mapped: Some(lsp::Range::at(3, 10, 3, 11)),
-          phase: DependencyPhase::Prior,
-          range: lsp::Range::at(3, 10, 3, 27),
+        optional: true,
+        path: None,
+        range: lsp::Range::at(0, 0, 0, 8),
+      }]
+    );
+  }
+
+  #[test]
+  fn private_exported_variable_is_marked_exported() {
+    let document = Document::from(indoc! {
+      "
+      [private]
+      export PATH := '/usr/local/bin'
+      "
+    });
+
+    let variables = document.variables();
+
+    assert_eq!(variables.len(), 1);
+
+    assert_eq!(
+      variables,
+      vec![Variable {
+        attributes: vec![Attribute {
+          arguments: vec![],
+          name: TextNode {
+            value: "private".into(),
+            range: lsp::Range::at(0, 1, 0, 8),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Assignment),
         }],
-        parameters: vec![Parameter {
-          name: "args".into(),
-          kind: ParameterKind::Normal,
-          default_value: None,
-          content: "args".into(),
-          range: lsp::Range::at(3, 4, 3, 8),
-        }],
-        content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_shebang() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        #!/usr/bin/env bash
-        echo \"foo\"
-      "
-    });
-
-    let recipe = document.find_recipe("foo").unwrap();
-
-    assert_eq!(
-      recipe.shebang,
-      Some(TextNode {
-        value: "#!/usr/bin/env bash".into(),
-        range: lsp::Range::at(1, 2, 1, 21),
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_multiple_dependencies() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz: foo bar
-        echo \"baz\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
         name: TextNode {
-          value: "baz".into(),
-          range: lsp::Range::at(6, 0, 6, 3)
+          value: "PATH".into(),
+          range: lsp::Range::at(1, 7, 1, 11),
         },
-        attributes: vec![],
-        dependencies: vec![
-          Dependency {
-            name: "foo".into(),
-            arguments: vec![],
-            mapped: None,
-            phase: DependencyPhase::Prior,
-            range: lsp::Range::at(6, 5, 6, 8),
-          },
-          Dependency {
-            name: "bar".into(),
-            arguments: vec![],
-            mapped: None,
-            phase: DependencyPhase::Prior,
-            range: lsp::Range::at(6, 9, 6, 12),
-          }
-        ],
-        parameters: vec![],
-        content: "baz: foo bar\n  echo \"baz\"".into(),
-        range: lsp::Range::at(6, 0, 8, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_subsequent_dependency() {
-    let recipe = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz: foo && bar
-        echo \"baz\"
-      "
-    })
-    .find_recipe("baz")
-    .unwrap();
-
-    assert_eq!(
-      recipe
-        .dependencies
-        .into_iter()
-        .map(|dependency| dependency.phase)
-        .collect::<Vec<_>>(),
-      vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
-    );
-  }
-
-  #[test]
-  fn recipe_with_parameters() {
-    let document = Document::from(indoc! {
-      "
-      bar target $lol:
-        echo \"Building {{target}}\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![
-          Parameter {
-            name: "target".into(),
-            kind: ParameterKind::Normal,
-            default_value: None,
-            content: "target".into(),
-            range: lsp::Range::at(0, 4, 0, 10),
-          },
-          Parameter {
-            name: "lol".into(),
-            kind: ParameterKind::Export,
-            default_value: None,
-            content: "$lol".into(),
-            range: lsp::Range::at(0, 11, 0, 15),
-          }
-        ],
-        content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
-        range: lsp::Range::at(0, 0, 2, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_with_variadic_parameter() {
-    let document = Document::from(indoc! {
-      "
-      baz first +second=\"default\":
-        echo \"{{first}} {{second}}\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
-        name: TextNode {
-          value: "baz".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![
-          Parameter {
-            name: "first".into(),
-            kind: ParameterKind::Normal,
-            default_value: None,
-            content: "first".into(),
-            range: lsp::Range::at(0, 4, 0, 9),
-          },
-          Parameter {
-            name: "second".into(),
-            kind: ParameterKind::Variadic(VariadicType::OneOrMore),
-            default_value: Some("\"default\"".into()),
-            content: "+second=\"default\"".into(),
-            range: lsp::Range::at(0, 10, 0, 27),
-          }
-        ],
-        content:
-          "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
-            .into(),
-        range: lsp::Range::at(0, 0, 2, 0),
-        shebang: None,
-      })
-    );
-  }
-
-  #[test]
-  fn recipe_without_parameters_or_dependencies() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
-        range: lsp::Range::at(0, 0, 2, 0),
-        shebang: None,
-      })
+        export: true,
+        content: "PATH := '/usr/local/bin'".into(),
+        range: lsp::Range::at(1, 7, 2, 0),
+      }]
     );
   }
 
@@ -1757,416 +2228,526 @@ mod tests {
   }
 
   #[test]
-  fn list_document_attributes() {
+  fn recipe_with_complex_default_parameter() {
+    let document = Document::from(indoc! {
+      r#"
+      foo triple=(arch + "-unknown-unknown"):
+      "#
+    });
+
+    assert_eq!(
+      document.find_recipe("foo").unwrap().parameters,
+      vec![Parameter {
+        name: "triple".into(),
+        kind: ParameterKind::Normal,
+        export: false,
+        default_value: Some("(arch + \"-unknown-unknown\")".into()),
+        content: "triple=(arch + \"-unknown-unknown\")".into(),
+        range: lsp::Range::at(0, 4, 0, 38),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_with_default_parameter() {
     let document = Document::from(indoc! {
       "
-      [private, description: \"desc\"]
+      baz first second=\"default\":
+        echo \"{{first}} {{second}}\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("baz"),
+      Some(Recipe {
+        name: TextNode {
+          value: "baz".into(),
+          range: lsp::Range::at(0, 0, 0, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![],
+        parameters: vec![
+          Parameter {
+            name: "first".into(),
+            kind: ParameterKind::Normal,
+            export: false,
+            default_value: None,
+            content: "first".into(),
+            range: lsp::Range::at(0, 4, 0, 9),
+          },
+          Parameter {
+            name: "second".into(),
+            kind: ParameterKind::Normal,
+            export: false,
+            default_value: Some("\"default\"".into()),
+            content: "second=\"default\"".into(),
+            range: lsp::Range::at(0, 10, 0, 26),
+          }
+        ],
+        content:
+          "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
+            .into(),
+        range: lsp::Range::at(0, 0, 2, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_dependency() {
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"foo\"
 
-      [alias_attr]
-      alias build := foo
-
-      [var_attr(\"value\")]
-      bar := \"bar\"
-
-      [export_attr]
-      export baz := \"baz\"
-
-      [module_attr]
-      mod utils \"./utils.just\"
-      "
-    });
-
-    let attributes = document.attributes();
-
-    assert_eq!(
-      attributes,
-      vec![
-        Attribute {
-          arguments: vec![],
-          name: TextNode {
-            value: "private".into(),
-            range: lsp::Range::at(0, 1, 0, 8),
-          },
-          range: lsp::Range::at(0, 0, 1, 0),
-          target: Some(AttributeTarget::Recipe),
-        },
-        Attribute {
-          arguments: vec![TextNode {
-            value: "\"desc\"".into(),
-            range: lsp::Range::at(0, 23, 0, 29),
-          }],
-          name: TextNode {
-            value: "description".into(),
-            range: lsp::Range::at(0, 10, 0, 21),
-          },
-          range: lsp::Range::at(0, 0, 1, 0),
-          target: Some(AttributeTarget::Recipe),
-        },
-        Attribute {
-          arguments: vec![],
-          name: TextNode {
-            value: "alias_attr".into(),
-            range: lsp::Range::at(4, 1, 4, 11),
-          },
-          range: lsp::Range::at(4, 0, 5, 0),
-          target: Some(AttributeTarget::Alias),
-        },
-        Attribute {
-          arguments: vec![TextNode {
-            value: "\"value\"".into(),
-            range: lsp::Range::at(7, 10, 7, 17),
-          }],
-          name: TextNode {
-            value: "var_attr".into(),
-            range: lsp::Range::at(7, 1, 7, 9),
-          },
-          range: lsp::Range::at(7, 0, 8, 0),
-          target: Some(AttributeTarget::Assignment),
-        },
-        Attribute {
-          arguments: vec![],
-          name: TextNode {
-            value: "export_attr".into(),
-            range: lsp::Range::at(10, 1, 10, 12),
-          },
-          range: lsp::Range::at(10, 0, 11, 0),
-          target: Some(AttributeTarget::Assignment),
-        },
-        Attribute {
-          arguments: vec![],
-          name: TextNode {
-            value: "module_attr".into(),
-            range: lsp::Range::at(13, 1, 13, 12),
-          },
-          range: lsp::Range::at(13, 0, 14, 0),
-          target: Some(AttributeTarget::Module),
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn imports() {
-    let document = Document::from(indoc! {
-      "
-      import 'foo/bar.just'
-
-      a: b
-        @echo A
+      bar: foo
+        echo \"bar\"
       "
     });
 
     assert_eq!(
-      document.imports(),
-      vec![Import {
-        optional: false,
-        path: TextNode {
-          value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 7, 0, 21),
-        },
-        range: lsp::Range::at(0, 0, 0, 21),
-      }]
-    );
-  }
-
-  #[test]
-  fn optional_import() {
-    let document = Document::from(indoc! {
-      "
-      import? 'foo/bar.just'
-      "
-    });
-
-    assert_eq!(
-      document.imports(),
-      vec![Import {
-        optional: true,
-        path: TextNode {
-          value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
-        },
-        range: lsp::Range::at(0, 0, 0, 22),
-      }]
-    );
-  }
-
-  #[test]
-  fn multiple_imports() {
-    let document = Document::from(indoc! {
-      "
-      import 'foo.just'
-      import? 'bar.just'
-      "
-    });
-
-    assert_eq!(
-      document.imports(),
-      vec![
-        Import {
-          optional: false,
-          path: TextNode {
-            value: "'foo.just'".into(),
-            range: lsp::Range::at(0, 7, 0, 17),
-          },
-          range: lsp::Range::at(0, 0, 0, 17),
-        },
-        Import {
-          optional: true,
-          path: TextNode {
-            value: "'bar.just'".into(),
-            range: lsp::Range::at(1, 8, 1, 18),
-          },
-          range: lsp::Range::at(1, 0, 1, 18),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn module_without_path() {
-    let document = Document::from(indoc! {
-      "
-      mod foo
-      "
-    });
-
-    assert_eq!(
-      document.modules(),
-      vec![Module {
+      document.find_recipe("bar"),
+      Some(Recipe {
         name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
+          value: "bar".into(),
+          range: lsp::Range::at(3, 0, 3, 3)
         },
-        optional: false,
-        path: None,
-        range: lsp::Range::at(0, 0, 0, 7),
-      }]
-    );
-  }
-
-  #[test]
-  fn module_with_path() {
-    let document = Document::from(indoc! {
-      r#"
-      mod foo "./utils.just"
-      "#
-    });
-
-    assert_eq!(
-      document.modules(),
-      vec![Module {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        optional: false,
-        path: Some(TextNode {
-          value: "\"./utils.just\"".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
-        }),
-        range: lsp::Range::at(0, 0, 0, 22),
-      }]
-    );
-  }
-
-  #[test]
-  fn optional_module() {
-    let document = Document::from(indoc! {
-      "
-      mod? foo
-      "
-    });
-
-    assert_eq!(
-      document.modules(),
-      vec![Module {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 5, 0, 8),
-        },
-        optional: true,
-        path: None,
-        range: lsp::Range::at(0, 0, 0, 8),
-      }]
-    );
-  }
-
-  #[test]
-  fn multiple_modules() {
-    let document = Document::from(indoc! {
-      r#"
-      mod foo
-      mod? bar "bar.just"
-      "#
-    });
-
-    assert_eq!(
-      document.modules(),
-      vec![
-        Module {
+        attributes: vec![],
+        dependencies: vec![Dependency {
           name: TextNode {
             value: "foo".into(),
-            range: lsp::Range::at(0, 4, 0, 7),
+            range: lsp::Range::at(3, 5, 3, 8),
           },
-          optional: false,
-          path: None,
-          range: lsp::Range::at(0, 0, 0, 7),
-        },
-        Module {
-          name: TextNode {
-            value: "bar".into(),
-            range: lsp::Range::at(1, 5, 1, 8),
-          },
-          optional: true,
-          path: Some(TextNode {
-            value: "\"bar.just\"".into(),
-            range: lsp::Range::at(1, 9, 1, 19),
-          }),
-          range: lsp::Range::at(1, 0, 1, 19),
-        },
-      ]
+          arguments: vec![],
+          mapped: None,
+          phase: DependencyPhase::Prior,
+          range: lsp::Range::at(3, 5, 3, 8),
+        }],
+        parameters: vec![],
+        content: "bar: foo\n  echo \"bar\"".into(),
+        range: lsp::Range::at(3, 0, 5, 0),
+        shebang: None,
+      })
     );
   }
 
   #[test]
-  fn list_function_calls() {
+  fn recipe_with_dependency_arguments() {
+    let document = Document::from(indoc! {
+      "
+      foo arg1 arg2:
+        echo \"{{arg1}} {{arg2}}\"
+
+      bar: (foo 'value1' 'value2')
+        echo \"bar\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("bar"),
+      Some(Recipe {
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(3, 0, 3, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(3, 6, 3, 9),
+          },
+          arguments: vec![
+            DependencyArgument {
+              value: "'value1'".into(),
+              range: lsp::Range::at(3, 10, 3, 18),
+              starred: None,
+            },
+            DependencyArgument {
+              value: "'value2'".into(),
+              range: lsp::Range::at(3, 19, 3, 27),
+              starred: None,
+            }
+          ],
+          mapped: None,
+          phase: DependencyPhase::Prior,
+          range: lsp::Range::at(3, 5, 3, 28),
+        }],
+        parameters: vec![],
+        content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
+        range: lsp::Range::at(3, 0, 5, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_invalid_parameters() {
+    #[track_caller]
+    fn case(source: &str) {
+      assert_eq!(
+        Document::from(source)
+          .find_recipe("foo")
+          .unwrap()
+          .parameters,
+        vec![],
+      );
+    }
+
+    case("foo $:\n");
+    case("foo +:\n");
+    case("foo *:\n");
+  }
+
+  #[test]
+  fn recipe_with_mapped_dependency_arguments() {
+    let document = Document::from(indoc! {
+      "
+      bar arg *args:
+        echo \"{{arg}} {{args}}\"
+
+      foo args: *(bar args *args)
+        echo \"foo\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo"),
+      Some(Recipe {
+        name: TextNode {
+          value: "foo".into(),
+          range: lsp::Range::at(3, 0, 3, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(3, 12, 3, 15),
+          },
+          arguments: vec![
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 16, 3, 20),
+              starred: None,
+            },
+            DependencyArgument {
+              value: "args".into(),
+              range: lsp::Range::at(3, 22, 3, 26),
+              starred: Some(lsp::Range::at(3, 21, 3, 22)),
+            }
+          ],
+          mapped: Some(lsp::Range::at(3, 10, 3, 11)),
+          phase: DependencyPhase::Prior,
+          range: lsp::Range::at(3, 10, 3, 27),
+        }],
+        parameters: vec![Parameter {
+          name: "args".into(),
+          kind: ParameterKind::Normal,
+          export: false,
+          default_value: None,
+          content: "args".into(),
+          range: lsp::Range::at(3, 4, 3, 8),
+        }],
+        content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
+        range: lsp::Range::at(3, 0, 5, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_module_path_dependency() {
     let document = Document::from(indoc! {
       "
       foo:
-        echo {{arch()}}
-        echo {{env_var(\"HOME\", \"fallback\")}}
-        echo {{show(['foo', 'bar'])}}
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: tools::foo
+        echo \"baz\"
       "
     });
 
-    let calls = document.function_calls();
-
     assert_eq!(
-      calls,
-      vec![
-        FunctionCall {
+      document.find_recipe("baz"),
+      Some(Recipe {
+        name: TextNode {
+          value: "baz".into(),
+          range: lsp::Range::at(6, 0, 6, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![Dependency {
+          name: TextNode {
+            value: "tools::foo".into(),
+            range: lsp::Range::at(6, 5, 6, 15),
+          },
           arguments: vec![],
-          name: TextNode {
-            value: "arch".into(),
-            range: lsp::Range::at(1, 9, 1, 13),
-          },
-          range: lsp::Range::at(1, 9, 1, 15),
-        },
-        FunctionCall {
-          arguments: vec![
-            TextNode {
-              value: "\"HOME\"".into(),
-              range: lsp::Range::at(2, 17, 2, 23),
-            },
-            TextNode {
-              value: "\"fallback\"".into(),
-              range: lsp::Range::at(2, 25, 2, 35),
-            },
-          ],
-          name: TextNode {
-            value: "env_var".into(),
-            range: lsp::Range::at(2, 9, 2, 16),
-          },
-          range: lsp::Range::at(2, 9, 2, 36),
-        },
-        FunctionCall {
-          arguments: vec![TextNode {
-            value: "['foo', 'bar']".into(),
-            range: lsp::Range::at(3, 14, 3, 28),
-          }],
-          name: TextNode {
-            value: "show".into(),
-            range: lsp::Range::at(3, 9, 3, 13),
-          },
-          range: lsp::Range::at(3, 9, 3, 29),
-        },
-      ],
+          mapped: None,
+          phase: DependencyPhase::Prior,
+          range: lsp::Range::at(6, 5, 6, 15),
+        }],
+        parameters: vec![],
+        content: "baz: tools::foo\n  echo \"baz\"".into(),
+        range: lsp::Range::at(6, 0, 8, 0),
+        shebang: None,
+      })
     );
   }
 
   #[test]
-  fn list_functions() {
+  fn recipe_with_multiple_dependencies() {
     let document = Document::from(indoc! {
       "
-      hello(name) := f\"Hello, \" + name
+      foo:
+        echo \"foo\"
 
-      greet(a, b) := hello(a) + \" and \" + hello(b)
+      bar:
+        echo \"bar\"
+
+      baz: foo bar
+        echo \"baz\"
       "
     });
 
     assert_eq!(
-      document.functions(),
-      vec![
-        Function {
-          name: TextNode {
-            value: "hello".into(),
-            range: lsp::Range::at(0, 0, 0, 5),
-          },
-          parameters: vec![TextNode {
-            value: "name".into(),
-            range: lsp::Range::at(0, 6, 0, 10),
-          }],
-          body: "f\"Hello, \" + name".into(),
-          content: "hello(name) := f\"Hello, \" + name".into(),
-          range: lsp::Range::at(0, 0, 1, 0),
+      document.find_recipe("baz"),
+      Some(Recipe {
+        name: TextNode {
+          value: "baz".into(),
+          range: lsp::Range::at(6, 0, 6, 3)
         },
-        Function {
-          name: TextNode {
-            value: "greet".into(),
-            range: lsp::Range::at(2, 0, 2, 5),
+        attributes: vec![],
+        dependencies: vec![
+          Dependency {
+            name: TextNode {
+              value: "foo".into(),
+              range: lsp::Range::at(6, 5, 6, 8),
+            },
+            arguments: vec![],
+            mapped: None,
+            phase: DependencyPhase::Prior,
+            range: lsp::Range::at(6, 5, 6, 8),
           },
-          parameters: vec![
-            TextNode {
-              value: "a".into(),
-              range: lsp::Range::at(2, 6, 2, 7),
+          Dependency {
+            name: TextNode {
+              value: "bar".into(),
+              range: lsp::Range::at(6, 9, 6, 12),
             },
-            TextNode {
-              value: "b".into(),
-              range: lsp::Range::at(2, 9, 2, 10),
-            },
-          ],
-          body: "hello(a) + \" and \" + hello(b)".into(),
-          content: "greet(a, b) := hello(a) + \" and \" + hello(b)".into(),
-          range: lsp::Range::at(2, 0, 3, 0),
-        },
-      ],
+            arguments: vec![],
+            mapped: None,
+            phase: DependencyPhase::Prior,
+            range: lsp::Range::at(6, 9, 6, 12),
+          }
+        ],
+        parameters: vec![],
+        content: "baz: foo bar\n  echo \"baz\"".into(),
+        range: lsp::Range::at(6, 0, 8, 0),
+        shebang: None,
+      })
     );
   }
 
   #[test]
-  fn find_function() {
+  fn recipe_with_parameters() {
     let document = Document::from(indoc! {
       "
-      foo(x) := x + \"!\"
-      "
-    });
-
-    assert!(document.find_function("foo").is_some());
-    assert!(document.find_function("bar").is_none());
-  }
-
-  #[test]
-  fn function_no_parameters() {
-    let document = Document::from(indoc! {
-      "
-      foo() := \"bar\"
+      bar target $lol:
+        echo \"Building {{target}}\"
       "
     });
 
     assert_eq!(
-      document.functions(),
-      vec![Function {
+      document.find_recipe("bar"),
+      Some(Recipe {
+        name: TextNode {
+          value: "bar".into(),
+          range: lsp::Range::at(0, 0, 0, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![],
+        parameters: vec![
+          Parameter {
+            name: "target".into(),
+            kind: ParameterKind::Normal,
+            export: false,
+            default_value: None,
+            content: "target".into(),
+            range: lsp::Range::at(0, 4, 0, 10),
+          },
+          Parameter {
+            name: "lol".into(),
+            kind: ParameterKind::Normal,
+            export: true,
+            default_value: None,
+            content: "$lol".into(),
+            range: lsp::Range::at(0, 11, 0, 15),
+          }
+        ],
+        content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
+        range: lsp::Range::at(0, 0, 2, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_shebang() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
+      "
+    });
+
+    let recipe = document.find_recipe("foo").unwrap();
+
+    assert_eq!(
+      recipe.shebang,
+      Some(TextNode {
+        value: "#!/usr/bin/env bash".into(),
+        range: lsp::Range::at(1, 2, 1, 21),
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_subsequent_dependency() {
+    let recipe = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+
+      baz: foo && bar
+        echo \"baz\"
+      "
+    })
+    .find_recipe("baz")
+    .unwrap();
+
+    assert_eq!(
+      recipe
+        .dependencies
+        .into_iter()
+        .map(|dependency| dependency.phase)
+        .collect::<Vec<_>>(),
+      vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
+    );
+  }
+
+  #[test]
+  fn recipe_with_variadic_parameter() {
+    let document = Document::from(indoc! {
+      "
+      baz first +second=\"default\":
+        echo \"{{first}} {{second}}\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("baz"),
+      Some(Recipe {
+        name: TextNode {
+          value: "baz".into(),
+          range: lsp::Range::at(0, 0, 0, 3)
+        },
+        attributes: vec![],
+        dependencies: vec![],
+        parameters: vec![
+          Parameter {
+            name: "first".into(),
+            kind: ParameterKind::Normal,
+            export: false,
+            default_value: None,
+            content: "first".into(),
+            range: lsp::Range::at(0, 4, 0, 9),
+          },
+          Parameter {
+            name: "second".into(),
+            kind: ParameterKind::Variadic(VariadicType::OneOrMore),
+            export: false,
+            default_value: Some("\"default\"".into()),
+            content: "+second=\"default\"".into(),
+            range: lsp::Range::at(0, 10, 0, 27),
+          }
+        ],
+        content:
+          "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
+            .into(),
+        range: lsp::Range::at(0, 0, 2, 0),
+        shebang: None,
+      })
+    );
+  }
+
+  #[test]
+  fn recipe_with_zero_or_more_variadic_parameter() {
+    let document = Document::from(indoc! {
+      "
+      foo *FLAGS:
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo").unwrap().parameters,
+      vec![Parameter {
+        name: "FLAGS".into(),
+        kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
+        export: false,
+        default_value: None,
+        content: "*FLAGS".into(),
+        range: lsp::Range::at(0, 4, 0, 10),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_with_exported_variadic_parameter() {
+    #[track_caller]
+    fn case(source: &str, expected: VariadicType) {
+      let parameter = Document::from(source)
+        .find_recipe("foo")
+        .unwrap()
+        .parameters
+        .into_iter()
+        .next()
+        .unwrap();
+
+      assert!(parameter.export);
+      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
+    }
+
+    case("foo +$args:\n", VariadicType::OneOrMore);
+    case("foo *$args:\n", VariadicType::ZeroOrMore);
+  }
+
+  #[test]
+  fn recipe_without_parameters_or_dependencies() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    assert_eq!(
+      document.find_recipe("foo"),
+      Some(Recipe {
         name: TextNode {
           value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3),
+          range: lsp::Range::at(0, 0, 0, 3)
         },
+        attributes: vec![],
+        dependencies: vec![],
         parameters: vec![],
-        body: "\"bar\"".into(),
-        content: "foo() := \"bar\"".into(),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
+        content: "foo:\n  echo \"foo\"".into(),
+        range: lsp::Range::at(0, 0, 2, 0),
+        shebang: None,
+      })
     );
   }
 }

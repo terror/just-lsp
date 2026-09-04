@@ -2,9 +2,11 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Setting {
+  pub attributes: Vec<Attribute>,
   pub kind: SettingKind,
   pub name: TextNode,
   pub range: lsp::Range,
+  pub value: TextNode,
 }
 
 impl Setting {
@@ -12,7 +14,7 @@ impl Setting {
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
     let range = node.get_range(document);
 
-    let name_node = node.child(1)?;
+    let name_node = node.child_by_field_name("left")?;
 
     let name = TextNode {
       value: document.get_node_text(&name_node),
@@ -29,14 +31,36 @@ impl Setting {
       .iter()
       .find(|child| child.kind() == "boolean");
 
-    let string_child =
-      right_children.iter().find(|child| child.kind() == "string");
-
     let expression_child = right_children
       .iter()
       .find(|child| child.kind() == "expression");
 
-    let kind = if node.find("list_literal").is_some() {
+    let string_child =
+      right_children.iter().find(|child| child.kind() == "string");
+
+    let value = boolean_child
+      .or(expression_child)
+      .or(string_child)
+      .map_or_else(
+        || TextNode {
+          range: lsp::Range {
+            start: name.range.end,
+            end: name.range.end,
+          },
+          value: String::new(),
+        },
+        |value| TextNode {
+          value: document.get_node_text(value),
+          range: value.get_range(document),
+        },
+      );
+
+    let kind = if expression_child.is_some_and(|expression| {
+      expression
+        .named_child(0)
+        .and_then(|value| value.named_child(0))
+        .is_some_and(|child| child.kind() == "list_literal")
+    }) {
       SettingKind::Array
     } else if let Some(boolean) = boolean_child {
       SettingKind::Boolean(document.get_node_text(boolean) == "true")
@@ -48,172 +72,31 @@ impl Setting {
       return None;
     };
 
-    Some(Setting { kind, name, range })
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
-
-  #[test]
-  fn parse_boolean_with_value() {
-    assert_eq!(
-      Document::from("set foo := true\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
+    Some(Setting {
+      attributes: document.attributes_for_node(node),
+      kind,
+      name,
+      range,
+      value,
+    })
   }
 
-  #[test]
-  fn parse_boolean_false() {
-    assert_eq!(
-      Document::from("set foo := false\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::Boolean(false),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
+  #[must_use]
+  pub fn has_attribute(&self, name: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .any(|attribute| attribute.name.value == name)
   }
 
-  #[test]
-  fn parse_boolean_without_value() {
-    assert_eq!(
-      Document::from("set export\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "export".into(),
-          range: lsp::Range::at(0, 4, 0, 10),
-        },
-        kind: SettingKind::Boolean(true),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_array() {
-    assert_eq!(
-      Document::from("set shell := [\"zsh\", \"-cu\"]\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "shell".into(),
-          range: lsp::Range::at(0, 4, 0, 9),
-        },
-        kind: SettingKind::Array,
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_hyphenated_array() {
-    assert_eq!(
-      Document::from(
-        "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n"
-      )
-      .settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "windows-shell".into(),
-          range: lsp::Range::at(0, 4, 0, 17),
-        },
-        kind: SettingKind::Array,
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_string() {
-    assert_eq!(
-      Document::from("set foo := \"bar\"\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_string_containing_walrus() {
-    assert_eq!(
-      Document::from("set foo := \"bar := baz\"\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_expression() {
-    assert_eq!(
-      Document::from("set foo := \"bar\" / baz\n").settings(),
-      vec![Setting {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 4, 0, 7),
-        },
-        kind: SettingKind::String,
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-    );
-  }
-
-  #[test]
-  fn parse_multiple_settings() {
-    assert_eq!(
-      Document::from(indoc! {"
-        set foo := true
-        set bar := \"baz\"
-        set shell := [\"zsh\", \"-cu\"]
-      "})
-      .settings(),
-      vec![
-        Setting {
-          name: TextNode {
-            value: "foo".into(),
-            range: lsp::Range::at(0, 4, 0, 7),
-          },
-          kind: SettingKind::Boolean(true),
-          range: lsp::Range::at(0, 0, 1, 0),
-        },
-        Setting {
-          name: TextNode {
-            value: "bar".into(),
-            range: lsp::Range::at(1, 4, 1, 7),
-          },
-          kind: SettingKind::String,
-          range: lsp::Range::at(1, 0, 2, 0),
-        },
-        Setting {
-          name: TextNode {
-            value: "shell".into(),
-            range: lsp::Range::at(2, 4, 2, 9),
-          },
-          kind: SettingKind::Array,
-          range: lsp::Range::at(2, 0, 3, 0),
-        },
-      ],
-    );
+  #[must_use]
+  pub fn loads_dotenv(&self) -> bool {
+    match self.name.value.as_str() {
+      "dotenv-filename" | "dotenv-path" => true,
+      "dotenv-load" | "dotenv-required" => {
+        matches!(self.kind, SettingKind::Boolean(true))
+      }
+      _ => false,
+    }
   }
 }

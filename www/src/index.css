@@ -84,16 +84,16 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-  --just-hl-keyword: #8055a5;
-  --just-hl-function: #147fa8;
-  --just-hl-namespace: #168a78;
-  --just-hl-variable: #151718;
-  --just-hl-string: #5d861e;
-  --just-hl-comment: #667984;
-  --just-hl-operator: #168a78;
-  --just-hl-punctuation: #70828b;
-  --just-hl-boolean: #a84f24;
-  --just-hl-attribute: #a84f24;
+  --just-hl-keyword: #a074c4;
+  --just-hl-function: #55b5db;
+  --just-hl-namespace: #55dbbe;
+  --just-hl-variable: #d6d6d6;
+  --just-hl-string: #9fca56;
+  --just-hl-comment: #78909c;
+  --just-hl-operator: #55dbbe;
+  --just-hl-punctuation: #91a7b0;
+  --just-hl-boolean: #db7b55;
+  --just-hl-attribute: #db7b55;
   --just-hl-error: #cd3f45;
 }
 
