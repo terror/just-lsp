@@ -1761,6 +1761,9 @@ mod tests {
 
       [windows]
       unexport FOO
+
+      [windows]
+      export VALUE := foo()
       "
     })
     .run();
@@ -5009,6 +5012,104 @@ mod tests {
   }
 
   #[test]
+  fn unused_function_called_from_another_function() {
+    Test::new(indoc! {
+      "
+      callee() := 'value'
+      caller() := callee()
+
+      use:
+        echo {{caller()}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unused_function_called_from_imported_document() {
+    Test::new(indoc! {
+      "
+      helper() := 'value'
+      "
+    })
+    .imported_document(indoc! {
+      "
+      use:
+        echo {{helper()}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unused_function_called_in_current_document() {
+    Test::new(indoc! {
+      "
+      helper() := 'value'
+
+      use:
+        echo {{helper()}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn unused_function_ignores_imported_definitions() {
+    Test::new("")
+      .imported_document("helper() := 'value'\n")
+      .run();
+  }
+
+  #[test]
+  fn unused_function_ignores_underscore_prefix() {
+    Test::new("_helper() := 'value'\n").run();
+  }
+
+  #[test]
+  fn unused_function_reports_uncalled_definition() {
+    Test::new("helper() := 'value'\n")
+      .warning(
+        "Function `helper` appears unused",
+        lsp::Range::at(0, 0, 0, 6),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unused_function_requires_call_syntax() {
+    Test::new(indoc! {
+      r#"
+      helper() := 'value'
+      _consumer(helper) := helper
+      text := "helper()"
+      # helper()
+
+      use:
+        echo {{text}}
+      "#
+    })
+    .warning(
+      "Function `helper` appears unused",
+      lsp::Range::at(0, 0, 0, 6),
+    )
+    .run();
+  }
+
+  #[test]
+  fn unused_function_shadowing_builtin_counts_call() {
+    Test::new(indoc! {
+      "
+      env_var() := 'shadowed'
+
+      use:
+        echo {{env_var()}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn used_variables_no_warnings() {
     Test::new(indoc! {
       "
@@ -5032,6 +5133,9 @@ mod tests {
       base := \"hello\"
 
       foo(x) := base + x
+
+      use:
+        echo {{foo('world')}}
       "
     })
     .run();
@@ -5042,6 +5146,9 @@ mod tests {
     Test::new(indoc! {
       "
       foo(x) := x + unknown
+
+      use:
+        echo {{foo('value')}}
       "
     })
     .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
@@ -5053,6 +5160,9 @@ mod tests {
     Test::new(indoc! {
       "
       foo(bar, bar) := bar
+
+      use:
+        echo {{foo('one', 'two')}}
       "
     })
     .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
@@ -5066,6 +5176,9 @@ mod tests {
       foo() := \"bar\"
       foo() := \"baz\"
       foo() := \"bat\"
+
+      use:
+        echo {{foo()}}
       "
     })
     .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
@@ -5082,6 +5195,9 @@ mod tests {
 
       [windows]
       foo() := \"bar\"
+
+      use:
+        echo {{foo()}}
       "
     })
     .run();
@@ -5118,6 +5234,9 @@ mod tests {
     Test::new(indoc! {
       "
       foo(x) := x + \"!\"
+
+      use:
+        echo {{foo('value')}}
       "
     })
     .run();

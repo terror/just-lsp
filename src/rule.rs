@@ -79,6 +79,7 @@ mod undefined_identifiers;
 mod unknown_attribute;
 mod unknown_function;
 mod unknown_setting;
+mod unused_function;
 mod unused_parameters;
 mod unused_variables;
 mod working_directory_conflict;
