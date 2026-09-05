@@ -20,6 +20,7 @@ use {
   tower_lsp::lsp_types as lsp,
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
+  url_ext::UrlExt,
 };
 
 pub use {
@@ -130,6 +131,7 @@ mod setting_kind;
 mod str_ext;
 mod text_node;
 mod unexport;
+mod url_ext;
 mod variable;
 mod workspace;
 

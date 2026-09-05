@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/resizable';
 import { Bot, Loader2, Moon, Sun } from 'lucide-react';
 import { useCallback, useLayoutEffect, useState } from 'react';
+import { useDefaultLayout } from 'react-resizable-panels';
 
 import defaultJustfile from '../../justfile?raw';
 import { AboutDialog } from './components/about-dialog';
@@ -26,6 +27,9 @@ const App = () => {
   const { parser, language: justLanguage, loading, error } = useTreeSitter();
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: `${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`,
+  });
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 
@@ -109,17 +113,18 @@ const App = () => {
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
           key={panelDirection}
-          autoSaveId={`${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`}
-          direction={panelDirection}
+          defaultLayout={defaultLayout}
+          onLayoutChanged={onLayoutChanged}
+          orientation={panelDirection}
           className='h-full rounded border'
         >
-          <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
+          <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
             <EditorPane value={doc} onChange={setDoc} extensions={extensions} />
           </ResizablePanel>
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel id='tree-panel' defaultSize={50} minSize={30}>
+          <ResizablePanel id='tree-panel' defaultSize='50%' minSize='30%'>
             <TreePane
               root={root}
               code={doc}

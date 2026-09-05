@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "isolatedModules": true,
     "jsx": "react-jsx",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
@@ -16,8 +15,9 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2020",
+    "types": ["bun", "node", "vite/client"],
     "useDefineForClassFields": true
   },
-  "include": ["src"],
+  "include": ["src", "tests", "playwright.config.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

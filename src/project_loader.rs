@@ -63,7 +63,7 @@ impl<'a> ProjectLoader<'a> {
 
     let path = path.as_path().lexiclean();
 
-    let Ok(uri) = lsp::Url::from_file_path(&path) else {
+    let Some(uri) = lsp::Url::from_path(&path) else {
       return Ok(ProjectDependencyTarget::Missing);
     };
 

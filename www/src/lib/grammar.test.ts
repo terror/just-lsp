@@ -6,14 +6,9 @@ import highlightsQuerySource from '../../../queries/highlights.scm?raw';
 
 describe('bundled tree-sitter-just wasm', () => {
   it('compiles the highlights query', async () => {
-    const runtime = 'public/tree-sitter.wasm';
-
-    expect(readFileSync(runtime)).toEqual(
-      readFileSync('node_modules/web-tree-sitter/tree-sitter.wasm')
-    );
-
     await Parser.init({
-      locateFile: () => runtime,
+      locateFile: () =>
+        import.meta.resolve('web-tree-sitter/web-tree-sitter.wasm'),
     });
 
     const wasm = readFileSync('public/tree-sitter-just.wasm');

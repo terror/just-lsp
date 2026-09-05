@@ -162,7 +162,7 @@ impl Document {
   ///
   /// Returns an [`Error`] if formatting fails.
   pub fn format(&self, config: &FormattingConfig) -> Result<String> {
-    let file = if let Ok(path) = self.uri.to_file_path() {
+    let file = if let Ok(path) = self.uri.file_path() {
       tempfile::Builder::new()
         .prefix(".justfile-fmt-")
         .tempfile_in(
@@ -413,10 +413,6 @@ impl Document {
               let mut phase = DependencyPhase::Prior;
 
               for index in 0..dependencies_node.child_count() {
-                let Ok(index) = index.try_into() else {
-                  continue;
-                };
-
                 let Some(node) = dependencies_node.child(index) else {
                   continue;
                 };

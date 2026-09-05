@@ -28,15 +28,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Setup Bun
-      uses: oven-sh/setup-bun@v1
+      uses: oven-sh/setup-bun@v2
       with:
-        bun-version: 1.3.14
+        bun-version: 1.4.1
 
     - name: Setup Pages
-      uses: actions/configure-pages@v4
+      uses: actions/configure-pages@v6
 
     - name: Install dependencies
       working-directory: ./www
@@ -54,12 +54,16 @@ jobs:
       working-directory: ./www
       run: bun run test
 
-    - name: Build
+    - name: Install browser
       working-directory: ./www
-      run: bun run build
+      run: bunx playwright install --with-deps chromium
+
+    - name: Build and integration tests
+      working-directory: ./www
+      run: bun run test:integration
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v5
       with:
         path: ./www/dist
 
@@ -77,4 +81,4 @@ jobs:
     steps:
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5

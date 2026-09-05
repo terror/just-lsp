@@ -50,21 +50,19 @@ ariadne = "0.6.0"
 clap = { version = "4.6.6", features = ["derive"] }
 dirs = "6.0.0"
 indoc = "2.0.7"
-inventory = "0.3"
+inventory = "0.3.24"
 lexiclean = "0.0.2"
 ropey = "1.6.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 strsim = "0.11.1"
 tempfile = "3.27.0"
-thiserror = "2"
-tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.19", features = ["io-util"] }
+thiserror = "2.0.20"
 tower-lsp = { workspace = true }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tree-sitter = "0.26.13"
-tree-sitter-highlight = "0.26.13"
+tree-sitter = "0.27.0"
+tree-sitter-highlight = "0.27.0"
 yansi = "1.0.1"
 
 [dev-dependencies]
@@ -73,4 +71,11 @@ pretty_assertions = "1.4.1"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.4.4"
+cc = "1.4.5"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.19", features = ["io-util"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+tree-sitter-language = "0.1.8"

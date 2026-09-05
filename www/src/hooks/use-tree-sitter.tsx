@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Parser, Language as TSLanguage } from 'web-tree-sitter';
+import runtime from 'web-tree-sitter/web-tree-sitter.wasm?url';
 
 interface UseTreeSitter {
   parser: Parser | undefined;
@@ -22,9 +23,7 @@ export function useTreeSitter(): UseTreeSitter {
         setLoading(true);
 
         await Parser.init({
-          locateFile(scriptName: string) {
-            return scriptName;
-          },
+          locateFile: () => runtime,
         });
 
         parserInstance = new Parser();
