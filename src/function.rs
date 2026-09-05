@@ -9,3 +9,10 @@ pub struct Function {
   pub parameters: Vec<TextNode>,
   pub range: lsp::Range,
 }
+
+impl Function {
+  #[must_use]
+  pub fn is_enabled(&self) -> bool {
+    platform::attributes_enabled(&self.attributes)
+  }
+}

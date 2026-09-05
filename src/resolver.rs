@@ -147,7 +147,7 @@ impl<'a> Resolver<'a> {
       "function_call" | "assert_expression" => {
         self
           .view
-          .find_function(&name)
+          .find_enabled_function(&name)
           .map(Symbol::Function)
           .or_else(|| {
             BUILTINS
@@ -256,7 +256,11 @@ impl<'a> Resolver<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[test]
   fn resolve_assert_definition() {
@@ -1312,6 +1316,34 @@ mod tests {
         },
       ]
     );
+  }
+
+  #[test]
+  fn resolve_platform_disabled_user_function_call_as_builtin() {
+    let platform = if cfg!(windows) { "unix" } else { "windows" };
+
+    let source = formatdoc! {
+      "
+      [{platform}]
+      env_var() := 'ok'
+
+      value := env_var('NAME')
+      "
+    };
+
+    let document = Document::from(source.as_str());
+
+    let root = document.tree.as_ref().unwrap().root_node();
+
+    let identifier = root.find("function_call > identifier").unwrap();
+
+    assert!(matches!(
+      Resolver::new(&document).resolve_symbol(&identifier),
+      Some(Symbol::Builtin(Builtin::Function {
+        name: "env_var",
+        ..
+      }))
+    ));
   }
 
   #[test]
