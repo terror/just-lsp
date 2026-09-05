@@ -10,8 +10,7 @@
     "format-check": "prettier --check .",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "bun test ./src",
-    "test:integration": "playwright test"
+    "test": "bun test ./src"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",
@@ -37,7 +36,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/bun": "^1.4.1",

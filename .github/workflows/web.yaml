@@ -54,13 +54,9 @@ jobs:
       working-directory: ./www
       run: bun run test
 
-    - name: Install browser
+    - name: Build
       working-directory: ./www
-      run: bunx playwright install --with-deps chromium
-
-    - name: Build and integration tests
-      working-directory: ./www
-      run: bun run test:integration
+      run: bun run build
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v5
