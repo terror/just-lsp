@@ -22,14 +22,8 @@ impl Document {
 
           Some(Alias {
             attributes: self.attributes_for_node(alias_node),
-            name: TextNode {
-              value: self.get_node_text(&left_node),
-              range: left_node.get_range(self),
-            },
-            value: TextNode {
-              value: self.get_node_text(&right_node),
-              range: right_node.get_range(self),
-            },
+            name: TextNode::from_node(&left_node, self),
+            value: TextNode::from_node(&right_node, self),
             range: alias_node.get_range(self),
           })
         })
@@ -113,17 +107,11 @@ impl Document {
                     "string" | "expression" | "attribute_named_param"
                   )
               })
-              .map(|argument| TextNode {
-                value: self.get_node_text(&argument),
-                range: argument.get_range(self),
-              })
+              .map(|argument| TextNode::from_node(&argument, self))
               .collect::<Vec<_>>();
 
             Attribute {
-              name: TextNode {
-                value: self.get_node_text(&identifier),
-                range: identifier.get_range(self),
-              },
+              name: TextNode::from_node(&identifier, self),
               arguments,
               target,
               range: attribute.get_range(self),
@@ -216,19 +204,13 @@ impl Document {
               sequence
                 .find_all("^expression")
                 .into_iter()
-                .map(|argument_node| TextNode {
-                  value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(self),
-                })
+                .map(|argument_node| TextNode::from_node(&argument_node, self))
                 .collect::<Vec<_>>()
             })
             .unwrap_or_default();
 
           Some(FunctionCall {
-            name: TextNode {
-              value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(self),
-            },
+            name: TextNode::from_node(&identifier_node, self),
             arguments,
             range: function_call_node.get_range(self),
           })
@@ -253,10 +235,7 @@ impl Document {
               params_node
                 .find_all("^identifier")
                 .iter()
-                .map(|param_node| TextNode {
-                  value: self.get_node_text(param_node),
-                  range: param_node.get_range(self),
-                })
+                .map(|param_node| TextNode::from_node(param_node, self))
                 .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -268,10 +247,7 @@ impl Document {
 
           Some(Function {
             attributes: self.attributes_for_node(function_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
+            name: TextNode::from_node(&name_node, self),
             parameters,
             body,
             content: self.get_node_text(function_node).trim().to_string(),
@@ -306,10 +282,7 @@ impl Document {
           Some(Import {
             attributes: self.attributes_for_node(import_node),
             optional: import_node.find("^?").is_some(),
-            path: TextNode {
-              value: self.get_node_text(&path_node),
-              range: path_node.get_range(self),
-            },
+            path: TextNode::from_node(&path_node, self),
             range: import_node.get_range(self),
           })
         })
@@ -327,17 +300,13 @@ impl Document {
         .filter_map(|module_node| {
           let name_node = module_node.child_by_field_name("name")?;
 
-          let path = module_node.find("string").map(|path_node| TextNode {
-            value: self.get_node_text(&path_node),
-            range: path_node.get_range(self),
-          });
+          let path = module_node
+            .find("string")
+            .map(|path_node| TextNode::from_node(&path_node, self));
 
           Some(Module {
             attributes: self.attributes_for_node(module_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
+            name: TextNode::from_node(&name_node, self),
             optional: module_node.find("^?").is_some(),
             path,
             range: module_node.get_range(self),
@@ -401,10 +370,7 @@ impl Document {
         .filter_map(|recipe_node| {
           let name_node = recipe_node.find("recipe_header > identifier")?;
 
-          let recipe_name = TextNode {
-            value: self.get_node_text(&name_node),
-            range: name_node.get_range(self),
-          };
+          let recipe_name = TextNode::from_node(&name_node, self);
 
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
@@ -434,9 +400,6 @@ impl Document {
                     else {
                       continue;
                     };
-
-                    let dependency_name =
-                      self.get_node_text(&dependency_name_node);
 
                     let arguments = dependency_node
                       .find("dependency_expression")
@@ -480,10 +443,7 @@ impl Document {
                       });
 
                     dependencies.push(Dependency {
-                      name: TextNode {
-                        value: dependency_name,
-                        range: dependency_name_node.get_range(self),
-                      },
+                      name: TextNode::from_node(&dependency_name_node, self),
                       arguments,
                       mapped,
                       phase,
@@ -510,13 +470,9 @@ impl Document {
                 .collect()
             });
 
-          let shebang =
-            recipe_node
-              .find("recipe_body > shebang")
-              .map(|shebang_node| TextNode {
-                value: self.get_node_text(&shebang_node),
-                range: shebang_node.get_range(self),
-              });
+          let shebang = recipe_node
+            .find("recipe_body > shebang")
+            .map(|shebang_node| TextNode::from_node(&shebang_node, self));
 
           Some(Recipe {
             name: recipe_name,
@@ -556,10 +512,7 @@ impl Document {
 
           Some(Unexport {
             attributes: self.attributes_for_node(unexport_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
+            name: TextNode::from_node(&name_node, self),
             range: unexport_node.get_range(self),
           })
         })
@@ -584,10 +537,7 @@ impl Document {
 
           Some(Variable {
             attributes: self.attributes_for_node(&attribute_node),
-            name: TextNode {
-              value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(self),
-            },
+            name: TextNode::from_node(&identifier_node, self),
             export: identifier_node.get_parent("export").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
             range: assignment_node.get_range(self),
