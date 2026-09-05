@@ -1153,6 +1153,21 @@ mod tests {
   }
 
   #[test]
+  fn attributes_optional_extra_arguments() {
+    Test::new(indoc! {
+      "
+      [confirm('foo', 'bar')]
+      foo:
+      "
+    })
+    .error(
+      "Attribute `confirm` got 2 arguments but takes 0-1 arguments",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn attributes_platform_specific_defaults() {
     Test::new(indoc! {
       "

@@ -60,7 +60,7 @@ define_rule! {
             continue;
           }
 
-          if context.builtin_attributes(&attribute_name).is_empty() {
+          if context.builtin_attribute(&attribute_name).is_none() {
             continue;
           }
 

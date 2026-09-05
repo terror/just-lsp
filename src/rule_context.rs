@@ -5,7 +5,7 @@ type BuiltinRef = &'static Builtin<'static>;
 pub struct RuleContext<'a> {
   aliases: OnceLock<Vec<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
-  builtin_attributes_map: OnceLock<HashMap<&'static str, Vec<BuiltinRef>>>,
+  builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document: &'a Document,
@@ -39,22 +39,22 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub fn builtin_attributes(&self, name: &str) -> &[&'static Builtin<'static>] {
-    self
-      .builtin_attributes_map()
-      .get(name)
-      .map_or(&[], Vec::as_slice)
+  pub fn builtin_attribute(
+    &self,
+    name: &str,
+  ) -> Option<&'static Builtin<'static>> {
+    self.builtin_attribute_map().get(name).copied()
   }
 
-  fn builtin_attributes_map(
+  fn builtin_attribute_map(
     &self,
-  ) -> &HashMap<&'static str, Vec<&'static Builtin<'static>>> {
-    self.builtin_attributes_map.get_or_init(|| {
+  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
+    self.builtin_attribute_map.get_or_init(|| {
       let mut map = HashMap::new();
 
       for builtin in BUILTINS {
         if let Builtin::Attribute { name, .. } = builtin {
-          map.entry(*name).or_insert_with(Vec::new).push(builtin);
+          map.entry(*name).or_insert(builtin);
         }
       }
 
@@ -163,7 +163,7 @@ impl<'a> RuleContext<'a> {
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
-      builtin_attributes_map: OnceLock::new(),
+      builtin_attribute_map: OnceLock::new(),
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
       document,
