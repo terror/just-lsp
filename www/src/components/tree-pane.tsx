@@ -1,26 +1,20 @@
-import type { SyntaxNode } from '@/lib/syntax-node';
-import { Text } from '@codemirror/state';
-import { useMemo } from 'react';
+import type { Node } from 'web-tree-sitter';
 
 import { TreeNode } from './tree-node';
 
 interface TreePaneProps {
-  root: SyntaxNode | undefined;
-  code: string;
-  expandedNodes: Set<SyntaxNode>;
-  toggleExpand: (node: SyntaxNode) => void;
+  root: Node | undefined;
+  collapsedNodes: Set<Node>;
+  toggleExpand: (node: Node) => void;
   onHighlightChange: (range: { from: number; to: number } | undefined) => void;
 }
 
 export const TreePane = ({
   root,
-  code,
-  expandedNodes,
+  collapsedNodes,
   toggleExpand,
   onHighlightChange,
 }: TreePaneProps) => {
-  const doc = useMemo(() => Text.of(code.split('\n')), [code]);
-
   return (
     <div className='h-full overflow-auto'>
       {root ? (
@@ -28,8 +22,7 @@ export const TreePane = ({
           <TreeNode
             node={root}
             level={0}
-            doc={doc}
-            expandedNodes={expandedNodes}
+            collapsedNodes={collapsedNodes}
             toggleExpand={toggleExpand}
             onHighlightChange={onHighlightChange}
           />

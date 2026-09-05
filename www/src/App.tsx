@@ -50,7 +50,7 @@ const App = () => {
     defaultJustfile.trim()
   );
 
-  const { root, expandedNodes, toggleExpand } = useSyntaxTree({
+  const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
     parser,
     language: justLanguage,
     code: doc,
@@ -127,8 +127,7 @@ const App = () => {
           <ResizablePanel id='tree-panel' defaultSize='50%' minSize='30%'>
             <TreePane
               root={root}
-              code={doc}
-              expandedNodes={expandedNodes}
+              collapsedNodes={collapsedNodes}
               toggleExpand={toggleExpand}
               onHighlightChange={handleHighlightChange}
             />
