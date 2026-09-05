@@ -107,34 +107,13 @@ impl SyntaxRule {
   }
 
   fn snippet_preview(text: &str) -> Option<String> {
-    let trimmed = text.trim();
-
-    if trimmed.is_empty() {
-      return None;
-    }
-
-    let mut collapsed = String::new();
-    let mut previous_space = false;
-
-    for char in trimmed.chars() {
-      if char.is_whitespace() {
-        if !previous_space {
-          collapsed.push(' ');
-          previous_space = true;
-        }
-      } else {
-        collapsed.push(char);
-        previous_space = false;
-      }
-    }
-
-    let collapsed = collapsed.trim();
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
 
     if collapsed.is_empty() {
       return None;
     }
 
-    Some(SyntaxRule::truncate(collapsed, 40))
+    Some(SyntaxRule::truncate(&collapsed, 40))
   }
 
   fn truncate(text: &str, max_chars: usize) -> String {
