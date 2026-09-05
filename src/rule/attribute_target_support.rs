@@ -12,25 +12,17 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        let matching = context.builtin_attributes(attribute_name);
-
-        if matching.is_empty() {
+        let Some(Builtin::Attribute { targets, .. }) =
+          context.builtin_attribute(attribute_name)
+        else {
           continue;
-        }
+        };
 
         let Some(target_type) = attribute.target else {
           continue;
         };
 
-        let is_valid_target = matching.iter().copied().any(|attr| {
-          if let Builtin::Attribute { targets, .. } = attr {
-            targets.contains(&target_type)
-          } else {
-            false
-          }
-        });
-
-        if !is_valid_target {
+        if !targets.contains(&target_type) {
           diagnostics.push(Diagnostic::error(
             format!(
               "Attribute `{attribute_name}` cannot be applied to {target_type} target",

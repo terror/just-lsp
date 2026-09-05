@@ -57,8 +57,8 @@ impl AttributeArgumentExpressionsRule {
 
     let attribute_name = document.get_node_text(&identifier);
 
-    match context.builtin_attributes(&attribute_name) {
-      [] => return Vec::new(),
+    match context.builtin_attribute(&attribute_name) {
+      None => return Vec::new(),
       _ if EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
         return Vec::new();
       }

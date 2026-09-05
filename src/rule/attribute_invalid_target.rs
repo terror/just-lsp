@@ -12,7 +12,7 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        if context.builtin_attributes(attribute_name).is_empty() {
+        if context.builtin_attribute(attribute_name).is_none() {
           continue;
         }
 
