@@ -1,18 +1,17 @@
-import type { SyntaxNode } from '@/lib/syntax-node';
 import { parse } from '@/lib/utils';
 import { useCallback, useMemo, useState } from 'react';
-import { Parser, Language as TSLanguage } from 'web-tree-sitter';
+import type { Language, Node, Parser } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
   parser: Parser | undefined;
-  language: TSLanguage | undefined;
+  language: Language | undefined;
   code: string;
 }
 
 interface UseSyntaxTree {
-  root: SyntaxNode | undefined;
-  expandedNodes: Set<SyntaxNode>;
-  toggleExpand: (node: SyntaxNode) => void;
+  root: Node | undefined;
+  collapsedNodes: Set<Node>;
+  toggleExpand: (node: Node) => void;
 }
 
 export function useSyntaxTree({
@@ -27,33 +26,19 @@ export function useSyntaxTree({
 
     const tree = parse({ parser, language, code });
 
-    return (tree?.rootNode as unknown as SyntaxNode) ?? undefined;
+    return tree?.rootNode ?? undefined;
   }, [parser, language, code]);
 
   const [collapsed, setCollapsed] = useState<{
-    root: SyntaxNode | undefined;
-    nodes: Set<SyntaxNode>;
+    root: Node | undefined;
+    nodes: Set<Node>;
   }>();
 
-  const expandedNodes = useMemo(() => {
-    const all = new Set<SyntaxNode>();
-
-    const walk = (node: SyntaxNode) => {
-      if (collapsed?.root !== root || !collapsed?.nodes.has(node)) {
-        all.add(node);
-      }
-      node.children.forEach(walk);
-    };
-
-    if (root) {
-      walk(root);
-    }
-
-    return all;
-  }, [root, collapsed]);
+  const collapsedNodes =
+    collapsed && collapsed.root === root ? collapsed.nodes : new Set<Node>();
 
   const toggleExpand = useCallback(
-    (node: SyntaxNode) => {
+    (node: Node) => {
       setCollapsed((prev) => {
         const nodes = new Set(prev?.root === root ? prev?.nodes : []);
 
@@ -69,5 +54,5 @@ export function useSyntaxTree({
     [root]
   );
 
-  return { root, expandedNodes, toggleExpand };
+  return { root, collapsedNodes, toggleExpand };
 }
