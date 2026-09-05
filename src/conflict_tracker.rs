@@ -65,6 +65,7 @@ mod tests {
 
         assert_eq!(conflicts.conflicts_with(&name, &attributes), *expected);
         assert_eq!(conflicts.record(&name, &attributes), *expected);
+
         assert!(conflicts.conflicts_with(&name, &attributes));
       }
     }
