@@ -103,9 +103,7 @@ impl DocumentStore {
   }
 
   fn read(uri: &lsp::Url) -> Result<Document> {
-    let path = uri
-      .to_file_path()
-      .map_err(|()| Error::InvalidDocumentUri(uri.clone()))?;
+    let path = uri.file_path()?;
 
     Document::new(&fs::read_to_string(path)?, uri.clone())
   }

@@ -50,7 +50,7 @@ impl Module {
 
   #[must_use]
   pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
-    let base_dir = base_uri.to_file_path().ok()?.parent()?.to_path_buf();
+    let base_dir = base_uri.file_path().ok()?.parent()?.to_path_buf();
 
     if let Some(path_node) = &self.path {
       let raw = path_node.value.trim_matches(|c| c == '\'' || c == '"');

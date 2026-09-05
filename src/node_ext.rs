@@ -19,15 +19,11 @@ fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
   };
 
   let children_matches = (0..node.child_count())
-    .filter_map(|i| child_at(&node, i))
+    .filter_map(|i| node.child(i))
     .flat_map(|child| collect_nodes_by_kind(child, kind))
     .collect::<Vec<_>>();
 
   [self_match, children_matches].concat()
-}
-
-fn child_at<'a>(node: &Node<'a>, index: usize) -> Option<Node<'a>> {
-  index.try_into().ok().and_then(|index| node.child(index))
 }
 
 impl NodeExt for Node<'_> {
@@ -46,7 +42,7 @@ impl NodeExt for Node<'_> {
 
     if let Some(rest) = selector.strip_prefix('^') {
       return (0..self.child_count())
-        .filter_map(|i| child_at(self, i))
+        .filter_map(|i| self.child(i))
         .filter(|child| child.kind() == rest)
         .collect();
     }
@@ -61,7 +57,7 @@ impl NodeExt for Node<'_> {
             .iter()
             .flat_map(|parent| {
               (0..parent.child_count())
-                .filter_map(|i| child_at(parent, i))
+                .filter_map(|i| parent.child(i))
                 .filter(|child| child.kind() == child_kind)
                 .collect::<Vec<_>>()
             })

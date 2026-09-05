@@ -25,7 +25,7 @@ impl Import {
     let path = if let Some(rest) = raw.strip_prefix("~/") {
       dirs::home_dir()?.join(rest)
     } else {
-      base_uri.to_file_path().ok()?.parent()?.join(raw)
+      base_uri.file_path().ok()?.parent()?.join(raw)
     };
 
     Some(path)
