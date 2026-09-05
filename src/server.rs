@@ -3936,6 +3936,59 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn rename_parameter_default_symbols() -> Result {
+    async fn case(ranges: &[lsp::Range]) -> Result {
+      for range in ranges {
+        Test::new()
+          .request(InitializeRequest { id: 1 })
+          .response(InitializeResponse { id: 1 })
+          .notification(DidOpenNotification {
+            uri: "file:///foo.just",
+            text: indoc! {"
+              foo := 'bar'
+              baz foo=foo bar=foo:
+                echo {{ foo }}
+            "},
+          })
+          .request(RenameRequest {
+            id: 2,
+            uri: "file:///foo.just",
+            line: range.start.line,
+            character: range.start.character,
+            new_name: "qux",
+          })
+          .response(RenameResponse {
+            id: 2,
+            uri: "file:///foo.just",
+            edits: ranges
+              .iter()
+              .map(|range| Rename {
+                start_line: range.start.line,
+                start_char: range.start.character,
+                end_line: range.end.line,
+                end_char: range.end.character,
+                new_text: "qux",
+              })
+              .collect(),
+          })
+          .run()
+          .await?;
+      }
+
+      Ok(())
+    }
+
+    case(&[
+      lsp::Range::at(1, 4, 1, 7),
+      lsp::Range::at(1, 16, 1, 19),
+      lsp::Range::at(2, 10, 2, 13),
+    ])
+    .await?;
+
+    case(&[lsp::Range::at(0, 0, 0, 3), lsp::Range::at(1, 8, 1, 11)]).await
+  }
+
+  #[tokio::test]
   async fn rename_recipe() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })

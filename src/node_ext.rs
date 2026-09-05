@@ -154,11 +154,12 @@ impl NodeExt for Node<'_> {
   }
 
   fn get_function(&self, document: &Document) -> Option<Function> {
-    let function_node = self.get_parent("function_definition")?;
+    let range = self.get_parent("function_definition")?.get_range(document);
 
-    document.find_function(
-      &document.get_node_text(&function_node.child_by_field_name("name")?),
-    )
+    document
+      .functions()
+      .into_iter()
+      .find(|function| function.range == range)
   }
 
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
@@ -183,11 +184,12 @@ impl NodeExt for Node<'_> {
   }
 
   fn get_recipe(&self, document: &Document) -> Option<Recipe> {
-    let recipe_node = self.get_parent("recipe")?;
+    let range = self.get_parent("recipe")?.get_range(document);
 
-    document.find_recipe(
-      &document.get_node_text(&recipe_node.find("recipe_header > identifier")?),
-    )
+    document
+      .recipes()
+      .into_iter()
+      .find(|recipe| recipe.range == range)
   }
 
   fn has_any_parent(&self, kinds: &[&str]) -> bool {
