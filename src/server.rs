@@ -1,6 +1,12 @@
 use super::*;
 
-pub(crate) struct Server(Arc<Inner>);
+pub(crate) struct Server {
+  client: Client,
+  config: RwLock<Config>,
+  executor: Executor,
+  initialized: AtomicBool,
+  workspace: RwLock<Workspace>,
+}
 
 impl Server {
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
@@ -64,7 +70,56 @@ impl Server {
   }
 
   pub(crate) fn new(client: Client) -> Self {
-    Self(Arc::new(Inner::new(client)))
+    let executor = Executor::new(client.clone());
+
+    Self {
+      client,
+      config: RwLock::new(Config::default()),
+      executor,
+      initialized: AtomicBool::new(false),
+      workspace: RwLock::new(Workspace::default()),
+    }
+  }
+
+  async fn publish_diagnostics(&self, uri: &lsp::Url) {
+    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
+      return;
+    }
+
+    let (diagnostics, version) = {
+      let workspace = self.workspace.read().await;
+      let config = self.config.read().await;
+
+      match workspace.documents.get_open(uri) {
+        Some(document) => {
+          let imported_documents =
+            workspace.projects.get(uri).into_iter().flat_map(|project| {
+              project.imported_documents(&workspace.documents)
+            });
+
+          let analyzer = Analyzer {
+            config: Some(&config),
+            document,
+            imported_documents: imported_documents.collect(),
+          };
+
+          (
+            analyzer
+              .analyze()
+              .into_iter()
+              .map(lsp::Diagnostic::from)
+              .collect(),
+            document.version,
+          )
+        }
+        None => return,
+      }
+    };
+
+    self
+      .client
+      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .await;
   }
 
   pub(crate) async fn run() -> Result {
@@ -78,6 +133,59 @@ impl Server {
 
     Ok(())
   }
+
+  async fn try_did_change(
+    &self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result {
+    let uri = params.text_document.uri.clone();
+
+    let roots = {
+      let mut workspace = self.workspace.write().await;
+
+      if !workspace.documents.is_open(&uri) {
+        return Ok(());
+      }
+
+      let roots = workspace.affected_roots(&uri);
+
+      workspace.documents.change(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
+
+    Ok(())
+  }
+
+  async fn try_did_open(
+    &self,
+    params: lsp::DidOpenTextDocumentParams,
+  ) -> Result {
+    let uri = params.text_document.uri.clone();
+
+    let roots = {
+      let mut workspace = self.workspace.write().await;
+      let mut roots = workspace.affected_roots(&uri);
+
+      roots.insert(uri.clone());
+
+      workspace.documents.open(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
+
+    Ok(())
+  }
 }
 
 impl Debug for Server {
@@ -88,161 +196,6 @@ impl Debug for Server {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Server {
-  async fn code_action(
-    &self,
-    params: lsp::CodeActionParams,
-  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    self.0.code_action(params).await
-  }
-
-  async fn code_lens(
-    &self,
-    params: lsp::CodeLensParams,
-  ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
-    self.0.code_lens(params).await
-  }
-
-  async fn completion(
-    &self,
-    params: lsp::CompletionParams,
-  ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
-    self.0.completion(params).await
-  }
-
-  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    if let Err(error) = self.0.did_change(params).await {
-      self
-        .0
-        .client
-        .log_message(lsp::MessageType::ERROR, error)
-        .await;
-    }
-  }
-
-  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.did_close(params).await;
-  }
-
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    if let Err(error) = self.0.did_open(params).await {
-      self
-        .0
-        .client
-        .log_message(lsp::MessageType::ERROR, error)
-        .await;
-    }
-  }
-
-  async fn document_highlight(
-    &self,
-    params: lsp::DocumentHighlightParams,
-  ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
-    self.0.document_highlight(params).await
-  }
-
-  async fn document_link(
-    &self,
-    params: lsp::DocumentLinkParams,
-  ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
-    self.0.document_link(params).await
-  }
-
-  async fn document_symbol(
-    &self,
-    params: lsp::DocumentSymbolParams,
-  ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
-    self.0.document_symbol(params).await
-  }
-
-  async fn execute_command(
-    &self,
-    params: lsp::ExecuteCommandParams,
-  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    self.0.execute_command(params).await
-  }
-
-  async fn folding_range(
-    &self,
-    params: lsp::FoldingRangeParams,
-  ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
-    self.0.folding_range(params).await
-  }
-
-  async fn formatting(
-    &self,
-    params: lsp::DocumentFormattingParams,
-  ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    self.0.formatting(params).await
-  }
-
-  async fn goto_definition(
-    &self,
-    params: lsp::GotoDefinitionParams,
-  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    self.0.goto_definition(params).await
-  }
-
-  async fn hover(
-    &self,
-    params: lsp::HoverParams,
-  ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
-    self.0.hover(params).await
-  }
-
-  async fn initialize(
-    &self,
-    params: lsp::InitializeParams,
-  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    self.0.initialize(params).await
-  }
-
-  async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.initialized(params).await;
-  }
-
-  async fn prepare_rename(
-    &self,
-    params: lsp::TextDocumentPositionParams,
-  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
-    self.0.prepare_rename(params).await
-  }
-
-  async fn references(
-    &self,
-    params: lsp::ReferenceParams,
-  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    self.0.references(params).await
-  }
-
-  async fn rename(
-    &self,
-    params: lsp::RenameParams,
-  ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
-    self.0.rename(params).await
-  }
-
-  async fn semantic_tokens_full(
-    &self,
-    params: lsp::SemanticTokensParams,
-  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
-    self.0.semantic_tokens_full(params).await
-  }
-
-  #[allow(clippy::unused_async)]
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    Inner::shutdown().await
-  }
-}
-
-pub(crate) struct Inner {
-  client: Client,
-  config: RwLock<Config>,
-  executor: Executor,
-  initialized: AtomicBool,
-  workspace: RwLock<Workspace>,
-}
-
-impl Inner {
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
@@ -441,32 +394,13 @@ impl Inner {
     Ok(None)
   }
 
-  async fn did_change(
-    &self,
-    params: lsp::DidChangeTextDocumentParams,
-  ) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    let roots = {
-      let mut workspace = self.workspace.write().await;
-
-      if !workspace.documents.is_open(&uri) {
-        return Ok(());
-      }
-
-      let roots = workspace.affected_roots(&uri);
-
-      workspace.documents.change(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
+  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
+    if let Err(error) = self.try_did_change(params).await {
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
-
-    Ok(())
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
@@ -499,26 +433,13 @@ impl Inner {
     }
   }
 
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    let roots = {
-      let mut workspace = self.workspace.write().await;
-      let mut roots = workspace.affected_roots(&uri);
-
-      roots.insert(uri.clone());
-
-      workspace.documents.open(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
+    if let Err(error) = self.try_did_open(params).await {
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
-
-    Ok(())
   }
 
   async fn document_highlight(
@@ -862,7 +783,7 @@ impl Inner {
     }
 
     Ok(lsp::InitializeResult {
-      capabilities: Server::capabilities(),
+      capabilities: Self::capabilities(),
       server_info: Some(lsp::ServerInfo {
         name: env!("CARGO_PKG_NAME").to_string(),
         version: Some(env!("CARGO_PKG_VERSION").to_string()),
@@ -882,18 +803,6 @@ impl Inner {
     self
       .initialized
       .store(true, std::sync::atomic::Ordering::Relaxed);
-  }
-
-  fn new(client: Client) -> Self {
-    let executor = Executor::new(client.clone());
-
-    Self {
-      client,
-      config: RwLock::new(Config::default()),
-      executor,
-      initialized: AtomicBool::new(false),
-      workspace: RwLock::new(Workspace::default()),
-    }
   }
 
   async fn prepare_rename(
@@ -922,47 +831,6 @@ impl Inner {
           },
         )
     }))
-  }
-
-  async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
-      return;
-    }
-
-    let (diagnostics, version) = {
-      let workspace = self.workspace.read().await;
-      let config = self.config.read().await;
-
-      match workspace.documents.get_open(uri) {
-        Some(document) => {
-          let imported_documents =
-            workspace.projects.get(uri).into_iter().flat_map(|project| {
-              project.imported_documents(&workspace.documents)
-            });
-
-          let analyzer = Analyzer {
-            config: Some(&config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
-
-          (
-            analyzer
-              .analyze()
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            document.version,
-          )
-        }
-        None => return,
-      }
-    };
-
-    self
-      .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
-      .await;
   }
 
   async fn references(
@@ -1062,8 +930,8 @@ impl Inner {
     Ok(None)
   }
 
-  fn shutdown() -> impl future::Future<Output = Result<(), jsonrpc::Error>> {
-    future::ready(Ok(()))
+  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+    Ok(())
   }
 }
 
