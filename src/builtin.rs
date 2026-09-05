@@ -94,19 +94,23 @@ impl Builtin<'_> {
   }
 
   fn function_completion_item(&self, name: &str) -> lsp::CompletionItem {
-    let deprecated = matches!(
-      self,
-      Self::Function {
-        deprecated: Some(_),
-        ..
-      }
-    );
+    let Self::Function {
+      name: canonical,
+      kind,
+      deprecated,
+      ..
+    } = self
+    else {
+      unreachable!();
+    };
 
-    let snippet = match name {
+    let deprecated = deprecated.is_some();
+
+    let snippet = match *canonical {
+      _ if matches!(kind, FunctionKind::Nullary) => format!("{name}()"),
       "absolute_path" | "blake3_file" | "canonicalize" | "clean"
-      | "extension" | "file_name" | "file_stem" | "parent_dir"
-      | "parent_directory" | "path_exists" | "read" | "sha256_file"
-      | "without_extension" => {
+      | "extension" | "file_name" | "file_stem" | "parent_directory"
+      | "path_exists" | "read" | "sha256_file" | "without_extension" => {
         format!("{name}(${{1:path:string}})")
       }
       "append" => {
@@ -119,47 +123,6 @@ impl Builtin<'_> {
       "join_list" => {
         format!("{name}(${{1:value}}${{2:, separator:string}})")
       }
-      "arch"
-      | "num_cpus"
-      | "num_jobs"
-      | "os"
-      | "os_family"
-      | "is_dependency"
-      | "recipe_name"
-      | "invocation_directory"
-      | "invocation_directory_native"
-      | "invocation_dir"
-      | "invocation_dir_native"
-      | "justfile"
-      | "justfile_directory"
-      | "justfile_dir"
-      | "module_file"
-      | "module_directory"
-      | "module_dir"
-      | "module_path"
-      | "source_file"
-      | "source_directory"
-      | "source_dir"
-      | "just_executable"
-      | "just_pid"
-      | "just_version"
-      | "uuid"
-      | "runtime_directory"
-      | "runtime_dir"
-      | "cache_directory"
-      | "cache_dir"
-      | "config_directory"
-      | "config_dir"
-      | "config_local_directory"
-      | "config_local_dir"
-      | "data_directory"
-      | "data_dir"
-      | "data_local_directory"
-      | "data_local_dir"
-      | "executable_directory"
-      | "executable_dir"
-      | "home_directory"
-      | "home_dir" => format!("{name}()"),
       "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
       "capitalize"
       | "encode_uri_component"
@@ -269,7 +232,7 @@ mod tests {
     let items = Builtin::Function {
       name: "foo",
       aliases: &[],
-      kind: FunctionKind::Nullary,
+      kind: FunctionKind::Unary,
       description: "",
       deprecated: None,
     }
@@ -296,20 +259,21 @@ mod tests {
 
   #[test]
   fn function_alias_uses_alias_snippet() {
-    let items = Builtin::Function {
-      name: "home_directory",
-      aliases: &["home_dir"],
-      kind: FunctionKind::Nullary,
-      description: "bar",
-      deprecated: None,
-    }
-    .completion_items();
+    #[track_caller]
+    fn case(name: &str, kind: FunctionKind, arguments: &str) {
+      let items = Builtin::Function {
+        name,
+        aliases: &["foo"],
+        kind,
+        description: "bar",
+        deprecated: None,
+      }
+      .completion_items();
 
-    assert_eq!(
-      items,
-      vec![
-        lsp::CompletionItem {
-          label: "home_directory".into(),
+      assert_eq!(
+        items,
+        [name, "foo"].map(|name| lsp::CompletionItem {
+          label: name.into(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
@@ -317,26 +281,15 @@ mod tests {
               value: "bar".into(),
             },
           )),
-          insert_text: Some("home_directory()".into()),
+          insert_text: Some(format!("{name}({arguments})")),
           insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_directory".into()),
+          sort_text: Some(format!("z{name}")),
           ..Default::default()
-        },
-        lsp::CompletionItem {
-          label: "home_dir".into(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: "bar".into(),
-            },
-          )),
-          insert_text: Some("home_dir()".into()),
-          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_dir".into()),
-          ..Default::default()
-        },
-      ],
-    );
+        }),
+      );
+    }
+
+    case("bar", FunctionKind::Nullary, "");
+    case("parent_directory", FunctionKind::Unary, "${1:path:string}");
   }
 }
