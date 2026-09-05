@@ -5009,6 +5009,77 @@ mod tests {
   }
 
   #[test]
+  fn unused_function_parameter_format_string_interpolation_is_a_use() {
+    Test::new("foo(name) := f'{{name}}'").run();
+  }
+
+  #[test]
+  fn unused_function_parameter_ignores_imported_definitions() {
+    Test::new("foo() := 'foo'")
+      .imported_document("bar(unused) := 'bar'")
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_ignores_suppressed_names() {
+    Test::new("foo(_unused, used) := used").run();
+  }
+
+  #[test]
+  fn unused_function_parameter_requires_exact_identifier() {
+    Test::new(indoc! {
+      "
+      name_suffix := 'value'
+      foo(name) := name_suffix
+      "
+    })
+    .warning(
+      "Function parameter `name` appears unused",
+      lsp::Range::at(1, 4, 1, 8),
+    )
+    .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_string_is_not_a_use() {
+    Test::new("foo(name) := 'name'")
+      .warning(
+        "Function parameter `name` appears unused",
+        lsp::Range::at(0, 4, 0, 8),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_warns_for_multiple_unused_parameters() {
+    Test::new("foo(first, second, third) := second")
+      .warning(
+        "Function parameter `first` appears unused",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .warning(
+        "Function parameter `third` appears unused",
+        lsp::Range::at(0, 19, 0, 24),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_warns_for_unused_parameter() {
+    Test::new("foo(name) := 'constant'")
+      .warning(
+        "Function parameter `name` appears unused",
+        lsp::Range::at(0, 4, 0, 8),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_with_used_parameter() {
+    Test::new("foo(name) := name").run();
+  }
+
+  #[test]
   fn used_variables_no_warnings() {
     Test::new(indoc! {
       "
