@@ -13,7 +13,7 @@ define_rule! {
 
       let document = context.document();
 
-      let (mut diagnostics, mut default_groups) = (Vec::new(), GroupSet::default());
+      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
       for recipe in context.document().recipes() {
         for attribute in recipe
@@ -21,13 +21,7 @@ define_rule! {
           .iter()
           .filter(|attribute| attribute.name.value == "default")
         {
-          let current = GroupSet::from_attributes(&recipe.attributes);
-
-          let duplicate = default_groups.conflicts_with(&current);
-
-          default_groups.union_with(current);
-
-          if duplicate {
+          if conflicts.record(&attribute.name, &recipe.attributes) {
             diagnostics.push(Diagnostic::error(
               format!(
                 "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",

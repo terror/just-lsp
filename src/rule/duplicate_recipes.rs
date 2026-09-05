@@ -15,20 +15,10 @@ define_rule! {
 
       let mut diagnostics = Vec::new();
 
-      let mut groups = HashMap::<String, GroupSet>::new();
+      let mut conflicts = ConflictTracker::default();
 
       for recipe in context.recipes() {
-        let current = GroupSet::from_attributes(&recipe.attributes);
-
-        let previous = groups
-          .entry(recipe.name.value.clone())
-          .or_default();
-
-        let duplicate = previous.conflicts_with(&current);
-
-        previous.union_with(current);
-
-        if duplicate {
+        if conflicts.record(&recipe.name, &recipe.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate recipe name `{}`", recipe.name.value),
             recipe.range,

@@ -7,20 +7,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut groups = HashMap::<String, GroupSet>::new();
+      let mut conflicts = ConflictTracker::default();
 
       for unexport in context.unexports() {
-        let current = GroupSet::from_attributes(&unexport.attributes);
-
-        let previous = groups
-          .entry(unexport.name.value.clone())
-          .or_default();
-
-        let duplicate = previous.conflicts_with(&current);
-
-        previous.union_with(current);
-
-        if duplicate {
+        if conflicts.record(&unexport.name, &unexport.attributes) {
           diagnostics.push(Diagnostic::error(
             format!(
               "Variable `{}` is unexported multiple times",

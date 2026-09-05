@@ -13,20 +13,10 @@ define_rule! {
         return Vec::new();
       }
 
-      let (mut diagnostics, mut groups) = (Vec::new(), HashMap::<String, GroupSet>::new());
+      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
       for variable in context.variables() {
-        let current = GroupSet::from_attributes(&variable.attributes);
-
-        let previous = groups
-          .entry(variable.name.value.clone())
-          .or_default();
-
-        let duplicate = previous.conflicts_with(&current);
-
-        previous.union_with(current);
-
-        if duplicate {
+        if conflicts.record(&variable.name, &variable.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate variable `{}`", variable.name.value),
             variable.range,

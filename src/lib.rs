@@ -1,4 +1,5 @@
 use {
+  conflict_tracker::ConflictTracker,
   document_entry::DocumentEntry,
   indoc::indoc,
   lexiclean::Lexiclean,
@@ -84,6 +85,7 @@ mod attribute_target;
 mod builtin;
 mod builtins;
 mod config;
+mod conflict_tracker;
 mod count;
 mod dependency;
 mod dependency_argument;
