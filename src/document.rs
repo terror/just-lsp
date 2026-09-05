@@ -410,44 +410,6 @@ impl Document {
             range: name_node.get_range(self),
           };
 
-          let attributes = recipe_node
-            .find_all("attribute")
-            .into_iter()
-            .flat_map(|attribute_node| {
-              attribute_node
-                .find_all("^identifier")
-                .into_iter()
-                .map(|identifier_node| {
-                  let arguments = identifier_node
-                    .siblings()
-                    .take_while(|sibling| sibling.kind() != "identifier")
-                    .filter(|sibling| {
-                      sibling.start_byte() != sibling.end_byte()
-                        && matches!(
-                          sibling.kind(),
-                          "string" | "expression" | "attribute_named_param"
-                        )
-                    })
-                    .map(|argument_node| TextNode {
-                      value: self.get_node_text(&argument_node),
-                      range: argument_node.get_range(self),
-                    })
-                    .collect::<Vec<_>>();
-
-                  Attribute {
-                    name: TextNode {
-                      value: self.get_node_text(&identifier_node),
-                      range: identifier_node.get_range(self),
-                    },
-                    arguments,
-                    target: Some(AttributeTarget::Recipe),
-                    range: attribute_node.get_range(self),
-                  }
-                })
-                .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
             .map(|dependencies_node| {
@@ -566,7 +528,7 @@ impl Document {
 
           Some(Recipe {
             name: recipe_name,
-            attributes,
+            attributes: self.attributes_for_node(recipe_node),
             dependencies,
             content: self.get_node_text(recipe_node).trim().to_string(),
             parameters,
