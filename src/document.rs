@@ -303,11 +303,9 @@ impl Document {
         .filter_map(|import_node| {
           let path_node = import_node.find("string")?;
 
-          let content = self.get_node_text(import_node);
-
           Some(Import {
             attributes: self.attributes_for_node(import_node),
-            optional: content.contains('?'),
+            optional: import_node.find("^?").is_some(),
             path: TextNode {
               value: self.get_node_text(&path_node),
               range: path_node.get_range(self),
@@ -329,8 +327,6 @@ impl Document {
         .filter_map(|module_node| {
           let name_node = module_node.child_by_field_name("name")?;
 
-          let content = self.get_node_text(module_node);
-
           let path = module_node.find("string").map(|path_node| TextNode {
             value: self.get_node_text(&path_node),
             range: path_node.get_range(self),
@@ -342,7 +338,7 @@ impl Document {
               value: self.get_node_text(&name_node),
               range: name_node.get_range(self),
             },
-            optional: content.contains('?'),
+            optional: module_node.find("^?").is_some(),
             path,
             range: module_node.get_range(self),
           })
@@ -2048,47 +2044,28 @@ mod tests {
 
   #[test]
   fn optional_import() {
-    let document = Document::from(indoc! {
-      "
-      import? 'foo/bar.just'
-      "
-    });
+    #[track_caller]
+    fn case(source: &str, expected: bool) {
+      assert_eq!(Document::from(source).imports()[0].optional, expected);
+    }
 
-    assert_eq!(
-      document.imports(),
-      vec![Import {
-        attributes: vec![],
-        optional: true,
-        path: TextNode {
-          value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
-        },
-        range: lsp::Range::at(0, 0, 0, 22),
-      }]
-    );
+    case("import 'foo.just'", false);
+    case("import? 'foo.just'", true);
+    case("import 'foo?bar.just'", false);
+    case("import? 'foo?bar.just'", true);
   }
 
   #[test]
   fn optional_module() {
-    let document = Document::from(indoc! {
-      "
-      mod? foo
-      "
-    });
+    #[track_caller]
+    fn case(source: &str, expected: bool) {
+      assert_eq!(Document::from(source).modules()[0].optional, expected);
+    }
 
-    assert_eq!(
-      document.modules(),
-      vec![Module {
-        attributes: vec![],
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 5, 0, 8),
-        },
-        optional: true,
-        path: None,
-        range: lsp::Range::at(0, 0, 0, 8),
-      }]
-    );
+    case("mod foo", false);
+    case("mod? foo", true);
+    case("mod foo 'foo?bar.just'", false);
+    case("mod? foo 'foo?bar.just'", true);
   }
 
   #[test]

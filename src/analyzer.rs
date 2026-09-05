@@ -2733,17 +2733,17 @@ mod tests {
   #[test]
   fn import_invalid_path() {
     let expected = if cfg!(windows) {
-      "Import path does not exist: `C:\\nonexistent.just`"
+      "Import path does not exist: `C:\\foo?bar.just`"
     } else {
-      "Import path does not exist: `/nonexistent.just`"
+      "Import path does not exist: `/foo?bar.just`"
     };
 
     Test::new(indoc! {
       "
-      import 'nonexistent.just'
+      import 'foo?bar.just'
       "
     })
-    .error(expected, lsp::Range::at(0, 7, 0, 25))
+    .error(expected, lsp::Range::at(0, 7, 0, 21))
     .run();
   }
 
@@ -2751,7 +2751,7 @@ mod tests {
   fn import_optional_invalid_path() {
     Test::new(indoc! {
       "
-      import? 'nonexistent.just'
+      import? 'foo?bar.just'
       "
     })
     .run();
