@@ -1600,6 +1600,40 @@ mod tests {
   }
 
   #[test]
+  fn circular_dependencies_overlapping_cycles() {
+    #[track_caller]
+    fn case(dependencies: &str, message: &'static str) {
+      Test::new(&formatdoc! {
+        "
+        foo: {dependencies}
+        bar: foo
+        baz: foo
+        "
+      })
+      .error(message, lsp::Range::at(0, 0, 1, 0))
+      .error(
+        "Recipe `bar` has circular dependency `bar -> foo -> bar`",
+        lsp::Range::at(1, 0, 2, 0),
+      )
+      .error(
+        "Recipe `baz` has circular dependency `baz -> foo -> baz`",
+        lsp::Range::at(2, 0, 3, 0),
+      )
+      .run();
+    }
+
+    case(
+      "bar baz",
+      "Recipe `foo` has circular dependency `foo -> bar -> foo`",
+    );
+
+    case(
+      "baz bar",
+      "Recipe `foo` has circular dependency `foo -> baz -> foo`",
+    );
+  }
+
+  #[test]
   fn circular_dependencies_self() {
     Test::new(indoc! {
       "
