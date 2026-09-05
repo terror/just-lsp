@@ -1057,8 +1057,7 @@ mod tests {
           .as_ref()
           .unwrap()
           .root_node()
-          .find("alias > identifier[1]")
-          .unwrap(),
+          .find_all("alias > identifier")[1],
       )
       .unwrap();
 

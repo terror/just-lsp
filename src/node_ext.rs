@@ -26,26 +26,6 @@ fn collect_nodes_by_kind<'a>(node: Node<'a>, kind: &str) -> Vec<Node<'a>> {
   [self_match, children_matches].concat()
 }
 
-fn collect_descendants_by_kind<'a>(
-  node: Node<'a>,
-  kind: &str,
-) -> Vec<Node<'a>> {
-  (0..node.child_count())
-    .filter_map(|i| child_at(&node, i))
-    .flat_map(|child| {
-      let self_match = if child.kind() == kind {
-        vec![child]
-      } else {
-        Vec::new()
-      };
-
-      let descendants = collect_descendants_by_kind(child, kind);
-
-      [self_match, descendants].concat()
-    })
-    .collect()
-}
-
 fn child_at<'a>(node: &Node<'a>, index: usize) -> Option<Node<'a>> {
   index.try_into().ok().and_then(|index| node.child(index))
 }
@@ -64,55 +44,11 @@ impl NodeExt for Node<'_> {
         .collect();
     }
 
-    if let Some(position_str) = selector.strip_prefix('@') {
-      return position_str
-        .parse::<usize>()
-        .ok()
-        .and_then(|position| child_at(self, position))
-        .map_or_else(Vec::new, |child| vec![child]);
-    }
-
     if let Some(rest) = selector.strip_prefix('^') {
-      if rest.contains('[') && rest.ends_with(']') {
-        let parts: Vec<&str> = rest.split('[').collect();
-
-        if parts.len() == 2 {
-          let (kind, index_str) = (parts[0], &parts[1][..parts[1].len() - 1]);
-
-          if let Ok(index) = index_str.parse::<usize>() {
-            let direct_children = (0..self.child_count())
-              .filter_map(|i| child_at(self, i))
-              .filter(|child| child.kind() == kind)
-              .collect::<Vec<_>>();
-
-            return direct_children
-              .get(index)
-              .copied()
-              .map_or_else(Vec::new, |node| vec![node]);
-          }
-        }
-      }
-
       return (0..self.child_count())
         .filter_map(|i| child_at(self, i))
         .filter(|child| child.kind() == rest)
         .collect();
-    }
-
-    if selector.contains('[') && selector.ends_with(']') {
-      let parts: Vec<&str> = selector.split('[').collect();
-
-      if parts.len() == 2 {
-        let (kind, index_str) = (parts[0], &parts[1][..parts[1].len() - 1]);
-
-        if let Ok(index) = index_str.parse::<usize>() {
-          let all_of_kind = self.find_all(kind);
-          return all_of_kind
-            .get(index)
-            .copied()
-            .map_or_else(Vec::new, |node| vec![node]);
-        }
-      }
     }
 
     if selector.contains(" > ") {
@@ -128,22 +64,6 @@ impl NodeExt for Node<'_> {
                 .filter_map(|i| child_at(parent, i))
                 .filter(|child| child.kind() == child_kind)
                 .collect::<Vec<_>>()
-            })
-            .collect()
-        },
-      );
-    }
-
-    if selector.contains(' ') {
-      let parts: Vec<&str> = selector.split_whitespace().collect();
-
-      return parts.iter().skip(1).fold(
-        self.find_all(parts[0]),
-        |ancestors, &descendant_kind| {
-          ancestors
-            .iter()
-            .flat_map(|&ancestor| {
-              collect_descendants_by_kind(ancestor, descendant_kind)
             })
             .collect()
         },
@@ -274,30 +194,6 @@ mod tests {
         "arch".to_string()
       ]
     );
-
-    let recipe_identifier_texts = root
-      .find_all("recipe identifier")
-      .iter()
-      .map(|node| document.get_node_text(node))
-      .collect::<Vec<_>>();
-
-    assert_eq!(recipe_identifier_texts, identifier_texts);
-
-    let function_call_texts = root
-      .find_all("recipe function_call")
-      .iter()
-      .map(|node| document.get_node_text(node).trim().to_string())
-      .collect::<Vec<_>>();
-
-    assert_eq!(function_call_texts, vec!["arch()".to_string()]);
-
-    let function_identifier_texts = root
-      .find_all("function_call identifier")
-      .iter()
-      .map(|node| document.get_node_text(node))
-      .collect::<Vec<_>>();
-
-    assert_eq!(function_identifier_texts, vec!["arch".to_string()]);
   }
 
   #[test]
@@ -323,7 +219,7 @@ mod tests {
 
     assert_eq!(identifier_texts, vec!["foo".to_string(), "bar".to_string()]);
 
-    let second_recipe = root.find("recipe[1]").unwrap();
+    let second_recipe = root.find_all("recipe")[1];
 
     let recipe_header = second_recipe.find("recipe_header").unwrap();
 
@@ -354,7 +250,7 @@ mod tests {
 
     let root = document.tree.as_ref().unwrap().root_node();
 
-    let second_recipe = root.find("recipe[1]").unwrap();
+    let second_recipe = root.find_all("recipe")[1];
 
     let recipe_header = second_recipe.find("recipe_header").unwrap();
     let parameters_node = recipe_header.find("parameters").unwrap();
@@ -372,47 +268,6 @@ mod tests {
       parameter_texts,
       vec!["arg1".to_string(), "arg2".to_string()]
     );
-  }
-
-  #[test]
-  fn find_indexed_nodes() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-
-      baz:
-        echo \"baz\"
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let selectors = ["recipe[0]", "recipe[1]", "recipe[2]"];
-
-    let recipe_texts = selectors
-      .iter()
-      .map(|selector| {
-        document
-          .get_node_text(&root.find(selector).unwrap())
-          .trim()
-          .to_string()
-      })
-      .collect::<Vec<_>>();
-
-    assert_eq!(
-      recipe_texts,
-      vec![
-        "foo:\n  echo \"foo\"".to_string(),
-        "bar:\n  echo \"bar\"".to_string(),
-        "baz:\n  echo \"baz\"".to_string()
-      ]
-    );
-
-    assert!(root.find("recipe[10]").is_none());
   }
 
   #[test]
@@ -436,43 +291,23 @@ mod tests {
 
   #[test]
   fn find_nonexistent() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
+    #[track_caller]
+    fn case(selector: &str) {
+      let document = Document::from("foo:\n");
+      let root = document.tree.as_ref().unwrap().root_node();
 
-    let tree = document.tree.as_ref().unwrap();
-    let root = tree.root_node();
+      assert!(root.find(selector).is_none());
+      assert!(root.find_all(selector).is_empty());
+    }
 
-    let nonexistent = root.find("nonexistent_kind");
-    assert!(nonexistent.is_none());
-
-    let empty_results = root.find_all("nonexistent_kind");
-    assert_eq!(empty_results.len(), 0);
-
-    let no_function_calls = root.find_all("function_call");
-    assert_eq!(no_function_calls.len(), 0);
-  }
-
-  #[test]
-  fn find_nth_occurrence() {
-    let document = Document::from(indoc! {
-      "
-      alias foo := bar
-      "
-    });
-
-    let root = document.tree.as_ref().unwrap().root_node();
-
-    let alias = root.find("alias").unwrap();
-
-    let first_identifier = alias.find("identifier[0]").unwrap();
-    let second_identifier = alias.find("identifier[1]").unwrap();
-
-    assert_eq!(document.get_node_text(&first_identifier), "foo");
-    assert_eq!(document.get_node_text(&second_identifier), "bar");
+    case("");
+    case(" ");
+    case("foo");
+    case("function_call");
+    case("@0");
+    case("recipe[0]");
+    case("^recipe[0]");
+    case("recipe identifier");
   }
 
   #[test]
