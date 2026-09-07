@@ -56,7 +56,3 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
 | `invalid-import-path`             | Invalid Import Path             | Literal non-optional import path points to a path that does not exist on disk.                                                |
-
-`unstable-feature-gate` emits warnings because `just` also enables unstable
-features through `--unstable` or `JUST_UNSTABLE`, which are not visible in the
-document. See the [unstable features specification](https://github.com/casey/just/blob/master/README.md#unstable-features).
