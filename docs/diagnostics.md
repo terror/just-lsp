@@ -55,4 +55,4 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
 | `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
-| `invalid-import-path`             | Invalid Import Path             | Enabled literal non-optional import path points to a path that does not exist on disk.                                        |
+| `invalid-import-path`             | Invalid Import Path             | Import path cannot be decoded or expanded, or an enabled non-optional import has an empty or missing path.                   |
