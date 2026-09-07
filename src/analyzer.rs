@@ -5052,6 +5052,26 @@ mod tests {
   }
 
   #[test]
+  fn unstable_feature_gate_cache_requires_unstable() {
+    Test::new("[script]\n[cache]\nfoo:\n")
+      .warning(
+        "`[cache]` is unstable without `set unstable`",
+        lsp::Range::at(1, 1, 1, 6),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_cache_with_arguments_requires_unstable() {
+    Test::new("[script]\n[cache(extra='bar')]\nfoo:\n")
+      .warning(
+        "`[cache]` is unstable without `set unstable`",
+        lsp::Range::at(1, 1, 1, 6),
+      )
+      .run();
+  }
+
+  #[test]
   fn unstable_feature_gate_disabled_lists() {
     Test::new("set lists := false\n").run();
   }
@@ -5152,37 +5172,33 @@ mod tests {
   }
 
   #[test]
-  fn unstable_feature_gate_requires_unstable() {
-    #[track_caller]
-    fn case(content: &str, message: &'static str, range: lsp::Range) {
-      Test::new(content).warning(message, range).run();
-    }
+  fn unstable_feature_gate_lists_requires_unstable() {
+    Test::new("set lists\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
+  }
 
-    case(
-      "set lists\n",
-      "`set lists` is unstable without `set unstable`",
-      lsp::Range::at(0, 4, 0, 9),
-    );
-    case(
-      "set lists := true\n",
-      "`set lists` is unstable without `set unstable`",
-      lsp::Range::at(0, 4, 0, 9),
-    );
-    case(
-      "foo(bar) := bar\n",
-      "User-defined function `foo` is unstable without `set unstable`",
-      lsp::Range::at(0, 0, 0, 3),
-    );
-    case(
-      "[script]\n[cache]\nfoo:\n",
-      "`[cache]` is unstable without `set unstable`",
-      lsp::Range::at(1, 1, 1, 6),
-    );
-    case(
-      "[script]\n[cache(extra='bar')]\nfoo:\n",
-      "`[cache]` is unstable without `set unstable`",
-      lsp::Range::at(1, 1, 1, 6),
-    );
+  #[test]
+  fn unstable_feature_gate_lists_true_requires_unstable() {
+    Test::new("set lists := true\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_user_defined_function_requires_unstable() {
+    Test::new("foo(bar) := bar\n")
+      .warning(
+        "User-defined function `foo` is unstable without `set unstable`",
+        lsp::Range::at(0, 0, 0, 3),
+      )
+      .run();
   }
 
   #[test]

@@ -2266,6 +2266,26 @@ mod tests {
   }
 
   #[test]
+  fn recipe_with_exported_variadic_parameter() {
+    #[track_caller]
+    fn case(source: &str, expected: VariadicType) {
+      let parameter = Document::from(source)
+        .find_recipe("foo")
+        .unwrap()
+        .parameters
+        .into_iter()
+        .next()
+        .unwrap();
+
+      assert!(parameter.export);
+      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
+    }
+
+    case("foo +$args:\n", VariadicType::OneOrMore);
+    case("foo *$args:\n", VariadicType::ZeroOrMore);
+  }
+
+  #[test]
   fn recipe_with_invalid_parameters() {
     #[track_caller]
     fn case(source: &str) {
@@ -2588,26 +2608,6 @@ mod tests {
         range: lsp::Range::at(0, 4, 0, 10),
       }],
     );
-  }
-
-  #[test]
-  fn recipe_with_exported_variadic_parameter() {
-    #[track_caller]
-    fn case(source: &str, expected: VariadicType) {
-      let parameter = Document::from(source)
-        .find_recipe("foo")
-        .unwrap()
-        .parameters
-        .into_iter()
-        .next()
-        .unwrap();
-
-      assert!(parameter.export);
-      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
-    }
-
-    case("foo +$args:\n", VariadicType::OneOrMore);
-    case("foo *$args:\n", VariadicType::ZeroOrMore);
   }
 
   #[test]
