@@ -2785,6 +2785,21 @@ mod tests {
   }
 
   #[test]
+  fn import_disabled_paths_are_ignored() {
+    #[track_caller]
+    fn case(path: &str) {
+      let attribute = if cfg!(windows) { "unix" } else { "windows" };
+
+      Test::new(&format!("[{attribute}]\nimport {path}\n")).run();
+    }
+
+    case("'foo.just'");
+    case("x'foo.just'");
+    case("''");
+    case("x''");
+  }
+
+  #[test]
   fn import_format_string_skipped() {
     Test::new(indoc! {
       r#"

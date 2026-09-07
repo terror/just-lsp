@@ -9,6 +9,7 @@ use {
   std::{
     cmp::Reverse,
     collections::{HashMap, HashSet, hash_map::Entry},
+    env,
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
