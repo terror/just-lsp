@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Diagnostic {
   /// A short header summarizing the diagnostic.
   pub display: String,
@@ -8,23 +8,12 @@ pub struct Diagnostic {
   pub id: String,
   /// A detailed message describing the diagnostic.
   pub message: String,
+  /// Quickfixes that can be applied to resolve the diagnostic.
+  pub quickfixes: Vec<Quickfix>,
   /// The range in the source code where the diagnostic applies.
   pub range: lsp::Range,
   /// The severity level of the diagnostic.
   pub severity: lsp::DiagnosticSeverity,
-}
-
-impl From<Diagnostic> for lsp::Diagnostic {
-  fn from(value: Diagnostic) -> lsp::Diagnostic {
-    lsp::Diagnostic {
-      code: Some(lsp::NumberOrString::String(value.id)),
-      message: value.message,
-      range: value.range,
-      severity: Some(value.severity),
-      source: Some("just-lsp".to_string()),
-      ..Default::default()
-    }
-  }
 }
 
 impl Diagnostic {
@@ -41,12 +30,32 @@ impl Diagnostic {
       display: String::new(),
       id: String::new(),
       message: message.into(),
+      quickfixes: Vec::new(),
       range,
       severity,
     }
   }
 
+  #[must_use]
+  pub fn quickfix(mut self, quickfix: impl Into<Option<Quickfix>>) -> Self {
+    self.quickfixes.extend(quickfix.into());
+    self
+  }
+
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
     Self::new(message, range, lsp::DiagnosticSeverity::WARNING)
+  }
+}
+
+impl From<Diagnostic> for lsp::Diagnostic {
+  fn from(value: Diagnostic) -> lsp::Diagnostic {
+    lsp::Diagnostic {
+      code: Some(lsp::NumberOrString::String(value.id)),
+      message: value.message,
+      range: value.range,
+      severity: Some(value.severity),
+      source: Some("just-lsp".to_string()),
+      ..Default::default()
+    }
   }
 }

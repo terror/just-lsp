@@ -50,10 +50,12 @@ define_rule! {
     id: "mixed-recipe-indentation",
     message: "mixed indentation",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       context
         .recipes()
         .iter()
-        .filter(|recipe| recipe.shebang.is_none())
+        .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(Self::find_mixed_indentation)
         .collect()
     }
@@ -62,11 +64,9 @@ define_rule! {
 
 impl MixedIndentationRule {
   fn find_mixed_indentation(recipe: &Recipe) -> Option<Diagnostic> {
-    let body_start_line = recipe.range.start.line + 1;
-
     Self::recipe_body_lines(&recipe.content)
       .try_fold(None, |expected_kind: Option<IndentKind>, line| {
-        let absolute_line = body_start_line + line.relative_line;
+        let absolute_line = recipe.range.start.line + line.relative_line;
 
         let Some(line_kind) = line.kind else {
           return ControlFlow::Break(Self::make_diagnostic(

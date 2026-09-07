@@ -2,14 +2,14 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Resolver<'a> {
-  document: &'a Document,
+  view: ProjectView<'a>,
 }
 
 impl<'a> Resolver<'a> {
-  /// Creates a new `Resolver` bound to the given `Document`.
+  /// Creates a new `Resolver` bound to the given `ProjectView`.
   #[must_use]
-  pub(crate) fn new(document: &'a Document) -> Self {
-    Self { document }
+  pub(crate) fn new(view: impl Into<ProjectView<'a>>) -> Self {
+    Self { view: view.into() }
   }
 
   /// Returns the definition site of the symbol that `identifier` refers
@@ -21,16 +21,20 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
-    Some(lsp::Location {
-      range: match self.resolve_symbol(identifier)? {
-        Symbol::Builtin(_) => identifier.get_range(self.document),
-        Symbol::Function(function) => function.name.range,
-        Symbol::FunctionParameter(parameter) => parameter.range,
-        Symbol::Parameter(parameter) => parameter.range,
-        Symbol::Recipe(recipe) => recipe.range,
-        Symbol::Variable(variable) => variable.range,
-      },
-      uri: self.document.uri.clone(),
+    Some(match self.resolve_symbol(identifier)? {
+      Symbol::Builtin(_) => lsp::Location::new(
+        self.view.document().uri.clone(),
+        identifier.get_range(self.view.document()),
+      ),
+      Symbol::Function(function) => function.location(function.name.range),
+      Symbol::FunctionParameter(parameter) => {
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
+      }
+      Symbol::Parameter(parameter) => {
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
+      }
+      Symbol::Recipe(recipe) => recipe.location(recipe.range),
+      Symbol::Variable(variable) => variable.location(variable.range),
     })
   }
 
@@ -48,7 +52,7 @@ impl<'a> Resolver<'a> {
           Symbol::Builtin(builtin) => builtin.description(),
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: function.content,
+            value: function.into_inner().content,
           },
           Symbol::FunctionParameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
@@ -60,15 +64,15 @@ impl<'a> Resolver<'a> {
           },
           Symbol::Recipe(recipe) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
+            value: recipe.into_inner().content,
           },
           Symbol::Variable(variable) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: variable.content,
+            value: variable.into_inner().content,
           },
         },
       ),
-      range: Some(identifier.get_range(self.document)),
+      range: Some(identifier.get_range(self.view.document())),
     })
   }
 
@@ -85,13 +89,12 @@ impl<'a> Resolver<'a> {
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
-    let name = self.document.get_node_text(identifier);
-
-    let Some(symbol) = self.resolve_symbol(identifier) else {
+    let Some(definition) = self.resolve_identifier_definition(identifier)
+    else {
       return Vec::new();
     };
 
-    let root = match &self.document.tree {
+    let root = match &self.view.document().tree {
       Some(tree) => tree.root_node(),
       None => return Vec::new(),
     };
@@ -100,109 +103,13 @@ impl<'a> Resolver<'a> {
       .find_all("identifier")
       .into_iter()
       .filter(|candidate| {
-        if candidate.id() == identifier.id() {
-          return true;
-        }
-
-        if self.document.get_node_text(candidate) != name {
-          return false;
-        }
-
-        let Some(candidate_parent) = candidate.parent() else {
-          return false;
-        };
-
-        let candidate_parent_kind = candidate_parent.kind();
-
-        match &symbol {
-          Symbol::Builtin(_) => false,
-          Symbol::Function(_) => {
-            candidate_parent_kind == "function_call"
-              || candidate_parent_kind == "function_definition"
-          }
-          Symbol::FunctionParameter(_) => {
-            let in_same_function = matches!(
-              (
-                identifier.get_parent("function_definition"),
-                candidate.get_parent("function_definition"),
-              ),
-              (Some(f1), Some(f2)) if f1.id() == f2.id()
-            );
-
-            in_same_function
-              && ["value", "function_parameters"]
-                .contains(&candidate_parent_kind)
-          }
-          Symbol::Parameter(_) => {
-            let in_same_recipe = matches!(
-              (identifier.get_parent("recipe"), candidate.get_parent("recipe")),
-              (Some(r1), Some(r2)) if r1.id() == r2.id()
-            );
-
-            in_same_recipe
-              && ["value", "parameter", "variadic_parameter"]
-                .contains(&candidate_parent_kind)
-          }
-          Symbol::Recipe(_) => [
-            "alias",
-            "dependency",
-            "dependency_expression",
-            "recipe_header",
-          ]
-          .contains(&candidate_parent_kind),
-          Symbol::Variable(_) => {
-            if candidate_parent_kind == "assignment" {
-              return true;
-            }
-
-            if candidate_parent_kind != "value" {
-              return false;
-            }
-
-            let containing_parameter = candidate
-              .get_parent("parameter")
-              .or_else(|| candidate.get_parent("variadic_parameter"));
-
-            if let Some(containing_parameter) = containing_parameter {
-              let containing_parameter_name = self.document.get_node_text(
-                &containing_parameter.find("identifier").unwrap(),
-              );
-
-              let shadowed_by_preceding_parameter =
-                candidate.get_recipe(self.document).is_some_and(|recipe| {
-                  recipe
-                    .parameters
-                    .iter()
-                    .take_while(|parameter| {
-                      parameter.name != containing_parameter_name
-                    })
-                    .any(|parameter| parameter.name == name)
-                });
-
-              return !shadowed_by_preceding_parameter;
-            }
-
-            if let Some(recipe) = candidate.get_recipe(self.document) {
-              return !recipe
-                .parameters
-                .iter()
-                .any(|parameter| parameter.name == name);
-            }
-
-            if let Some(function) = candidate.get_function(self.document) {
-              return !function
-                .parameters
-                .iter()
-                .any(|parameter| parameter.value == name);
-            }
-
-            true
-          }
-        }
+        self
+          .resolve_identifier_definition(candidate)
+          .is_some_and(|resolved| resolved == definition)
       })
       .map(|found| lsp::Location {
-        uri: self.document.uri.clone(),
-        range: found.get_range(self.document),
+        uri: self.view.document().uri.clone(),
+        range: found.get_range(self.view.document()),
       })
       .collect()
   }
@@ -216,8 +123,9 @@ impl<'a> Resolver<'a> {
   /// assignment, or a parameter name in a recipe header) are looked up
   /// through the document so that callers receive a fully-populated
   /// [`Symbol`] rather than a raw range.
-  fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
-    let name = self.document.get_node_text(identifier);
+  #[must_use]
+  pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+    let name = self.view.document().get_node_text(identifier);
 
     let parent_kind = identifier.parent()?.kind();
 
@@ -233,12 +141,12 @@ impl<'a> Resolver<'a> {
 
     match parent_kind {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        self.document.find_recipe(&name).map(Symbol::Recipe)
+        self.view.find_recipe(&name).map(Symbol::Recipe)
       }
-      "assignment" => self.document.find_variable(&name).map(Symbol::Variable),
+      "assignment" => self.view.find_variable(&name).map(Symbol::Variable),
       "function_call" | "assert_expression" => {
         self
-          .document
+          .view
           .find_function(&name)
           .map(Symbol::Function)
           .or_else(|| {
@@ -253,28 +161,28 @@ impl<'a> Resolver<'a> {
           })
       }
       "function_definition" => {
-        self.document.find_function(&name).map(Symbol::Function)
+        self.view.find_function(&name).map(Symbol::Function)
       }
-      "function_parameters" => {
-        identifier.get_function(self.document).and_then(|function| {
+      "function_parameters" => identifier
+        .get_function(self.view.document())
+        .and_then(|function| {
           function
             .parameters
             .iter()
             .find(|parameter| parameter.value == name)
             .cloned()
             .map(Symbol::FunctionParameter)
-        })
-      }
-      "parameter" | "variadic_parameter" => {
-        identifier.get_recipe(self.document).and_then(|recipe| {
+        }),
+      "parameter" | "variadic_parameter" => identifier
+        .get_recipe(self.view.document())
+        .and_then(|recipe| {
           recipe
             .parameters
             .iter()
             .find(|parameter| parameter.name == name)
             .cloned()
             .map(Symbol::Parameter)
-        })
-      }
+        }),
       "value" => {
         let containing_parameter = identifier
           .get_parent("parameter")
@@ -282,7 +190,7 @@ impl<'a> Resolver<'a> {
 
         match containing_parameter {
           None => identifier
-            .get_recipe(self.document)
+            .get_recipe(self.view.document())
             .and_then(|recipe| {
               recipe
                 .parameters
@@ -292,26 +200,27 @@ impl<'a> Resolver<'a> {
                 .map(Symbol::Parameter)
             })
             .or_else(|| {
-              identifier.get_function(self.document).and_then(|function| {
-                function
-                  .parameters
-                  .iter()
-                  .find(|parameter| parameter.value == name)
-                  .cloned()
-                  .map(Symbol::FunctionParameter)
-              })
+              identifier.get_function(self.view.document()).and_then(
+                |function| {
+                  function
+                    .parameters
+                    .iter()
+                    .find(|parameter| parameter.value == name)
+                    .cloned()
+                    .map(Symbol::FunctionParameter)
+                },
+              )
             })
-            .or_else(|| {
-              self.document.find_variable(&name).map(Symbol::Variable)
-            })
+            .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
             .or_else(|| builtin_constant(&name)),
           Some(containing_parameter) => {
             let containing_parameter_name = self
-              .document
+              .view
+              .document()
               .get_node_text(&containing_parameter.find("identifier")?);
 
             identifier
-              .get_recipe(self.document)
+              .get_recipe(self.view.document())
               .and_then(|recipe| {
                 recipe
                   .parameters
@@ -323,9 +232,7 @@ impl<'a> Resolver<'a> {
                   .cloned()
                   .map(Symbol::Parameter)
               })
-              .or_else(|| {
-                self.document.find_variable(&name).map(Symbol::Variable)
-              })
+              .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
               .or_else(|| builtin_constant(&name))
           }
         }
@@ -352,13 +259,11 @@ mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   #[test]
-  fn resolve_shadowed_parameter_default_definition() {
+  fn resolve_assert_definition() {
     let document = Document::from(indoc! {
       "
-      a := 'foo'
-
-      b a=a:
-        echo {{ a }}
+      foo name:
+        echo {{ assert(name == 'bar', 'baz') }}
       "
     });
 
@@ -369,7 +274,7 @@ mod tests {
           .as_ref()
           .unwrap()
           .root_node()
-          .find("parameter > value > identifier")
+          .find("assert_expression > identifier")
           .unwrap(),
       )
       .unwrap();
@@ -378,8 +283,300 @@ mod tests {
       definition,
       lsp::Location {
         uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 1, 0),
+        range: lsp::Range::at(1, 10, 1, 16),
       }
+    );
+  }
+
+  #[test]
+  fn resolve_assert_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo name:
+        echo {{ assert(name == 'bar', 'baz') }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("assert_expression > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          Abort execution with `message` if `condition` is false, or the
+          condition source if `message` is not provided.
+
+          ```just
+          foo version:
+            echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
+          ```
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_attribute_hover() {
+    let document = Document::from(indoc! {
+      "
+      [no-cd]
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("attribute > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          Don't change directory before executing the recipe.
+
+          Normally `just` runs recipes with the current directory set to
+          the directory containing the `justfile`. With `[no-cd]`, the
+          recipe runs with the current directory unchanged, so it can use
+          paths relative to the invocation directory or operate on the
+          user's current directory.
+
+          ```just
+          [no-cd]
+          commit file:
+            git add {{file}}
+            git commit
+          ```
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_constant_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo {{ RED }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          ANSI escape sequence for red foreground text: `\\e[31m`.
+
+          Terminate styled output with `NORMAL` to reset.
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_function_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("function_call > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          Instruction set architecture of the host machine.
+
+          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+          `x86`, `x86_64`, or `xcore`.
+
+          ```just
+          system-info:
+            @echo This is an {{arch()}} machine.
+          ```
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_identifier_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("function_call > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(1, 10, 1, 14),
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_setting_hover() {
+    let document = Document::from(indoc! {
+      "
+      set export
+
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("setting > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: indoc! {
+          "
+          Export every top-level `just` variable as an environment
+          variable.
+
+          Equivalent to prefixing each assignment with `export`, so
+          recipes and backticks see the variables as `$NAME` rather than
+          needing `{{ name }}` interpolation.
+
+          ```just
+          set export
+
+          a := \"hello\"
+
+          @foo b:
+            echo $a
+            echo $b
+          ```
+          "
+        }
+        .to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_argument_references() {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      [group: 'test']
+      foo: (bar a)
+
+      bar a:
+        echo {{ a }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("dependency_expression > expression > value > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 1),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 10, 3, 11),
+        },
+      ]
     );
   }
 
@@ -417,51 +614,122 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe_definition() {
+  fn resolve_dependency_expression_hover() {
     let document = Document::from(indoc! {
       "
       foo:
-        echo \"foo\"
+        echo foo
 
-      bar: foo
-        echo \"bar\"
+      bar: (foo)
+        echo bar
       "
     });
 
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
         &document
           .tree
           .as_ref()
           .unwrap()
           .root_node()
-          .find("dependency > identifier")
+          .find("dependency_expression > identifier")
           .unwrap(),
       )
       .unwrap();
 
     assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 3, 0),
-      }
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "foo:\n  echo foo".to_string(),
+      })
     );
   }
 
   #[test]
-  fn resolve_variable_definition() {
+  fn resolve_dependency_expression_references() {
     let document = Document::from(indoc! {
       "
-      var := \"value\"
-
       foo:
-        echo {{ var }}
+        echo foo
+
+      bar: (foo)
+        echo bar
       "
     });
 
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("dependency_expression > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 3),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 6, 3, 9),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_dependency_references() {
+    let document = Document::from(indoc! {
+      "
+      all: foo
+
+      foo:
+        echo foo
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("dependency > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 5, 0, 8),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 0, 2, 3),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_export_parameter_hover() {
+    let document = Document::from(indoc! {
+      "
+      foo $env_var:
+        echo {{ env_var }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
         &document
           .tree
           .as_ref()
@@ -473,12 +741,88 @@ mod tests {
       .unwrap();
 
     assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "$env_var".to_string(),
+      })
     );
+  }
+
+  #[test]
+  fn resolve_export_variable_hover() {
+    let document = Document::from(indoc! {
+      "
+      export VERSION := \"1.0.0\"
+
+      foo:
+        echo {{ VERSION }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "VERSION := \"1.0.0\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_hover_non_identifier() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    });
+
+    let hover = Resolver::new(&document).resolve_identifier_hover(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("text")
+        .unwrap(),
+    );
+
+    assert_eq!(hover, None);
+  }
+
+  #[test]
+  fn resolve_hover_nonexistent_variable() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo {{ nonexistent }}
+      "
+    });
+
+    let hover = Resolver::new(&document).resolve_identifier_hover(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("value > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(hover, None);
   }
 
   #[test]
@@ -512,137 +856,16 @@ mod tests {
   }
 
   #[test]
-  fn resolve_builtin_identifier_definition() {
+  fn resolve_parameter_hover() {
     let document = Document::from(indoc! {
       "
-      foo:
-        echo {{ arch() }}
+      foo param=\"default\":
+        echo {{ param }}
       "
     });
 
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("function_call > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(1, 10, 1, 14),
-      }
-    );
-  }
-
-  #[test]
-  fn resolve_assert_definition() {
-    let document = Document::from(indoc! {
-      "
-      foo name:
-        echo {{ assert(name == 'bar', 'baz') }}
-      "
-    });
-
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("assert_expression > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(1, 10, 1, 16),
-      }
-    );
-  }
-
-  #[test]
-  fn resolve_self_definition() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("recipe_header > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 2, 0),
-      }
-    );
-  }
-
-  #[test]
-  fn resolve_user_function_definition() {
-    let document = Document::from(indoc! {
-      "
-      foo(x) := x + \"!\"
-
-      bar:
-        echo {{ foo(\"baz\") }}
-      "
-    });
-
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("function_call > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 0, 3),
-      }
-    );
-  }
-
-  #[test]
-  fn resolve_user_function_parameter_definition() {
-    let document = Document::from(indoc! {
-      "
-      foo(x) := x
-      "
-    });
-
-    let definition = Resolver::new(&document)
-      .resolve_identifier_definition(
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
         &document
           .tree
           .as_ref()
@@ -654,23 +877,22 @@ mod tests {
       .unwrap();
 
     assert_eq!(
-      definition,
-      lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 4, 0, 5),
-      }
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "param=\"default\"".to_string(),
+      })
     );
   }
 
   #[test]
-  fn resolve_dependency_expression_hover() {
+  fn resolve_parameter_over_variable() {
     let document = Document::from(indoc! {
       "
-      foo:
-        echo foo
+      param := \"global value\"
 
-      bar: (foo)
-        echo bar
+      foo param=\"local value\":
+        echo {{ param }}
       "
     });
 
@@ -681,7 +903,7 @@ mod tests {
           .as_ref()
           .unwrap()
           .root_node()
-          .find("dependency_expression > identifier")
+          .find("value > identifier")
           .unwrap(),
       )
       .unwrap();
@@ -690,8 +912,87 @@ mod tests {
       hover.contents,
       lsp::HoverContents::Markup(lsp::MarkupContent {
         kind: lsp::MarkupKind::PlainText,
-        value: "foo:\n  echo foo".to_string(),
+        value: "param=\"local value\"".to_string(),
       })
+    );
+  }
+
+  #[test]
+  fn resolve_parameter_references_with_defaults() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+
+      baz foo=foo bar=foo:
+        echo {{ foo }}
+
+      qux foo:
+        echo {{ foo }}
+
+      baz foo=foo:
+        echo {{ foo }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("parameter > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 4, 2, 7),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 16, 2, 19),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 10, 3, 13),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_recipe_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo
+        echo \"bar\"
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("dependency > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 3, 0),
+      }
     );
   }
 
@@ -756,8 +1057,7 @@ mod tests {
           .as_ref()
           .unwrap()
           .root_node()
-          .find("alias > identifier[1]")
-          .unwrap(),
+          .find_all("alias > identifier")[1],
       )
       .unwrap();
 
@@ -771,379 +1071,91 @@ mod tests {
   }
 
   #[test]
-  fn resolve_parameter_hover() {
+  fn resolve_recipe_parameter_references() {
     let document = Document::from(indoc! {
       "
-      foo param=\"default\":
-        echo {{ param }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "param=\"default\"".to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_variadic_parameter_hover() {
-    let document = Document::from(indoc! {
-      "
-      foo +args:
-        echo {{ args }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "+args".to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_export_parameter_hover() {
-    let document = Document::from(indoc! {
-      "
-      foo $env_var:
-        echo {{ env_var }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "$env_var".to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_variable_hover() {
-    let document = Document::from(indoc! {
-      "
-      var := \"value\"
+      foo := 'bar'
 
       foo:
-        echo {{ var }}
+        echo {{ foo }}
+
+      bar foo: foo
+        echo {{ foo }}
+        echo {{ foo }}
+
+      alias baz := foo
       "
     });
 
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("parameter > identifier")
+        .unwrap(),
+    );
 
     assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "var := \"value\"".to_string(),
-      })
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(5, 4, 5, 7),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(6, 10, 6, 13),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(7, 10, 7, 13),
+        },
+      ]
     );
   }
 
   #[test]
-  fn resolve_export_variable_hover() {
+  fn resolve_recipe_references() {
     let document = Document::from(indoc! {
       "
-      export VERSION := \"1.0.0\"
-
-      foo:
-        echo {{ VERSION }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "VERSION := \"1.0.0\"".to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_builtin_function_hover() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo {{ arch() }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("function_call > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: indoc! {
-          "
-          Instruction set architecture of the host machine.
-
-          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
-          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
-          `x86`, `x86_64`, or `xcore`.
-
-          ```just
-          system-info:
-            @echo This is an {{arch()}} machine.
-          ```
-          "
-        }
-        .to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_assert_hover() {
-    let document = Document::from(indoc! {
-      "
-      foo name:
-        echo {{ assert(name == 'bar', 'baz') }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("assert_expression > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: indoc! {
-          "
-          Abort execution with `message` if `condition` is false, or the
-          condition source if `message` is not provided.
-
-          ```just
-          foo version:
-            echo {{ assert(version =~ '^v[0-9]+$', 'invalid version') }}
-          ```
-          "
-        }
-        .to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_builtin_constant_hover() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo {{ RED }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: indoc! {
-          "
-          ANSI escape sequence for red foreground text: `\\e[31m`.
-
-          Terminate styled output with `NORMAL` to reset.
-          "
-        }
-        .to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_builtin_attribute_hover() {
-    let document = Document::from(indoc! {
-      "
-      [no-cd]
       foo:
         echo \"foo\"
+
+      bar foo: foo
+        echo \"bar\"
+
+      alias baz := foo
       "
     });
 
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("attribute > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: indoc! {
-          "
-          Don't change directory before executing the recipe.
-
-          Normally `just` runs recipes with the current directory set to
-          the directory containing the `justfile`. With `[no-cd]`, the
-          recipe runs with the current directory unchanged, so it can use
-          paths relative to the invocation directory or operate on the
-          user's current directory.
-
-          ```just
-          [no-cd]
-          commit file:
-            git add {{file}}
-            git commit
-          ```
-          "
-        }
-        .to_string(),
-      })
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("recipe_header > identifier")
+        .unwrap(),
     );
-  }
-
-  #[test]
-  fn resolve_builtin_setting_hover() {
-    let document = Document::from(indoc! {
-      "
-      set export
-
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("setting > identifier")
-          .unwrap(),
-      )
-      .unwrap();
 
     assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::Markdown,
-        value: indoc! {
-          "
-          Export every top-level `just` variable as an environment
-          variable.
-
-          Equivalent to prefixing each assignment with `export`, so
-          recipes and backticks see the variables as `$NAME` rather than
-          needing `{{ name }}` interpolation.
-
-          ```just
-          set export
-
-          a := \"hello\"
-
-          @foo b:
-            echo $a
-            echo $b
-          ```
-          "
-        }
-        .to_string(),
-      })
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 3),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 9, 3, 12),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(6, 13, 6, 16),
+        },
+      ]
     );
   }
 
@@ -1205,39 +1217,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_parameter_over_variable() {
-    let document = Document::from(indoc! {
-      "
-      param := \"global value\"
-
-      foo param=\"local value\":
-        echo {{ param }}
-      "
-    });
-
-    let hover = Resolver::new(&document)
-      .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find("value > identifier")
-          .unwrap(),
-      )
-      .unwrap();
-
-    assert_eq!(
-      hover.contents,
-      lsp::HoverContents::Markup(lsp::MarkupContent {
-        kind: lsp::MarkupKind::PlainText,
-        value: "param=\"local value\"".to_string(),
-      })
-    );
-  }
-
-  #[test]
-  fn resolve_hover_non_identifier() {
+  fn resolve_self_definition() {
     let document = Document::from(indoc! {
       "
       foo:
@@ -1245,39 +1225,125 @@ mod tests {
       "
     });
 
-    let hover = Resolver::new(&document).resolve_identifier_hover(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("text")
-        .unwrap(),
-    );
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("recipe_header > identifier")
+          .unwrap(),
+      )
+      .unwrap();
 
-    assert_eq!(hover, None);
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 2, 0),
+      }
+    );
   }
 
   #[test]
-  fn resolve_hover_nonexistent_variable() {
+  fn resolve_shadowed_parameter_default_definition() {
     let document = Document::from(indoc! {
       "
-      foo:
-        echo {{ nonexistent }}
+      a := 'foo'
+
+      b a=a:
+        echo {{ a }}
       "
     });
 
-    let hover = Resolver::new(&document).resolve_identifier_hover(
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("parameter > value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_shadowed_parameter_default_references() {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      b a=a:
+        echo {{ a }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
         .as_ref()
         .unwrap()
         .root_node()
-        .find("value > identifier")
+        .find("assignment > identifier")
         .unwrap(),
     );
 
-    assert_eq!(hover, None);
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 1),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 4, 2, 5),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_user_function_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("function_call > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 0, 3),
+      }
+    );
   }
 
   #[test]
@@ -1313,6 +1379,35 @@ mod tests {
   }
 
   #[test]
+  fn resolve_user_function_parameter_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 4, 0, 5),
+      }
+    );
+  }
+
+  #[test]
   fn resolve_user_function_parameter_hover() {
     let document = Document::from(indoc! {
       "
@@ -1342,16 +1437,14 @@ mod tests {
   }
 
   #[test]
-  fn resolve_recipe_references() {
+  fn resolve_user_function_parameter_references() {
     let document = Document::from(indoc! {
       "
-      foo:
-        echo \"foo\"
+      foo(x) := x + x
 
-      bar foo: foo
-        echo \"bar\"
+      bar(x) := x
 
-      alias baz := foo
+      foo(x) := x
       "
     });
 
@@ -1361,7 +1454,48 @@ mod tests {
         .as_ref()
         .unwrap()
         .root_node()
-        .find("recipe_header > identifier")
+        .find("function_parameters > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 4, 0, 5),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 10, 0, 11),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 14, 0, 15),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_user_function_references() {
+    let document = Document::from(indoc! {
+      "
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"a\") }}
+        echo {{ foo(\"b\") }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("function_definition > identifier")
         .unwrap(),
     );
 
@@ -1374,57 +1508,11 @@ mod tests {
         },
         lsp::Location {
           uri: document.uri.clone(),
-          range: lsp::Range::at(3, 9, 3, 12),
+          range: lsp::Range::at(3, 10, 3, 13),
         },
         lsp::Location {
           uri: document.uri.clone(),
-          range: lsp::Range::at(6, 13, 6, 16),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_recipe_parameter_references() {
-    let document = Document::from(indoc! {
-      "
-      foo := 'bar'
-
-      foo:
-        echo {{ foo }}
-
-      bar foo: foo
-        echo {{ foo }}
-        echo {{ foo }}
-
-      alias baz := foo
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("parameter > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(5, 4, 5, 7),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(6, 10, 6, 13),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(7, 10, 7, 13),
+          range: lsp::Range::at(4, 10, 4, 13),
         },
       ]
     );
@@ -1504,6 +1592,130 @@ mod tests {
   }
 
   #[test]
+  fn resolve_variable_definition() {
+    let document = Document::from(indoc! {
+      "
+      var := \"value\"
+
+      foo:
+        echo {{ var }}
+      "
+    });
+
+    let definition = Resolver::new(&document)
+      .resolve_identifier_definition(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      definition,
+      lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }
+    );
+  }
+
+  #[test]
+  fn resolve_variable_excludes_parameter_default_shadowed_by_preceding_parameter()
+   {
+    let document = Document::from(indoc! {
+      "
+      a := 'foo'
+
+      bar a b=a:
+        echo {{ b }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 0, 1),
+      }]
+    );
+  }
+
+  #[test]
+  fn resolve_variable_excludes_user_function_parameter_shadow() {
+    let document = Document::from(indoc! {
+      "
+      base := 'global'
+
+      join(base) := base + '!'
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 0, 4),
+      }]
+    );
+  }
+
+  #[test]
+  fn resolve_variable_hover() {
+    let document = Document::from(indoc! {
+      "
+      var := \"value\"
+
+      foo:
+        echo {{ var }}
+      "
+    });
+
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "var := \"value\"".to_string(),
+      })
+    );
+  }
+
+  #[test]
   fn resolve_variable_references() {
     let document = Document::from(indoc! {
       "
@@ -1554,73 +1766,6 @@ mod tests {
           range: lsp::Range::at(11, 10, 11, 13),
         },
       ]
-    );
-  }
-
-  #[test]
-  fn resolve_shadowed_parameter_default_references() {
-    let document = Document::from(indoc! {
-      "
-      a := 'foo'
-
-      b a=a:
-        echo {{ a }}
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("assignment > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 0, 0, 1),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(2, 4, 2, 5),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_variable_excludes_parameter_default_shadowed_by_preceding_parameter()
-   {
-    let document = Document::from(indoc! {
-      "
-      a := 'foo'
-
-      bar a b=a:
-        echo {{ b }}
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("assignment > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 0, 1),
-      }]
     );
   }
 
@@ -1694,12 +1839,13 @@ mod tests {
   }
 
   #[test]
-  fn resolve_variable_excludes_user_function_parameter_shadow() {
+  fn resolve_variable_references_in_variadic_parameter_defaults() {
     let document = Document::from(indoc! {
       "
-      base := 'global'
+      foo := 'bar'
 
-      join(base) := base + '!'
+      baz bar=foo +foo=foo:
+        echo {{ foo }}
       "
     });
 
@@ -1715,112 +1861,6 @@ mod tests {
 
     assert_eq!(
       references,
-      vec![lsp::Location {
-        uri: document.uri.clone(),
-        range: lsp::Range::at(0, 0, 0, 4),
-      }]
-    );
-  }
-
-  #[test]
-  fn resolve_dependency_references() {
-    let document = Document::from(indoc! {
-      "
-      all: foo
-
-      foo:
-        echo foo
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("dependency > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 5, 0, 8),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(2, 0, 2, 3),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_dependency_argument_references() {
-    let document = Document::from(indoc! {
-      "
-      a := 'foo'
-
-      [group: 'test']
-      foo: (bar a)
-
-      bar a:
-        echo {{ a }}
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("dependency_expression > expression > value > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 0, 0, 1),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(3, 10, 3, 11),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_dependency_expression_references() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo foo
-
-      bar: (foo)
-        echo bar
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("dependency_expression > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
       vec![
         lsp::Location {
           uri: document.uri.clone(),
@@ -1828,21 +1868,54 @@ mod tests {
         },
         lsp::Location {
           uri: document.uri.clone(),
-          range: lsp::Range::at(3, 6, 3, 9),
+          range: lsp::Range::at(2, 8, 2, 11),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 17, 2, 20),
         },
       ]
     );
   }
 
   #[test]
-  fn resolve_user_function_references() {
+  fn resolve_variadic_parameter_hover() {
     let document = Document::from(indoc! {
       "
-      foo(x) := x + \"!\"
+      foo +args:
+        echo {{ args }}
+      "
+    });
 
-      bar:
-        echo {{ foo(\"a\") }}
-        echo {{ foo(\"b\") }}
+    let hover = Resolver::new(&document)
+      .resolve_identifier_hover(
+        &document
+          .tree
+          .as_ref()
+          .unwrap()
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      )
+      .unwrap();
+
+    assert_eq!(
+      hover.contents,
+      lsp::HoverContents::Markup(lsp::MarkupContent {
+        kind: lsp::MarkupKind::PlainText,
+        value: "+args".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn resolve_variadic_parameter_references_with_defaults() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+
+      baz bar=foo +foo=foo:
+        echo {{ foo }}
       "
     });
 
@@ -1852,7 +1925,7 @@ mod tests {
         .as_ref()
         .unwrap()
         .root_node()
-        .find("function_definition > identifier")
+        .find("variadic_parameter > parameter > identifier")
         .unwrap(),
     );
 
@@ -1861,54 +1934,11 @@ mod tests {
       vec![
         lsp::Location {
           uri: document.uri.clone(),
-          range: lsp::Range::at(0, 0, 0, 3),
+          range: lsp::Range::at(2, 13, 2, 16),
         },
         lsp::Location {
           uri: document.uri.clone(),
           range: lsp::Range::at(3, 10, 3, 13),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(4, 10, 4, 13),
-        },
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_user_function_parameter_references() {
-    let document = Document::from(indoc! {
-      "
-      foo(x) := x + x
-
-      bar(x) := x
-      "
-    });
-
-    let references = Resolver::new(&document).resolve_identifier_references(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("function_parameters > identifier")
-        .unwrap(),
-    );
-
-    assert_eq!(
-      references,
-      vec![
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 4, 0, 5),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 10, 0, 11),
-        },
-        lsp::Location {
-          uri: document.uri.clone(),
-          range: lsp::Range::at(0, 14, 0, 15),
         },
       ]
     );

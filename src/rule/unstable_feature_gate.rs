@@ -7,37 +7,41 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let settings = context.document().settings();
-
-      if settings.iter().any(|setting| {
-        setting.name.value == "unstable"
-          && matches!(setting.kind, SettingKind::Boolean(true))
-      }) {
+      if context.setting_enabled("unstable") {
         return diagnostics;
       }
 
-      diagnostics.extend(settings.iter().filter_map(|setting| {
+      for setting in context.document().settings() {
         if setting.name.value == "lists"
           && matches!(setting.kind, SettingKind::Boolean(true))
         {
-          Some(Diagnostic::warning(
+          diagnostics.push(Diagnostic::warning(
             "`set lists` is unstable without `set unstable`",
             setting.name.range,
-          ))
-        } else {
-          None
+          ));
         }
-      }));
+      }
 
-      diagnostics.extend(context.document().functions().iter().map(|function| {
-        Diagnostic::warning(
+      for function in context.document().functions() {
+        diagnostics.push(Diagnostic::warning(
           format!(
             "User-defined function `{}` is unstable without `set unstable`",
             function.name.value
           ),
           function.name.range,
-        )
-      }));
+        ));
+      }
+
+      for attribute in context.attributes() {
+        if attribute.name.value == "cache"
+          && attribute.target == Some(AttributeTarget::Recipe)
+        {
+          diagnostics.push(Diagnostic::warning(
+            "`[cache]` is unstable without `set unstable`",
+            attribute.name.range,
+          ));
+        }
+      }
 
       diagnostics
     }

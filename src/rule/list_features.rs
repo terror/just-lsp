@@ -58,7 +58,7 @@ impl ListFeaturesRule {
 
   fn condition_comparison_operator(node: Node<'_>) -> Option<Node<'_>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| child.kind() == "expression")
       .and_then(Self::comparison_operator)
   }
@@ -67,6 +67,7 @@ impl ListFeaturesRule {
     match name {
       "bool" => Some("the `bool()` function requires `set lists`"),
       "join_list" => Some("the `join_list()` function requires `set lists`"),
+      "num_jobs" => Some("the `num_jobs()` function requires `set lists`"),
       "show" => Some("the `show()` function requires `set lists`"),
       "split" => Some("the `split()` function requires `set lists`"),
       "which" => Some("the `which()` function requires `set lists`"),
@@ -76,7 +77,7 @@ impl ListFeaturesRule {
 
   fn if_token(node: Node<'_>) -> Option<Node<'_>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| child.kind() == "if")
   }
 
@@ -89,7 +90,7 @@ impl ListFeaturesRule {
       return false;
     };
 
-    let Some(name) = setting.child(1) else {
+    let Some(name) = setting.child_by_field_name("left") else {
       return false;
     };
 
@@ -110,7 +111,7 @@ impl ListFeaturesRule {
     operators: &[&str],
   ) -> Option<Node<'tree>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| operators.contains(&child.kind()))
   }
 
@@ -203,9 +204,7 @@ impl ListFeaturesRule {
     }
 
     for index in 0..node.child_count() {
-      if let Ok(index) = index.try_into()
-        && let Some(child) = node.child(index)
-      {
+      if let Some(child) = node.child(index) {
         Self::validate_node(context, document, child, diagnostics);
       }
     }

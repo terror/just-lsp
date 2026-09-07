@@ -16,12 +16,7 @@ define_rule! {
           continue;
         };
 
-        let dotenv_array_setting = matches!(
-          setting.name.value.as_str(),
-          "dotenv-filename" | "dotenv-path"
-        ) && setting.kind == SettingKind::Array;
-
-        if setting.kind == *kind || dotenv_array_setting {
+        if kind.accepts(&setting.kind) {
           continue;
         }
 

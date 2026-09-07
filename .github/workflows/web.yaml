@@ -28,19 +28,19 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Setup Bun
-      uses: oven-sh/setup-bun@v1
+      uses: oven-sh/setup-bun@v2
       with:
-        bun-version: latest
+        bun-version: 1.4.1
 
     - name: Setup Pages
-      uses: actions/configure-pages@v4
+      uses: actions/configure-pages@v6
 
     - name: Install dependencies
       working-directory: ./www
-      run: bun install
+      run: bun install --frozen-lockfile
 
     - name: Format
       working-directory: ./www
@@ -52,14 +52,14 @@ jobs:
 
     - name: Test
       working-directory: ./www
-      run: bun test --pass-with-no-tests
+      run: bun run test
 
     - name: Build
       working-directory: ./www
       run: bun run build
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v5
       with:
         path: ./www/dist
 
@@ -77,4 +77,4 @@ jobs:
     steps:
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5

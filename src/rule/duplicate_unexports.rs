@@ -7,10 +7,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut seen = HashSet::new();
+      let mut conflicts = ConflictTracker::default();
 
       for unexport in context.unexports() {
-        if !seen.insert(unexport.name.value.clone()) {
+        if conflicts.record(&unexport.name, &unexport.attributes) {
           diagnostics.push(Diagnostic::error(
             format!(
               "Variable `{}` is unexported multiple times",

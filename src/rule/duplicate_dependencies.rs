@@ -28,7 +28,7 @@ define_rule! {
 
         for dependency in &recipe.dependencies {
           let key = DependencyKey {
-            name: dependency.name.clone(),
+            name: dependency.name.value.clone(),
             mapped: dependency.mapped.is_some(),
             phase: dependency.phase,
             arguments: dependency
@@ -46,13 +46,13 @@ define_rule! {
               format!(
                 "Recipe `{}` lists dependency `{}` more than once; just only runs it once, so it's redundant",
                 recipe.name.value,
-                dependency.name
+                dependency.name.value
               )
             } else {
               format!(
                 "Recipe `{}` lists dependency `{}` with the same arguments more than once; just only runs it once, so it's redundant",
                 recipe.name.value,
-                dependency.name
+                dependency.name.value
               )
             };
 

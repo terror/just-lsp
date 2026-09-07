@@ -1,7 +1,8 @@
 use super::*;
 
-const VALID_KWARGS: &[&str] =
-  &["help", "long", "short", "value", "pattern", "flag"];
+const VALID_KWARGS: &[&str] = &[
+  "flag", "help", "long", "max", "min", "multiple", "pattern", "short", "value",
+];
 
 define_rule! {
   /// Validates `[arg(NAME, ...)]` attributes: that NAME refers to an existing
@@ -69,6 +70,11 @@ define_rule! {
 }
 
 impl ArgAttributeRule {
+  fn const_expression(node: Node) -> bool {
+    node.find("function_call").is_none()
+      && node.find("external_command").is_none()
+  }
+
   fn parameter_unknown(
     context: &RuleContext,
     attribute: Node,
@@ -180,9 +186,19 @@ impl ArgAttributeRule {
 
       let value = node.child_by_field_name("value")?;
 
-      (!Self::string_literal_expression(value)).then(|| {
+      let valid = if matches!(name.as_str(), "help" | "pattern") {
+        Self::const_expression(value)
+      } else {
+        Self::string_literal_expression(value)
+      };
+
+      (!valid).then(|| {
         Diagnostic::error(
-          "Attribute `arg` arguments must be string literals".to_string(),
+          if matches!(name.as_str(), "help" | "pattern") {
+            "Attribute `arg` arguments must be const expressions".to_string()
+          } else {
+            "Attribute `arg` arguments must be string literals".to_string()
+          },
           value.get_range(document),
         )
       })

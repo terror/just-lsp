@@ -13,11 +13,10 @@ define_rule! {
         return Vec::new();
       }
 
-      let mut diagnostics = Vec::new();
-      let mut seen = HashSet::new();
+      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
       for variable in context.variables() {
-        if !seen.insert(variable.name.value.clone()) {
+        if conflicts.record(&variable.name, &variable.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate variable `{}`", variable.name.value),
             variable.range,

@@ -5,16 +5,16 @@ define_rule! {
     id: "export-unexport-conflict",
     message: "export/unexport conflict",
     run(context) {
-      let unexports = context
-        .unexports()
-        .iter()
-        .map(|unexport| unexport.name.value.clone())
-        .collect::<HashSet<_>>();
+      let mut unexports = ConflictTracker::default();
+
+      for unexport in context.unexports() {
+        unexports.record(&unexport.name, &unexport.attributes);
+      }
 
       let mut diagnostics = Vec::new();
 
       for variable in context.variables() {
-        if unexports.contains(&variable.name.value) {
+        if unexports.conflicts_with(&variable.name, &variable.attributes) {
           diagnostics.push(Diagnostic::error(
             format!(
               "Variable {} is both exported and unexported",

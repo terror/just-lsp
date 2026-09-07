@@ -4,6 +4,8 @@ use super::*;
 pub enum Error {
   #[error("{0}")]
   Format(String),
+  #[error("document URI `{0}` is not a file URI")]
+  InvalidDocumentUri(lsp::Url),
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]

@@ -218,6 +218,48 @@ fn analyze_accepts_clean_justfile() -> Result {
 }
 
 #[test]
+fn analyze_accepts_deprecated_setting_in_import() -> Result {
+  Test::new()?
+    .file(
+      "settings.just",
+      "\n\n\n\n\nset windows-shell := [\"powershell.exe\"]\n",
+    )
+    .file("justfile", "import 'settings.just'\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_accepts_imported_recipe() -> Result {
+  Test::new()?
+    .file("foo.just", "foo:\n")
+    .file("justfile", "import 'foo.just'\n\nbar: foo\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_accepts_unstable_features_with_imported_setting() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        "
+        import 'foo.just'
+        set lists
+        foo(bar) := bar
+        [script]
+        [cache]
+        baz:
+        "
+      },
+    )
+    .file("foo.just", "import 'bar.just'\n")
+    .file("bar.just", "set unstable\n")
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
@@ -249,6 +291,27 @@ fn analyze_errors_when_justfile_cannot_be_found() -> Result {
 }
 
 #[test]
+fn analyze_errors_when_multiple_justfiles_are_found() -> Result {
+  Test::new()?
+    .file("justfile", "")
+    .file(".justfile", "")
+    .expected_status(1)
+    .expected_stderr("error: multiple candidate justfiles found in `[ROOT]`\n")
+    .run()
+}
+
+#[test]
+fn analyze_finds_case_insensitive_justfiles() -> Result {
+  #[track_caller]
+  fn case(name: &str) -> Result {
+    Test::new()?.file(name, "foo:\n").directory("bar").run()
+  }
+
+  case("JuStFiLe")?;
+  case(".JuStFiLe")
+}
+
+#[test]
 fn analyze_finds_justfile_in_parent_directory() -> Result {
   Test::new()?
     .file(
@@ -260,6 +323,15 @@ fn analyze_finds_justfile_in_parent_directory() -> Result {
         "
       },
     )
+    .directory("foo/bar")
+    .run()
+}
+
+#[test]
+fn analyze_finds_nearest_dot_justfile() -> Result {
+  Test::new()?
+    .file("justfile", "foo:\n  echo {{bar()}}\n")
+    .file("foo/.justfile", "foo:\n")
     .directory("foo/bar")
     .run()
 }
@@ -412,6 +484,25 @@ fn analyze_reports_syntax_errors_and_fails() -> Result {
          │ ╰────────────────── Syntax error near `foo echo "foo"`
       ───╯
       "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_unstable_features_as_warnings() -> Result {
+  Test::new()?
+    .file("justfile", "set lists\n")
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      "
+      warning[unstable-feature-gate]: unstable feature used without set unstable
+         ╭─[ justfile:1:5 ]
+         │
+       1 │ set lists
+         │     ──┬──
+         │       ╰──── `set lists` is unstable without `set unstable`
+      ───╯
+      "
     })
     .run()
 }

@@ -8,41 +8,60 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.document().settings() {
         if let Some(Builtin::Setting {
-          deprecated: Some(replacement),
+          deprecated: Some(deprecation),
           ..
         }) = context.builtin_setting(&setting.name.value)
         {
-          diagnostics.push(Diagnostic::warning(
+          let diagnostic = Diagnostic::warning(
             format!(
-              "`{}` is deprecated, use `{replacement}` instead",
+              "`{}` is deprecated, use {deprecation} instead",
               setting.name.value
             ),
             setting.name.range,
-          ));
+          );
+
+          let diagnostic = match *deprecation {
+            Deprecation::Replacement(replacement) => {
+              diagnostic.quickfix(Quickfix::replacement(&setting.name, replacement))
+            }
+            Deprecation::SettingAttribute {
+              attribute,
+              setting: replacement,
+            } => {
+              if context.settings().iter().any(|replacement_setting| {
+                replacement_setting.name.value == replacement
+                  && replacement_setting.has_attribute(attribute)
+              }) {
+                diagnostic
+              } else {
+                let line = context.document()
+                  .content
+                  .line(setting.range.start.line as usize)
+                  .to_string();
+
+                let line = line.replacen(&setting.name.value, replacement, 1);
+
+                diagnostic.quickfix(
+                  Quickfix::edit(
+                    format!(
+                      "Replace `{}` with `[{attribute}] set {replacement}`",
+                      setting.name.value
+                    ),
+                    setting.range,
+                    format!("[{attribute}]\n{line}"),
+                  )
+                )
+              }
+            }
+          };
+
+          diagnostics.push(diagnostic);
         }
       }
 
       diagnostics
-    },
-    quickfixes(context) {
-      let mut quickfixes = Vec::new();
-
-      for setting in context.settings() {
-        if let Some(Builtin::Setting {
-          deprecated: Some(replacement),
-          ..
-        }) = context.builtin_setting(&setting.name.value)
-        {
-          quickfixes.push(Quickfix::replacement(
-            &setting.name,
-            replacement.to_string(),
-          ));
-        }
-      }
-
-      quickfixes
     }
   }
 }

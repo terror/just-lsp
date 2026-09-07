@@ -39,80 +39,104 @@ const lightEditor = {
   string: '#5d861e',
 };
 
-export const base16SetiTheme = EditorView.theme(
-  {
-    '&': {
-      backgroundColor: lightEditor.background,
-      color: lightEditor.foreground,
-      '--editor-active-line': lightEditor.activeLine,
-      '--editor-cursor-secondary': `${base16Seti.base0D}4d`,
-      '--editor-fat-cursor': `${base16Seti.base0D}80`,
-      '--editor-gutter-background': lightEditor.gutterBackground,
-      '--editor-gutter-border': `1px solid ${lightEditor.gutterBorder}`,
-      '--editor-gutter-foreground': lightEditor.gutterForeground,
-      '--editor-highlight-background': lightEditor.highlightBackground,
-      '--editor-highlight-outline': lightEditor.highlightOutline,
-      '--just-hl-attribute': lightEditor.boolean,
-      '--just-hl-boolean': lightEditor.boolean,
-      '--just-hl-comment': lightEditor.comment,
-      '--just-hl-error': base16Seti.base08,
-      '--just-hl-function': lightEditor.function,
-      '--just-hl-keyword': lightEditor.keyword,
-      '--just-hl-namespace': lightEditor.namespace,
-      '--just-hl-operator': lightEditor.namespace,
-      '--just-hl-punctuation': lightEditor.punctuation,
-      '--just-hl-string': lightEditor.string,
-      '--just-hl-variable': lightEditor.foreground,
-    },
-    '&.cm-focused': {
-      outline: 'none',
-    },
-    '&.cm-focused .cm-cursor': {
-      borderLeftColor: lightEditor.cursor,
-    },
-    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
-      {
-        backgroundColor: lightEditor.selectionBackground,
+const darkEditor = {
+  activeLine: base16Seti.base01,
+  background: base16Seti.base00,
+  boolean: base16Seti.base09,
+  comment: '#78909c',
+  cursor: base16Seti.base06,
+  foreground: base16Seti.base05,
+  function: base16Seti.base0D,
+  gutterBackground: base16Seti.base00,
+  gutterBorder: base16Seti.base01,
+  gutterForeground: '#70838c',
+  highlightBackground: base16Seti.base02,
+  highlightOutline: base16Seti.base0D,
+  keyword: base16Seti.base0E,
+  namespace: base16Seti.base0C,
+  punctuation: '#91a7b0',
+  selectionBackground: '#315f70',
+  string: base16Seti.base0B,
+};
+
+const createBase16SetiTheme = (editor: typeof lightEditor, dark: boolean) =>
+  EditorView.theme(
+    {
+      '&': {
+        backgroundColor: editor.background,
+        color: editor.foreground,
+        '--editor-active-line': editor.activeLine,
+        '--editor-cursor-secondary': `${base16Seti.base0D}4d`,
+        '--editor-fat-cursor': `${base16Seti.base0D}80`,
+        '--editor-gutter-background': editor.gutterBackground,
+        '--editor-gutter-border': `1px solid ${editor.gutterBorder}`,
+        '--editor-gutter-foreground': editor.gutterForeground,
+        '--editor-highlight-background': editor.highlightBackground,
+        '--editor-highlight-outline': editor.highlightOutline,
+        '--just-hl-attribute': editor.boolean,
+        '--just-hl-boolean': editor.boolean,
+        '--just-hl-comment': editor.comment,
+        '--just-hl-error': base16Seti.base08,
+        '--just-hl-function': editor.function,
+        '--just-hl-keyword': editor.keyword,
+        '--just-hl-namespace': editor.namespace,
+        '--just-hl-operator': editor.namespace,
+        '--just-hl-punctuation': editor.punctuation,
+        '--just-hl-string': editor.string,
+        '--just-hl-variable': editor.foreground,
       },
-    '.cm-activeLine': {
-      backgroundColor: lightEditor.activeLine,
+      '&.cm-focused': {
+        outline: 'none',
+      },
+      '&.cm-focused .cm-cursor': {
+        borderLeftColor: editor.cursor,
+      },
+      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
+        {
+          backgroundColor: editor.selectionBackground,
+        },
+      '.cm-activeLine': {
+        backgroundColor: editor.activeLine,
+      },
+      '.cm-activeLineGutter': {
+        backgroundColor: editor.activeLine,
+        color: editor.foreground,
+      },
+      '.cm-content': {
+        caretColor: editor.cursor,
+      },
+      '.cm-foldPlaceholder': {
+        backgroundColor: editor.activeLine,
+        borderColor: editor.gutterBorder,
+        color: editor.foreground,
+      },
+      '.cm-gutters': {
+        backgroundColor: editor.gutterBackground,
+        borderRight: `1px solid ${editor.gutterBorder}`,
+        color: editor.gutterForeground,
+      },
+      '.cm-lineNumbers .cm-gutterElement': {
+        color: editor.gutterForeground,
+      },
+      '.cm-matchingBracket': {
+        backgroundColor: editor.highlightBackground,
+        color: editor.foreground,
+      },
+      '.cm-nonmatchingBracket': {
+        backgroundColor: dark ? '#4a2428' : '#f9dcde',
+        color: base16Seti.base08,
+      },
+      '.cm-scroller': {
+        backgroundColor: editor.background,
+      },
+      '.cm-tooltip': {
+        backgroundColor: editor.background,
+        borderColor: editor.gutterBorder,
+        color: editor.foreground,
+      },
     },
-    '.cm-activeLineGutter': {
-      backgroundColor: lightEditor.activeLine,
-      color: lightEditor.foreground,
-    },
-    '.cm-content': {
-      caretColor: lightEditor.cursor,
-    },
-    '.cm-foldPlaceholder': {
-      backgroundColor: lightEditor.activeLine,
-      borderColor: lightEditor.gutterBorder,
-      color: lightEditor.foreground,
-    },
-    '.cm-gutters': {
-      backgroundColor: lightEditor.gutterBackground,
-      borderRight: `1px solid ${lightEditor.gutterBorder}`,
-      color: lightEditor.gutterForeground,
-    },
-    '.cm-lineNumbers .cm-gutterElement': {
-      color: lightEditor.gutterForeground,
-    },
-    '.cm-matchingBracket': {
-      backgroundColor: lightEditor.highlightBackground,
-      color: lightEditor.foreground,
-    },
-    '.cm-nonmatchingBracket': {
-      backgroundColor: '#f9dcde',
-      color: base16Seti.base08,
-    },
-    '.cm-scroller': {
-      backgroundColor: lightEditor.background,
-    },
-    '.cm-tooltip': {
-      backgroundColor: lightEditor.background,
-      borderColor: lightEditor.gutterBorder,
-      color: lightEditor.foreground,
-    },
-  },
-  { dark: false }
-);
+    { dark }
+  );
+
+export const base16SetiLightTheme = createBase16SetiTheme(lightEditor, false);
+export const base16SetiDarkTheme = createBase16SetiTheme(darkEditor, true);
