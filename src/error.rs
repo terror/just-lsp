@@ -6,6 +6,8 @@ pub enum Error {
   Format(String),
   #[error("document URI `{0}` is not a file URI")]
   InvalidDocumentUri(lsp::Url),
+  #[error("Invalid escape sequence in string literal")]
+  InvalidStringEscape,
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]
