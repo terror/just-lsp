@@ -4,7 +4,13 @@ use {
 };
 
 fn main() {
-  let src = Path::new("vendor/tree-sitter-just-src");
+  let src = Path::new("vendor/tree-sitter-just/src");
+
+  let src = if src.is_dir() {
+    src
+  } else {
+    Path::new("vendor/tree-sitter-just-src")
+  };
 
   println!("cargo:rerun-if-changed={}", src.display());
 
