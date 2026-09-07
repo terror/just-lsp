@@ -20,7 +20,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "arg",
@@ -41,13 +41,54 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       - `pattern=\"PATTERN\"` requires the value to match a regular
         expression. Patterns are full-match; `just` rejects the
         invocation if the supplied value does not match.
+      - `multiple` allows an option or flag to be passed more than
+        once, assigning the list of passed values to the parameter.
+      - `min=MIN` requires at least `MIN` values. Requires `multiple`
+        or a variadic parameter.
+      - `max=MAX` allows at most `MAX` values. Requires `multiple` or
+        a variadic parameter.
 
       Multiple keys may be combined in a single `[arg(...)]`.
 
       ```just
+      set unstable
+      set lists
+
       [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
       greet NAME:
         @echo Hello, {{NAME}}
+
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "cache",
+    kind: AttributeKind::Variadic,
+    description: indoc! {
+      "
+      Skip recipe invocations when a matching entry exists in the
+      cache.
+
+      Currently unstable. The `[cache]` attribute may only be used
+      with script recipes. The `environment`, `inputs`, `outputs`, and
+      `extra` keyword arguments customize the cache key.
+
+      By default, the cache key includes environment variables exported
+      or unexported in the justfile. Pass a list of names to `environment`
+      to select the environment variables included in the key.
+
+      ```just
+      set unstable
+
+      [script]
+      [cache(environment=['PATH'], inputs='Cargo.lock', outputs='target', extra=arch())]
+      build:
+        cargo build
       ```
       "
     },
@@ -79,6 +120,31 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       [confirm(\"Are you sure you want to delete everything?\")]
       delete-everything:
         rm -rf *
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
+    name: "continue",
+    kind: AttributeKind::Variadic,
+    description: indoc! {
+      "
+      Continue execution normally if a command is interrupted by any
+      of `SIGNALS` and exits successfully.
+
+      With no argument, handles `SIGINT` (`ctrl-c`) so that `SIGQUIT`
+      still aborts. Pass one or more signal names to customize which
+      signals are handled.
+
+      ```just
+      [continue]
+      test:
+        cargo test
+
+      [continue(\"SIGHUP\", \"SIGINT\")]
+      serve:
+        ./serve.sh
       ```
       "
     },
@@ -150,7 +216,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "env",
@@ -226,7 +292,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "group",
@@ -277,7 +343,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "macos",
@@ -299,7 +365,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "metadata",
@@ -333,7 +399,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "no-cd",
@@ -414,7 +480,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       one of the active platforms matches.
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "parallel",
@@ -545,6 +611,29 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     targets: &[AttributeTarget::Recipe],
   },
   Builtin::Attribute {
+    name: "timestamp",
+    kind: AttributeKind::Optional,
+    description: indoc! {
+      "
+      Print timestamps before commands in this recipe.
+
+      With no argument, timestamps are formatted as `HH:MM:SS`. Pass a
+      `strftime`-style format string to customize the output.
+
+      ```just
+      [timestamp]
+      build:
+        cargo build
+
+      [timestamp(\"%H:%M:%S%.3f %Z\")]
+      test:
+        cargo test
+      ```
+      "
+    },
+    targets: &[AttributeTarget::Recipe],
+  },
+  Builtin::Attribute {
     name: "unix",
     kind: AttributeKind::Nullary,
     description: indoc! {
@@ -563,18 +652,19 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "windows",
     kind: AttributeKind::Nullary,
     description: indoc! {
       "
-      Enable the recipe on Windows.
+      Enable a recipe or setting on Windows.
 
       Part of the platform-gating family of attributes. When any
       platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      one of the active platforms matches. It can also specialize
+      `set shell` for Windows.
 
       ```just
       [windows]
@@ -583,7 +673,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    targets: &[AttributeTarget::Recipe],
+    targets: AttributeTarget::ALL,
   },
   Builtin::Attribute {
     name: "working-directory",
@@ -902,6 +992,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       working directory. Does not follow symlinks or canonicalize. For
       that, use `canonicalize()`.
 
+      With `set lists`, applies to each list element individually.
+
       ```just
       absolute_path(\"./bar.txt\")  # in /foo -> \"/foo/bar.txt\"
       ```
@@ -916,6 +1008,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       append(\"/src\", \"foo bar baz\")  # => \"foo/src bar/src baz/src\"
@@ -947,10 +1042,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "assert",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
-      Abort execution with `message` if `condition` is false.
+      Abort execution with `message` if `condition` is false, or the
+      condition source if `message` is not provided.
 
       ```just
       foo version:
@@ -983,6 +1079,23 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
       string. Aborts if the file cannot be read.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "bool",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` to a canonical boolean value.
+
+      Returns `[]` when `value` is `\"\"`, `\"0\"`, `\"false\"`, or
+      `[]`, and `\"true\"` when `value` is `\"1\"` or `\"true\"`.
+      All other values are errors.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1195,6 +1308,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       unset. Called with two arguments, returns `default` when the
       variable is unset.
 
+      With `set lists`, `key` may be a list of names, checked in
+      order. The first set variable is returned; if none are set,
+      `default` is returned or execution aborts if no default is
+      provided.
+
       A default can be substituted for an *empty* value (not just an
       unset one) with the `||` operator, currently unstable:
 
@@ -1218,7 +1336,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "env_var_or_default",
@@ -1232,7 +1350,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       `default` when the variable is unset.
       "
     },
-    deprecated: Some("env"),
+    deprecated: Some(Deprecation::Replacement("env")),
   },
   Builtin::Function {
     name: "error",
@@ -1373,9 +1491,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Nullary,
     description: indoc! {
       "
-      Return the string `\"true\"` if the current recipe is being run
-      as a dependency of another recipe, and `\"false\"` if it was
-      invoked directly from the command line.
+      Return whether the current recipe is being run as a dependency
+      of another recipe.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
       "
     },
     deprecated: None,
@@ -1396,6 +1516,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```just
       join(\"foo/bar\", \"baz\")  # => \"foo/bar/baz\"
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "join_list",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Join the elements of `value` into a string separated by
+      `separator`, or spaces if `separator` is not provided.
+
+      Requires `set lists`.
       "
     },
     deprecated: None,
@@ -1423,6 +1557,22 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Process ID of the running `just` executable, as a decimal string.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "just_version",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Version of the `just` executable.
+
+      ```just
+      just-info:
+        @echo The version is: {{ just_version() }}
+      ```
       "
     },
     deprecated: None,
@@ -1469,6 +1619,17 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```just
       kebabcase(\"helloWorld\")  # => \"hello-world\"
       ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
+    name: "len",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Return the number of elements in `value`.
       "
     },
     deprecated: None,
@@ -1561,6 +1722,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "num_jobs",
+    aliases: &[],
+    kind: FunctionKind::Nullary,
+    description: indoc! {
+      "
+      Return the value passed to `just` with `--jobs`, or an empty
+      list if `--jobs` was not passed.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "os",
     aliases: &[],
     kind: FunctionKind::Nullary,
@@ -1615,11 +1790,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: FunctionKind::Unary,
     description: indoc! {
       "
-      Return `\"true\"` if `path` points at an existing filesystem
-      entity, `\"false\"` otherwise.
+      Return whether `path` points at an existing filesystem entity.
 
-      Symbolic links are traversed. Returns `\"false\"` for broken
-      symlinks or when the path is inaccessible.
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise. Symbolic links are
+      traversed; broken symlinks and inaccessible paths are false.
       "
     },
     deprecated: None,
@@ -1631,6 +1806,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
+
+      With `set lists`, applies to each list element individually
+      and does not split elements on whitespace.
 
       ```just
       prepend(\"src/\", \"foo bar baz\")  # => \"src/foo src/bar src/baz\"
@@ -1646,6 +1824,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
+
+      With `set lists`, applies to each list element individually.
 
       Replaces every single quote with `'\\''` and surrounds the
       result in single quotes. Sufficient for `sh` and most
@@ -1764,7 +1944,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
-      `requirement`, returning `\"true\"` or `\"false\"`.
+      `requirement`.
+
+      Returns `\"true\"` when true. When false, returns `[]` with
+      `set lists` and `\"false\"` otherwise.
 
       ```just
       semver_matches(\"1.2.3\", \">=1.0.0\")  # => \"true\"
@@ -1851,6 +2034,20 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "show",
+    aliases: &[],
+    kind: FunctionKind::Unary,
+    description: indoc! {
+      "
+      Convert `value` into a string containing its literal
+      representation.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "snakecase",
     aliases: &[],
     kind: FunctionKind::Unary,
@@ -1894,23 +2091,39 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Function {
+    name: "split",
+    aliases: &[],
+    kind: FunctionKind::UnaryOpt,
+    description: indoc! {
+      "
+      Split `string` on `separator`, or whitespace if `separator` is
+      not provided, returning a list.
+
+      Requires `set lists`.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Function {
     name: "style",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    kind: FunctionKind::UnaryOpt,
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
-      `just` itself for styled output.
+      `just` itself for styled output. With `text`, return the styled
+      text followed by a reset sequence.
 
-      Unlike the plain color constants, `style(name)` produces the
-      exact sequence `just` uses, so recipe output can match
-      `just`'s own styling.
+      Unlike the plain color constants, `style(styles)` produces the
+      exact sequence `just` uses, so recipe output can match `just`'s
+      own styling.
 
-      Recognized values of `name`: `'command'` (echoed recipe lines),
-      `'error'`, and `'warning'`.
+      The `'command'`, `'error'`, and `'warning'` styles match `just`'s
+      echoed recipe lines and messages.
 
       ```just
       scary:
+        @echo '{{ style(\"warning\", \"careful!\") }}'
         @echo '{{ style(\"error\") }}OH NO{{ NORMAL }}'
       ```
       "
@@ -2096,15 +2309,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
-      `name` and return its full path, or the empty string if no such
-      executable is found.
+      `name` and return its full path, or `[]` if no such executable
+      is found.
 
       Unlike `require()`, does not abort on missing executables, so
-      this is useful for optional tooling. Currently unstable; requires
-      `set unstable`.
+      this is useful for optional tooling.
+
+      Requires `set lists`.
 
       ```just
-      set unstable
+      set lists
 
       bosh := which(\"bosh\")
       ```
@@ -2209,8 +2423,34 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "dotenv-command",
+    kind: SettingKind::StringOrArray,
+    description: indoc! {
+      "
+      Run one or more commands and load their output as environment files.
+
+      `just` runs the command with the configured `shell` and parses
+      its stdout as an environment file. With `set lists`, the value
+      may be a list of commands. Commands run in list order, and
+      variables from later commands take precedence over variables from
+      earlier commands.
+
+      Unlike `set dotenv-command`, the `--dotenv-command` command-line
+      option may be passed multiple times to set or override the
+      setting at runtime. Its values run in option order with the same
+      precedence rules.
+
+      ```just
+      set lists
+      set dotenv-command := [\"sops -d .enc.env\", \"vault dotenv\"]
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "dotenv-filename",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file with a custom name.
@@ -2265,7 +2505,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Setting {
     name: "dotenv-path",
-    kind: SettingKind::String,
+    kind: SettingKind::StringOrArray,
     description: indoc! {
       "
       Load a `.env` file from a specific path. Errors if the file is
@@ -2362,6 +2602,24 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "indentation",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Set recipe body indentation used when formatting with `--fmt` or
+      `--dump`.
+
+      Accepts any string of whitespace characters. The default is four
+      spaces.
+
+      ```just
+      set indentation := \"  \"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "lazy",
     kind: SettingKind::Boolean(false),
     description: indoc! {
@@ -2373,6 +2631,37 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       referenced by the recipe being run. Useful when some assignments
       involve expensive backticks or `shell()` calls that only a subset
       of recipes need.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "lists",
+    kind: SettingKind::Boolean(false),
+    description: indoc! {
+      "
+      Allow values to be lists of strings instead of only strings.
+
+      Currently unstable.
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
+    name: "minimum-version",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      Error if `just` is older than `minimum-version`.
+
+      Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g.
+      `\"1.55.0\"`. The setting should be placed at the top of the
+      `justfile`, before any other content, so that `just` rejects the
+      file before evaluating anything else.
+
+      ```just
+      set minimum-version := \"1.55.0\"
+      ```
       "
     },
     deprecated: None,
@@ -2521,13 +2810,16 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       for a more flexible, version-agnostic alternative.
       "
     },
-    deprecated: Some("windows-shell"),
+    deprecated: Some(Deprecation::Replacement("windows-shell")),
   },
   Builtin::Setting {
     name: "windows-shell",
     kind: SettingKind::Array,
     description: indoc! {
       "
+      **Deprecated**: use the `[windows]` attribute on `set shell`
+      instead.
+
       Set the command used to invoke recipes and evaluate backticks
       on Windows.
 
@@ -2542,7 +2834,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       ```
       "
     },
-    deprecated: None,
+    deprecated: Some(Deprecation::SettingAttribute {
+      attribute: "windows",
+      setting: "shell",
+    }),
   },
   Builtin::Setting {
     name: "working-directory",
@@ -2567,55 +2862,6 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  #[test]
-  fn no_duplicate_names() {
-    #[track_caller]
-    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
-      let mut seen = HashSet::new();
-
-      for name in names {
-        assert!(
-          seen.insert(name),
-          "duplicate {kind} name in BUILTINS: {name}",
-        );
-      }
-    }
-
-    case(
-      "attribute",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Attribute { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "constant",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "function",
-      BUILTINS.iter().flat_map(|builtin| match builtin {
-        Builtin::Function { name, aliases, .. } => once(*name)
-          .chain(aliases.iter().copied())
-          .collect::<Vec<_>>(),
-        _ => Vec::new(),
-      }),
-    );
-
-    case(
-      "setting",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Setting { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-  }
 
   #[test]
   fn alphabetical_by_kind() {
@@ -2654,6 +2900,55 @@ mod tests {
       BUILTINS.iter().filter_map(|builtin| match builtin {
         Builtin::Function { name, .. } => Some(*name),
         _ => None,
+      }),
+    );
+
+    case(
+      "setting",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Setting { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+  }
+
+  #[test]
+  fn no_duplicate_names() {
+    #[track_caller]
+    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
+      let mut seen = HashSet::new();
+
+      for name in names {
+        assert!(
+          seen.insert(name),
+          "duplicate {kind} name in BUILTINS: {name}",
+        );
+      }
+    }
+
+    case(
+      "attribute",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Attribute { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "constant",
+      BUILTINS.iter().filter_map(|builtin| match builtin {
+        Builtin::Constant { name, .. } => Some(*name),
+        _ => None,
+      }),
+    );
+
+    case(
+      "function",
+      BUILTINS.iter().flat_map(|builtin| match builtin {
+        Builtin::Function { name, aliases, .. } => once(*name)
+          .chain(aliases.iter().copied())
+          .collect::<Vec<_>>(),
+        _ => Vec::new(),
       }),
     );
 

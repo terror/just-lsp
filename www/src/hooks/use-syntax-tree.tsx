@@ -1,18 +1,17 @@
-import type { SyntaxNode } from '@/lib/types';
 import { parse } from '@/lib/utils';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Parser, Language as TSLanguage } from 'web-tree-sitter';
+import { useCallback, useMemo, useState } from 'react';
+import type { Language, Node, Parser } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
   parser: Parser | undefined;
-  language: TSLanguage | undefined;
+  language: Language | undefined;
   code: string;
 }
 
 interface UseSyntaxTree {
-  root: SyntaxNode | undefined;
-  expandedNodes: Set<SyntaxNode>;
-  toggleExpand: (node: SyntaxNode) => void;
+  root: Node | undefined;
+  collapsedNodes: Set<Node>;
+  toggleExpand: (node: Node) => void;
 }
 
 export function useSyntaxTree({
@@ -27,44 +26,33 @@ export function useSyntaxTree({
 
     const tree = parse({ parser, language, code });
 
-    return (tree?.rootNode as unknown as SyntaxNode) ?? undefined;
+    return tree?.rootNode ?? undefined;
   }, [parser, language, code]);
 
-  const [expandedNodes, setExpandedNodes] = useState<Set<SyntaxNode>>(
-    () => new Set()
+  const [collapsed, setCollapsed] = useState<{
+    root: Node | undefined;
+    nodes: Set<Node>;
+  }>();
+
+  const collapsedNodes =
+    collapsed && collapsed.root === root ? collapsed.nodes : new Set<Node>();
+
+  const toggleExpand = useCallback(
+    (node: Node) => {
+      setCollapsed((prev) => {
+        const nodes = new Set(prev?.root === root ? prev?.nodes : []);
+
+        if (nodes.has(node)) {
+          nodes.delete(node);
+        } else {
+          nodes.add(node);
+        }
+
+        return { root, nodes };
+      });
+    },
+    [root]
   );
 
-  useEffect(() => {
-    if (!root) {
-      setExpandedNodes(new Set());
-      return;
-    }
-
-    const all = new Set<SyntaxNode>();
-
-    const walk = (node: SyntaxNode) => {
-      all.add(node);
-      node.children.forEach(walk);
-    };
-
-    walk(root);
-
-    setExpandedNodes(all);
-  }, [root]);
-
-  const toggleExpand = useCallback((node: SyntaxNode) => {
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(node)) {
-        next.delete(node);
-      } else {
-        next.add(node);
-      }
-
-      return next;
-    });
-  }, []);
-
-  return { root, expandedNodes, toggleExpand };
+  return { root, collapsedNodes, toggleExpand };
 }

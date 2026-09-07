@@ -1,6 +1,8 @@
 use super::*;
 
-const EXPRESSION_ATTRIBUTES: &[&str] = &["confirm", "env", "working-directory"];
+const EXPRESSION_ATTRIBUTES: &[&str] =
+  &["cache", "confirm", "env", "timestamp", "working-directory"];
+const CONST_EXPRESSION_ATTRIBUTES: &[&str] = &["doc"];
 
 define_rule! {
   AttributeArgumentExpressionsRule {
@@ -28,6 +30,11 @@ define_rule! {
 }
 
 impl AttributeArgumentExpressionsRule {
+  fn const_expression(node: Node) -> bool {
+    node.find("function_call").is_none()
+      && node.find("external_command").is_none()
+  }
+
   fn string_literal_expression(node: Node) -> bool {
     let Some(value) = node.find("^value") else {
       return false;
@@ -50,10 +57,26 @@ impl AttributeArgumentExpressionsRule {
 
     let attribute_name = document.get_node_text(&identifier);
 
-    match context.builtin_attributes(&attribute_name) {
-      [] => return Vec::new(),
+    match context.builtin_attribute(&attribute_name) {
+      None => return Vec::new(),
       _ if EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
         return Vec::new();
+      }
+      _ if CONST_EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
+        return identifier
+          .siblings()
+          .take_while(|node| node.kind() != "identifier")
+          .filter(|node| node.kind() == "expression")
+          .filter(|node| !Self::const_expression(*node))
+          .map(|node| {
+            Diagnostic::error(
+              format!(
+                "Attribute `{attribute_name}` arguments must be const expressions"
+              ),
+              node.get_range(document),
+            )
+          })
+          .collect();
       }
       _ => {}
     }

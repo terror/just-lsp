@@ -21,22 +21,8 @@ impl Recipe {
   }
 
   #[must_use]
-  pub fn groups(&self) -> HashSet<Group> {
-    let mut groups = HashSet::new();
-
-    for attribute in &self.attributes {
-      let attribute_name = attribute.name.value.as_str();
-
-      if let Some(targets) = Group::targets(attribute_name) {
-        groups.extend(targets);
-      }
-    }
-
-    if groups.is_empty() {
-      groups.insert(Group::Any);
-    }
-
-    groups
+  pub fn groups(&self) -> GroupSet {
+    GroupSet::from_attributes(&self.attributes)
   }
 
   #[must_use]
@@ -46,95 +32,20 @@ impl Recipe {
       .iter()
       .any(|attribute| attribute.name.value == name)
   }
+
+  #[must_use]
+  pub fn runs_as_script(&self, default_script: bool) -> bool {
+    if self.has_attribute("shell") {
+      return false;
+    }
+
+    self.has_attribute("script") || self.shebang.is_some() || default_script
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  #[test]
-  fn recipe_groups_no_attributes() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(0, 0, 0, 4),
-      },
-      attributes: vec![],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "test:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 2, 0),
-    };
-
-    assert_eq!(recipe.groups(), HashSet::from([Group::Any]));
-  }
-
-  #[test]
-  fn recipe_groups_single_attribute() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(1, 0, 1, 4),
-      },
-      attributes: vec![Attribute {
-        name: TextNode {
-          value: "linux".to_string(),
-          range: lsp::Range::at(0, 1, 0, 6),
-        },
-        arguments: vec![],
-        target: Some(AttributeTarget::Recipe),
-        range: lsp::Range::at(0, 0, 1, 0),
-      }],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "[linux]\ntest:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 3, 0),
-    };
-
-    assert_eq!(recipe.groups(), HashSet::from([Group::Linux]));
-  }
-
-  #[test]
-  fn recipe_groups_multiple_attributes() {
-    let recipe = Recipe {
-      name: TextNode {
-        value: "test".into(),
-        range: lsp::Range::at(2, 0, 2, 4),
-      },
-      attributes: vec![
-        Attribute {
-          name: TextNode {
-            value: "linux".to_string(),
-            range: lsp::Range::at(0, 1, 0, 6),
-          },
-          arguments: vec![],
-          target: Some(AttributeTarget::Recipe),
-          range: lsp::Range::at(0, 0, 1, 0),
-        },
-        Attribute {
-          name: TextNode {
-            value: "windows".to_string(),
-            range: lsp::Range::at(1, 1, 1, 8),
-          },
-          arguments: vec![],
-          target: Some(AttributeTarget::Recipe),
-          range: lsp::Range::at(1, 0, 2, 0),
-        },
-      ],
-      dependencies: vec![],
-      shebang: None,
-      parameters: vec![],
-      content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
-      range: lsp::Range::at(0, 0, 4, 0),
-    };
-
-    assert_eq!(
-      recipe.groups(),
-      HashSet::from([Group::Linux, Group::Windows])
-    );
-  }
 
   #[test]
   fn recipe_groups_all_attributes() {
@@ -228,7 +139,7 @@ mod tests {
 
     assert_eq!(
       recipe.groups(),
-      HashSet::from([
+      GroupSet::from([
         Group::Android,
         Group::Dragonfly,
         Group::Freebsd,
@@ -239,6 +150,64 @@ mod tests {
         Group::Windows,
       ])
     );
+  }
+
+  #[test]
+  fn recipe_groups_multiple_attributes() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(2, 0, 2, 4),
+      },
+      attributes: vec![
+        Attribute {
+          name: TextNode {
+            value: "linux".to_string(),
+            range: lsp::Range::at(0, 1, 0, 6),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: lsp::Range::at(0, 0, 1, 0),
+        },
+        Attribute {
+          name: TextNode {
+            value: "windows".to_string(),
+            range: lsp::Range::at(1, 1, 1, 8),
+          },
+          arguments: vec![],
+          target: Some(AttributeTarget::Recipe),
+          range: lsp::Range::at(1, 0, 2, 0),
+        },
+      ],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 4, 0),
+    };
+
+    assert_eq!(
+      recipe.groups(),
+      GroupSet::from([Group::Linux, Group::Windows])
+    );
+  }
+
+  #[test]
+  fn recipe_groups_no_attributes() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(0, 0, 0, 4),
+      },
+      attributes: vec![],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "test:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 2, 0),
+    };
+
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
   }
 
   #[test]
@@ -264,6 +233,77 @@ mod tests {
       range: lsp::Range::at(0, 0, 3, 0),
     };
 
-    assert_eq!(recipe.groups(), HashSet::from([Group::Any]));
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Any]));
+  }
+
+  #[test]
+  fn recipe_groups_single_attribute() {
+    let recipe = Recipe {
+      name: TextNode {
+        value: "test".into(),
+        range: lsp::Range::at(1, 0, 1, 4),
+      },
+      attributes: vec![Attribute {
+        name: TextNode {
+          value: "linux".to_string(),
+          range: lsp::Range::at(0, 1, 0, 6),
+        },
+        arguments: vec![],
+        target: Some(AttributeTarget::Recipe),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }],
+      dependencies: vec![],
+      shebang: None,
+      parameters: vec![],
+      content: "[linux]\ntest:\n  echo test".to_string(),
+      range: lsp::Range::at(0, 0, 3, 0),
+    };
+
+    assert_eq!(recipe.groups(), GroupSet::from([Group::Linux]));
+  }
+
+  #[test]
+  fn runs_as_script_with_default_script() {
+    let recipe = Document::from("foo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(!recipe.runs_as_script(false));
+    assert!(recipe.runs_as_script(true));
+  }
+
+  #[test]
+  fn runs_as_script_with_script_attribute() {
+    let recipe = Document::from("[script]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(recipe.runs_as_script(false));
+  }
+
+  #[test]
+  fn runs_as_script_with_shebang() {
+    let recipe = Document::from("foo:\n  #!/usr/bin/env sh\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(recipe.runs_as_script(false));
+  }
+
+  #[test]
+  fn shell_attribute_overrides_default_script() {
+    let recipe = Document::from("[shell]\nfoo:\n  echo foo")
+      .recipes()
+      .into_iter()
+      .next()
+      .unwrap();
+
+    assert!(!recipe.runs_as_script(true));
   }
 }

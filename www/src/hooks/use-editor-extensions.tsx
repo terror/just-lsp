@@ -1,5 +1,8 @@
 import { useEditorSettings } from '@/contexts/editor-settings-context';
-import { base16SetiTheme } from '@/lib/base16-seti-theme';
+import {
+  base16SetiDarkTheme,
+  base16SetiLightTheme,
+} from '@/lib/base16-seti-theme';
 import { highlightExtension } from '@/lib/cm-highlight-extension';
 import { createJustSyntaxHighlightingExtension } from '@/lib/just-syntax-highlighting';
 import { EditorState, Extension } from '@codemirror/state';
@@ -11,17 +14,19 @@ import { Language as TSLanguage } from 'web-tree-sitter';
 interface UseEditorExtensionsOptions {
   language: TSLanguage | undefined;
   highlight: { from: number; to: number } | undefined;
+  darkMode: boolean;
 }
 
 export function useEditorExtensions({
   language,
   highlight,
+  darkMode,
 }: UseEditorExtensionsOptions): Extension[] {
   const { settings } = useEditorSettings();
 
   return useMemo(() => {
     const extensions: Extension[] = [
-      base16SetiTheme,
+      darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
       ...createJustSyntaxHighlightingExtension(language),
       highlightExtension(highlight),
@@ -42,5 +47,6 @@ export function useEditorExtensions({
     settings.lineWrapping,
     language,
     highlight,
+    darkMode,
   ]);
 }

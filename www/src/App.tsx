@@ -1,10 +1,12 @@
+import { Button } from '@/components/ui/button';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { Bot, Loader2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { Bot, Loader2, Moon, Sun } from 'lucide-react';
+import { useCallback, useLayoutEffect, useState } from 'react';
+import { useDefaultLayout } from 'react-resizable-panels';
 
 import defaultJustfile from '../../justfile?raw';
 import { AboutDialog } from './components/about-dialog';
@@ -18,19 +20,37 @@ import { useTreeSitter } from './hooks/use-tree-sitter';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
+const THEME_STORAGE_KEY = 'just-lsp:theme';
 const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
 const App = () => {
   const { parser, language: justLanguage, loading, error } = useTreeSitter();
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: `${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`,
+  });
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      return savedTheme === 'dark';
+    }
+
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem(THEME_STORAGE_KEY, darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const [doc, setDoc] = usePersistedDoc(
     EDITOR_STORAGE_KEY,
     defaultJustfile.trim()
   );
 
-  const { root, expandedNodes, toggleExpand } = useSyntaxTree({
+  const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
     parser,
     language: justLanguage,
     code: doc,
@@ -50,6 +70,7 @@ const App = () => {
   const extensions = useEditorExtensions({
     language: justLanguage,
     highlight,
+    darkMode,
   });
 
   if (error) {
@@ -71,7 +92,20 @@ const App = () => {
         <a href='/' className='font-semibold'>
           just-lsp
         </a>
-        <div className='ml-auto'>
+        <div className='ml-auto flex items-center gap-1'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-8 w-8 cursor-pointer'
+            onClick={() => setDarkMode((enabled) => !enabled)}
+            aria-label={
+              darkMode ? 'Switch to light mode' : 'Switch to dark mode'
+            }
+            aria-pressed={darkMode}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <Sun /> : <Moon />}
+          </Button>
           <AboutDialog />
         </div>
       </div>
@@ -79,21 +113,21 @@ const App = () => {
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
           key={panelDirection}
-          autoSaveId={`${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`}
-          direction={panelDirection}
+          defaultLayout={defaultLayout}
+          onLayoutChanged={onLayoutChanged}
+          orientation={panelDirection}
           className='h-full rounded border'
         >
-          <ResizablePanel id='editor-panel' defaultSize={50} minSize={30}>
+          <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
             <EditorPane value={doc} onChange={setDoc} extensions={extensions} />
           </ResizablePanel>
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel id='tree-panel' defaultSize={50} minSize={30}>
+          <ResizablePanel id='tree-panel' defaultSize='50%' minSize='30%'>
             <TreePane
               root={root}
-              code={doc}
-              expandedNodes={expandedNodes}
+              collapsedNodes={collapsedNodes}
               toggleExpand={toggleExpand}
               onHighlightChange={handleHighlightChange}
             />

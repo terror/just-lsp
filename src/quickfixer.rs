@@ -1,237 +1,443 @@
 use super::*;
 
 pub struct Quickfixer<'a> {
-  document: &'a Document,
-  parameters: &'a lsp::CodeActionParams,
+  pub diagnostics: &'a [Diagnostic],
+  pub parameters: &'a lsp::CodeActionParams,
 }
 
-impl<'a> Quickfixer<'a> {
-  #[must_use]
-  pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
-    self
-      .deprecated_replacements()
-      .into_iter()
-      .filter(|(name, _, _)| name.range.overlaps(self.parameters.range))
-      .map(|(name, code, replacement)| {
-        self.replacement_action(&name, code, replacement)
-      })
-      .collect()
-  }
-
-  fn deprecated_replacements(
+impl Quickfixer<'_> {
+  fn action(
     &self,
-  ) -> Vec<(TextNode, &'static str, &'static str)> {
-    let functions =
-      self
-        .document
-        .function_calls()
-        .into_iter()
-        .filter_map(|call| {
-          let replacement =
-            BUILTINS.iter().find_map(|builtin| match builtin {
-              Builtin::Function {
-                name,
-                deprecated: Some(replacement),
-                ..
-              } if *name == call.name.value => Some(*replacement),
-              _ => None,
-            })?;
-
-          Some((call.name, "deprecated-function", replacement))
-        });
-
-    let settings = self.document.settings().into_iter().filter_map(|setting| {
-      let replacement = BUILTINS.iter().find_map(|builtin| match builtin {
-        Builtin::Setting {
-          name,
-          deprecated: Some(replacement),
-          ..
-        } if *name == setting.name.value => Some(*replacement),
-        _ => None,
-      })?;
-
-      Some((setting.name, "deprecated-setting", replacement))
-    });
-
-    functions.chain(settings).collect()
-  }
-
-  fn matching_diagnostics(
-    &self,
-    range: lsp::Range,
-    code: &str,
-  ) -> Vec<lsp::Diagnostic> {
-    self
+    source: &Diagnostic,
+    quickfix: &Quickfix,
+  ) -> lsp::CodeActionOrCommand {
+    let diagnostics = self
       .parameters
       .context
       .diagnostics
       .iter()
       .filter(|diagnostic| {
-        diagnostic.range == range
+        diagnostic.range == source.range
           && matches!(
             &diagnostic.code,
-            Some(lsp::NumberOrString::String(c)) if c == code
+            Some(lsp::NumberOrString::String(value)) if value == &source.id
           )
       })
       .cloned()
-      .collect()
-  }
-
-  #[must_use]
-  pub fn new(
-    document: &'a Document,
-    parameters: &'a lsp::CodeActionParams,
-  ) -> Self {
-    Self {
-      document,
-      parameters,
-    }
-  }
-
-  fn replacement_action(
-    &self,
-    name: &TextNode,
-    code: &str,
-    replacement: &str,
-  ) -> lsp::CodeActionOrCommand {
-    let diagnostics = self.matching_diagnostics(name.range, code);
+      .collect::<Vec<_>>();
 
     lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: format!("Replace `{}` with `{}`", name.value, replacement),
+      title: quickfix.title().to_string(),
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
       edit: Some(lsp::WorkspaceEdit {
         changes: Some(HashMap::from([(
           self.parameters.text_document.uri.clone(),
-          vec![lsp::TextEdit {
-            range: name.range,
-            new_text: replacement.to_string(),
-          }],
+          quickfix.edits().to_vec(),
         )])),
         ..Default::default()
       }),
       ..Default::default()
     })
   }
+
+  #[must_use]
+  pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
+    self
+      .diagnostics
+      .iter()
+      .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
+      .flat_map(|diagnostic| {
+        diagnostic
+          .quickfixes
+          .iter()
+          .map(move |quickfix| self.action(diagnostic, quickfix))
+      })
+      .collect()
+  }
 }
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  fn diagnostic(range: lsp::Range, code: &str) -> lsp::Diagnostic {
-    lsp::Diagnostic {
-      range,
-      code: Some(lsp::NumberOrString::String(code.to_string())),
-      ..Default::default()
-    }
-  }
-
-  fn parameters(
+  #[derive(Debug)]
+  struct Test {
+    config: Config,
+    diagnostics: Option<Vec<Diagnostic>>,
+    document: Document,
+    imported_documents: Vec<Document>,
+    quickfixes: Vec<Quickfix>,
     range: lsp::Range,
-    diagnostics: Vec<lsp::Diagnostic>,
-  ) -> lsp::CodeActionParams {
-    lsp::CodeActionParams {
-      text_document: lsp::TextDocumentIdentifier {
-        uri: lsp::Url::parse("file:///test.just").unwrap(),
-      },
-      range,
-      context: lsp::CodeActionContext {
+  }
+
+  impl Test {
+    fn config(self, config: Config) -> Self {
+      Self { config, ..self }
+    }
+
+    fn diagnostics(self, diagnostics: Vec<Diagnostic>) -> Self {
+      Self {
+        diagnostics: Some(diagnostics),
+        ..self
+      }
+    }
+
+    fn imported_document(self, content: &str) -> Self {
+      Self {
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([Document::from(content)])
+          .collect(),
+        ..self
+      }
+    }
+
+    fn new(content: &str) -> Self {
+      Self {
+        config: Config::default(),
+        diagnostics: None,
+        document: Document::from(content),
+        imported_documents: Vec::new(),
+        quickfixes: Vec::new(),
+        range: lsp::Range::at(0, 0, 0, 0),
+      }
+    }
+
+    fn quickfix(self, quickfix: Quickfix) -> Self {
+      Self {
+        quickfixes: self.quickfixes.into_iter().chain([quickfix]).collect(),
+        ..self
+      }
+    }
+
+    fn range(self, range: lsp::Range) -> Self {
+      Self { range, ..self }
+    }
+
+    fn run(self) {
+      let Test {
+        config,
         diagnostics,
-        ..Default::default()
-      },
-      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-      partial_result_params: lsp::PartialResultParams::default(),
+        document,
+        imported_documents,
+        quickfixes,
+        range,
+      } = self;
+
+      let parameters = lsp::CodeActionParams {
+        text_document: lsp::TextDocumentIdentifier {
+          uri: document.uri.clone(),
+        },
+        range,
+        context: lsp::CodeActionContext {
+          diagnostics: Vec::new(),
+          ..Default::default()
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        partial_result_params: lsp::PartialResultParams::default(),
+      };
+
+      let analyzer = Analyzer {
+        config: Some(&config),
+        document: &document,
+        imported_documents: imported_documents.iter().collect(),
+      };
+
+      let actual_diagnostics = analyzer
+        .analyze()
+        .into_iter()
+        .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
+        .collect::<Vec<_>>();
+
+      if let Some(diagnostics) = diagnostics {
+        assert_eq!(actual_diagnostics, diagnostics);
+      }
+
+      let quickfixer = Quickfixer {
+        diagnostics: &actual_diagnostics,
+        parameters: &parameters,
+      };
+
+      let actions = quickfixer.collect();
+
+      assert_eq!(actions.len(), quickfixes.len());
+
+      for (action, quickfix) in actions.into_iter().zip(quickfixes) {
+        let lsp::CodeActionOrCommand::CodeAction(action) = action else {
+          unreachable!("expected CodeAction");
+        };
+
+        assert_eq!(
+          action,
+          lsp::CodeAction {
+            title: quickfix.title().to_string(),
+            kind: Some(lsp::CodeActionKind::QUICKFIX),
+            diagnostics: None,
+            edit: Some(lsp::WorkspaceEdit {
+              changes: Some(HashMap::from([(
+                document.uri.clone(),
+                quickfix.edits().to_vec(),
+              )])),
+              ..Default::default()
+            }),
+            ..Default::default()
+          }
+        );
+      }
     }
   }
 
   #[test]
-  fn collect_filters_multiple_calls_by_range() {
-    let document = Document::from(
-      "foo := env_var(\"A\")\nbar := env_var_or_default(\"B\", \"C\")\n",
-    );
-
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(0, 10, 0, 10), vec![]),
-    )
-    .collect();
-
-    assert_eq!(actions.len(), 1);
-
-    let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
-      unreachable!("expected CodeAction");
-    };
-
-    assert_eq!(action.title, "Replace `env_var` with `env`");
+  fn filters_multiple_calls_by_range() {
+    Test::new(indoc! {
+      "
+      foo := env_var(\"A\")
+      bar := env_var_or_default(\"B\", \"C\")
+      "
+    })
+    .range(lsp::Range::at(0, 10, 0, 10))
+    .quickfix(Quickfix::edit(
+      "Replace `env_var` with `env`",
+      lsp::Range::at(0, 7, 0, 14),
+      "env",
+    ))
+    .run();
   }
 
   #[test]
-  fn collect_replaces_deprecated_setting() {
-    let document = Document::from("set windows-powershell := true\n");
-
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(0, 4, 0, 4), vec![]),
-    )
-    .collect();
-
-    assert_eq!(actions.len(), 1);
-
-    let lsp::CodeActionOrCommand::CodeAction(action) = &actions[0] else {
-      unreachable!("expected CodeAction");
-    };
-
-    assert_eq!(
-      action.title,
-      "Replace `windows-powershell` with `windows-shell`"
-    );
-
-    assert_eq!(
-      action.edit,
-      Some(lsp::WorkspaceEdit {
-        changes: Some(HashMap::from([(
-          lsp::Url::parse("file:///test.just").unwrap(),
-          vec![lsp::TextEdit {
-            range: lsp::Range::at(0, 4, 0, 22),
-            new_text: "windows-shell".to_string(),
-          }],
-        )])),
-        ..Default::default()
-      }),
-    );
+  fn ignores_imported_recipes() {
+    Test::new("import 'dep.just'\n")
+      .imported_document(indoc! {
+        "
+        [parallel]
+        foo:
+        "
+      })
+      .run();
   }
 
   #[test]
-  fn collect_ignores_setting_outside_range() {
-    let document =
-      Document::from("set windows-powershell := true\nset export := true\n");
-
-    let actions = Quickfixer::new(
-      &document,
-      &parameters(lsp::Range::at(1, 4, 1, 4), vec![]),
-    )
-    .collect();
-
-    assert_eq!(actions, vec![]);
+  fn ignores_setting_outside_range() {
+    Test::new(indoc! {
+      "
+      set windows-powershell := true
+      set export := true
+      "
+    })
+    .range(lsp::Range::at(1, 4, 1, 4))
+    .run();
   }
 
   #[test]
-  fn matching_diagnostics_filters_by_code_and_range() {
-    let document = Document::from("foo := env_var(\"A\")\n");
+  fn only_returns_diagnostics_with_quickfixes() {
+    Test::new(indoc! {
+      "
+      foo := unknown
+      bar := env_var(\"BAR\")
+      "
+    })
+    .diagnostics(vec![Diagnostic {
+      display: "deprecated function".into(),
+      id: "deprecated-function".into(),
+      message: "`env_var` is deprecated, use `env` instead".into(),
+      quickfixes: vec![Quickfix::edit(
+        "Replace `env_var` with `env`",
+        lsp::Range::at(1, 7, 1, 14),
+        "env",
+      )],
+      range: lsp::Range::at(1, 7, 1, 14),
+      severity: lsp::DiagnosticSeverity::WARNING,
+    }])
+    .run();
+  }
 
-    let target = lsp::Range::at(0, 7, 0, 14);
+  #[test]
+  fn removes_parallel_attribute() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar
+      bar:
+      "
+    })
+    .range(lsp::Range::at(0, 0, 1, 0))
+    .quickfix(Quickfix::removal(
+      lsp::Range::at(0, 0, 1, 0),
+      "Remove `[parallel]`",
+    ))
+    .run();
+  }
 
-    let diagnostics = vec![
-      diagnostic(target, "deprecated-function"),
-      diagnostic(target, "other-rule"),
-      diagnostic(lsp::Range::at(1, 0, 1, 5), "deprecated-function"),
-    ];
+  #[test]
+  fn removes_parallel_attribute_item() {
+    Test::new(indoc! {
+      "
+      [private, parallel]
+      foo: bar
+      bar:
+      "
+    })
+    .range(lsp::Range::at(0, 0, 1, 0))
+    .quickfix(Quickfix::removal(
+      lsp::Range::at(0, 8, 0, 18),
+      "Remove `[parallel]`",
+    ))
+    .run();
+  }
 
-    assert_eq!(
-      Quickfixer::new(&document, &parameters(target, diagnostics))
-        .matching_diagnostics(target, "deprecated-function"),
-      vec![diagnostic(target, "deprecated-function")]
-    );
+  #[test]
+  fn replaces_deprecated_setting() {
+    Test::new("set windows-powershell := true\n")
+      .range(lsp::Range::at(0, 4, 0, 4))
+      .quickfix(Quickfix::edit(
+        "Replace `windows-powershell` with `windows-shell`",
+        lsp::Range::at(0, 4, 0, 22),
+        "windows-shell",
+      ))
+      .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_alias_target() {
+    Test::new(indoc! {
+      "
+      build:
+
+      alias b := biuld
+      "
+    })
+    .range(lsp::Range::at(2, 11, 2, 11))
+    .quickfix(Quickfix::edit(
+      "Replace `biuld` with `build`",
+      lsp::Range::at(2, 11, 2, 16),
+      "build",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_attribute() {
+    Test::new(indoc! {
+      "
+      [prvate]
+      build:
+      "
+    })
+    .range(lsp::Range::at(0, 1, 0, 1))
+    .quickfix(Quickfix::edit(
+      "Replace `prvate` with `private`",
+      lsp::Range::at(0, 1, 0, 7),
+      "private",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_dependency_name_only() {
+    Test::new(indoc! {
+      "
+      import 'dep.just'
+
+      test target: (biuld target)
+      "
+    })
+    .imported_document("build target:\n")
+    .range(lsp::Range::at(2, 14, 2, 14))
+    .quickfix(Quickfix::edit(
+      "Replace `biuld` with `build`",
+      lsp::Range::at(2, 14, 2, 19),
+      "build",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_function() {
+    Test::new("jobs := num_jobz()\n")
+      .range(lsp::Range::at(0, 8, 0, 8))
+      .quickfix(Quickfix::edit(
+        "Replace `num_jobz` with `num_jobs`",
+        lsp::Range::at(0, 8, 0, 16),
+        "num_jobs",
+      ))
+      .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_identifier_with_local_parameter() {
+    Test::new(indoc! {
+      "
+      build target:
+        echo {{targte}}
+      "
+    })
+    .range(lsp::Range::at(1, 9, 1, 9))
+    .quickfix(Quickfix::edit(
+      "Replace `targte` with `target`",
+      lsp::Range::at(1, 9, 1, 15),
+      "target",
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_misspelled_setting() {
+    Test::new("set shel := ['bash']\n")
+      .range(lsp::Range::at(0, 4, 0, 4))
+      .quickfix(Quickfix::edit(
+        "Replace `shel` with `shell`",
+        lsp::Range::at(0, 4, 0, 8),
+        "shell",
+      ))
+      .run();
+  }
+
+  #[test]
+  fn replaces_windows_shell_setting() {
+    Test::new(
+      "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
+    )
+    .range(lsp::Range::at(0, 4, 0, 4))
+    .quickfix(Quickfix::edit(
+      "Replace `windows-shell` with `[windows] set shell`",
+      lsp::Range::at(0, 0, 1, 0),
+      indoc! {
+          "
+          [windows]
+          set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+          "
+      },
+    ))
+    .run();
+  }
+
+  #[test]
+  fn skips_disabled_rules() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "deprecated-function": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new("foo := env_var(\"A\")\n")
+      .config(config)
+      .range(lsp::Range::at(0, 10, 0, 10))
+      .run();
+  }
+
+  #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    Test::new(indoc! {
+      "
+      [windows]
+      set shell := [\"foo\"]
+      set windows-shell := [\"bar\"]
+      "
+    })
+    .range(lsp::Range::at(2, 4, 2, 4))
+    .run();
   }
 }

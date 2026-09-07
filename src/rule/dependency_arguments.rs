@@ -9,11 +9,13 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
+      let lists = context.setting_enabled("lists");
+
       let recipe_parameters = context.recipe_parameters();
 
       for recipe in context.recipes() {
         for dependency in &recipe.dependencies {
-          if let Some(parameters) = recipe_parameters.get(&dependency.name) {
+          if let Some(parameters) = recipe_parameters.get(&dependency.name.value) {
             let required_parameters = parameters
               .iter()
               .filter(|parameter| {
@@ -25,7 +27,7 @@ define_rule! {
               })
               .count();
 
-            let has_variadic = parameters
+            let has_unlimited_variadic = !lists && parameters
               .iter()
               .any(|parameter| matches!(parameter.kind, ParameterKind::Variadic(_)));
 
@@ -35,16 +37,16 @@ define_rule! {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
-                  dependency.name,
+                  dependency.name.value,
                   Count("argument", required_parameters)
                 ),
                 dependency.range,
               ));
-            } else if !has_variadic && argument_count > parameter_count {
+            } else if !has_unlimited_variadic && argument_count > parameter_count {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
-                  dependency.name,
+                  dependency.name.value,
                   Count("argument", parameter_count)
                 ),
                 dependency.range,

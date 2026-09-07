@@ -75,11 +75,11 @@ module_path     : NAME ('::' NAME)+
 
 assignment      : attribute* NAME ':=' expression NEWLINE
 
-eager           : attribute* 'eager' assignment
+eager           : attribute* 'eager' NAME ':=' expression NEWLINE
 
-export          : attribute* 'export' assignment
+export          : attribute* 'export' NAME ':=' expression NEWLINE
 
-unexport        : attribute* 'unexport' assignment
+unexport        : 'unexport' NAME _eol
 
 import          : 'import' '?'? string
 
@@ -100,8 +100,13 @@ expression      : '/'? expression_inner
 
 expression_inner
                 : if_expression
-                | expression_inner '+' expression_inner
+                | expression_inner '++' expression_inner
                 | expression_inner '/' expression_inner
+                | expression_inner '+' expression_inner
+                | expression_inner '==' expression_inner
+                | expression_inner '!=' expression_inner
+                | expression_inner '=~' (regex_literal | expression_inner)
+                | expression_inner '!~' (regex_literal | expression_inner)
                 | expression_inner '&&' expression_inner
                 | expression_inner '||' expression_inner
                 | value
@@ -115,10 +120,7 @@ else_clause     : 'else' braced_expression
 braced_expression
                 : '{' expression '}'
 
-condition       : expression '==' expression
-                | expression '!=' expression
-                | expression '=~' (regex_literal | expression)
-                | expression
+condition       : expression
 
 regex_literal   : string
 
@@ -131,7 +133,7 @@ value           : assert_expression
                 | '(' expression ')'
 
 assert_expression
-                : 'assert' '(' condition ',' expression ','? ')'
+                : 'assert' '(' condition (',' expression ','?)? ')'
 
 function_call   : NAME '(' sequence? ')'
 
@@ -152,7 +154,7 @@ attribute_argument
                 | attribute_named_param
 
 attribute_named_param
-                : NAME ('=' string)?
+                : NAME ('=' expression)?
 
 recipe          : attribute* recipe_header NEWLINE recipe_body?
 
@@ -179,10 +181,21 @@ recipe_body     : INDENT (shebang NEWLINE)? (recipe_line NEWLINE | NEWLINE)* DED
 recipe_line     : recipe_line_prefix? (TEXT | interpolation)+
 
 recipe_line_prefix
-                : '@-'
+                : '@-?'
+                | '@?-'
+                | '-@?'
+                | '-?@'
+                | '?@-'
+                | '?-@'
+                | '@-'
+                | '@?'
                 | '-@'
+                | '-?'
+                | '?@'
+                | '?-'
                 | '@'
                 | '-'
+                | '?'
 
 shebang         : SHEBANG
 

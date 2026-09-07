@@ -17,13 +17,13 @@ pub enum Builtin<'a> {
     aliases: &'a [&'a str],
     kind: FunctionKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
   Setting {
     name: &'a str,
     kind: SettingKind,
     description: &'a str,
-    deprecated: Option<&'a str>,
+    deprecated: Option<Deprecation<'a>>,
   },
 }
 
@@ -57,17 +57,25 @@ impl Builtin<'_> {
         .chain(aliases.iter().copied())
         .map(|name| self.function_completion_item(name))
         .collect(),
-      Self::Setting { name, .. } => vec![lsp::CompletionItem {
-        label: name.to_string(),
-        kind: Some(lsp::CompletionItemKind::PROPERTY),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          self.description(),
-        )),
-        insert_text: Some(name.to_string()),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        sort_text: Some(format!("z{name}")),
-        ..Default::default()
-      }],
+      Self::Setting {
+        name, deprecated, ..
+      } => {
+        let deprecated = deprecated.is_some();
+
+        vec![lsp::CompletionItem {
+          label: name.to_string(),
+          kind: Some(lsp::CompletionItemKind::PROPERTY),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            self.description(),
+          )),
+          deprecated: deprecated.then_some(true),
+          insert_text: Some(name.to_string()),
+          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+          sort_text: Some(format!("z{name}")),
+          tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
+          ..Default::default()
+        }]
+      }
     }
   }
 
@@ -86,58 +94,35 @@ impl Builtin<'_> {
   }
 
   fn function_completion_item(&self, name: &str) -> lsp::CompletionItem {
-    let snippet = match name {
+    let Self::Function {
+      name: canonical,
+      kind,
+      deprecated,
+      ..
+    } = self
+    else {
+      unreachable!();
+    };
+
+    let deprecated = deprecated.is_some();
+
+    let snippet = match *canonical {
+      _ if matches!(kind, FunctionKind::Nullary) => format!("{name}()"),
       "absolute_path" | "blake3_file" | "canonicalize" | "clean"
-      | "extension" | "file_name" | "file_stem" | "parent_dir"
-      | "parent_directory" | "path_exists" | "read" | "sha256_file"
-      | "without_extension" => {
+      | "extension" | "file_name" | "file_stem" | "parent_directory"
+      | "path_exists" | "read" | "sha256_file" | "without_extension" => {
         format!("{name}(${{1:path:string}})")
       }
       "append" => {
         format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
       }
       "assert" => {
-        format!("{name}(${{1:condition}}, ${{2:message:string}})")
+        format!("{name}(${{1:condition}}${{2:, message:string}})")
       }
-      "arch"
-      | "num_cpus"
-      | "os"
-      | "os_family"
-      | "is_dependency"
-      | "recipe_name"
-      | "invocation_directory"
-      | "invocation_directory_native"
-      | "invocation_dir"
-      | "invocation_dir_native"
-      | "justfile"
-      | "justfile_directory"
-      | "justfile_dir"
-      | "module_file"
-      | "module_directory"
-      | "module_dir"
-      | "module_path"
-      | "source_file"
-      | "source_directory"
-      | "source_dir"
-      | "just_executable"
-      | "just_pid"
-      | "uuid"
-      | "runtime_directory"
-      | "runtime_dir"
-      | "cache_directory"
-      | "cache_dir"
-      | "config_directory"
-      | "config_dir"
-      | "config_local_directory"
-      | "config_local_dir"
-      | "data_directory"
-      | "data_dir"
-      | "data_local_directory"
-      | "data_local_dir"
-      | "executable_directory"
-      | "executable_dir"
-      | "home_directory"
-      | "home_dir" => format!("{name}()"),
+      "bool" | "len" | "show" => format!("{name}(${{1:value}})"),
+      "join_list" => {
+        format!("{name}(${{1:value}}${{2:, separator:string}})")
+      }
       "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
       "capitalize"
       | "encode_uri_component"
@@ -182,14 +167,20 @@ impl Builtin<'_> {
           "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})"
         )
       }
-      "require" | "style" | "which" => {
+      "require" | "which" => {
         format!("{name}(${{1:name:string}})")
+      }
+      "style" => {
+        format!("{name}(${{1:styles:string}}${{2:, text:string}})")
       }
       "semver_matches" => {
         format!("{name}(${{1:version:string}}, ${{2:requirement:string}})")
       }
       "shell" => {
         format!("{name}(${{1:command:string}}${{2:, args:string...}})")
+      }
+      "split" => {
+        format!("{name}(${{1:string:string}}${{2:, separator:string}})")
       }
       "trim_end_match" | "trim_end_matches" | "trim_start_match"
       | "trim_start_matches" => {
@@ -204,9 +195,11 @@ impl Builtin<'_> {
       documentation: Some(lsp::Documentation::MarkupContent(
         self.description(),
       )),
+      deprecated: deprecated.then_some(true),
       insert_text: Some(snippet),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       sort_text: Some(format!("z{name}")),
+      tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
       ..Default::default()
     }
   }
@@ -217,11 +210,29 @@ mod tests {
   use super::*;
 
   #[test]
+  fn deprecated_function_completion_item_is_marked_deprecated() {
+    let item = Builtin::Function {
+      name: "foo",
+      aliases: &[],
+      kind: FunctionKind::Nullary,
+      description: "",
+      deprecated: Some(Deprecation::Replacement("bar")),
+    }
+    .completion_items()
+    .into_iter()
+    .next()
+    .unwrap();
+
+    assert_eq!(item.deprecated, Some(true));
+    assert_eq!(item.tags, Some(vec![lsp::CompletionItemTag::DEPRECATED]));
+  }
+
+  #[test]
   fn fallback_function_completion_snippet() {
     let items = Builtin::Function {
       name: "foo",
       aliases: &[],
-      kind: FunctionKind::Nullary,
+      kind: FunctionKind::Unary,
       description: "",
       deprecated: None,
     }
@@ -248,20 +259,21 @@ mod tests {
 
   #[test]
   fn function_alias_uses_alias_snippet() {
-    let items = Builtin::Function {
-      name: "home_directory",
-      aliases: &["home_dir"],
-      kind: FunctionKind::Nullary,
-      description: "bar",
-      deprecated: None,
-    }
-    .completion_items();
+    #[track_caller]
+    fn case(name: &str, kind: FunctionKind, arguments: &str) {
+      let items = Builtin::Function {
+        name,
+        aliases: &["foo"],
+        kind,
+        description: "bar",
+        deprecated: None,
+      }
+      .completion_items();
 
-    assert_eq!(
-      items,
-      vec![
-        lsp::CompletionItem {
-          label: "home_directory".into(),
+      assert_eq!(
+        items,
+        [name, "foo"].map(|name| lsp::CompletionItem {
+          label: name.into(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
           documentation: Some(lsp::Documentation::MarkupContent(
             lsp::MarkupContent {
@@ -269,26 +281,15 @@ mod tests {
               value: "bar".into(),
             },
           )),
-          insert_text: Some("home_directory()".into()),
+          insert_text: Some(format!("{name}({arguments})")),
           insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_directory".into()),
+          sort_text: Some(format!("z{name}")),
           ..Default::default()
-        },
-        lsp::CompletionItem {
-          label: "home_dir".into(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: "bar".into(),
-            },
-          )),
-          insert_text: Some("home_dir()".into()),
-          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_dir".into()),
-          ..Default::default()
-        },
-      ],
-    );
+        }),
+      );
+    }
+
+    case("bar", FunctionKind::Nullary, "");
+    case("parent_directory", FunctionKind::Unary, "${1:path:string}");
   }
 }

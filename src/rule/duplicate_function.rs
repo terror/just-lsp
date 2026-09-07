@@ -6,12 +6,14 @@ define_rule! {
     id: "duplicate-function",
     message: "duplicate function",
     run(context) {
-      let mut seen = HashSet::new();
+      let mut conflicts = ConflictTracker::default();
 
       context
         .functions()
         .iter()
-        .filter(|function| !seen.insert(function.name.value.clone()))
+        .filter(|function| {
+          conflicts.record(&function.name, &function.attributes)
+        })
         .map(|function| {
           Diagnostic::error(
             format!("Duplicate function `{}`", function.name.value),

@@ -8,10 +8,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut seen = HashSet::new();
+      let mut conflicts = ConflictTracker::default();
 
       for alias in context.aliases() {
-        if !seen.insert(alias.name.value.clone()) {
+        if conflicts.record(&alias.name, &alias.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate alias `{}`", alias.name.value),
             alias.range,

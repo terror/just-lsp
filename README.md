@@ -71,8 +71,13 @@ Otherwise, see below for the complete package list:
     </tr>
     <tr>
       <td><a href=https://brew.sh>Homebrew</a></td>
-      <td><a href=https://github.com/terror/homebrew-tap>terror/tap/just-lsp</a></td>
-      <td><code>brew install terror/tap/just-lsp</code></td>
+      <td><a href=https://formulae.brew.sh/formula/just-lsp>just-lsp</a></td>
+      <td><code>brew install just-lsp</code></td>
+    </tr>
+    <tr>
+      <td><a href=https://nixos.org/nix/>Nix</a></td>
+      <td><a href=https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/ju/just-lsp/package.nix>just-lsp</a></td>
+      <td><code>nix-env -iA nixpkgs.just-lsp</code></td>
     </tr>
   </tbody>
 </table>
@@ -90,10 +95,22 @@ Otherwise, see below for the complete package list:
   </thead>
   <tbody>
     <tr>
+      <td><a href=https://alpinelinux.org>Alpine</a></td>
+      <td><a href=https://wiki.alpinelinux.org/wiki/Alpine_Linux_package_management>apk-tools</a></td>
+      <td><a href=https://pkgs.alpinelinux.org/package/edge/testing/x86_64/just-lsp>just-lsp</a></td>
+      <td><code>apk add just-lsp</code></td>
+    </tr>
+    <tr>
       <td><a href=https://www.archlinux.org>Arch</a></td>
       <td><a href=https://wiki.archlinux.org/title/Pacman>pacman</a></td>
       <td><a href=https://archlinux.org/packages/extra/x86_64/just-lsp/>just-lsp</a></td>
       <td><code>pacman -S just-lsp</code></td>
+    </tr>
+    <tr>
+      <td><a href=https://voidlinux.org>Void</a></td>
+      <td><a href=https://wiki.voidlinux.org/XBPS>XBPS</a></td>
+      <td><a href=https://github.com/void-linux/void-packages/tree/master/srcpkgs/just-lsp>just-lsp</a></td>
+      <td><code>xbps-install -S just-lsp</code></td>
     </tr>
   </tbody>
 </table>

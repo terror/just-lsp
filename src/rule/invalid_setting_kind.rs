@@ -16,12 +16,21 @@ define_rule! {
           continue;
         };
 
-        if setting.kind == *kind {
+        if kind.accepts(&setting.kind) {
           continue;
         }
 
+        let article = if *kind == SettingKind::Array {
+          "an"
+        } else {
+          "a"
+        };
+
         diagnostics.push(Diagnostic::error(
-          format!("Setting `{}` expects a {kind} value", setting.name.value),
+          format!(
+            "Setting `{}` expects {article} {kind} value",
+            setting.name.value
+          ),
           setting.range,
         ));
       }

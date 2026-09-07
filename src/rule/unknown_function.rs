@@ -15,10 +15,34 @@ define_rule! {
         if context.builtin_function(function_name.as_str()).is_none()
           && !context.user_function_names().contains(function_name)
         {
-          diagnostics.push(Diagnostic::error(
-            format!("Unknown function `{function_name}`"),
-            function_call.name.range,
-          ));
+          let suggestion = function_name.find_suggestion(
+            BUILTINS
+              .iter()
+              .filter_map(|builtin| match builtin {
+                Builtin::Function { name, aliases, .. } => {
+                  Some(once(*name).chain(aliases.iter().copied()))
+                }
+                _ => None,
+              })
+              .flatten()
+              .chain(context.user_function_names().iter().map(String::as_str)),
+          );
+
+          let message = match &suggestion {
+            Some(suggestion) => format!(
+              "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
+            ),
+            None => format!("Unknown function `{function_name}`"),
+          };
+
+          let quickfix = suggestion.map(|suggestion| {
+            Quickfix::replacement(&function_call.name, suggestion)
+          });
+
+          diagnostics.push(
+            Diagnostic::error(message, function_call.name.range)
+              .quickfix(quickfix),
+          );
         }
       }
 

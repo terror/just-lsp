@@ -8,10 +8,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut seen = HashSet::new();
+      let mut conflicts = ConflictTracker::default();
 
       for setting in context.settings() {
-        if !seen.insert(setting.name.value.clone()) {
+        if conflicts.record(&setting.name, &setting.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate setting `{}`", setting.name.value),
             setting.range,
