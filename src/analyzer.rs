@@ -178,6 +178,7 @@ mod tests {
   fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := '' || 'bar'
@@ -195,6 +196,7 @@ mod tests {
   fn accepts_unary_negation_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo bar:
@@ -594,6 +596,7 @@ mod tests {
   fn arg_attribute_with_flag() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       [arg('foo', flag)]
@@ -1340,6 +1343,8 @@ mod tests {
   fn cache_attribute_invalid_keyword_and_missing_value() {
     Test::new(indoc! {
       "
+      set unstable
+
       [script]
       [cache(foo='bar', inputs)]
       build:
@@ -1348,11 +1353,11 @@ mod tests {
     })
     .error(
       "Unknown `[cache]` keyword `foo`, expected one of environment, extra, inputs, outputs",
-      lsp::Range::at(1, 7, 1, 16),
+      lsp::Range::at(3, 7, 3, 16),
     )
     .error(
       "`[cache]` keyword `inputs` requires a value",
-      lsp::Range::at(1, 18, 1, 24),
+      lsp::Range::at(3, 18, 3, 24),
     )
     .run();
   }
@@ -1361,6 +1366,7 @@ mod tests {
   fn cache_attribute_kwargs() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       environment := 'PATH'
@@ -1378,6 +1384,8 @@ mod tests {
   fn cache_attribute_rejects_positional_arguments() {
     Test::new(indoc! {
       "
+      set unstable
+
       [script]
       [cache('foo')]
       build:
@@ -1386,7 +1394,7 @@ mod tests {
     })
     .error(
       "Attribute `cache` only accepts keyword arguments",
-      lsp::Range::at(1, 7, 1, 12),
+      lsp::Range::at(3, 7, 3, 12),
     )
     .run();
   }
@@ -1395,6 +1403,8 @@ mod tests {
   fn cache_with_default_script() {
     Test::new(indoc! {
       "
+      set unstable
+
       set default-script
 
       [cache]
@@ -1409,6 +1419,8 @@ mod tests {
   fn cache_with_default_script_and_shell() {
     Test::new(indoc! {
       "
+      set unstable
+
       set default-script
 
       [shell]
@@ -1419,7 +1431,7 @@ mod tests {
     })
     .error(
       "Recipe `build` uses `[cache]` without script mode",
-      lsp::Range::at(3, 0, 4, 0),
+      lsp::Range::at(5, 0, 6, 0),
     )
     .run();
   }
@@ -1428,6 +1440,8 @@ mod tests {
   fn cache_with_explicit_script() {
     Test::new(indoc! {
       "
+      set unstable
+
       [script]
       [cache]
       build:
@@ -1441,6 +1455,8 @@ mod tests {
   fn cache_with_script_and_shell() {
     Test::new(indoc! {
       "
+      set unstable
+
       [script]
       [shell]
       [cache]
@@ -1450,7 +1466,7 @@ mod tests {
     })
     .error(
       "Recipe `build` can't combine `[script]` with `[shell]`",
-      lsp::Range::at(0, 0, 1, 0),
+      lsp::Range::at(2, 0, 3, 0),
     )
     .run();
   }
@@ -1459,6 +1475,8 @@ mod tests {
   fn cache_with_shebang() {
     Test::new(indoc! {
       "
+      set unstable
+
       [cache]
       build:
         #!/usr/bin/env sh
@@ -1472,6 +1490,8 @@ mod tests {
   fn cache_with_shebang_and_shell() {
     Test::new(indoc! {
       "
+      set unstable
+
       [shell]
       [cache]
       build:
@@ -1481,7 +1501,7 @@ mod tests {
     })
     .error(
       "Recipe `build` uses `[cache]` without script mode",
-      lsp::Range::at(1, 0, 2, 0),
+      lsp::Range::at(3, 0, 4, 0),
     )
     .run();
   }
@@ -1490,6 +1510,8 @@ mod tests {
   fn cache_with_shell() {
     Test::new(indoc! {
       "
+      set unstable
+
       [cache]
       build:
         cargo build
@@ -1497,7 +1519,7 @@ mod tests {
     })
     .error(
       "Recipe `build` uses `[cache]` without script mode",
-      lsp::Range::at(0, 0, 1, 0),
+      lsp::Range::at(2, 0, 3, 0),
     )
     .run();
   }
@@ -1753,6 +1775,8 @@ mod tests {
   fn conditional_attributes_on_all_top_level_items() {
     Test::new(indoc! {
       "
+      set unstable
+
       [windows]
       foo() := 'bar'
 
@@ -2577,6 +2601,7 @@ mod tests {
   fn function_calls_join_list_accepts_optional_separator() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -2590,6 +2615,7 @@ mod tests {
   fn function_calls_join_list_rejects_extra_arguments() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -2598,7 +2624,7 @@ mod tests {
     })
     .error(
       "Function `join_list` accepts at most 2 arguments, but 3 provided",
-      lsp::Range::at(3, 10, 3, 45),
+      lsp::Range::at(4, 10, 4, 45),
     )
     .run();
   }
@@ -2607,6 +2633,7 @@ mod tests {
   fn function_calls_len() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -2644,6 +2671,7 @@ mod tests {
     fn case(expression: &str) {
       Test::new(&formatdoc! {
         "
+        set unstable
         set lists
 
         foo := {expression}
@@ -2663,6 +2691,7 @@ mod tests {
   fn function_calls_split_rejects_missing_argument() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := split()
@@ -2673,7 +2702,7 @@ mod tests {
     })
     .error(
       "Function `split` requires at least 1 argument, but 0 provided",
-      lsp::Range::at(2, 7, 2, 14),
+      lsp::Range::at(3, 7, 3, 14),
     )
     .run();
   }
@@ -2682,6 +2711,7 @@ mod tests {
   fn function_calls_split_too_many_args() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := split(\"foo,bar\", \",\", \"bar\")
@@ -2692,7 +2722,7 @@ mod tests {
     })
     .error(
       "Function `split` accepts at most 2 arguments, but 3 provided",
-      lsp::Range::at(2, 7, 2, 35),
+      lsp::Range::at(3, 7, 3, 35),
     )
     .run();
   }
@@ -2838,6 +2868,8 @@ mod tests {
   fn list_features_allow_shadowed_functions_without_lists() {
     Test::new(indoc! {
       "
+      set unstable
+
       bool(value) := value
       join_list(value) := value
       len(value) := value
@@ -3368,6 +3400,7 @@ mod tests {
   fn parser_errors_valid_with_list_expressions() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo := ['foo'] ++ ['bar']
@@ -3618,6 +3651,7 @@ mod tests {
   fn recipe_dependencies_mapped() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3634,6 +3668,7 @@ mod tests {
   fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo arg:
@@ -3650,6 +3685,7 @@ mod tests {
   fn recipe_dependencies_mapped_reject_multiple_starred_arguments() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg other:
@@ -3661,7 +3697,7 @@ mod tests {
     })
     .error(
       "Mapped dependencies may not include multiple starred arguments",
-      lsp::Range::at(5, 23, 5, 24),
+      lsp::Range::at(6, 23, 6, 24),
     )
     .run();
   }
@@ -3688,6 +3724,7 @@ mod tests {
   fn recipe_dependencies_mapped_require_starred_argument() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3699,7 +3736,7 @@ mod tests {
     })
     .error(
       "Mapped dependencies must include a starred argument",
-      lsp::Range::at(5, 10, 5, 11),
+      lsp::Range::at(6, 10, 6, 11),
     )
     .run();
   }
@@ -3756,6 +3793,7 @@ mod tests {
   fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       bar arg:
@@ -3767,7 +3805,7 @@ mod tests {
     })
     .error(
       "Starred dependency arguments require mapped dependencies",
-      lsp::Range::at(5, 16, 5, 17),
+      lsp::Range::at(6, 16, 6, 17),
     )
     .run();
   }
@@ -3957,6 +3995,7 @@ mod tests {
   fn recipe_invocation_variadic_params_reject_extra_arguments_with_lists() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo arg1 +args:
@@ -3968,7 +4007,7 @@ mod tests {
     })
     .error(
       "Dependency `foo` accepts 2 arguments, but 3 provided",
-      lsp::Range::at(5, 5, 5, 37),
+      lsp::Range::at(6, 5, 6, 37),
     )
     .run();
   }
@@ -4301,6 +4340,7 @@ mod tests {
   fn settings_array_type_error_with_nested_list() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
       set shell := show(['foo'])
 
@@ -4310,7 +4350,7 @@ mod tests {
     })
     .error(
       "Setting `shell` expects an array value",
-      lsp::Range::at(1, 0, 2, 0),
+      lsp::Range::at(2, 0, 3, 0),
     )
     .run();
   }
@@ -4472,6 +4512,7 @@ mod tests {
     fn case(setting: &str) {
       Test::new(&formatdoc! {
         r#"
+        set unstable
         set lists
         set {setting} := ["foo", "bar"]
 
@@ -4574,6 +4615,7 @@ mod tests {
   fn settings_lists_recognized() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       foo:
@@ -4779,6 +4821,7 @@ mod tests {
   fn settings_windows_shell_replacement() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       [windows]
@@ -4788,7 +4831,7 @@ mod tests {
     })
     .warning(
       "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
-      lsp::Range::at(4, 4, 4, 17),
+      lsp::Range::at(5, 4, 5, 17),
     )
     .run();
   }
@@ -5009,6 +5052,156 @@ mod tests {
   }
 
   #[test]
+  fn unstable_feature_gate_cache_requires_unstable() {
+    Test::new("[script]\n[cache]\nfoo:\n")
+      .warning(
+        "`[cache]` is unstable without `set unstable`",
+        lsp::Range::at(1, 1, 1, 6),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_cache_with_arguments_requires_unstable() {
+    Test::new("[script]\n[cache(extra='bar')]\nfoo:\n")
+      .warning(
+        "`[cache]` is unstable without `set unstable`",
+        lsp::Range::at(1, 1, 1, 6),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_disabled_lists() {
+    Test::new("set lists := false\n").run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_disabled_unstable() {
+    Test::new(indoc! {
+      "
+      set unstable := false
+      set lists
+      foo(bar) := bar
+      [script]
+      [cache]
+      baz:
+      "
+    })
+    .warning(
+      "`set lists` is unstable without `set unstable`",
+      lsp::Range::at(1, 4, 1, 9),
+    )
+    .warning(
+      "User-defined function `foo` is unstable without `set unstable`",
+      lsp::Range::at(2, 0, 2, 3),
+    )
+    .warning(
+      "`[cache]` is unstable without `set unstable`",
+      lsp::Range::at(4, 1, 4, 6),
+    )
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_enabled_unstable() {
+    #[track_caller]
+    fn case(setting: &str) {
+      Test::new(&formatdoc! {
+        "
+        {setting}
+        set lists
+        foo(bar) := bar
+        [script]
+        [cache]
+        baz:
+        "
+      })
+      .run();
+    }
+
+    case("set unstable");
+    case("set unstable := true");
+  }
+
+  #[test]
+  fn unstable_feature_gate_imported_features() {
+    Test::new("foo:\n")
+      .imported_document(indoc! {
+        "
+        set lists
+        bar(baz) := baz
+        [script]
+        [cache]
+        baz:
+        "
+      })
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_imported_unstable() {
+    Test::new(indoc! {
+      "
+      set lists
+      foo(bar) := bar
+      [script]
+      [cache]
+      baz:
+      "
+    })
+    .imported_document("set unstable\n")
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_invalid_cache_target() {
+    Test::new(indoc! {
+      "
+      [cache]
+      foo := 'bar'
+      baz:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Attribute `cache` cannot be applied to assignment target",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_lists_requires_unstable() {
+    Test::new("set lists\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_lists_true_requires_unstable() {
+    Test::new("set lists := true\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unstable_feature_gate_user_defined_function_requires_unstable() {
+    Test::new("foo(bar) := bar\n")
+      .warning(
+        "User-defined function `foo` is unstable without `set unstable`",
+        lsp::Range::at(0, 0, 0, 3),
+      )
+      .run();
+  }
+
+  #[test]
   fn used_variables_no_warnings() {
     Test::new(indoc! {
       "
@@ -5029,6 +5222,8 @@ mod tests {
   fn user_defined_function_body_references_variable() {
     Test::new(indoc! {
       "
+      set unstable
+
       base := \"hello\"
 
       foo(x) := base + x
@@ -5041,10 +5236,12 @@ mod tests {
   fn user_defined_function_body_unknown_identifier() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + unknown
       "
     })
-    .error("Variable `unknown` not found", lsp::Range::at(0, 14, 0, 21))
+    .error("Variable `unknown` not found", lsp::Range::at(2, 14, 2, 21))
     .run();
   }
 
@@ -5052,10 +5249,12 @@ mod tests {
   fn user_defined_function_duplicate_parameters() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(bar, bar) := bar
       "
     })
-    .error("Duplicate parameter `bar`", lsp::Range::at(0, 9, 0, 12))
+    .error("Duplicate parameter `bar`", lsp::Range::at(2, 9, 2, 12))
     .run();
   }
 
@@ -5063,13 +5262,15 @@ mod tests {
   fn user_defined_function_duplicates() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo() := \"bar\"
       foo() := \"baz\"
       foo() := \"bat\"
       "
     })
-    .error("Duplicate function `foo`", lsp::Range::at(1, 0, 2, 0))
-    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(3, 0, 4, 0))
+    .error("Duplicate function `foo`", lsp::Range::at(4, 0, 5, 0))
     .run();
   }
 
@@ -5077,6 +5278,8 @@ mod tests {
   fn user_defined_function_duplicates_platform_specific() {
     Test::new(indoc! {
       "
+      set unstable
+
       [unix]
       foo() := \"foo\"
 
@@ -5091,6 +5294,8 @@ mod tests {
   fn user_defined_function_no_params() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo() := \"bar\"
 
       baz:
@@ -5104,6 +5309,8 @@ mod tests {
   fn user_defined_function_not_flagged_as_unknown() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
 
       bar:
@@ -5117,6 +5324,8 @@ mod tests {
   fn user_defined_function_parameters_not_unresolved() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
       "
     })
@@ -5143,6 +5352,8 @@ mod tests {
   fn user_defined_function_too_few_args() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(a, b) := a + b
 
       bar:
@@ -5151,7 +5362,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 2 arguments, but 1 provided",
-      lsp::Range::at(3, 10, 3, 18),
+      lsp::Range::at(5, 10, 5, 18),
     )
     .run();
   }
@@ -5160,6 +5371,8 @@ mod tests {
   fn user_defined_function_wrong_arity() {
     Test::new(indoc! {
       "
+      set unstable
+
       foo(x) := x + \"!\"
 
       bar:
@@ -5168,7 +5381,7 @@ mod tests {
     })
     .error(
       "Function `foo` accepts 1 argument, but 2 provided",
-      lsp::Range::at(3, 10, 3, 23),
+      lsp::Range::at(5, 10, 5, 23),
     )
     .run();
   }
@@ -5291,6 +5504,7 @@ mod tests {
   fn variables_used_in_starred_dependency_args() {
     Test::new(indoc! {
       "
+      set unstable
       set lists
 
       used := \"value\"
@@ -5305,7 +5519,7 @@ mod tests {
     })
     .warning(
       "Variable `unused` appears unused",
-      lsp::Range::at(3, 0, 3, 6),
+      lsp::Range::at(4, 0, 4, 6),
     )
     .run();
   }
