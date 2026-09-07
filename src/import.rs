@@ -14,6 +14,15 @@ impl Import {
     self.path.value.starts_with(['f', 'x'])
   }
 
+  pub(crate) fn is_enabled(&self) -> bool {
+    self
+      .attributes
+      .iter()
+      .filter_map(Attribute::condition)
+      .reduce(|left, right| left || right)
+      .unwrap_or(true)
+  }
+
   #[must_use]
   pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
     let raw = self.path.value.trim_matches(|c| c == '\'' || c == '"');
@@ -71,6 +80,38 @@ mod tests {
       import("'~/bar.just'").resolve(&base).unwrap(),
       dirs::home_dir().unwrap().join("bar.just"),
     );
+  }
+
+  #[test]
+  fn is_enabled() {
+    #[track_caller]
+    fn case(attributes: &[&str], expected: bool) {
+      let import = Import {
+        attributes: attributes
+          .iter()
+          .map(|name| Attribute {
+            name: TextNode {
+              value: (*name).into(),
+              ..Default::default()
+            },
+            ..Default::default()
+          })
+          .collect(),
+        ..import("'foo.just'")
+      };
+
+      assert_eq!(import.is_enabled(), expected);
+    }
+
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    case(&[], true);
+    case(&["foo"], true);
+    case(&[env::consts::OS], true);
+    case(&["unix"], cfg!(unix));
+    case(&[disabled], false);
+    case(&[disabled, "foo"], false);
+    case(&[disabled, env::consts::OS], true);
   }
 
   #[test]

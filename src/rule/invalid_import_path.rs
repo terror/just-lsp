@@ -10,7 +10,7 @@ define_rule! {
       let mut diagnostics = Vec::new();
 
       for import in document.imports() {
-        if import.optional {
+        if import.optional || !import.is_enabled() {
           continue;
         }
 
