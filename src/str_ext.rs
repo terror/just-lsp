@@ -43,7 +43,7 @@ impl StrExt for str {
 
     StringLiteral::parse(self)
       .ok()?
-      .map(|StringLiteral { cooked }| cooked)
+      .map(|StringLiteral { cooked, .. }| cooked)
   }
 
   fn point_delta(&self) -> Point {

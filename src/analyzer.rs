@@ -2827,6 +2827,27 @@ mod tests {
   }
 
   #[test]
+  fn import_invalid_string_escape() {
+    #[track_caller]
+    fn case(source: &str, range: lsp::Range) {
+      Test::new(source)
+        .error("Invalid escape sequence in string literal", range)
+        .run();
+    }
+
+    case(r#"import "\u{D800}""#, lsp::Range::at(0, 7, 0, 17));
+    case(r#"import x"\u{110000}""#, lsp::Range::at(0, 7, 0, 20));
+    case(r#"import? "\u{DFFF}""#, lsp::Range::at(0, 8, 0, 18));
+
+    let attribute = if cfg!(windows) { "unix" } else { "windows" };
+
+    case(
+      &format!("[{attribute}]\nimport \"\\u{{D800}}\"\n"),
+      lsp::Range::at(1, 7, 1, 17),
+    );
+  }
+
+  #[test]
   fn import_optional_invalid_path() {
     Test::new(indoc! {
       "
@@ -2837,12 +2858,19 @@ mod tests {
   }
 
   #[test]
-  fn import_shell_expanded_string_skipped() {
+  fn import_shell_expanded_string_path_is_checked() {
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\nonexistent.just`"
+    } else {
+      "Import path does not exist: `/nonexistent.just`"
+    };
+
     Test::new(indoc! {
       "
       import x'nonexistent.just'
       "
     })
+    .error(expected, lsp::Range::at(0, 7, 0, 26))
     .run();
   }
 
@@ -3452,7 +3480,7 @@ mod tests {
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
-      import x'~/.config/just/common.just'
+      import? x'~/.config/just/common.just'
 
       greeting := x"~/$USER/${GREETING:-hello}"
 

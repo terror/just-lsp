@@ -3,6 +3,7 @@ use super::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct StringLiteral {
   pub(crate) cooked: String,
+  pub(crate) shell_expanded: bool,
 }
 
 impl StringLiteral {
@@ -86,6 +87,10 @@ impl StringLiteral {
   }
 
   pub(crate) fn parse(source: &str) -> Result<Option<Self>> {
+    let (shell_expanded, source) = source
+      .strip_prefix('x')
+      .map_or((false, source), |source| (true, source));
+
     let Some(kind) = StringKind::from_token_start(source) else {
       return Ok(None);
     };
@@ -111,7 +116,10 @@ impl StringLiteral {
       uncooked
     };
 
-    Ok(Some(Self { cooked }))
+    Ok(Some(Self {
+      cooked,
+      shell_expanded,
+    }))
   }
 
   fn unindent(source: &str) -> String {
@@ -197,7 +205,7 @@ mod tests {
       assert_eq!(
         StringLiteral::parse(source)
           .unwrap()
-          .map(|StringLiteral { cooked }| cooked)
+          .map(|StringLiteral { cooked, .. }| cooked)
           .as_deref(),
         expected,
       );
@@ -226,5 +234,14 @@ mod tests {
     case(r#""foo\"""#, Some("foo\""));
     case(r#""""foo"bar""""#, Some("foo\"bar"));
     case("'''foo'bar'''", Some("foo'bar"));
+  }
+
+  #[test]
+  fn parses_shell_expanded_strings() {
+    let literal = StringLiteral::parse("x'foo'").unwrap().unwrap();
+
+    assert!(literal.shell_expanded);
+
+    assert_eq!(literal.cooked, "foo");
   }
 }
