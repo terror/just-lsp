@@ -931,6 +931,7 @@ mod tests {
     pretty_assertions::assert_eq,
     serde_json::{Value, json},
     std::env,
+    tokio_stream::StreamExt,
     tower_lsp::LspService,
     tower_test::mock::Spawn,
   };

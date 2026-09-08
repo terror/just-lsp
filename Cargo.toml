@@ -69,6 +69,7 @@ yansi = "1.0.1"
 [dev-dependencies]
 executable-path = "1.0.1"
 pretty_assertions = "1.4.1"
+tokio-stream = "0.1.19"
 tower-test = "0.4.0"
 
 [build-dependencies]
@@ -76,7 +77,6 @@ cc = "1.4.5"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.19", features = ["io-util"] }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 tree-sitter-language = "0.1.8"
