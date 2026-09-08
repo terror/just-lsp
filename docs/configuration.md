@@ -1,6 +1,6 @@
 ---
 title: Configuration
-order: 10
+order: 30
 ---
 
 `just-lsp` accepts configuration through the LSP `initializationOptions` object,

@@ -49,7 +49,7 @@ const Documentation = () => {
             Documentation
           </h1>
           <p className='text-muted-foreground mt-4 text-lg'>
-            Configuration options and diagnostics for just-lsp.
+            A guide to working with just-lsp.
           </p>
 
           <details className='my-8 rounded-md border p-4 lg:hidden'>
