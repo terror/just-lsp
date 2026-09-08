@@ -15,6 +15,12 @@ export const Header = ({ theme }: { theme: ReturnType<typeof useTheme> }) => (
       className='ml-auto flex flex-wrap items-center gap-4 text-sm'
     >
       <NavLink
+        to='/documentation'
+        className='text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground aria-[current=page]:font-medium'
+      >
+        Documentation
+      </NavLink>
+      <NavLink
         to='/playground'
         className='text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground aria-[current=page]:font-medium'
       >

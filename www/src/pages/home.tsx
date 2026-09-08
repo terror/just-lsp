@@ -150,13 +150,13 @@ const Home = () => {
               — formatting options and diagnostic severity levels.
             </li>
             <li className='text-muted-foreground'>
-              <a
-                href='https://github.com/terror/just-lsp/blob/master/docs/diagnostics.md'
+              <Link
+                to='/documentation'
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
-                Diagnostics
-              </a>{' '}
-              — the full list of rules and examples.
+                Documentation
+              </Link>{' '}
+              — diagnostic rules, examples, and fixes.
             </li>
             <li className='text-muted-foreground'>
               <a
