@@ -586,7 +586,6 @@ dependencies = [
  "clap",
  "indoc",
  "inventory",
- "lexiclean",
  "pretty_assertions",
  "ropey",
  "serde",
@@ -631,12 +630,6 @@ name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
-
-[[package]]
-name = "lexiclean"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd8ed82c150ca245d90866523e598895b0ebfcad69dc5aac269df69278cd614"
 
 [[package]]
 name = "libc"
