@@ -42,6 +42,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `function-parameters`             | Function Parameters             | User-defined function parameter list has duplicates.                                                                          |
 | `unstable-feature-gate`           | Unstable Feature Gate           | Warning: `set lists`, user-defined functions, or `[cache]` are used without `set unstable` in the document or its imports.       |
 | `unused-function`                 | Unused Function                 | Warning: user-defined function is never called in the document or its imports.                                                 |
+| `unused-function-parameter`       | Unused Function Parameter       | Warning: user-defined function parameter is never referenced in the function body unless its name begins with `_`.             |
 | `list-features`                   | List Features                   | Syntax and builtins that require `set lists` are used without enabling it.                                                    |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type.                                                                                |
