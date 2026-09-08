@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct StringLiteral {
   pub(crate) cooked: String,
   pub(crate) shell_expanded: bool,

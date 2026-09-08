@@ -861,15 +861,96 @@ mod tests {
   }
 
   #[test]
-  fn attributes_duplicate_group_attribute_allowed() {
+  fn attributes_duplicate_group_attribute() {
+    #[track_caller]
+    fn case(first: &str, second: &str) {
+      Test::new(&format!("[group({first})]\n[group({second})]\nfoo:\n"))
+        .error(
+          "Recipe attribute `group` with value `foo` is duplicated",
+          lsp::Range::at(1, 0, 2, 0),
+        )
+        .run();
+    }
+
+    case("'foo'", "\"foo\"");
+    case("'foo'", r#""\u{66}oo""#);
+    case("'foo'", "'''  foo'''");
+    case("x'foo'", "x\"foo\"");
+  }
+
+  #[test]
+  fn attributes_duplicate_group_inline() {
     Test::new(indoc! {
       "
-      [group('dev')]
-      [group('dev')]
-      build:
-        echo \"build\"
+      [group: 'foo', no-cd, group('foo')]
+      bar:
       "
     })
+    .error(
+      "Recipe attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_module() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      [group: 'foo']
+      mod bar
+      "
+    })
+    .error(
+      "Module attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_nonliteral_arguments() {
+    #[track_caller]
+    fn case(expression: &str) {
+      let end = 7 + u32::try_from(expression.len()).unwrap();
+
+      Test::new(&format!(
+        "[group({expression})]\n[group({expression})]\nfoo:\n"
+      ))
+      .error(
+        "Attribute `group` arguments must be string literals",
+        lsp::Range::at(0, 7, 0, end),
+      )
+      .error(
+        "Attribute `group` arguments must be string literals",
+        lsp::Range::at(1, 7, 1, end),
+      )
+      .run();
+    }
+
+    case("f'foo'");
+    case("env('foo')");
+    case("'foo' + 'bar'");
+  }
+
+  #[test]
+  fn attributes_duplicate_group_without_argument() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      [group, group('foo')]
+      bar:
+      "
+    })
+    .error(
+      "Attribute `group` got 0 arguments but takes 1 argument",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .error(
+      "Recipe attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
     .run();
   }
 
@@ -1108,15 +1189,14 @@ mod tests {
 
   #[test]
   fn attributes_multiple_group_attributes_allowed() {
-    Test::new(indoc! {
-      "
-      [group('lint')]
-      [group('rust')]
-      build:
-        echo \"build\"
-      "
-    })
-    .run();
+    #[track_caller]
+    fn case(first: &str, second: &str) {
+      Test::new(&format!("[group({first})]\n[group({second})]\nfoo:\n")).run();
+    }
+
+    case("'foo'", "'bar'");
+    case("'$FOO'", "x'$FOO'");
+    case(r"'\t'", r#""\t""#);
   }
 
   #[test]
@@ -1236,6 +1316,23 @@ mod tests {
       [default]
       bar:
         echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_same_group_on_multiple_targets_allowed() {
+    Test::new(indoc! {
+      "
+      [group('foo')]
+      foo:
+
+      [group('foo')]
+      bar:
+
+      [group('foo')]
+      mod baz
       "
     })
     .run();
