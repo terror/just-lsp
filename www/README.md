@@ -15,10 +15,11 @@ Adding a document automatically adds its content and navigation entry. A parent
 document can contain only frontmatter to provide a heading without introductory
 text.
 
-Rule categories use the same structure. For example, `docs/rules/aliases.md`
-provides the category heading, and `docs/rules/aliases/*.md` contains its rules.
-An optional `severity` (`error` or `warning`) displays a default severity badge
-and the entry's filename as its rule code.
+Features are documented under `docs/features`. Analysis rules use the same
+structure: `docs/features/analysis/aliases.md` provides the category heading,
+and `docs/features/analysis/aliases/*.md` contains its rules. An optional
+`severity` (`error` or `warning`) displays a default severity badge and the
+entry's filename as its rule code.
 
 Filenames without `.md` become page anchors and must be unique across the
 documentation. Filenames and directories must start with a lowercase letter and
