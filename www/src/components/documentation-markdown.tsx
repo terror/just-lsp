@@ -3,7 +3,9 @@ import Markdown, { type ExtraProps } from 'react-markdown';
 
 const CodeBlock = ({ children, node }: ComponentProps<'pre'> & ExtraProps) => {
   const code = node?.children[0];
+
   const label = code?.type === 'element' ? code.data?.meta : undefined;
+
   const block = (
     <pre className='bg-muted text-foreground overflow-x-auto rounded-md border px-4 py-3 text-sm leading-6 [tab-size:4]'>
       {children}
