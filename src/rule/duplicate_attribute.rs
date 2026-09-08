@@ -55,7 +55,17 @@ define_rule! {
               .siblings()
               .take_while(|node| node.kind() != "identifier")
               .find(|node| node.kind() == "expression")
-              .and_then(|argument| Self::group_value(argument, document));
+              .and_then(|argument| {
+                let value = argument.find("^value")?;
+
+                let string = value.find("^string")?;
+
+                if string.byte_range() != argument.byte_range() {
+                  return None;
+                }
+
+                StringLiteral::parse(&document.get_node_text(&string)).ok()?
+              });
 
             let Some(group) = group else {
               continue;
@@ -101,18 +111,5 @@ define_rule! {
 
       diagnostics
     }
-  }
-}
-
-impl DuplicateAttributeRule {
-  fn group_value(argument: Node, document: &Document) -> Option<StringLiteral> {
-    let value = argument.find("^value")?;
-    let string = value.find("^string")?;
-
-    if string.byte_range() != argument.byte_range() {
-      return None;
-    }
-
-    StringLiteral::parse(&document.get_node_text(&string)).ok()?
   }
 }
