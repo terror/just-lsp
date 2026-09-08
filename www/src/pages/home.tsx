@@ -85,7 +85,7 @@ const Home = () => {
             id='editor-setup'
             className='mb-4 text-xl font-semibold tracking-tight'
           >
-            Editor setup
+            Usage
           </h2>
           <p className='text-muted-foreground'>
             just-lsp works with any editor that supports the Language Server
