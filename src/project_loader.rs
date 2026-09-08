@@ -65,7 +65,7 @@ impl<'a> ProjectLoader<'a> {
       Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
     };
 
-    let path = path.as_path().lexiclean();
+    let path = path.clean();
 
     let Some(uri) = lsp::Url::from_path(&path) else {
       return Ok(ProjectDependencyTarget::Missing);

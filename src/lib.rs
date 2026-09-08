@@ -3,7 +3,7 @@ use {
   document_entry::DocumentEntry,
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
   indoc::indoc,
-  lexiclean::Lexiclean,
+  path_ext::PathExt,
   project_view_document::ProjectViewDocument,
   ropey::Rope,
   serde::{Deserialize, Serialize},
@@ -15,7 +15,7 @@ use {
     fs,
     iter::{once, successors},
     ops::{ControlFlow, Deref, RangeInclusive},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process,
     sync::OnceLock,
   },
@@ -115,6 +115,7 @@ mod located;
 mod module;
 mod node_ext;
 mod parameter;
+mod path_ext;
 mod point_ext;
 mod project;
 mod project_dependency;
