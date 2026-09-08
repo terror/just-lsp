@@ -1,6 +1,5 @@
 use {
   anyhow::Error,
-  executable_path::executable_path,
   indoc::{formatdoc, indoc},
   pretty_assertions::assert_eq,
   std::{fs, iter::once, path::PathBuf, process::Command, str},
@@ -35,7 +34,7 @@ impl<'a> Test<'a> {
   }
 
   fn command(&self) -> Command {
-    let mut command = Command::new(executable_path(env!("CARGO_PKG_NAME")));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_just-lsp"));
 
     command
       .arg("analyze")
