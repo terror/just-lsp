@@ -26,14 +26,14 @@ impl Executor {
     ))
     .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
 
-    let mut command = tokio::process::Command::new("just");
+    let mut command = AsyncCommand::new("just");
 
     command.arg(recipe_name);
 
     command
       .current_dir(directory.clone())
-      .stdout(process::Stdio::piped())
-      .stderr(process::Stdio::piped());
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped());
 
     let client = self.client.clone();
 
@@ -68,29 +68,31 @@ impl Executor {
     tokio::spawn(async move {
       match command.spawn() {
         Ok(mut child) => {
-          let stdout_lines = LinesStream::new(
-            tokio::io::BufReader::new(
-              child.stdout.take().expect("Failed to capture stdout"),
-            )
-            .lines(),
-          );
+          let mut stdout_lines = BufReader::new(
+            child.stdout.take().expect("Failed to capture stdout"),
+          )
+          .lines();
 
-          let stderr_lines = LinesStream::new(
-            tokio::io::BufReader::new(
-              child.stderr.take().expect("Failed to capture stderr"),
-            )
-            .lines(),
-          );
+          let mut stderr_lines = BufReader::new(
+            child.stderr.take().expect("Failed to capture stderr"),
+          )
+          .lines();
 
-          let mut merged_stream = StreamExt::merge(stdout_lines, stderr_lines);
+          let mut stdout_eof = false;
+          let mut stderr_eof = false;
 
           let mut buffer = String::new();
           let mut current_line = 0;
           let mut last_update = Instant::now();
 
-          while let Some(line_result) = merged_stream.next().await {
+          while !stdout_eof || !stderr_eof {
+            let (line_result, eof) = select! {
+              line = stdout_lines.next_line(), if !stdout_eof => (line, &mut stdout_eof),
+              line = stderr_lines.next_line(), if !stderr_eof => (line, &mut stderr_eof),
+            };
+
             match line_result {
-              Ok(line) => {
+              Ok(Some(line)) => {
                 buffer.push_str(&line);
 
                 buffer.push('\n');
@@ -125,6 +127,7 @@ impl Executor {
                   last_update = now;
                 }
               }
+              Ok(None) => *eof = true,
               Err(error) => {
                 buffer.push_str("Error reading output: ");
                 buffer.push_str(&error.to_string());
@@ -195,7 +198,7 @@ impl Executor {
         let directory = uri
           .to_file_path()
           .ok()
-          .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+          .and_then(|path| path.parent().map(Path::to_path_buf))
           .unwrap_or_default();
 
         if parameters
