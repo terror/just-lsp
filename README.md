@@ -26,7 +26,7 @@ for [just](https://github.com/casey/just), the command runner.
 
 - Diagnostics on every change, catching syntax errors, unknown recipes, bad
   dependencies, indentation issues, and more. See
-  [`docs/diagnostics.md`](docs/diagnostics.md) for the full list of rules.
+  the [rule documentation](docs/rules) for the full list of rules.
 
 - Rename and find references for recipes, aliases, variables, and parameters,
   scope-aware so refactors don't accidentally rewrite unrelated identifiers.
@@ -244,7 +244,7 @@ Common values are `"\t"` for tabs and `"  "` for two spaces.
 ### Rules
 
 Individual diagnostic rules can be configured under the `rules` key. Each rule
-is keyed by its code (see [`docs/diagnostics.md`](docs/diagnostics.md)) and
+is keyed by its code (see the [rule documentation](docs/rules)) and
 accepts either a level string or a table with a `level` field:
 
 ```json
@@ -256,7 +256,7 @@ accepts either a level string or a table with a `level` field:
 }
 ```
 
-Rule codes are listed in [`docs/diagnostics.md`](docs/diagnostics.md).
+Rule codes are listed in the [rule documentation](docs/rules).
 Supported levels are:
 
 | Level                 | Behavior                                  |
