@@ -12,10 +12,10 @@ impl<'a> Resolver<'a> {
     Self { view: view.into() }
   }
 
-  /// Returns the definition site of the symbol that `identifier` refers
-  /// to. Builtins have no in-document declaration, so the identifier's
-  /// own range is returned instead, letting editors anchor inline
-  /// documentation at the cursor.
+  /// Returns the definition site of the symbol that `identifier` refers to.
+  /// Builtins have no in-document declaration, so the identifier's own range is
+  /// returned instead, letting editors anchor inline documentation at the
+  /// cursor.
   #[must_use]
   pub(crate) fn resolve_identifier_definition(
     &self,
@@ -38,9 +38,9 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Builds hover content for the symbol at `identifier`. User-defined
-  /// symbols show their source text; builtins show their Markdown
-  /// documentation from the static [`BUILTINS`] table.
+  /// Builds hover content for the symbol at `identifier`. User-defined symbols
+  /// show their source text; builtins show their Markdown documentation from
+  /// the static [`BUILTINS`] table.
   #[must_use]
   pub(crate) fn resolve_identifier_hover(
     &self,
@@ -76,14 +76,13 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Collects every location in the document that references the same
-  /// symbol as `identifier`. The identifier itself is always included.
+  /// Collects every location in the document that references the same symbol as
+  /// `identifier`. The identifier itself is always included.
   ///
-  /// Scoping follows `just`'s semantics: parameters are local to their
-  /// recipe, while variables are global but can be shadowed by a
-  /// same-named parameter. Variable references inside parameter defaults
-  /// (e.g. `a=a`) are treated as belonging to the outer scope, not the
-  /// parameter being defined.
+  /// Scoping follows `just`'s semantics: parameters are local to their recipe,
+  /// while variables are global but can be shadowed by a same-named parameter.
+  /// Variable references inside parameter defaults (e.g. `a=a`) are treated as
+  /// belonging to the outer scope, not the parameter being defined.
   #[must_use]
   pub(crate) fn resolve_identifier_references(
     &self,
@@ -115,14 +114,12 @@ impl<'a> Resolver<'a> {
   }
 
   /// Classifies `identifier` into the [`Symbol`] it refers to, following
-  /// `just`'s name-resolution priority: recipe names, then parameters
-  /// (which shadow globals within their recipe), then variables, then
-  /// builtins.
+  /// `just`'s name-resolution priority: recipe names, then parameters (which
+  /// shadow globals within their recipe), then variables, then builtins.
   ///
-  /// Identifiers at definition sites (the left-hand side of an
-  /// assignment, or a parameter name in a recipe header) are looked up
-  /// through the document so that callers receive a fully-populated
-  /// [`Symbol`] rather than a raw range.
+  /// Identifiers at definition sites (the left-hand side of an assignment, or a
+  /// parameter name in a recipe header) are looked up through the document so
+  /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
   #[must_use]
   pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     let name = self.view.document().get_node_text(identifier);

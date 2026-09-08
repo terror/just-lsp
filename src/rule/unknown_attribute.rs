@@ -1,7 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Warns when an attribute name isn't part of the known builtin attribute set.
+  /// Warns when an attribute name isn't part of the known builtin attribute
+  /// set.
   UnknownAttributeRule {
     id: "unknown-attribute",
     message: "unknown attribute",

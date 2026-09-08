@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Highlights recipe parameters that never get read anywhere in the recipe body
-  /// (unless `set export` is on).
+  /// Highlights recipe parameters that never get read anywhere in the recipe
+  /// body (unless `set export` is on).
   UnusedParameterRule {
     id: "unused-parameters",
     message: "unused parameter",

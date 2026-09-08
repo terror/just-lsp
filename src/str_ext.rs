@@ -10,8 +10,8 @@ pub trait StrExt {
   /// Returns the decoded value of a plain string literal.
   fn literal(&self) -> Option<String>;
 
-  /// Returns a `Point` describing the tree-sitter point that would
-  /// be reached after inserting this UTF-8 text.
+  /// Returns a `Point` describing the tree-sitter point that would be reached
+  /// after inserting this UTF-8 text.
   fn point_delta(&self) -> Point;
 }
 

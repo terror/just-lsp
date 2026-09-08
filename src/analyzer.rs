@@ -9,9 +9,9 @@ pub struct Analyzer<'a> {
 impl Analyzer<'_> {
   /// Run all registered rules against the document.
   ///
-  /// Rules that return `None` from `severity()` are filtered out, so
-  /// config can suppress individual rules entirely. Diagnostics are
-  /// sorted by position then message for deterministic output.
+  /// Rules that return `None` from `severity()` are filtered out, so config can
+  /// suppress individual rules entirely. Diagnostics are sorted by position
+  /// then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(&self.view);
