@@ -1,49 +1,42 @@
-import { Button } from '@/components/ui/button';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { Bot, Loader2, Moon, Sun } from 'lucide-react';
-import { useCallback, useLayoutEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDefaultLayout } from 'react-resizable-panels';
 
-import defaultJustfile from '../../justfile?raw';
-import { AboutDialog } from './components/about-dialog';
-import { EditorPane } from './components/editor-pane';
-import { TreePane } from './components/tree-pane';
-import { useEditorExtensions } from './hooks/use-editor-extensions';
-import { useMediaQuery } from './hooks/use-media-query';
-import { usePersistedDoc } from './hooks/use-persisted-doc';
-import { useSyntaxTree } from './hooks/use-syntax-tree';
-import { useTreeSitter } from './hooks/use-tree-sitter';
+import defaultJustfile from '../../../justfile?raw';
+import { EditorPane } from '../components/editor-pane';
+import { Header } from '../components/header';
+import { TreePane } from '../components/tree-pane';
+import { useEditorExtensions } from '../hooks/use-editor-extensions';
+import { useMediaQuery } from '../hooks/use-media-query';
+import { usePersistedDoc } from '../hooks/use-persisted-doc';
+import { useSyntaxTree } from '../hooks/use-syntax-tree';
+import { useTheme } from '../hooks/use-theme';
+import { useTreeSitter } from '../hooks/use-tree-sitter';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
-const THEME_STORAGE_KEY = 'just-lsp:theme';
 const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
-const App = () => {
+const Playground = () => {
   const { parser, language: justLanguage, loading, error } = useTreeSitter();
+
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
+
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: `${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`,
   });
-  const [darkMode, setDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-      return savedTheme === 'dark';
-    }
+  const theme = useTheme();
 
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useLayoutEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-    localStorage.setItem(THEME_STORAGE_KEY, darkMode ? 'dark' : 'light');
-  }, [darkMode]);
+  useEffect(() => {
+    document.title = 'Playground - just-lsp';
+  }, []);
 
   const [doc, setDoc] = usePersistedDoc(
     EDITOR_STORAGE_KEY,
@@ -70,7 +63,7 @@ const App = () => {
   const extensions = useEditorExtensions({
     language: justLanguage,
     highlight,
-    darkMode,
+    darkMode: theme.darkMode,
   });
 
   if (error) {
@@ -87,28 +80,7 @@ const App = () => {
 
   return (
     <div className='flex h-screen max-w-full flex-col'>
-      <div className='flex items-center gap-x-2 px-4 py-4'>
-        <Bot className='h-4 w-4' />
-        <a href='/' className='font-semibold'>
-          just-lsp
-        </a>
-        <div className='ml-auto flex items-center gap-1'>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-8 w-8 cursor-pointer'
-            onClick={() => setDarkMode((enabled) => !enabled)}
-            aria-label={
-              darkMode ? 'Switch to light mode' : 'Switch to dark mode'
-            }
-            aria-pressed={darkMode}
-            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {darkMode ? <Sun /> : <Moon />}
-          </Button>
-          <AboutDialog />
-        </div>
-      </div>
+      <Header theme={theme} />
 
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
@@ -138,4 +110,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default Playground;

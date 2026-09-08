@@ -28,7 +28,9 @@ export function useTreeSitter(): UseTreeSitter {
 
         parserInstance = new Parser();
 
-        const loadedLanguage = await TSLanguage.load('tree-sitter-just.wasm');
+        const loadedLanguage = await TSLanguage.load(
+          `${import.meta.env.BASE_URL}tree-sitter-just.wasm`
+        );
 
         setParser(parserInstance);
         setLanguage(loadedLanguage);
