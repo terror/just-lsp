@@ -2,7 +2,7 @@ use {
   just_lsp::{Analyzer, Document},
   serde::Serialize,
   tower_lsp::lsp_types::DiagnosticSeverity,
-  typeshare::typeshare,
+  typeshare_annotation::typeshare,
   wasm_bindgen::prelude::*,
 };
 
