@@ -1,3 +1,8 @@
+---
+title: Diagnostics
+order: 20
+---
+
 Configure individual diagnostic rules under the `rules` key, using the rule
 codes listed in the diagnostic reference. Each rule accepts a level string or
 an object with a `level` field:

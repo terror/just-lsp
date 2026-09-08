@@ -1,3 +1,8 @@
+---
+title: Diagnostics
+order: 20
+---
+
 Rules run when just-lsp analyzes a document. Each diagnostic includes a rule
 code, a message, a source range, and a severity. Each entry lists the rule's
 code and default severity, explains what it checks, and shows how to fix the

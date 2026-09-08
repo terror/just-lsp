@@ -1,75 +1,81 @@
 import { parse } from 'yaml';
 import { z } from 'zod';
 
-const ruleMetadataSchema = z.object({
-  category: z.string().trim().min(1),
+const metadataSchema = z.object({
   order: z.int().positive(),
-  severity: z.enum(['error', 'warning']),
+  severity: z.enum(['error', 'warning']).optional(),
   title: z.string().trim().min(1),
 });
 
-type DocumentationRule = z.infer<typeof ruleMetadataSchema> & {
+export type DocumentationSection = z.infer<typeof metadataSchema> & {
+  children: DocumentationSection[];
   content: string;
   id: string;
 };
 
-type RuleGroup = {
-  id: string;
-  rules: DocumentationRule[];
-  title: string;
-};
-
-const parseRule = ([path, source]: [string, string]): DocumentationRule => {
-  const id = path.match(/\/([a-z][a-z0-9-]*)\.md$/)?.[1];
+const parseDocument = ([path, source]: [string, string]): [
+  string,
+  DocumentationSection,
+] => {
+  const filename = path.match(
+    /^(?:\.\/)?((?:[a-z][a-z0-9-]*\/)*)([a-z][a-z0-9-]*)\.md$/
+  );
 
   const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
 
-  if (!id || !frontmatter) {
-    throw new Error(`${path}: expected a rule filename and YAML frontmatter`);
-  }
-
-  const metadata = ruleMetadataSchema.safeParse(parse(frontmatter[1]));
-
-  const content = source.slice(frontmatter[0].length).trim();
-
-  if (!metadata.success || !content) {
+  if (!filename || !frontmatter) {
     throw new Error(
-      `${path}: expected title, category, severity, order, and Markdown content`
+      `${path}: expected a documentation filename and YAML frontmatter`
     );
   }
 
-  return { ...metadata.data, content, id };
+  try {
+    const metadata = metadataSchema.parse(parse(frontmatter[1]));
+
+    const content = source.slice(frontmatter[0].length).trim();
+
+    return [
+      `${filename[1]}${filename[2]}`,
+      { ...metadata, children: [], content, id: filename[2] },
+    ];
+  } catch (error) {
+    throw new Error(
+      `${path}: ${error instanceof Error ? error.message : error}`,
+      { cause: error }
+    );
+  }
 };
 
 export const loadDocumentation = (
   sources: Record<string, string>
-): RuleGroup[] => {
-  const rules = Object.entries(sources)
-    .map(parseRule)
+): DocumentationSection[] => {
+  const documents = Object.entries(sources)
+    .map(parseDocument)
     .sort(
-      (left, right) =>
+      ([, left], [, right]) =>
         left.order - right.order || left.id.localeCompare(right.id)
     );
 
-  const groups = new Map<string, RuleGroup>();
+  const paths = new Map(documents);
+  const sections: DocumentationSection[] = [];
   const ids = new Set<string>();
 
-  for (const rule of rules) {
-    if (ids.has(rule.id)) {
-      throw new Error(`Duplicate documentation rule: ${rule.id}`);
+  for (const [path, section] of documents) {
+    if (ids.has(section.id)) {
+      throw new Error(`Duplicate documentation ID: ${section.id}`);
     }
 
-    ids.add(rule.id);
+    ids.add(section.id);
 
-    const group = groups.get(rule.category) ?? {
-      id: rule.category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      rules: [],
-      title: rule.category,
-    };
+    const parentPath = path.match(/^(.*)\//)?.[1];
+    const parent = parentPath ? paths.get(parentPath) : undefined;
 
-    group.rules.push(rule);
-    groups.set(rule.category, group);
+    if (parentPath && !parent) {
+      throw new Error(`${path}.md: missing parent document ${parentPath}.md`);
+    }
+
+    (parent?.children ?? sections).push(section);
   }
 
-  return [...groups.values()];
+  return sections;
 };
