@@ -268,10 +268,20 @@ mod tests {
     }
 
     fn run(self) {
-      let scope = Scope::analyze(&RuleContext::new(
-        &self.document,
-        &self.imported_documents,
-      ));
+      let view = ProjectView {
+        document: &self.document,
+        documents: once(&self.document)
+          .chain(&self.imported_documents)
+          .enumerate()
+          .map(|(traversal_order, document)| ProjectViewDocument {
+            document,
+            load_depth: usize::from(traversal_order > 0),
+            traversal_order,
+          })
+          .collect(),
+      };
+
+      let scope = Scope::analyze(&RuleContext::new(&view));
 
       let mut actual_unresolved = scope
         .unresolved_identifiers

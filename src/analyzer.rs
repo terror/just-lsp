@@ -3,8 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub struct Analyzer<'a> {
   pub config: Option<&'a Config>,
-  pub document: &'a Document,
-  pub imported_documents: Vec<&'a Document>,
+  pub view: ProjectView<'a>,
 }
 
 impl Analyzer<'_> {
@@ -15,8 +14,7 @@ impl Analyzer<'_> {
   /// sorted by position then message for deterministic output.
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
-    let context =
-      RuleContext::new(self.document, self.imported_documents.iter().copied());
+    let context = RuleContext::new(&self.view);
 
     let default = Config::default();
 
@@ -92,11 +90,21 @@ mod tests {
     }
 
     fn imported_document(self, content: &str) -> Self {
+      let document = Document::new(
+        content,
+        lsp::Url::parse(&format!(
+          "file:///foo{}.just",
+          self.imported_documents.len()
+        ))
+        .unwrap(),
+      )
+      .unwrap();
+
       Self {
         imported_documents: self
           .imported_documents
           .into_iter()
-          .chain([Document::from(content)])
+          .chain([document])
           .collect(),
         ..self
       }
@@ -135,8 +143,18 @@ mod tests {
 
       let analyzer = Analyzer {
         config: Some(&config),
-        document: &document,
-        imported_documents: imported_documents.iter().collect(),
+        view: ProjectView {
+          document: &document,
+          documents: once(&document)
+            .chain(&imported_documents)
+            .enumerate()
+            .map(|(traversal_order, document)| ProjectViewDocument {
+              document,
+              load_depth: usize::from(traversal_order > 0),
+              traversal_order,
+            })
+            .collect(),
+        },
       };
 
       let diagnostics = analyzer
@@ -373,6 +391,41 @@ mod tests {
       "Recipe `nonexistent` not found",
       lsp::Range::at(6, 13, 6, 24),
     )
+    .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_recipe_diagnostics() {
+    Test::new("foo: (bar 'baz')\n")
+      .imported_document("bar baz: bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_later_function_declaration_wins() {
+    Test::new(indoc! {
+      "
+      set unstable
+      foo() := 'bar'
+      foo(bar) := bar
+      baz:
+        echo {{ foo('bar') }}
+      "
+    })
+    .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
+  fn analyzer_root_recipe_overrides_import() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes
+      foo $bar:
+      baz: (foo 'bar')
+      "
+    })
+    .imported_document("foo $bar $baz:\n")
     .run();
   }
 
@@ -1656,6 +1709,30 @@ mod tests {
   }
 
   #[test]
+  fn circular_dependencies_report_only_local_members() {
+    Test::new("foo: bar\n")
+      .imported_document("bar: foo\n")
+      .error(
+        "Recipe `foo` has circular dependency `foo -> bar -> foo`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn circular_dependencies_report_winning_declaration() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes
+      foo:
+      foo: foo
+      "
+    })
+    .error("Recipe `foo` depends on itself", lsp::Range::at(2, 0, 3, 0))
+    .run();
+  }
+
+  #[test]
   fn circular_dependencies_self() {
     Test::new(indoc! {
       "
@@ -1685,6 +1762,27 @@ mod tests {
     .error(
       "Recipe `bar` has circular dependency `bar -> foo -> bar`",
       lsp::Range::at(3, 0, 5, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn circular_dependencies_use_root_dependencies() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes
+      foo: bar
+      bar: foo
+      "
+    })
+    .imported_document("bar:\n")
+    .error(
+      "Recipe `foo` has circular dependency `foo -> bar -> foo`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .error(
+      "Recipe `bar` has circular dependency `bar -> foo -> bar`",
+      lsp::Range::at(2, 0, 3, 0),
     )
     .run();
   }
@@ -2188,6 +2286,22 @@ mod tests {
         echo foo on linux
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn duplicate_recipe_parameters_are_checked_at_their_declarations() {
+    Test::new(indoc! {
+      "
+      set allow-duplicate-recipes
+      [arg('bar')]
+      foo bar:
+      [arg('baz')]
+      foo baz:
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .warning("Parameter `baz` appears unused", lsp::Range::at(4, 4, 4, 7))
     .run();
   }
 

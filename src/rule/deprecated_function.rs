@@ -11,7 +11,7 @@ define_rule! {
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if context.function(function_name).is_some() {
+        if context.user_function_names().contains(function_name) {
           continue;
         }
 
