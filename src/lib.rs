@@ -1,6 +1,7 @@
 use {
   conflict_tracker::ConflictTracker,
   document_entry::DocumentEntry,
+  function_parameter::FunctionParameter::{Optional, Required, Variadic},
   indoc::indoc,
   lexiclean::Lexiclean,
   project_view_document::ProjectViewDocument,
@@ -47,7 +48,8 @@ pub use {
   error::Error,
   function::Function,
   function_call::FunctionCall,
-  function_kind::FunctionKind,
+  function_parameter::FunctionParameter,
+  function_signature::FunctionSignature,
   group::Group,
   group_set::GroupSet,
   import::Import,
@@ -103,7 +105,8 @@ mod document_store;
 mod error;
 mod function;
 mod function_call;
-mod function_kind;
+mod function_parameter;
+mod function_signature;
 mod group;
 mod group_set;
 mod import;

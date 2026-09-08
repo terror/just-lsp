@@ -985,7 +985,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "absolute_path",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the absolute form of `path`, resolved against the current
@@ -1004,7 +1004,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "append",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("suffix", Some("string")),
+      Required("s", Some("string")),
+    ]),
     description: indoc! {
       "
       Append `suffix` to each whitespace-separated token in `s`.
@@ -1022,7 +1025,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "arch",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Instruction set architecture of the host machine.
@@ -1042,7 +1045,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "assert",
     aliases: &[],
-    kind: FunctionKind::UnaryOpt,
+    signature: FunctionSignature(&[
+      Required("condition", None),
+      Optional("message", Some("string")),
+    ]),
     description: indoc! {
       "
       Abort execution with `message` if `condition` is false, or the
@@ -1059,7 +1065,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "blake3",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("string", Some("string"))]),
     description: indoc! {
       "
       Return the BLAKE3 hash of `string` as a lowercase hex string.
@@ -1074,7 +1080,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "blake3_file",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the BLAKE3 hash of the file at `path` as a lowercase hex
@@ -1086,7 +1092,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "bool",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("value", None)]),
     description: indoc! {
       "
       Convert `value` to a canonical boolean value.
@@ -1103,7 +1109,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "cache_directory",
     aliases: &["cache_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       User-specific cache directory.
@@ -1119,7 +1125,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "canonicalize",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Canonicalize `path` by resolving symlinks and removing `.`,
@@ -1136,7 +1142,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "capitalize",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Return `s` with the first character uppercased and the rest
@@ -1152,7 +1158,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "choose",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("n", Some("string")),
+      Required("alphabet", Some("string")),
+    ]),
     description: indoc! {
       "
       Return a string of `n` randomly selected characters from
@@ -1168,7 +1177,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "clean",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Simplify `path` by removing extra path separators, intermediate
@@ -1186,7 +1195,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "config_directory",
     aliases: &["config_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       User-specific configuration directory.
@@ -1202,7 +1211,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "config_local_directory",
     aliases: &["config_local_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Local user-specific configuration directory, for configuration
@@ -1217,7 +1226,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "data_directory",
     aliases: &["data_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       User-specific data directory.
@@ -1233,7 +1242,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "data_local_directory",
     aliases: &["data_local_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Local user-specific data directory, for data that should not
@@ -1248,7 +1257,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "datetime",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("format", Some("string"))]),
     description: indoc! {
       "
       Return the current local time formatted with `format`.
@@ -1267,7 +1276,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "datetime_utc",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("format", Some("string"))]),
     description: indoc! {
       "
       Return the current UTC time formatted with `format`.
@@ -1282,7 +1291,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "encode_uri_component",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Percent-encode every character in `s` except
@@ -1299,7 +1308,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "env",
     aliases: &[],
-    kind: FunctionKind::UnaryOpt,
+    signature: FunctionSignature(&[
+      Required("key", Some("string")),
+      Optional("default", Some("string")),
+    ]),
     description: indoc! {
       "
       Retrieve the environment variable named `key`.
@@ -1327,7 +1339,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "env_var",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("key", Some("string"))]),
     description: indoc! {
       "
       **Deprecated**: use `env(key)` instead.
@@ -1341,7 +1353,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "env_var_or_default",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("key", Some("string")),
+      Required("default", Some("string")),
+    ]),
     description: indoc! {
       "
       **Deprecated**: use `env(key, default)` instead.
@@ -1355,7 +1370,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "error",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("message", Some("string"))]),
     description: indoc! {
       "
       Abort execution and report `message` to the user. Diverges and
@@ -1372,7 +1387,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "executable_directory",
     aliases: &["executable_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       User-specific executable directory.
@@ -1387,7 +1402,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "extension",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the file extension of `path`, not including the leading
@@ -1403,7 +1418,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "file_name",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the file name of `path` with any leading directory
@@ -1419,7 +1434,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "file_stem",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the file name of `path` without its extension or any
@@ -1435,7 +1450,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "home_directory",
     aliases: &["home_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       The user's home directory.
@@ -1449,7 +1464,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "invocation_directory",
     aliases: &["invocation_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1473,7 +1488,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "invocation_directory_native",
     aliases: &["invocation_dir_native"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       The absolute path of the directory in which `just` was invoked,
@@ -1488,7 +1503,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "is_dependency",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Return whether the current recipe is being run as a dependency
@@ -1503,7 +1518,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "join",
     aliases: &[],
-    kind: FunctionKind::BinaryPlus,
+    signature: FunctionSignature(&[
+      Required("a", Some("string")),
+      Required("b", Some("string")),
+      Variadic("more", Some("string")),
+    ]),
     description: indoc! {
       "
       Join two or more path components.
@@ -1523,7 +1542,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "join_list",
     aliases: &[],
-    kind: FunctionKind::UnaryOpt,
+    signature: FunctionSignature(&[
+      Required("value", None),
+      Optional("separator", Some("string")),
+    ]),
     description: indoc! {
       "
       Join the elements of `value` into a string separated by
@@ -1537,7 +1559,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "just_executable",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Absolute path to the `just` executable that is currently running.
@@ -1553,7 +1575,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "just_pid",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Process ID of the running `just` executable, as a decimal string.
@@ -1564,7 +1586,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "just_version",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Version of the `just` executable.
@@ -1580,7 +1602,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "justfile",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Absolute path to the current `justfile`.
@@ -1595,7 +1617,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "justfile_directory",
     aliases: &["justfile_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Absolute path to the parent directory of the current `justfile`.
@@ -1611,7 +1633,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "kebabcase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `kebab-case`.
@@ -1626,7 +1648,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "len",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("value", None)]),
     description: indoc! {
       "
       Return the number of elements in `value`.
@@ -1637,7 +1659,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "lowercamelcase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `lowerCamelCase`.
@@ -1652,7 +1674,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "lowercase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to lowercase.
@@ -1667,7 +1689,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "module_directory",
     aliases: &["module_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Directory of the current module file. Behaves like
@@ -1680,7 +1702,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "module_file",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Path of the current module file. Behaves like `justfile()` in
@@ -1693,7 +1715,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "module_path",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       `::`-separated path to the current module.
@@ -1708,7 +1730,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "num_cpus",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Number of logical CPUs available on the host machine.
@@ -1724,7 +1746,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "num_jobs",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Return the value passed to `just` with `--jobs`, or an empty
@@ -1738,7 +1760,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "os",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Host operating system.
@@ -1753,7 +1775,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "os_family",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Host operating system family. Returns `unix` or `windows`.
@@ -1771,7 +1793,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "parent_directory",
     aliases: &["parent_dir"],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the parent directory of `path`. Aborts if `path` has no
@@ -1787,7 +1809,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "path_exists",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return whether `path` points at an existing filesystem entity.
@@ -1802,7 +1824,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "prepend",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("prefix", Some("string")),
+      Required("s", Some("string")),
+    ]),
     description: indoc! {
       "
       Prepend `prefix` to each whitespace-separated token in `s`.
@@ -1820,7 +1845,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "quote",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
@@ -1841,7 +1866,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "read",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the contents of the file at `path` as a string. Aborts if
@@ -1853,7 +1878,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "recipe_name",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Return the name of the current recipe.
@@ -1869,7 +1894,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "replace",
     aliases: &[],
-    kind: FunctionKind::Ternary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("from", Some("string")),
+      Required("to", Some("string")),
+    ]),
     description: indoc! {
       "
       Replace every occurrence of `from` in `s` with `to`.
@@ -1884,7 +1913,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "replace_regex",
     aliases: &[],
-    kind: FunctionKind::Ternary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("regex", Some("string")),
+      Required("replacement", Some("string")),
+    ]),
     description: indoc! {
       "
       Replace every match of `regex` in `s` with `replacement`.
@@ -1905,7 +1938,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "require",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("name", Some("string"))]),
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -1925,7 +1958,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "runtime_directory",
     aliases: &["runtime_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       The user-specific runtime directory.
@@ -1940,7 +1973,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "semver_matches",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("version", Some("string")),
+      Required("requirement", Some("string")),
+    ]),
     description: indoc! {
       "
       Check whether a semantic version `version` satisfies a
@@ -1959,7 +1995,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "sha256",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("string", Some("string"))]),
     description: indoc! {
       "
       Return the SHA-256 hash of `string` as a lowercase hex string.
@@ -1970,7 +2006,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "sha256_file",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return the SHA-256 hash of the file at `path` as a lowercase hex
@@ -1982,7 +2018,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "shell",
     aliases: &[],
-    kind: FunctionKind::UnaryPlus,
+    signature: FunctionSignature(&[
+      Required("command", Some("string")),
+      Variadic("args", Some("string")),
+    ]),
     description: indoc! {
       "
       Return the standard output of shell script `command`, with zero
@@ -2006,7 +2045,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "shoutykebabcase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `SHOUTY-KEBAB-CASE`.
@@ -2021,7 +2060,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "shoutysnakecase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `SHOUTY_SNAKE_CASE`.
@@ -2036,7 +2075,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "show",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("value", None)]),
     description: indoc! {
       "
       Convert `value` into a string containing its literal
@@ -2050,7 +2089,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "snakecase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `snake_case`.
@@ -2065,7 +2104,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "source_directory",
     aliases: &["source_dir"],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Directory of the current source file. Behaves like
@@ -2079,7 +2118,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "source_file",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Path of the current source file. Behaves like `justfile()` in
@@ -2093,7 +2132,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "split",
     aliases: &[],
-    kind: FunctionKind::UnaryOpt,
+    signature: FunctionSignature(&[
+      Required("string", Some("string")),
+      Optional("separator", Some("string")),
+    ]),
     description: indoc! {
       "
       Split `string` on `separator`, or whitespace if `separator` is
@@ -2107,7 +2149,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "style",
     aliases: &[],
-    kind: FunctionKind::UnaryOpt,
+    signature: FunctionSignature(&[
+      Required("styles", Some("string")),
+      Optional("text", Some("string")),
+    ]),
     description: indoc! {
       "
       Return the terminal display attribute escape sequence used by
@@ -2133,7 +2178,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "titlecase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `Title Case`.
@@ -2148,7 +2193,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Remove leading and trailing whitespace from `s`.
@@ -2163,7 +2208,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_end",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Remove trailing whitespace from `s`.
@@ -2178,7 +2223,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_end_match",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("substring", Some("string")),
+    ]),
     description: indoc! {
       "
       Remove a single trailing occurrence of `substring` from `s` if
@@ -2195,7 +2243,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_end_matches",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("substring", Some("string")),
+    ]),
     description: indoc! {
       "
       Repeatedly remove trailing occurrences of `substring` from `s`
@@ -2212,7 +2263,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_start",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Remove leading whitespace from `s`.
@@ -2227,7 +2278,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_start_match",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("substring", Some("string")),
+    ]),
     description: indoc! {
       "
       Remove a single leading occurrence of `substring` from `s` if
@@ -2244,7 +2298,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "trim_start_matches",
     aliases: &[],
-    kind: FunctionKind::Binary,
+    signature: FunctionSignature(&[
+      Required("s", Some("string")),
+      Required("substring", Some("string")),
+    ]),
     description: indoc! {
       "
       Repeatedly remove leading occurrences of `substring` from `s`
@@ -2260,7 +2317,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "uppercamelcase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to `UpperCamelCase` (also known as PascalCase).
@@ -2275,7 +2332,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "uppercase",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("s", Some("string"))]),
     description: indoc! {
       "
       Convert `s` to uppercase.
@@ -2290,7 +2347,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "uuid",
     aliases: &[],
-    kind: FunctionKind::Nullary,
+    signature: FunctionSignature(&[]),
     description: indoc! {
       "
       Generate a random version 4 UUID.
@@ -2305,7 +2362,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "which",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("name", Some("string"))]),
     description: indoc! {
       "
       Search the directories in `$PATH` for an executable called
@@ -2329,7 +2386,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "without_extension",
     aliases: &[],
-    kind: FunctionKind::Unary,
+    signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
       Return `path` with its extension removed. Aborts if `path` has

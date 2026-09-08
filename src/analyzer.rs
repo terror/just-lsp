@@ -2704,6 +2704,9 @@ mod tests {
       "
       foo:
         echo {{ arch() }}
+        echo {{ join('a', 'b') }}
+        echo {{ shell('echo foo') }}
+        echo {{ shell('echo $@', 'foo', 'bar', 'baz') }}
         echo {{ join(\"a\", \"b\", \"c\") }}
         echo {{ uppercase(\"foo\",) }}
       "
@@ -2864,6 +2867,31 @@ mod tests {
     .error(
       "Function `replace` requires at least 3 arguments, but 0 provided",
       lsp::Range::at(1, 10, 1, 19),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_few_variadic_arguments() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ join() }}
+        echo {{ join('a') }}
+        echo {{ shell() }}
+      "
+    })
+    .error(
+      "Function `join` requires at least 2 arguments, but 0 provided",
+      lsp::Range::at(1, 10, 1, 16),
+    )
+    .error(
+      "Function `join` requires at least 2 arguments, but 1 provided",
+      lsp::Range::at(2, 10, 2, 19),
+    )
+    .error(
+      "Function `shell` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(3, 10, 3, 17),
     )
     .run();
   }
