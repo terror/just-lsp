@@ -1883,6 +1883,9 @@ mod tests {
 
       [windows]
       unexport FOO
+
+      [windows]
+      export BAR := foo()
       "
     })
     .run();
@@ -5271,6 +5274,7 @@ mod tests {
       [script]
       [cache]
       baz:
+        echo {{foo('bar')}}
       "
     })
     .warning(
@@ -5300,6 +5304,7 @@ mod tests {
         [script]
         [cache]
         baz:
+          echo {{{{foo('bar')}}}}
         "
       })
       .run();
@@ -5333,6 +5338,7 @@ mod tests {
       [script]
       [cache]
       baz:
+        echo {{foo('bar')}}
       "
     })
     .imported_document("set unstable\n")
@@ -5378,12 +5384,75 @@ mod tests {
 
   #[test]
   fn unstable_feature_gate_user_defined_function_requires_unstable() {
-    Test::new("foo(bar) := bar\n")
+    Test::new("foo(bar) := bar\nbaz:\n  echo {{foo('bar')}}\n")
       .warning(
         "User-defined function `foo` is unstable without `set unstable`",
         lsp::Range::at(0, 0, 0, 3),
       )
       .run();
+  }
+
+  #[test]
+  fn unused_function_called_from_imported_document() {
+    Test::new("set unstable\nfoo() := 'bar'\n")
+      .imported_document("bar:\n  echo {{foo()}}\n")
+      .run();
+  }
+
+  #[test]
+  fn unused_function_calls() {
+    #[track_caller]
+    fn case(content: &str) {
+      Test::new(&format!("set unstable\n{content}")).run();
+    }
+
+    case("foo() := 'bar'\nbar:\n  echo {{foo()}}\n");
+    case("foo() := 'bar'\nbar() := foo()\nbaz:\n  echo {{bar()}}\n");
+    case("env_var() := 'foo'\nbar:\n  echo {{env_var()}}\n");
+  }
+
+  #[test]
+  fn unused_function_ignores_imported_definitions() {
+    Test::new("").imported_document("foo() := 'bar'\n").run();
+  }
+
+  #[test]
+  fn unused_function_ignores_underscore_prefix() {
+    Test::new("set unstable\n_foo() := 'bar'\n").run();
+  }
+
+  #[test]
+  fn unused_function_reports_resolved_definition() {
+    Test::new("set unstable\nfoo() := 'bar'\nfoo() := 'baz'\n")
+      .error("Duplicate function `foo`", lsp::Range::at(2, 0, 3, 0))
+      .warning("Function `foo` appears unused", lsp::Range::at(2, 0, 2, 3))
+      .run();
+  }
+
+  #[test]
+  fn unused_function_reports_uncalled_definition() {
+    Test::new("set unstable\nfoo() := 'bar'\n")
+      .warning("Function `foo` appears unused", lsp::Range::at(1, 0, 1, 3))
+      .run();
+  }
+
+  #[test]
+  fn unused_function_requires_call_syntax() {
+    Test::new(indoc! {
+      r#"
+      set unstable
+
+      foo() := 'bar'
+      _bar(foo) := foo
+      foo := "foo()"
+      # foo()
+
+      baz:
+        echo {{foo}}
+      "#
+    })
+    .warning("Function `foo` appears unused", lsp::Range::at(2, 0, 2, 3))
+    .run();
   }
 
   #[test]
@@ -5412,6 +5481,9 @@ mod tests {
       base := \"hello\"
 
       foo(x) := base + x
+
+      bar:
+        echo {{foo('bar')}}
       "
     })
     .run();
@@ -5424,6 +5496,9 @@ mod tests {
       set unstable
 
       foo(x) := x + unknown
+
+      bar:
+        echo {{foo('bar')}}
       "
     })
     .error("Variable `unknown` not found", lsp::Range::at(2, 14, 2, 21))
@@ -5437,6 +5512,9 @@ mod tests {
       set unstable
 
       foo(bar, bar) := bar
+
+      bar:
+        echo {{foo('bar', 'baz')}}
       "
     })
     .error("Duplicate parameter `bar`", lsp::Range::at(2, 9, 2, 12))
@@ -5452,6 +5530,9 @@ mod tests {
       foo() := \"bar\"
       foo() := \"baz\"
       foo() := \"bat\"
+
+      bar:
+        echo {{foo()}}
       "
     })
     .error("Duplicate function `foo`", lsp::Range::at(3, 0, 4, 0))
@@ -5470,6 +5551,9 @@ mod tests {
 
       [windows]
       foo() := \"bar\"
+
+      bar:
+        echo {{foo()}}
       "
     })
     .run();
@@ -5512,6 +5596,9 @@ mod tests {
       set unstable
 
       foo(x) := x + \"!\"
+
+      bar:
+        echo {{foo('bar')}}
       "
     })
     .run();
