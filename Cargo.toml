@@ -45,9 +45,6 @@ codegen-units = 1
 lto = true
 
 [dependencies]
-anyhow = "1.0.104"
-ariadne = "0.6.0"
-clap = { version = "4.6.6", features = ["derive"] }
 indoc = "2.0.7"
 inventory = "0.3.24"
 ropey = { version = "1.6.1", default-features = false, features = ["cr_lines", "simd"] }
@@ -59,10 +56,7 @@ tempfile = "3.27.0"
 thiserror = "2.0.20"
 tower-lsp = { workspace = true }
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tree-sitter = "0.27.0"
-tree-sitter-highlight = "0.27.0"
-yansi = "1.0.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
@@ -73,7 +67,13 @@ tower-test = "0.4.0"
 cc = "1.4.5"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+anyhow = "1.0.104"
+ariadne = "0.6.0"
+clap = { version = "4.6.6", features = ["derive"] }
 tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tree-sitter-highlight = "0.27.0"
+yansi = "1.0.1"
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 tree-sitter-language = "0.1.8"
