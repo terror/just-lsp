@@ -6,6 +6,17 @@ enum AttributeKey {
   Name(String),
 }
 
+impl Display for AttributeKey {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Group(group) => {
+        write!(f, "`group` with value `{}`", group.cooked)
+      }
+      Self::Name(name) => write!(f, "`{name}`"),
+    }
+  }
+}
+
 define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
@@ -98,17 +109,6 @@ define_rule! {
       }
 
       diagnostics
-    }
-  }
-}
-
-impl Display for AttributeKey {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::Group(group) => {
-        write!(f, "`group` with value `{}`", group.cooked)
-      }
-      Self::Name(name) => write!(f, "`{name}`"),
     }
   }
 }
