@@ -1,6 +1,6 @@
 ---
 title: Diagnostics
-order: 30
+order: 40
 ---
 
 Rules run when just-lsp analyzes a document. Each diagnostic includes a rule

@@ -5,8 +5,8 @@ order: 20
 
 Install the
 [vscode-just extension](https://marketplace.visualstudio.com/items?itemName=nefrob.vscode-just-syntax)
-and [install `just-lsp`](https://github.com/terror/just-lsp#installation) so it
-is on your `PATH`. Open a justfile to start the language server.
+and [install `just-lsp`](#installation) so it is on your `PATH`. Open a justfile
+to start the language server.
 
 If the binary is installed elsewhere, set `vscode-just.lspPath` in your
 `settings.json`:

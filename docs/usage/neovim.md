@@ -3,8 +3,8 @@ title: Neovim
 order: 10
 ---
 
-[Install `just-lsp`](https://github.com/terror/just-lsp#installation) and make
-sure it is on your `PATH`. With Neovim 0.11.3+ and
+[Install `just-lsp`](#installation) and make sure it is on your `PATH`. With
+Neovim 0.11.3+ and
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) installed, add this
 to your `init.lua`:
 
