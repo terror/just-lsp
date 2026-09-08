@@ -57,8 +57,8 @@ pub trait RopeExt {
 }
 
 impl RopeExt for Rope {
-  /// Applies a previously constructed [`Edit`] to the rope, keeping both
-  /// the textual contents and the internal tree-sitter offsets in sync.
+  /// Applies a previously constructed [`Edit`] to the rope, keeping both the
+  /// textual contents and the internal tree-sitter offsets in sync.
   fn apply_edit(&mut self, edit: &Edit) {
     self.remove(edit.start_char..edit.end_char);
 
@@ -67,8 +67,8 @@ impl RopeExt for Rope {
     }
   }
 
-  /// Converts an LSP `textDocument/didChange` event into a [`Edit`] that
-  /// can be consumed both by `ropey` and tree-sitter.
+  /// Converts an LSP `textDocument/didChange` event into a [`Edit`] that can be
+  /// consumed both by `ropey` and tree-sitter.
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
