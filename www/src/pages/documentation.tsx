@@ -1,11 +1,23 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
+import configuration from '../../../docs/configuration.md?raw';
+import diagnostics from '../../../docs/configuration/diagnostics.md?raw';
+import formatting from '../../../docs/configuration/formatting.md?raw';
 import overview from '../../../docs/rules.md?raw';
 import { DocumentationMarkdown } from '../components/documentation-markdown';
 import { Header } from '../components/header';
 import { useTheme } from '../hooks/use-theme';
 import { loadDocumentation } from '../lib/documentation';
+
+const configurationSections = [
+  { content: formatting, id: 'formatting', title: 'Formatting' },
+  {
+    content: diagnostics,
+    id: 'diagnostics',
+    title: 'Diagnostics',
+  },
+];
 
 const ruleGroups = loadDocumentation(
   import.meta.glob<string>('../../../docs/rules/*.md', {
@@ -15,13 +27,30 @@ const ruleGroups = loadDocumentation(
   })
 );
 
-const RuleNavigation = () => (
+const DocumentationNavigation = () => (
   <nav aria-label='Documentation navigation' className='space-y-6 text-sm'>
+    <div>
+      <a href='#configuration' className='font-medium hover:underline'>
+        Configuration
+      </a>
+      <ul className='mt-2 space-y-1 border-l pl-3'>
+        {configurationSections.map((section) => (
+          <li key={section.id}>
+            <a
+              href={`#${section.id}`}
+              className='text-muted-foreground hover:text-foreground block py-1 break-words'
+            >
+              {section.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
     <a
       href='#rules'
       className='text-muted-foreground hover:text-foreground block'
     >
-      Rule configuration
+      Diagnostics
     </a>
     {ruleGroups.map((group) => (
       <div key={group.id}>
@@ -50,11 +79,6 @@ const Documentation = () => {
 
   const { hash } = useLocation();
 
-  const ruleCount = ruleGroups.reduce(
-    (count, group) => count + group.rules.length,
-    0
-  );
-
   useEffect(() => {
     document.title = 'Documentation - just-lsp';
   }, []);
@@ -72,7 +96,7 @@ const Documentation = () => {
       <div className='mx-auto max-w-6xl px-6 py-12 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-12 lg:py-16'>
         <aside className='hidden lg:block'>
           <div className='sticky top-6 max-h-[calc(100dvh-3rem)] overflow-y-auto pr-4'>
-            <RuleNavigation />
+            <DocumentationNavigation />
           </div>
         </aside>
 
@@ -81,8 +105,7 @@ const Documentation = () => {
             Documentation
           </h1>
           <p className='text-muted-foreground mt-4 text-lg'>
-            A reference for all {ruleCount} diagnostic rules in just-lsp: what
-            they check, why they report a problem, and how to fix it.
+            Configuration options and diagnostics for just-lsp.
           </p>
 
           <details className='my-8 rounded-md border p-4 lg:hidden'>
@@ -90,16 +113,46 @@ const Documentation = () => {
               On this page
             </summary>
             <div className='mt-4 max-h-96 overflow-y-auto'>
-              <RuleNavigation />
+              <DocumentationNavigation />
             </div>
           </details>
 
-          <section aria-labelledby='rules' className='mt-12'>
+          <section aria-labelledby='configuration' className='mt-12'>
+            <h2
+              id='configuration'
+              className='scroll-mt-6 text-xl font-semibold tracking-tight'
+            >
+              Configuration
+            </h2>
+            <DocumentationMarkdown>{configuration}</DocumentationMarkdown>
+            {configurationSections.map((section) => (
+              <section
+                key={section.id}
+                aria-labelledby={section.id}
+                className='mt-10'
+              >
+                <h3
+                  id={section.id}
+                  className='scroll-mt-6 text-lg font-semibold tracking-tight'
+                >
+                  <a
+                    href={`#${section.id}`}
+                    className='hover:underline hover:underline-offset-4'
+                  >
+                    {section.title}
+                  </a>
+                </h3>
+                <DocumentationMarkdown>{section.content}</DocumentationMarkdown>
+              </section>
+            ))}
+          </section>
+
+          <section aria-labelledby='rules' className='mt-16'>
             <h2
               id='rules'
               className='scroll-mt-6 text-xl font-semibold tracking-tight'
             >
-              Diagnostic rules
+              Diagnostics
             </h2>
             <DocumentationMarkdown>{overview}</DocumentationMarkdown>
           </section>
