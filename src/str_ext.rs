@@ -61,8 +61,7 @@ impl StrExt for str {
           rows += 1;
           column = 0;
         }
-        '\n' | '\u{000B}' | '\u{000C}' | '\u{0085}' | '\u{2028}'
-        | '\u{2029}' => {
+        '\n' => {
           rows += 1;
           column = 0;
         }
@@ -143,5 +142,16 @@ mod tests {
   #[test]
   fn newline_moves_to_next_row_and_resets_column() {
     assert_eq!("hi\n😊".point_delta(), Point::new(1, "😊".len()));
+  }
+
+  #[test]
+  fn unicode_line_separators_advance_columns() {
+    for separator in
+      ['\u{000B}', '\u{000C}', '\u{0085}', '\u{2028}', '\u{2029}']
+    {
+      let text = format!("foo{separator}bar");
+
+      assert_eq!(text.point_delta(), Point::new(0, text.len()));
+    }
   }
 }

@@ -2202,6 +2202,87 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn did_change_handles_multibyte_characters() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///foo.just",
+        text: "# ─🧪\nfoo:\n  echo '─🧪'",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///foo.just",
+        version: 2,
+        changes: vec![
+          lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(0, 2, 0, u32::MAX)),
+            range_length: None,
+            text: "bar".into(),
+          },
+          lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(2, 8, 2, u32::MAX)),
+            range_length: None,
+            text: "🧪bar'".into(),
+          },
+        ],
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///foo.just",
+        line: 1,
+        character: 1,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo '🧪bar'",
+        kind: "plaintext",
+        start_line: 1,
+        start_char: 0,
+        end_line: 1,
+        end_char: 3,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_preserves_unicode_line_separators() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///foo.just",
+        text: "foo:\n  echo 'foo\u{2028}bar'\n\nbaz: foo",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///foo.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(1, 12, 1, 15)),
+          range_length: None,
+          text: "baz\u{2029}qux".into(),
+        }],
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///foo.just",
+        line: 3,
+        character: 6,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo 'foo\u{2028}baz\u{2029}qux'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn did_change_updates_document() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -2219,7 +2300,7 @@ mod tests {
         uri: "file:///test.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(1, 7, 1, 13)),
+          range: Some(lsp::Range::at(1, 7, 2, 0)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
