@@ -38,7 +38,12 @@ impl Import {
     };
 
     let raw = if shell_expanded {
-      shellexpand::full(&cooked)?.into_owned()
+      shellexpand::full_with_context(
+        &cooked,
+        || env::home_dir()?.into_os_string().into_string().ok(),
+        |name| env::var(name).map(Some),
+      )?
+      .into_owned()
     } else {
       cooked
     };
@@ -48,7 +53,7 @@ impl Import {
     }
 
     Ok(if let Some(rest) = raw.strip_prefix("~/") {
-      dirs::home_dir().map(|home| home.join(rest))
+      env::home_dir().map(|home| home.join(rest))
     } else {
       base_uri
         .file_path()
@@ -96,15 +101,22 @@ mod tests {
 
   #[test]
   fn home_directory() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str, expected: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(
-      import("'~/bar.just'").resolve(&base).unwrap().unwrap(),
-      dirs::home_dir().unwrap().join("bar.just"),
-    );
+      assert_eq!(
+        import(source).resolve(&base).unwrap().unwrap(),
+        env::home_dir().unwrap().join(expected),
+      );
+    }
+
+    case("'~/bar.just'", "bar.just");
+    case("x'~/bar.just'", "bar.just");
+    case("x'~'", "");
   }
 
   #[test]
