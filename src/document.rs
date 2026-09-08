@@ -122,30 +122,6 @@ impl Document {
       .collect()
   }
 
-  #[must_use]
-  pub fn find_function(&self, name: &str) -> Option<Function> {
-    self
-      .functions()
-      .into_iter()
-      .find(|function| function.name.value == name)
-  }
-
-  #[must_use]
-  pub fn find_recipe(&self, name: &str) -> Option<Recipe> {
-    self
-      .recipes()
-      .into_iter()
-      .find(|recipe| recipe.name.value == name)
-  }
-
-  #[must_use]
-  pub fn find_variable(&self, name: &str) -> Option<Variable> {
-    self
-      .variables()
-      .into_iter()
-      .find(|var| var.name.value == name)
-  }
-
   /// # Errors
   ///
   /// Returns an [`Error`] if formatting fails.
@@ -664,77 +640,6 @@ mod tests {
         range: lsp::Range::at(1, 6, 2, 0),
       }]
     );
-  }
-
-  #[test]
-  fn find_function() {
-    let document = Document::from(indoc! {
-      "
-      foo(x) := x + \"!\"
-      "
-    });
-
-    assert!(document.find_function("foo").is_some());
-    assert!(document.find_function("bar").is_none());
-  }
-
-  #[test]
-  fn find_nonexistent_recipe() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    assert_eq!(document.find_recipe("nonexistent"), None);
-  }
-
-  #[test]
-  fn find_recipe() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("foo").unwrap(),
-      Recipe {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
-        parameters: vec![],
-        range: lsp::Range::at(0, 0, 3, 0),
-        shebang: None,
-      }
-    );
-
-    assert_eq!(
-      document.find_recipe("bar").unwrap(),
-      Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        content: "bar:\n  echo \"bar\"".into(),
-        parameters: vec![],
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      }
-    );
-
-    assert!(document.find_recipe("baz").is_none());
   }
 
   #[test]
@@ -1905,35 +1810,33 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
+      document.recipes(),
+      vec![
+        Recipe {
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(0, 0, 0, 3)
+          },
+          attributes: vec![],
+          dependencies: vec![],
+          parameters: vec![],
+          content: "foo:\n  echo \"foo\"".into(),
+          range: lsp::Range::at(0, 0, 3, 0),
+          shebang: None,
         },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
-        range: lsp::Range::at(0, 0, 3, 0),
-        shebang: None,
-      })
-    );
-
-    assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![],
-        content: "bar:\n  echo \"bar\"".into(),
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      })
+        Recipe {
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(3, 0, 3, 3)
+          },
+          attributes: vec![],
+          dependencies: vec![],
+          parameters: vec![],
+          content: "bar:\n  echo \"bar\"".into(),
+          range: lsp::Range::at(3, 0, 5, 0),
+          shebang: None,
+        }
+      ]
     );
   }
 
@@ -2062,7 +1965,7 @@ mod tests {
       "
     });
 
-    let recipe = document.find_recipe("foo").unwrap();
+    let recipe = &document.recipes()[0];
 
     assert_eq!(recipe.attributes.len(), 3);
 
@@ -2121,7 +2024,7 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo").unwrap().parameters,
+      document.recipes()[0].parameters,
       vec![Parameter {
         name: "triple".into(),
         kind: ParameterKind::Normal,
@@ -2143,8 +2046,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2174,7 +2077,7 @@ mod tests {
             .into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2191,8 +2094,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2212,7 +2115,7 @@ mod tests {
         content: "bar: foo\n  echo \"bar\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2229,8 +2132,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2261,7 +2164,7 @@ mod tests {
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2269,13 +2172,7 @@ mod tests {
   fn recipe_with_exported_variadic_parameter() {
     #[track_caller]
     fn case(source: &str, expected: VariadicType) {
-      let parameter = Document::from(source)
-        .find_recipe("foo")
-        .unwrap()
-        .parameters
-        .into_iter()
-        .next()
-        .unwrap();
+      let parameter = &Document::from(source).recipes()[0].parameters[0];
 
       assert!(parameter.export);
       assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
@@ -2289,13 +2186,7 @@ mod tests {
   fn recipe_with_invalid_parameters() {
     #[track_caller]
     fn case(source: &str) {
-      assert_eq!(
-        Document::from(source)
-          .find_recipe("foo")
-          .unwrap()
-          .parameters,
-        vec![],
-      );
+      assert_eq!(Document::from(source).recipes()[0].parameters, vec![]);
     }
 
     case("foo $:\n");
@@ -2316,8 +2207,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2355,7 +2246,7 @@ mod tests {
         content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2375,8 +2266,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[2],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(6, 0, 6, 3)
@@ -2396,7 +2287,7 @@ mod tests {
         content: "baz: tools::foo\n  echo \"baz\"".into(),
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2416,8 +2307,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[2],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(6, 0, 6, 3)
@@ -2449,7 +2340,7 @@ mod tests {
         content: "baz: foo bar\n  echo \"baz\"".into(),
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2463,8 +2354,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2492,7 +2383,7 @@ mod tests {
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2506,7 +2397,7 @@ mod tests {
       "
     });
 
-    let recipe = document.find_recipe("foo").unwrap();
+    let recipe = &document.recipes()[0];
 
     assert_eq!(
       recipe.shebang,
@@ -2519,7 +2410,7 @@ mod tests {
 
   #[test]
   fn recipe_with_subsequent_dependency() {
-    let recipe = Document::from(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -2530,14 +2421,12 @@ mod tests {
       baz: foo && bar
         echo \"baz\"
       "
-    })
-    .find_recipe("baz")
-    .unwrap();
+    });
 
     assert_eq!(
-      recipe
+      document.recipes()[2]
         .dependencies
-        .into_iter()
+        .iter()
         .map(|dependency| dependency.phase)
         .collect::<Vec<_>>(),
       vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
@@ -2554,8 +2443,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2585,7 +2474,7 @@ mod tests {
             .into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2598,7 +2487,7 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo").unwrap().parameters,
+      document.recipes()[0].parameters,
       vec![Parameter {
         name: "FLAGS".into(),
         kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
@@ -2620,8 +2509,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2632,7 +2521,7 @@ mod tests {
         content: "foo:\n  echo \"foo\"".into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 }

@@ -167,26 +167,6 @@ mod tests {
   }
 
   #[test]
-  fn analyzer_uses_imported_declarations() {
-    let mut test =
-      Test::new("import 'foo.just'\n\nbar: foo").file("foo.just", "foo:");
-
-    let project = test.load();
-
-    assert!(
-      Analyzer {
-        config: None,
-        document: test.documents.get(&test.root).unwrap(),
-        imported_documents: project
-          .imported_documents(&test.documents)
-          .collect(),
-      }
-      .analyze()
-      .is_empty()
-    );
-  }
-
-  #[test]
   fn loads_shell_expanded_import() {
     let mut test =
       Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");

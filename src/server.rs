@@ -90,30 +90,25 @@ impl Server {
       let workspace = self.workspace.read().await;
       let config = self.config.read().await;
 
-      match workspace.documents.get_open(uri) {
-        Some(document) => {
-          let imported_documents =
-            workspace.projects.get(uri).into_iter().flat_map(|project| {
-              project.imported_documents(&workspace.documents)
-            });
+      let Some(view) = workspace.project_view(uri) else {
+        return;
+      };
 
-          let analyzer = Analyzer {
-            config: Some(&config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
+      let version = view.document().version;
 
-          (
-            analyzer
-              .analyze()
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            document.version,
-          )
-        }
-        None => return,
-      }
+      let analyzer = Analyzer {
+        config: Some(&config),
+        view,
+      };
+
+      (
+        analyzer
+          .analyze()
+          .into_iter()
+          .map(lsp::Diagnostic::from)
+          .collect(),
+        version,
+      )
     };
 
     self
@@ -208,11 +203,11 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    let Some(document) =
-      workspace.documents.get_open(&params.text_document.uri)
-    else {
+    let Some(view) = workspace.project_view(&params.text_document.uri) else {
       return Ok(None);
     };
+
+    let document = view.document();
 
     let mut actions = Vec::new();
 
@@ -241,16 +236,9 @@ impl LanguageServer for Server {
       }));
     }
 
-    let imported_documents = workspace
-      .projects
-      .get(&params.text_document.uri)
-      .into_iter()
-      .flat_map(|project| project.imported_documents(&workspace.documents));
-
     let analyzer = Analyzer {
       config: Some(&config),
-      document,
-      imported_documents: imported_documents.collect(),
+      view,
     };
 
     let diagnostics = analyzer

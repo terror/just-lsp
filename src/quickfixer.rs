@@ -141,8 +141,18 @@ mod tests {
 
       let analyzer = Analyzer {
         config: Some(&config),
-        document: &document,
-        imported_documents: imported_documents.iter().collect(),
+        view: ProjectView {
+          document: &document,
+          documents: once(&document)
+            .chain(&imported_documents)
+            .enumerate()
+            .map(|(traversal_order, document)| ProjectViewDocument {
+              document,
+              load_depth: usize::from(traversal_order > 0),
+              traversal_order,
+            })
+            .collect(),
+        },
       };
 
       let actual_diagnostics = analyzer
