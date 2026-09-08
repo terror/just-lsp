@@ -259,7 +259,13 @@ impl<'doc> Tokenizer<'doc> {
     let source = self.document.content.to_string();
 
     let highlight_iter = highlighter
-      .highlight(&HIGHLIGHT_CONFIGURATION, source.as_bytes(), None, |_| None)
+      .highlight(
+        &HIGHLIGHT_CONFIGURATION,
+        source.as_bytes(),
+        None,
+        None,
+        |_| None,
+      )
       .map_err(|error| anyhow!("Failed to highlight document: {error}"))?;
 
     let mut highlight_stack = Vec::new();

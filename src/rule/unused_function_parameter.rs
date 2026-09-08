@@ -1,8 +1,6 @@
 use super::*;
 
 define_rule! {
-  /// Highlights user-defined function parameters that are never referenced in
-  /// the function body.
   UnusedFunctionParameterRule {
     id: "unused-function-parameter",
     message: "unused function parameter",
@@ -15,46 +13,28 @@ define_rule! {
 
       tree
         .root_node()
-        .find_all("function_definition")
+        .find_all("function_parameters > identifier")
         .into_iter()
-        .flat_map(|function_node| {
-          let Some(body_node) = function_node
+        .filter(|parameter| !parameter.is_missing())
+        .filter_map(|parameter| {
+          let body = parameter
+            .get_parent("function_definition")?
             .child_by_field_name("body")
-            .filter(|body_node| !body_node.is_missing())
-          else {
-            return Vec::new();
-          };
+            .filter(|body| !body.is_missing())?;
 
-          let used = body_node
+          let name = document.get_node_text(&parameter);
+
+          let used = body
             .find_all("value > identifier")
-            .into_iter()
-            .map(|identifier_node| document.get_node_text(&identifier_node))
-            .collect::<HashSet<_>>();
+            .iter()
+            .any(|identifier| document.get_node_text(identifier) == name);
 
-          let Some(parameters_node) =
-            function_node.child_by_field_name("parameters")
-          else {
-            return Vec::new();
-          };
-
-          parameters_node
-            .find_all("^identifier")
-            .into_iter()
-            .filter_map(move |parameter_node| {
-              if parameter_node.is_missing() {
-                return None;
-              }
-
-              let name = document.get_node_text(&parameter_node);
-
-              (!name.starts_with('_') && !used.contains(&name)).then(|| {
-                Diagnostic::warning(
-                  format!("Function parameter `{name}` appears unused"),
-                  parameter_node.get_range(document),
-                )
-              })
-            })
-            .collect::<Vec<_>>()
+          (!name.starts_with('_') && !used).then(|| {
+            Diagnostic::warning(
+              format!("Function parameter `{name}` appears unused"),
+              parameter.get_range(document),
+            )
+          })
         })
         .collect()
     }

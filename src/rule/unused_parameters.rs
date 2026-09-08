@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Highlights recipe parameters that never get read anywhere in the recipe body
-  /// (unless `set export` is on).
+  /// Highlights recipe parameters that never get read anywhere in the recipe
+  /// body (unless `set export` is on).
   UnusedParameterRule {
     id: "unused-parameters",
     message: "unused parameter",
@@ -13,14 +13,18 @@ define_rule! {
 
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
-      context
-        .scope()
-        .recipe_identifier_usage
+      let recipes = context.document().recipes();
+
+      recipes
         .iter()
-        .filter_map(|(recipe_name, identifiers)| {
-          context.recipe(recipe_name).map(|recipe| (recipe, identifiers))
+        .filter_map(|recipe| {
+          context
+            .scope()
+            .recipe_identifier_usage
+            .get(&recipe.name.value)
+            .map(|identifiers| (recipe, identifiers))
         })
-        .flat_map(|(recipe, identifiers): (&Recipe, _)| {
+        .flat_map(|(recipe, identifiers)| {
           let recipe_enables_positional_arguments =
             positional_arguments_enabled || recipe.has_attribute("positional-arguments");
 

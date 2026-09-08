@@ -1,7 +1,7 @@
 use {
   anyhow::Error,
   executable_path::executable_path,
-  indoc::indoc,
+  indoc::{formatdoc, indoc},
   pretty_assertions::assert_eq,
   std::{fs, iter::once, path::PathBuf, process::Command, str},
   tempfile::TempDir,
@@ -13,10 +13,12 @@ type Result<T = (), E = Error> = std::result::Result<T, E>;
 struct Test<'a> {
   arguments: Vec<String>,
   directory: Option<String>,
+  environment: Vec<(String, String)>,
   expected_status: i32,
   expected_stderr: String,
   expected_stdout: String,
   files: Vec<(&'a str, &'a str)>,
+  removed_environment: Vec<String>,
   tempdir: TempDir,
 }
 
@@ -39,9 +41,14 @@ impl<'a> Test<'a> {
       .arg("analyze")
       .env("NO_COLOR", "1")
       .env("RUST_BACKTRACE", "0")
+      .envs(self.environment.iter().map(|(name, value)| (name, value)))
       .current_dir(self.current_dir());
 
     command.args(&self.arguments);
+
+    for name in &self.removed_environment {
+      command.env_remove(name);
+    }
 
     command
   }
@@ -57,6 +64,17 @@ impl<'a> Test<'a> {
   fn directory(self, directory: &str) -> Self {
     Self {
       directory: Some(directory.to_owned()),
+      ..self
+    }
+  }
+
+  fn environment(self, name: &str, value: &str) -> Self {
+    Self {
+      environment: self
+        .environment
+        .into_iter()
+        .chain(once((name.to_owned(), value.to_owned())))
+        .collect(),
       ..self
     }
   }
@@ -97,10 +115,12 @@ impl<'a> Test<'a> {
     Ok(Self {
       arguments: Vec::new(),
       directory: None,
+      environment: Vec::new(),
       expected_status: 0,
       expected_stderr: String::new(),
       expected_stdout: String::new(),
       files: Vec::new(),
+      removed_environment: Vec::new(),
       tempdir: TempDir::with_prefix("just-lsp-test")?,
     })
   }
@@ -129,6 +149,17 @@ impl<'a> Test<'a> {
         .replace(&canonical_root, "[ROOT]")
         .replace(&root, "[ROOT]"),
     )
+  }
+
+  fn remove_environment(self, name: &str) -> Self {
+    Self {
+      removed_environment: self
+        .removed_environment
+        .into_iter()
+        .chain(once(name.to_owned()))
+        .collect(),
+      ..self
+    }
   }
 
   fn run(self) -> Result {
@@ -234,6 +265,32 @@ fn analyze_accepts_imported_recipe() -> Result {
   Test::new()?
     .file("foo.just", "foo:\n")
     .file("justfile", "import 'foo.just'\n\nbar: foo\n")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_accepts_optional_empty_shell_expanded_import() -> Result {
+  Test::new()?
+    .file("justfile", "import? x'$JUST_LSP_TEST_EMPTY_IMPORT'\n")
+    .environment("JUST_LSP_TEST_EMPTY_IMPORT", "")
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_accepts_shell_expanded_import() -> Result {
+  let test = Test::new()?;
+
+  let path = test.tempdir.path().join("foo.just").display().to_string();
+
+  test
+    .file("foo.just", "foo:\n  echo {{project}}\n")
+    .file(
+      "justfile",
+      "project := 'just-lsp'\nimport x\"$JUST_LSP_TEST_IMPORT\"\n\nbar: foo\n",
+    )
+    .environment("JUST_LSP_TEST_IMPORT", &path)
     .argument("justfile")
     .run()
 }
@@ -374,6 +431,27 @@ fn analyze_reports_diagnostics_for_parent_justfile() -> Result {
 }
 
 #[test]
+fn analyze_reports_empty_shell_expanded_import() -> Result {
+  Test::new()?
+    .file("justfile", "import x'$JUST_LSP_TEST_EMPTY_IMPORT'\n")
+    .environment("JUST_LSP_TEST_EMPTY_IMPORT", "")
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      "
+      error[invalid-import-path]: invalid import path
+         ╭─[ justfile:1:8 ]
+         │
+       1 │ import x'$JUST_LSP_TEST_EMPTY_IMPORT'
+         │        ───────────────┬──────────────
+         │                       ╰──────────────── Import path is empty
+      ───╯
+      "
+    })
+    .run()
+}
+
+#[test]
 fn analyze_reports_errors_and_fails() -> Result {
   Test::new()?
     .file(
@@ -436,6 +514,40 @@ fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
       "#
     })
     .run()
+}
+
+#[test]
+fn analyze_reports_shell_expansion_error() -> Result {
+  #[track_caller]
+  fn case(attributes: &str) -> Result {
+    let source =
+      format!("{attributes}import? x'$JUST_LSP_TEST_MISSING_IMPORT'\n");
+
+    let line = attributes.lines().count() + 1;
+
+    Test::new()?
+      .file("justfile", &source)
+      .remove_environment("JUST_LSP_TEST_MISSING_IMPORT")
+      .argument("justfile")
+      .expected_status(1)
+      .expected_stdout(&formatdoc! {
+        "
+        error[invalid-import-path]: invalid import path
+           ╭─[ justfile:{line}:9 ]
+           │
+         {line} │ import? x'$JUST_LSP_TEST_MISSING_IMPORT'
+           │         ────────────────┬───────────────
+           │                         ╰───────────────── Shell expansion failed: error looking key 'JUST_LSP_TEST_MISSING_IMPORT' up: environment variable not found
+        ───╯
+        "
+      })
+      .run()
+  }
+
+  let attribute = if cfg!(windows) { "unix" } else { "windows" };
+
+  case("")?;
+  case(&format!("[{attribute}]\n"))
 }
 
 #[test]

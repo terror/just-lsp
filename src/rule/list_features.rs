@@ -58,7 +58,7 @@ impl ListFeaturesRule {
 
   fn condition_comparison_operator(node: Node<'_>) -> Option<Node<'_>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| child.kind() == "expression")
       .and_then(Self::comparison_operator)
   }
@@ -77,7 +77,7 @@ impl ListFeaturesRule {
 
   fn if_token(node: Node<'_>) -> Option<Node<'_>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| child.kind() == "if")
   }
 
@@ -111,7 +111,7 @@ impl ListFeaturesRule {
     operators: &[&str],
   ) -> Option<Node<'tree>> {
     (0..node.child_count())
-      .filter_map(|index| node.child(index.try_into().ok()?))
+      .filter_map(|index| node.child(index))
       .find(|child| operators.contains(&child.kind()))
   }
 
@@ -204,9 +204,7 @@ impl ListFeaturesRule {
     }
 
     for index in 0..node.child_count() {
-      if let Ok(index) = index.try_into()
-        && let Some(child) = node.child(index)
-      {
+      if let Some(child) = node.child(index) {
         Self::validate_node(context, document, child, diagnostics);
       }
     }

@@ -192,7 +192,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
   }
 
   if (valid_symbols[INDENT] || valid_symbols[DEDENT]) {
-    while (!lexer->eof(lexer) && isspace(lexer->lookahead)) {
+    while (!lexer->eof(lexer) && iswspace(lexer->lookahead)) {
       switch (lexer->lookahead) {
       case '\n':
         if (valid_symbols[INDENT]) {

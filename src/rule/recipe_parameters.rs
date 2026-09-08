@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Validates recipe parameter lists for duplicate names, ordering mistakes, and
-  /// illegal variadic/default combinations.
+  /// Validates recipe parameter lists for duplicate names, ordering mistakes,
+  /// and illegal variadic/default combinations.
   RecipeParameterRule {
     id: "recipe-parameters",
     message: "invalid recipe parameters",

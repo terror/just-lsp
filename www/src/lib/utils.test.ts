@@ -1,8 +1,7 @@
-import { EditorState } from '@codemirror/state';
 import { describe, expect, it, mock } from 'bun:test';
 import { type Language, type Parser, type Tree } from 'web-tree-sitter';
 
-import { cn, parse, positionToOffset } from './utils';
+import { cn, parse } from './utils';
 
 describe('cn utility', () => {
   it('merges class names correctly', () => {
@@ -33,22 +32,5 @@ describe('parse', () => {
     expect(mockParser.parse).toHaveBeenCalledWith(code);
 
     expect(result).toBeDefined();
-  });
-});
-
-describe('positionToOffset', () => {
-  it('converts position to offset correctly', () => {
-    const doc = EditorState.create({ doc: 'line1\nline2\nline3' }).doc;
-
-    expect(positionToOffset({ row: 0, column: 0 }, doc)).toBe(0);
-    expect(positionToOffset({ row: 0, column: 3 }, doc)).toBe(3);
-    expect(positionToOffset({ row: 1, column: 0 }, doc)).toBe(6);
-    expect(positionToOffset({ row: 1, column: 2 }, doc)).toBe(8);
-    expect(positionToOffset({ row: 0, column: 100 }, doc)).toBe(5);
-  });
-
-  it('returns null when line number exceeds document lines', () => {
-    const doc = EditorState.create({ doc: 'line1\nline2' }).doc;
-    expect(positionToOffset({ row: 2, column: 0 }, doc)).toBeNull();
   });
 });

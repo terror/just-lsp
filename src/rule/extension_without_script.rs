@@ -1,7 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Reports recipes that use the `[extension]` attribute without `[script]` or a shebang.
+  /// Reports recipes that use the `[extension]` attribute without `[script]` or
+  /// a shebang.
   ExtensionWithoutScriptRule {
     id: "extension-without-script",
     message: "extension without script",
