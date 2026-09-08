@@ -7,6 +7,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | Code                              | Name                            | Description                                                                                                                   |
 | --------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `syntax-errors`                   | Syntax Errors                   | Parse tree contains errors or missing nodes.                                                                                  |
+| `backtick-shebang`                | Backtick Shebang                | Backtick expression begins with the reserved `#!` sequence.                                                                   |
 | `missing-recipe-for-alias`        | Missing Recipe for Alias        | Alias points to a recipe that doesn't exist.                                                                                  |
 | `duplicate-alias`                 | Duplicate Alias                 | Alias name is defined more than once.                                                                                         |
 | `alias-recipe-conflict`           | Alias/Recipe Conflict           | Alias and recipe share a name and would shadow each other.                                                                    |
@@ -19,7 +20,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `attribute-target-support`        | Attribute Target Support        | Attribute is used on an unsupported target kind.                                                                              |
 | `cache-attribute`                 | Cache Attribute                 | `[cache]` uses an unknown keyword, a keyword without a value, or a positional argument.                                      |
 | `cache-without-script`            | Cache Without Script Mode       | Recipe uses `[cache]` without script mode.                                                                                    |
-| `duplicate-attribute`             | Duplicate Attribute             | Attributes that must be unique or group values appear more than once on a target, or `[default]` appears more than once in a module. |
+| `duplicate-attribute`             | Duplicate Attribute             | A target repeats a unique attribute or group value, or `[default]` appears more than once in a module.                         |
 | `script-shell-conflict`           | Script Shell Conflict           | Recipe combines mutually exclusive `[script]` and `[shell]` attributes.                                                       |
 | `exit-message-conflict`           | Exit Message Conflict           | Recipe combines mutually exclusive `[exit-message]` and `[no-exit-message]` attributes.                                       |
 | `extension-without-script`        | Extension Without Script        | Recipe uses `[extension]` without `[script]` or a shebang, so the attribute has no effect.                                    |
@@ -31,7 +32,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `dependency-arguments`            | Dependency Arguments            | Dependency invocation provides the wrong number of arguments.                                                                 |
 | `mapped-dependencies`             | Mapped Dependencies             | Mapped dependencies require `set lists`, at least one starred argument, and at most one starred argument.                      |
 | `parallel-dependencies`           | Parallel Dependencies           | Warning: `[parallel]` is applied to a recipe with fewer than two dependencies, so it has no effect.                           |
-| `working-directory-conflict`      | Working Directory Conflict      | Recipe combines mutually exclusive `[no-cd]` and `[working-directory]` attributes.                                            |
+| `working-directory-conflict`      | Working Directory Conflict      | Recipe attributes or global settings combine mutually exclusive `no-cd` and `working-directory` behavior.                     |
 | `mixed-recipe-indentation`        | Mixed Recipe Indentation        | Recipe body mixes tabs and spaces for indentation.                                                                            |
 | `inconsistent-recipe-indentation` | Inconsistent Recipe Indentation | Recipe indentation width changes after the first indented line.                                                               |
 | `unknown-function`                | Unknown Function                | Call targets a function that isn't a builtin or user-defined function.                                                        |
@@ -39,6 +40,9 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `deprecated-function`             | Deprecated Function             | Warning: function call uses a deprecated builtin function with a replacement.                                                 |
 | `duplicate-function`              | Duplicate Function              | User-defined function name is defined more than once.                                                                         |
 | `function-parameters`             | Function Parameters             | User-defined function parameter list has duplicates.                                                                          |
+| `unstable-feature-gate`           | Unstable Feature Gate           | Warning: `set lists`, user-defined functions, or `[cache]` are used without `set unstable` in the document or its imports.       |
+| `unused-function`                 | Unused Function                 | Warning: user-defined function is never called in the document or its imports.                                                 |
+| `unused-function-parameter`       | Unused Function Parameter       | Warning: user-defined function parameter is never referenced in the function body unless its name begins with `_`.             |
 | `list-features`                   | List Features                   | Syntax and builtins that require `set lists` are used without enabling it.                                                    |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
 | `invalid-setting-kind`            | Invalid Setting Kind            | Setting is assigned a value of the wrong type.                                                                                |
@@ -49,7 +53,8 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `duplicate-unexport`              | Duplicate Unexport              | Environment variable name is unexported more than once.                                                                       |
 | `export-unexport-conflict`        | Export/Unexport Conflict        | Variable is both assigned and unexported.                                                                                     |
 | `undefined-identifiers`           | Undefined Identifiers           | Expression identifier cannot be resolved to a parameter, variable, builtin, or user-defined function.                         |
-| `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced.                                                                    |
+| `unused-variables`                | Unused Variables                | Warning: non-exported global variable is never referenced in the document or its imports.                                      |
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
+| `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
-| `invalid-import-path`             | Invalid Import Path             | Literal non-optional import path points to a path that does not exist on disk.                                                |
+| `invalid-import-path`             | Invalid Import Path             | Import path cannot be decoded or expanded, or an enabled non-optional import has an empty or missing path.                   |

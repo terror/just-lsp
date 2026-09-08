@@ -1,11 +1,14 @@
 use super::*;
 
 define_rule! {
-  /// Reports recipes that use the `[extension]` attribute without `[script]` or a shebang.
+  /// Reports recipes that use the `[extension]` attribute without `[script]` or
+  /// a shebang.
   ExtensionWithoutScriptRule {
     id: "extension-without-script",
     message: "extension without script",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       let mut diagnostics = Vec::new();
 
       for recipe in context.recipes() {
@@ -13,7 +16,7 @@ define_rule! {
           continue;
         };
 
-        if recipe.has_attribute("script") || recipe.shebang.is_some() {
+        if recipe.runs_as_script(default_script) {
           continue;
         }
 

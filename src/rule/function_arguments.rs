@@ -1,21 +1,36 @@
 use super::*;
 
 define_rule! {
-  /// Verifies builtin function calls use a valid argument count and respect
-  /// variadic constraints.
+  /// Verifies function calls use a valid argument count and respect variadic
+  /// constraints.
   FunctionArgumentsRule {
     id: "function-arguments",
     message: "invalid function arguments",
     run(context) {
       let mut diagnostics = Vec::new();
 
+      let functions = context.view().resolved_functions();
+
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if let Some(Builtin::Function { kind, .. }) =
+        if let Some(function) = functions.get(function_name) {
+          let (argument_count, parameter_count) =
+            (function_call.arguments.len(), function.parameters.len());
+
+          if argument_count != parameter_count {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Function `{function_name}` accepts {parameter_count} {}, but {argument_count} provided",
+                Count("argument", parameter_count)
+              ),
+              function_call.range,
+            ));
+          }
+        } else if let Some(Builtin::Function { signature, .. }) =
           context.builtin_function(function_name.as_str())
         {
-          let range = kind.argument_range();
+          let range = signature.argument_range();
 
           let (min, max) = (*range.start(), *range.end());
 
@@ -39,22 +54,6 @@ define_rule! {
             diagnostics.push(Diagnostic::error(
               format!(
                 "Function `{function_name}` accepts {upper}, but {argument_count} provided"
-              ),
-              function_call.range,
-            ));
-          }
-        } else if let Some(function) = context
-          .functions()
-          .iter()
-          .find(|function| function.name.value == *function_name)
-        {
-          let (argument_count, parameter_count) = (function_call.arguments.len(), function.parameters.len());
-
-          if argument_count != parameter_count {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "Function `{function_name}` accepts {parameter_count} {}, but {argument_count} provided",
-                Count("argument", parameter_count)
               ),
               function_call.range,
             ));

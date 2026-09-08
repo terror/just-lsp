@@ -1,13 +1,12 @@
 [package]
 name = "just-lsp"
-version = "0.5.1"
+version = "0.7.1"
 description = "A language server for just"
 authors = ["Liam <liam@scalzulli.com>"]
 license = "CC0-1.0"
 homepage = "https://github.com/terror/just-lsp"
 repository = "https://github.com/terror/just-lsp"
 edition = "2024"
-exclude = ["/screenshot.png", "/www"]
 categories = ["development-tools"]
 keywords = ["productivity", "compilers", "language-servers", "just", "tree-sitter"]
 resolver = "2"
@@ -46,33 +45,38 @@ codegen-units = 1
 lto = true
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.104"
 ariadne = "0.6.0"
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 dirs = "6.0.0"
 indoc = "2.0.7"
-inventory = "0.3"
+inventory = "0.3.24"
 lexiclean = "0.0.2"
-ropey = "1.6.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-target = "2.1.0"
+ropey = { version = "1.6.1", default-features = false, features = ["cr_lines", "simd"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+shellexpand = "3.1.0"
+strsim = "0.11.1"
 tempfile = "3.27.0"
-thiserror = "2"
-tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.18", features = ["io-util"] }
+thiserror = "2.0.20"
 tower-lsp = { workspace = true }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tree-sitter = "0.26.9"
-tree-sitter-highlight = "0.26.9"
+tree-sitter = "0.27.0"
+tree-sitter-highlight = "0.27.0"
 yansi = "1.0.1"
 
 [dev-dependencies]
 executable-path = "1.0.1"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.150"
 tower-test = "0.4.0"
 
 [build-dependencies]
-cc = "1.2.62"
+cc = "1.4.5"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1.53.1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.19", features = ["io-util"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+tree-sitter-language = "0.1.8"

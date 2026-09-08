@@ -1,31 +1,37 @@
 use super::*;
 
 define_rule! {
-  /// Highlights recipe parameters that never get read anywhere in the recipe body
-  /// (unless `set export` is on).
+  /// Highlights recipe parameters that never get read anywhere in the recipe
+  /// body (unless `set export` is on).
   UnusedParameterRule {
     id: "unused-parameters",
     message: "unused parameter",
     run(context) {
+      let default_script = context.setting_enabled("default-script");
+
       let exported = context.setting_enabled("export");
 
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
-      context
-        .scope()
-        .recipe_identifier_usage
+      let recipes = context.document().recipes();
+
+      recipes
         .iter()
-        .filter_map(|(recipe_name, identifiers)| {
-          context.recipe(recipe_name).map(|recipe| (recipe, identifiers))
+        .filter_map(|recipe| {
+          context
+            .scope()
+            .recipe_identifier_usage
+            .get(&recipe.name.value)
+            .map(|identifiers| (recipe, identifiers))
         })
-        .flat_map(|(recipe, identifiers): (&Recipe, _)| {
+        .flat_map(|(recipe, identifiers)| {
           let recipe_enables_positional_arguments =
             positional_arguments_enabled || recipe.has_attribute("positional-arguments");
 
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
               UnusedParameterRule::positional_argument_indices(recipe),
-              recipe.shebang.is_some()
+              recipe.runs_as_script(default_script)
                 || UnusedParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {
@@ -36,7 +42,7 @@ define_rule! {
             let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
             let is_unused = !identifiers.contains(&parameter.name)
-              && parameter.kind != ParameterKind::Export
+              && !parameter.export
               && !exported
               && !used_via_position;
 

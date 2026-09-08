@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Finds non-exported global variables that are never referenced anywhere in
-  /// the document.
+  /// Finds non-exported global variables that are never referenced in the
+  /// document or any of its imports.
   UnusedVariableRule {
     id: "unused-variables",
     message: "unused variable",
@@ -15,13 +15,14 @@ define_rule! {
 
       let exported = context.setting_enabled("export");
 
+      let view = ProjectView::from(context.document());
+
       for (variable_name, is_used) in &context.scope().variable_usage {
-        if *is_used {
+        if variable_name.starts_with('_') || *is_used {
           continue;
         }
 
-        let Some(variable) = context.document().find_variable(variable_name)
-        else {
+        let Some(variable) = view.find_variable(variable_name) else {
           continue;
         };
 

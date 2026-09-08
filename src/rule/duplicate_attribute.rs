@@ -2,12 +2,6 @@ use super::*;
 
 const REPEATABLE_ATTRIBUTES: &[&str] = &["arg", "env", "metadata"];
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-enum GroupValue {
-  Cooked(String),
-  Raw(String),
-}
-
 define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
@@ -19,21 +13,15 @@ define_rule! {
 
       let document = context.document();
 
-      let (mut diagnostics, mut default_groups) = (Vec::new(), GroupSet::default());
+      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
-      for recipe in context.document().recipes() {
+      for recipe in document.recipes() {
         for attribute in recipe
           .attributes
           .iter()
           .filter(|attribute| attribute.name.value == "default")
         {
-          let current = GroupSet::from_attributes(&recipe.attributes);
-
-          let duplicate = default_groups.conflicts_with(&current);
-
-          default_groups.union_with(current);
-
-          if duplicate {
+          if conflicts.record(&attribute.name, &recipe.attributes) {
             diagnostics.push(Diagnostic::error(
               format!(
                 "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
@@ -45,10 +33,8 @@ define_rule! {
         }
       }
 
-      let mut target_seen: HashMap<(usize, usize), HashSet<String>> =
-        HashMap::new();
-      let mut target_groups: HashMap<(usize, usize), HashSet<GroupValue>> =
-        HashMap::new();
+      let mut target_seen = HashSet::new();
+      let mut target_groups = HashSet::new();
 
       for attribute_node in tree.root_node().find_all("attribute") {
         let Some(parent) = attribute_node.parent() else {
@@ -69,25 +55,21 @@ define_rule! {
               .siblings()
               .take_while(|node| node.kind() != "identifier")
               .find(|node| node.kind() == "expression")
-              .and_then(|argument| GroupValue::new(argument, document));
+              .and_then(|argument| Self::group_value(argument, document));
 
             let Some(group) = group else {
               continue;
             };
 
-            let seen = target_groups.entry(target_key).or_default();
-
-            if seen.contains(&group) {
+            if !target_groups.insert((target_key, group.clone())) {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "{} attribute `group` with value `{}` is duplicated",
                   target.target_name(),
-                  group.value(),
+                  group.cooked,
                 ),
                 attribute_node.get_range(document),
               ));
-            } else {
-              seen.insert(group);
             }
 
             continue;
@@ -97,7 +79,7 @@ define_rule! {
             continue;
           }
 
-          if context.builtin_attributes(&attribute_name).is_empty() {
+          if context.builtin_attribute(&attribute_name).is_none() {
             continue;
           }
 
@@ -105,9 +87,7 @@ define_rule! {
             continue;
           }
 
-          let seen = target_seen.entry(target_key).or_default();
-
-          if !seen.insert(attribute_name.clone()) {
+          if !target_seen.insert((target_key, attribute_name.clone())) {
             diagnostics.push(Diagnostic::error(
               format!(
                 "{} attribute `{attribute_name}` is duplicated",
@@ -124,26 +104,15 @@ define_rule! {
   }
 }
 
-impl GroupValue {
-  fn new(argument: Node, document: &Document) -> Option<Self> {
+impl DuplicateAttributeRule {
+  fn group_value(argument: Node, document: &Document) -> Option<StringLiteral> {
     let value = argument.find("^value")?;
     let string = value.find("^string")?;
 
-    if string.find("format_string").is_some() {
+    if string.byte_range() != argument.byte_range() {
       return None;
     }
 
-    let group = document.get_node_text(&argument);
-
-    Some(match group.literal() {
-      Some(group) => Self::Cooked(group),
-      None => Self::Raw(group),
-    })
-  }
-
-  fn value(&self) -> &str {
-    match self {
-      Self::Cooked(value) | Self::Raw(value) => value,
-    }
+    StringLiteral::parse(&document.get_node_text(&string)).ok()?
   }
 }

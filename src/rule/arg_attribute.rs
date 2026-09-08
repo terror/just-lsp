@@ -80,24 +80,21 @@ impl ArgAttributeRule {
     attribute: Node,
     parameter_name: &str,
   ) -> bool {
-    let Some(recipe_node) = attribute.get_parent("recipe") else {
-      return false;
-    };
-
-    let Some(name_node) = recipe_node.find("recipe_header > identifier") else {
-      return false;
-    };
-
-    let recipe_name = context.document().get_node_text(&name_node);
-
-    let Some(recipe) = context.recipe(&recipe_name) else {
+    let Some(recipe) = attribute.get_parent("recipe") else {
       return false;
     };
 
     !recipe
-      .parameters
-      .iter()
-      .any(|parameter| parameter.name == parameter_name)
+      .find("recipe_header > parameters")
+      .is_some_and(|parameters| {
+        parameters
+          .find_all("^parameter, ^variadic_parameter")
+          .iter()
+          .filter_map(|parameter| {
+            Parameter::from_node(parameter, context.document())
+          })
+          .any(|parameter| parameter.name == parameter_name)
+      })
   }
 
   fn string_literal_expression(node: Node) -> bool {

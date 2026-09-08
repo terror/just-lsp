@@ -1,11 +1,11 @@
 use super::*;
 
-pub(crate) struct Server(Arc<Inner>);
-
-impl Debug for Server {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Server").finish()
-  }
+pub(crate) struct Server {
+  client: Client,
+  config: RwLock<Config>,
+  executor: Executor,
+  initialized: AtomicBool,
+  workspace: RwLock<Workspace>,
 }
 
 impl Server {
@@ -70,7 +70,51 @@ impl Server {
   }
 
   pub(crate) fn new(client: Client) -> Self {
-    Self(Arc::new(Inner::new(client)))
+    let executor = Executor::new(client.clone());
+
+    Self {
+      client,
+      config: RwLock::new(Config::default()),
+      executor,
+      initialized: AtomicBool::new(false),
+      workspace: RwLock::new(Workspace::default()),
+    }
+  }
+
+  async fn publish_diagnostics(&self, uri: &lsp::Url) {
+    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
+      return;
+    }
+
+    let (diagnostics, version) = {
+      let workspace = self.workspace.read().await;
+      let config = self.config.read().await;
+
+      let Some(view) = workspace.project_view(uri) else {
+        return;
+      };
+
+      let version = view.document().version;
+
+      let analyzer = Analyzer {
+        config: Some(&config),
+        view,
+      };
+
+      (
+        analyzer
+          .analyze()
+          .into_iter()
+          .map(lsp::Diagnostic::from)
+          .collect(),
+        version,
+      )
+    };
+
+    self
+      .client
+      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .await;
   }
 
   pub(crate) async fn run() -> Result {
@@ -84,165 +128,69 @@ impl Server {
 
     Ok(())
   }
+
+  async fn try_did_change(
+    &self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result {
+    let uri = params.text_document.uri.clone();
+
+    let roots = {
+      let mut workspace = self.workspace.write().await;
+
+      if !workspace.documents.is_open(&uri) {
+        return Ok(());
+      }
+
+      let roots = workspace.affected_roots(&uri);
+
+      workspace.documents.change(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
+
+    Ok(())
+  }
+
+  async fn try_did_open(
+    &self,
+    params: lsp::DidOpenTextDocumentParams,
+  ) -> Result {
+    let uri = params.text_document.uri.clone();
+
+    let roots = {
+      let mut workspace = self.workspace.write().await;
+      let mut roots = workspace.affected_roots(&uri);
+
+      roots.insert(uri.clone());
+
+      workspace.documents.open(params)?;
+      workspace.load_projects(roots.iter().cloned())?;
+
+      roots
+    };
+
+    for root in roots {
+      self.publish_diagnostics(&root).await;
+    }
+
+    Ok(())
+  }
+}
+
+impl Debug for Server {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Server").finish()
+  }
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Server {
-  async fn code_action(
-    &self,
-    params: lsp::CodeActionParams,
-  ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    self.0.code_action(params).await
-  }
-
-  async fn code_lens(
-    &self,
-    params: lsp::CodeLensParams,
-  ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
-    self.0.code_lens(params).await
-  }
-
-  async fn completion(
-    &self,
-    params: lsp::CompletionParams,
-  ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
-    self.0.completion(params).await
-  }
-
-  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
-    if let Err(error) = self.0.did_change(params).await {
-      self
-        .0
-        .client
-        .log_message(lsp::MessageType::ERROR, error)
-        .await;
-    }
-  }
-
-  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    self.0.did_close(params).await;
-  }
-
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
-    if let Err(error) = self.0.did_open(params).await {
-      self
-        .0
-        .client
-        .log_message(lsp::MessageType::ERROR, error)
-        .await;
-    }
-  }
-
-  async fn document_highlight(
-    &self,
-    params: lsp::DocumentHighlightParams,
-  ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
-    self.0.document_highlight(params).await
-  }
-
-  async fn document_link(
-    &self,
-    params: lsp::DocumentLinkParams,
-  ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
-    self.0.document_link(params).await
-  }
-
-  async fn document_symbol(
-    &self,
-    params: lsp::DocumentSymbolParams,
-  ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
-    self.0.document_symbol(params).await
-  }
-
-  async fn execute_command(
-    &self,
-    params: lsp::ExecuteCommandParams,
-  ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    self.0.execute_command(params).await
-  }
-
-  async fn folding_range(
-    &self,
-    params: lsp::FoldingRangeParams,
-  ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
-    self.0.folding_range(params).await
-  }
-
-  async fn formatting(
-    &self,
-    params: lsp::DocumentFormattingParams,
-  ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    self.0.formatting(params).await
-  }
-
-  async fn goto_definition(
-    &self,
-    params: lsp::GotoDefinitionParams,
-  ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    self.0.goto_definition(params).await
-  }
-
-  async fn hover(
-    &self,
-    params: lsp::HoverParams,
-  ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
-    self.0.hover(params).await
-  }
-
-  #[allow(clippy::unused_async)]
-  async fn initialize(
-    &self,
-    params: lsp::InitializeParams,
-  ) -> Result<lsp::InitializeResult, jsonrpc::Error> {
-    self.0.initialize(params).await
-  }
-
-  async fn initialized(&self, params: lsp::InitializedParams) {
-    self.0.initialized(params).await;
-  }
-
-  async fn prepare_rename(
-    &self,
-    params: lsp::TextDocumentPositionParams,
-  ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
-    self.0.prepare_rename(params).await
-  }
-
-  async fn references(
-    &self,
-    params: lsp::ReferenceParams,
-  ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    self.0.references(params).await
-  }
-
-  async fn rename(
-    &self,
-    params: lsp::RenameParams,
-  ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
-    self.0.rename(params).await
-  }
-
-  async fn semantic_tokens_full(
-    &self,
-    params: lsp::SemanticTokensParams,
-  ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
-    self.0.semantic_tokens_full(params).await
-  }
-
-  #[allow(clippy::unused_async)]
-  async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
-    self.0.shutdown().await
-  }
-}
-
-pub(crate) struct Inner {
-  client: Client,
-  config: RwLock<Config>,
-  initialized: AtomicBool,
-  workspace: RwLock<Workspace>,
-}
-
-impl Inner {
   async fn code_action(
     &self,
     params: lsp::CodeActionParams,
@@ -255,11 +203,11 @@ impl Inner {
 
     let workspace = self.workspace.read().await;
 
-    let Some(document) =
-      workspace.documents.get_open(&params.text_document.uri)
-    else {
+    let Some(view) = workspace.project_view(&params.text_document.uri) else {
       return Ok(None);
     };
+
+    let document = view.document();
 
     let mut actions = Vec::new();
 
@@ -288,21 +236,23 @@ impl Inner {
       }));
     }
 
-    let imported_documents = workspace
-      .projects
-      .get(&params.text_document.uri)
-      .into_iter()
-      .flat_map(|project| project.imported_documents(&workspace.documents));
+    let analyzer = Analyzer {
+      config: Some(&config),
+      view,
+    };
 
-    actions.extend(
-      Quickfixer {
-        config: Some(&config),
-        document,
-        imported_documents: imported_documents.collect(),
-        parameters: &params,
-      }
-      .collect(),
-    );
+    let diagnostics = analyzer
+      .analyze()
+      .into_iter()
+      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
+      .collect::<Vec<_>>();
+
+    let quickfixer = Quickfixer {
+      diagnostics: &diagnostics,
+      parameters: &params,
+    };
+
+    actions.extend(quickfixer.collect());
 
     Ok(Some(actions))
   }
@@ -432,32 +382,13 @@ impl Inner {
     Ok(None)
   }
 
-  async fn did_change(
-    &self,
-    params: lsp::DidChangeTextDocumentParams,
-  ) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    let roots = {
-      let mut workspace = self.workspace.write().await;
-
-      if !workspace.documents.is_open(&uri) {
-        return Ok(());
-      }
-
-      let roots = workspace.affected_roots(&uri);
-
-      workspace.documents.change(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
+  async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
+    if let Err(error) = self.try_did_change(params).await {
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
-
-    Ok(())
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
@@ -490,26 +421,13 @@ impl Inner {
     }
   }
 
-  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    let roots = {
-      let mut workspace = self.workspace.write().await;
-      let mut roots = workspace.affected_roots(&uri);
-
-      roots.insert(uri.clone());
-
-      workspace.documents.open(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
+  async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
+    if let Err(error) = self.try_did_open(params).await {
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, error)
+        .await;
     }
-
-    Ok(())
   }
 
   async fn document_highlight(
@@ -689,54 +607,7 @@ impl Inner {
     &self,
     params: lsp::ExecuteCommandParams,
   ) -> Result<Option<serde_json::Value>, jsonrpc::Error> {
-    match Command::try_from(params.command.as_str()) {
-      Ok(Command::RunRecipe) => {
-        let recipe_name = params
-          .arguments
-          .first()
-          .and_then(|recipe_name| recipe_name.as_str());
-
-        let uri = params
-          .arguments
-          .get(1)
-          .and_then(|arguments| arguments.as_str())
-          .and_then(|arguments| lsp::Url::parse(arguments).ok());
-
-        let parameters = params.arguments.get(2).and_then(|parameters| {
-          serde_json::from_value::<Vec<ParameterJson>>(parameters.clone()).ok()
-        });
-
-        if let (Some(recipe_name), Some(uri), Some(parameters)) =
-          (recipe_name, uri, parameters)
-        {
-          let path = uri
-            .to_file_path()
-            .ok()
-            .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
-            .unwrap_or(PathBuf::new());
-
-          let recipe_arguments = Vec::new();
-
-          if !parameters.is_empty() {
-            self.client.show_message(
-              lsp::MessageType::WARNING,
-              "Running a recipe code action with parameters is not yet supported."
-            )
-            .await;
-
-            return Ok(None);
-          }
-
-          self.run_recipe(recipe_name, recipe_arguments, path).await;
-        }
-      }
-      Err(error) => {
-        self
-          .client
-          .show_message(lsp::MessageType::ERROR, error)
-          .await;
-      }
-    }
+    self.executor.execute(params).await;
 
     Ok(None)
   }
@@ -884,7 +755,6 @@ impl Inner {
     }))
   }
 
-  #[allow(clippy::unused_async)]
   async fn initialize(
     &self,
     params: lsp::InitializeParams,
@@ -901,7 +771,7 @@ impl Inner {
     }
 
     Ok(lsp::InitializeResult {
-      capabilities: Server::capabilities(),
+      capabilities: Self::capabilities(),
       server_info: Some(lsp::ServerInfo {
         name: env!("CARGO_PKG_NAME").to_string(),
         version: Some(env!("CARGO_PKG_VERSION").to_string()),
@@ -923,15 +793,6 @@ impl Inner {
       .store(true, std::sync::atomic::Ordering::Relaxed);
   }
 
-  fn new(client: Client) -> Self {
-    Self {
-      client,
-      config: RwLock::new(Config::default()),
-      initialized: AtomicBool::new(false),
-      workspace: RwLock::new(Workspace::default()),
-    }
-  }
-
   async fn prepare_rename(
     &self,
     params: lsp::TextDocumentPositionParams,
@@ -941,9 +802,16 @@ impl Inner {
     let workspace = self.workspace.read().await;
 
     Ok(workspace.documents.get_open(uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(params.position)
         .filter(|node| node.kind() == "identifier")
+        .filter(|identifier| {
+          resolver
+            .resolve_symbol(identifier)
+            .is_some_and(|symbol| symbol.is_renameable())
+        })
         .map(
           |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
             range: identifier.get_range(document),
@@ -951,47 +819,6 @@ impl Inner {
           },
         )
     }))
-  }
-
-  async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
-      return;
-    }
-
-    let (diagnostics, version) = {
-      let workspace = self.workspace.read().await;
-      let config = self.config.read().await;
-
-      match workspace.documents.get_open(uri) {
-        Some(document) => {
-          let imported_documents =
-            workspace.projects.get(uri).into_iter().flat_map(|project| {
-              project.imported_documents(&workspace.documents)
-            });
-
-          let analyzer = Analyzer {
-            config: Some(&config),
-            document,
-            imported_documents: imported_documents.collect(),
-          };
-
-          (
-            analyzer
-              .analyze()
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            document.version,
-          )
-        }
-        None => return,
-      }
-    };
-
-    self
-      .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
-      .await;
   }
 
   async fn references(
@@ -1027,12 +854,17 @@ impl Inner {
     let workspace = self.workspace.read().await;
 
     Ok(workspace.documents.get_open(&uri).and_then(|document| {
+      let resolver = Resolver::new(document);
+
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
+        .filter(|identifier| {
+          resolver
+            .resolve_symbol(identifier)
+            .is_some_and(|symbol| symbol.is_renameable())
+        })
         .map(|identifier| {
-          let resolver = Resolver::new(document);
-
           let references = resolver.resolve_identifier_references(&identifier);
 
           let text_edits = references
@@ -1049,181 +881,6 @@ impl Inner {
           }
         })
     }))
-  }
-
-  async fn run_recipe(
-    &self,
-    recipe_name: &str,
-    recipe_arguments: Vec<String>,
-    directory: PathBuf,
-  ) {
-    let document_uri = lsp::Url::parse(&format!(
-      "just-recipe:/{}/{}",
-      directory.display(),
-      recipe_name
-    ))
-    .unwrap_or_else(|_| lsp::Url::parse("just-recipe:/output").unwrap());
-
-    let mut command = tokio::process::Command::new("just");
-
-    command.arg(recipe_name);
-
-    for argument in recipe_arguments {
-      command.arg(argument);
-    }
-
-    command
-      .current_dir(directory.clone())
-      .stdout(process::Stdio::piped())
-      .stderr(process::Stdio::piped());
-
-    let client = self.client.clone();
-
-    client
-      .show_document(lsp::ShowDocumentParams {
-        uri: document_uri.clone(),
-        external: Some(false),
-        take_focus: Some(true),
-        selection: None,
-      })
-      .await
-      .ok();
-
-    let changes = HashMap::from([(
-      document_uri.clone(),
-      vec![lsp::TextEdit {
-        range: lsp::Range::at(0, 0, u32::MAX, 0),
-        new_text: String::new(),
-      }],
-    )]);
-
-    client
-      .apply_edit(lsp::WorkspaceEdit {
-        changes: Some(changes),
-        ..Default::default()
-      })
-      .await
-      .ok();
-
-    let recipe_name = recipe_name.to_string();
-
-    tokio::spawn(async move {
-      match command.spawn() {
-        Ok(mut child) => {
-          let stdout_lines = LinesStream::new(
-            tokio::io::BufReader::new(
-              child.stdout.take().expect("Failed to capture stdout"),
-            )
-            .lines(),
-          );
-
-          let stderr_lines = LinesStream::new(
-            tokio::io::BufReader::new(
-              child.stderr.take().expect("Failed to capture stderr"),
-            )
-            .lines(),
-          );
-
-          let mut merged_stream = StreamExt::merge(stdout_lines, stderr_lines);
-
-          let mut buffer = String::new();
-          let mut current_line = 0;
-          let mut last_update = Instant::now();
-
-          while let Some(line_result) = merged_stream.next().await {
-            match line_result {
-              Ok(line) => {
-                buffer.push_str(&line);
-
-                buffer.push('\n');
-
-                let now = Instant::now();
-
-                if (now.duration_since(last_update).as_millis() > 50
-                  || buffer.len() > 1024)
-                  && !buffer.is_empty()
-                {
-                  let changes = HashMap::from([(
-                    document_uri.clone(),
-                    vec![lsp::TextEdit {
-                      range: lsp::Range::at(current_line, 0, current_line, 0),
-                      new_text: buffer.trim().into(),
-                    }],
-                  )]);
-
-                  client
-                    .apply_edit(lsp::WorkspaceEdit {
-                      changes: Some(changes),
-                      ..Default::default()
-                    })
-                    .await
-                    .ok();
-
-                  let newlines = u32::try_from(buffer.matches('\n').count())
-                    .expect("line count exceeds u32::MAX");
-
-                  current_line += newlines;
-                  buffer.clear();
-                  last_update = now;
-                }
-              }
-              Err(error) => {
-                buffer.push_str("Error reading output: ");
-                buffer.push_str(&error.to_string());
-                buffer.push('\n');
-              }
-            }
-          }
-
-          if !buffer.is_empty() {
-            let changes = HashMap::from([(
-              document_uri.clone(),
-              vec![lsp::TextEdit {
-                range: lsp::Range::at(current_line, 0, current_line, 0),
-                new_text: buffer.trim().into(),
-              }],
-            )]);
-
-            client
-              .apply_edit(lsp::WorkspaceEdit {
-                changes: Some(changes),
-                ..Default::default()
-              })
-              .await
-              .ok();
-          }
-
-          match child.wait().await {
-            Ok(status) => {
-              if !status.success() {
-                client
-                  .show_message(
-                    lsp::MessageType::WARNING,
-                    format!("Recipe '{recipe_name}' completed with non-zero exit code: {status}"),
-                  )
-                  .await;
-              }
-            }
-            Err(error) => {
-              client
-                .show_message(
-                  lsp::MessageType::ERROR,
-                  format!("Error waiting for recipe '{recipe_name}': {error}"),
-                )
-                .await;
-            }
-          }
-        }
-        Err(error) => {
-          client
-            .show_message(
-              lsp::MessageType::ERROR,
-              format!("Failed to run recipe '{recipe_name}': {error}"),
-            )
-            .await;
-        }
-      }
-    });
   }
 
   async fn semantic_tokens_full(
@@ -1261,7 +918,6 @@ impl Inner {
     Ok(None)
   }
 
-  #[allow(clippy::unused_async)]
   async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
     Ok(())
   }
@@ -2219,7 +1875,16 @@ mod tests {
       .response(InitializeResponse { id: 1 })
       .notification(DidOpenNotification {
         uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
+        text: "foo := env(\"BAR\")\n",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 10)),
+          range_length: None,
+          text: "env_var".into(),
+        }],
       })
       .request(CodeActionRequest {
         id: 2,
@@ -2248,6 +1913,25 @@ mod tests {
             }
           }
         ]
+      }))
+      .notification(DidChangeNotification {
+        uri: "file:///test.just",
+        version: 3,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 7, 0, 14)),
+          range_length: None,
+          text: "env".into(),
+        }],
+      })
+      .request(CodeActionRequest {
+        id: 3,
+        uri: "file:///test.just",
+        range: lsp::Range::at(0, 8, 0, 8),
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": []
       }))
       .run()
       .await
@@ -2518,6 +2202,87 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn did_change_handles_multibyte_characters() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///foo.just",
+        text: "# ─🧪\nfoo:\n  echo '─🧪'",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///foo.just",
+        version: 2,
+        changes: vec![
+          lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(0, 2, 0, u32::MAX)),
+            range_length: None,
+            text: "bar".into(),
+          },
+          lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(2, 8, 2, u32::MAX)),
+            range_length: None,
+            text: "🧪bar'".into(),
+          },
+        ],
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///foo.just",
+        line: 1,
+        character: 1,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo '🧪bar'",
+        kind: "plaintext",
+        start_line: 1,
+        start_char: 0,
+        end_line: 1,
+        end_char: 3,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_preserves_unicode_line_separators() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///foo.just",
+        text: "foo:\n  echo 'foo\u{2028}bar'\n\nbaz: foo",
+      })
+      .notification(DidChangeNotification {
+        uri: "file:///foo.just",
+        version: 2,
+        changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(1, 12, 1, 15)),
+          range_length: None,
+          text: "baz\u{2029}qux".into(),
+        }],
+      })
+      .request(HoverRequest {
+        id: 2,
+        uri: "file:///foo.just",
+        line: 3,
+        character: 6,
+      })
+      .response(HoverResponse {
+        id: 2,
+        content: "foo:\n  echo 'foo\u{2028}baz\u{2029}qux'",
+        kind: "plaintext",
+        start_line: 3,
+        start_char: 5,
+        end_line: 3,
+        end_char: 8,
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn did_change_updates_document() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -2535,7 +2300,7 @@ mod tests {
         uri: "file:///test.just",
         version: 2,
         changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(1, 7, 1, 13)),
+          range: Some(lsp::Range::at(1, 7, 2, 0)),
           range_length: None,
           text: "\"updated\"".into(),
         }],
@@ -3869,6 +3634,35 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn prepare_rename_builtin_function() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn prepare_rename_identifier() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3930,6 +3724,69 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn prepare_rename_undefined() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ missing }}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 13,
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn prepare_rename_variable() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          x := '1'
+
+          foo:
+            echo {{ x }}
+          "
+        },
+      })
+      .request(PrepareRenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 0,
+        character: 0,
+      })
+      .response(PrepareRenameResponse {
+        id: 2,
+        start_line: 0,
+        start_char: 0,
+        end_line: 0,
+        end_char: 1,
+        placeholder: "x",
+      })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn recipe_references() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -3986,6 +3843,89 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn rename_builtin() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      })
+      .request(RenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 11,
+        new_name: "cpu",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_parameter_default_symbols() -> Result {
+    async fn case(ranges: &[lsp::Range]) -> Result {
+      for range in ranges {
+        Test::new()
+          .request(InitializeRequest { id: 1 })
+          .response(InitializeResponse { id: 1 })
+          .notification(DidOpenNotification {
+            uri: "file:///foo.just",
+            text: indoc! {"
+              foo := 'bar'
+              baz foo=foo bar=foo:
+                echo {{ foo }}
+            "},
+          })
+          .request(RenameRequest {
+            id: 2,
+            uri: "file:///foo.just",
+            line: range.start.line,
+            character: range.start.character,
+            new_name: "qux",
+          })
+          .response(RenameResponse {
+            id: 2,
+            uri: "file:///foo.just",
+            edits: ranges
+              .iter()
+              .map(|range| Rename {
+                start_line: range.start.line,
+                start_char: range.start.character,
+                end_line: range.end.line,
+                end_char: range.end.character,
+                new_text: "qux",
+              })
+              .collect(),
+          })
+          .run()
+          .await?;
+      }
+
+      Ok(())
+    }
+
+    case(&[
+      lsp::Range::at(1, 4, 1, 7),
+      lsp::Range::at(1, 16, 1, 19),
+      lsp::Range::at(2, 10, 2, 13),
+    ])
+    .await?;
+
+    case(&[lsp::Range::at(0, 0, 0, 3), lsp::Range::at(1, 8, 1, 11)]).await
+  }
+
+  #[tokio::test]
   async fn rename_recipe() -> Result {
     Test::new()
       .request(InitializeRequest { id: 1 })
@@ -4038,6 +3978,36 @@ mod tests {
           },
         ],
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_undefined() -> Result {
+    Test::new()
+      .request(InitializeRequest { id: 1 })
+      .response(InitializeResponse { id: 1 })
+      .notification(DidOpenNotification {
+        uri: "file:///test.just",
+        text: indoc! {
+          "
+          foo:
+            echo {{ missing }}
+          "
+        },
+      })
+      .request(RenameRequest {
+        id: 2,
+        uri: "file:///test.just",
+        line: 1,
+        character: 13,
+        new_name: "defined",
+      })
+      .response(json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": null
+      }))
       .run()
       .await
   }

@@ -4,6 +4,7 @@ use {
   ariadne::{Color, Label, Report, ReportKind, sources},
   clap::{Parser, builder::styling},
   command::Command,
+  executor::Executor,
   just_lsp::*,
   resolver::Resolver,
   ropey::Rope,
@@ -12,13 +13,14 @@ use {
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
+    fs,
     io::{self, stderr},
     path::PathBuf,
     process,
-    sync::{Arc, LazyLock, atomic::AtomicBool},
+    sync::{LazyLock, atomic::AtomicBool},
     time::Instant,
   },
   subcommand::Subcommand,
@@ -36,6 +38,7 @@ use {
 
 mod arguments;
 mod command;
+mod executor;
 mod resolver;
 mod server;
 mod subcommand;

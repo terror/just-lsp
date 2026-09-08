@@ -28,8 +28,7 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
   serde_wasm_bindgen::to_value(
     &Analyzer {
       config: None,
-      document: &document,
-      imported_documents: Vec::new(),
+      view: (&document).into(),
     }
     .analyze()
     .into_iter()

@@ -6,17 +6,12 @@ localhost := `if [ -f "foo" ]; then; echo hi; fi`
 #            ^ punctuation.special
 #                                               ^ punctuation.special
 
-# interpolation within injection
+# double braces within injection are plain text
 foo := `[ {{ dir(localhost) }} = "hi" ] && "bye"`
 # <- variable
 #   ^^ operator
 #      ^ punctuation.special
-#         ^^ punctuation.bracket
-#            ^^^ function.call
-#               ^ punctuation.bracket
-#                ^^^^^^^^^ variable
-#                         ^ punctuation.bracket
-#                           ^^ punctuation.bracket
+#         ^^ string
 #                                               ^ punctuation.special
 
 stuff := ```

@@ -16,10 +16,7 @@ impl Setting {
 
     let name_node = node.child_by_field_name("left")?;
 
-    let name = TextNode {
-      value: document.get_node_text(&name_node),
-      range: name_node.get_range(document),
-    };
+    let name = TextNode::from_node(&name_node, document);
 
     let mut cursor = node.walk();
 
@@ -49,10 +46,7 @@ impl Setting {
           },
           value: String::new(),
         },
-        |value| TextNode {
-          value: document.get_node_text(value),
-          range: value.get_range(document),
-        },
+        |value| TextNode::from_node(value, document),
       );
 
     let kind = if expression_child.is_some_and(|expression| {
@@ -87,5 +81,16 @@ impl Setting {
       .attributes
       .iter()
       .any(|attribute| attribute.name.value == name)
+  }
+
+  #[must_use]
+  pub fn loads_dotenv(&self) -> bool {
+    match self.name.value.as_str() {
+      "dotenv-filename" | "dotenv-path" => true,
+      "dotenv-load" | "dotenv-required" => {
+        matches!(self.kind, SettingKind::Boolean(true))
+      }
+      _ => false,
+    }
   }
 }

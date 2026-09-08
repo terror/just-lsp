@@ -57,13 +57,17 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Dynamic);
     }
 
-    let Some(path) = import.resolve(source) else {
-      return Ok(ProjectDependencyTarget::Missing);
+    let path = match import.resolve(source) {
+      Ok(Some(path)) => path,
+      Ok(None) | Err(Error::EmptyImportPath) => {
+        return Ok(ProjectDependencyTarget::Missing);
+      }
+      Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
     };
 
     let path = path.as_path().lexiclean();
 
-    let Ok(uri) = lsp::Url::from_file_path(&path) else {
+    let Some(uri) = lsp::Url::from_path(&path) else {
       return Ok(ProjectDependencyTarget::Missing);
     };
 
@@ -160,26 +164,6 @@ mod tests {
     fn uri(&self, path: &str) -> lsp::Url {
       lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
     }
-  }
-
-  #[test]
-  fn analyzer_uses_imported_declarations() {
-    let mut test =
-      Test::new("import 'foo.just'\n\nbar: foo").file("foo.just", "foo:");
-
-    let project = test.load();
-
-    assert!(
-      Analyzer {
-        config: None,
-        document: test.documents.get(&test.root).unwrap(),
-        imported_documents: project
-          .imported_documents(&test.documents)
-          .collect(),
-      }
-      .analyze()
-      .is_empty()
-    );
   }
 
   #[test]
@@ -312,7 +296,7 @@ mod tests {
       import? 'missing.just'
       import 'required-missing.just'
       import 'bar.just'
-      import x'dynamic.just'
+      import f'dynamic.just'
 
       foo:
       "
@@ -403,5 +387,28 @@ mod tests {
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
     assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
+  }
+
+  #[test]
+  fn loads_shell_expanded_import() {
+    let mut test =
+      Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");
+
+    let imported = test.uri("foo.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.root][0].target,
+      ProjectDependencyTarget::Resolved(imported.clone()),
+    );
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [imported],
+    );
   }
 }

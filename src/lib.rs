@@ -1,5 +1,7 @@
 use {
+  conflict_tracker::ConflictTracker,
   document_entry::DocumentEntry,
+  function_parameter::FunctionParameter::{Optional, Required, Variadic},
   indoc::indoc,
   lexiclean::Lexiclean,
   project_view_document::ProjectViewDocument,
@@ -8,17 +10,22 @@ use {
   std::{
     cmp::Reverse,
     collections::{HashMap, HashSet, hash_map::Entry},
+    env,
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
-    ops::{ControlFlow, RangeInclusive},
+    ops::{ControlFlow, Deref, RangeInclusive},
     path::{Path, PathBuf},
     process,
     sync::OnceLock,
   },
+  string_delimiter::StringDelimiter,
+  string_kind::StringKind,
+  string_literal::StringLiteral,
   tower_lsp::lsp_types as lsp,
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
+  url_ext::UrlExt,
 };
 
 pub use {
@@ -41,7 +48,8 @@ pub use {
   error::Error,
   function::Function,
   function_call::FunctionCall,
-  function_kind::FunctionKind,
+  function_parameter::FunctionParameter,
+  function_signature::FunctionSignature,
   group::Group,
   group_set::GroupSet,
   import::Import,
@@ -52,7 +60,6 @@ pub use {
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
-  position_ext::PositionExt,
   project::Project,
   project_dependency::ProjectDependency,
   project_dependency_kind::ProjectDependencyKind,
@@ -84,6 +91,7 @@ mod attribute_target;
 mod builtin;
 mod builtins;
 mod config;
+mod conflict_tracker;
 mod count;
 mod dependency;
 mod dependency_argument;
@@ -96,7 +104,8 @@ mod document_store;
 mod error;
 mod function;
 mod function_call;
-mod function_kind;
+mod function_parameter;
+mod function_signature;
 mod group;
 mod group_set;
 mod import;
@@ -107,7 +116,6 @@ mod module;
 mod node_ext;
 mod parameter;
 mod point_ext;
-mod position_ext;
 mod project;
 mod project_dependency;
 mod project_dependency_kind;
@@ -126,8 +134,12 @@ mod scope;
 mod setting;
 mod setting_kind;
 mod str_ext;
+mod string_delimiter;
+mod string_kind;
+mod string_literal;
 mod text_node;
 mod unexport;
+mod url_ext;
 mod variable;
 mod workspace;
 

@@ -1,6 +1,6 @@
 use super::*;
 
-const VALID_KWARGS: &[&str] = &["extra", "inputs", "outputs"];
+const VALID_KWARGS: &[&str] = &["environment", "extra", "inputs", "outputs"];
 
 define_rule! {
   CacheAttributeRule {

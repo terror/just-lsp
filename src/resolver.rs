@@ -12,37 +12,35 @@ impl<'a> Resolver<'a> {
     Self { view: view.into() }
   }
 
-  /// Returns the definition site of the symbol that `identifier` refers
-  /// to. Builtins have no in-document declaration, so the identifier's
-  /// own range is returned instead, letting editors anchor inline
-  /// documentation at the cursor.
+  /// Returns the definition site of the symbol that `identifier` refers to.
+  /// Builtins have no in-document declaration, so the identifier's own range is
+  /// returned instead, letting editors anchor inline documentation at the
+  /// cursor.
   #[must_use]
   pub(crate) fn resolve_identifier_definition(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
-    let (uri, range) = match self.resolve_symbol(identifier)? {
-      Symbol::Builtin(_) => (
+    Some(match self.resolve_symbol(identifier)? {
+      Symbol::Builtin(_) => lsp::Location::new(
         self.view.document().uri.clone(),
         identifier.get_range(self.view.document()),
       ),
-      Symbol::Function(function) => (function.uri, function.value.name.range),
+      Symbol::Function(function) => function.location(function.name.range),
       Symbol::FunctionParameter(parameter) => {
-        (self.view.document().uri.clone(), parameter.range)
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
       }
       Symbol::Parameter(parameter) => {
-        (self.view.document().uri.clone(), parameter.range)
+        lsp::Location::new(self.view.document().uri.clone(), parameter.range)
       }
-      Symbol::Recipe(recipe) => (recipe.uri, recipe.value.range),
-      Symbol::Variable(variable) => (variable.uri, variable.value.range),
-    };
-
-    Some(lsp::Location { uri, range })
+      Symbol::Recipe(recipe) => recipe.location(recipe.range),
+      Symbol::Variable(variable) => variable.location(variable.range),
+    })
   }
 
-  /// Builds hover content for the symbol at `identifier`. User-defined
-  /// symbols show their source text; builtins show their Markdown
-  /// documentation from the static [`BUILTINS`] table.
+  /// Builds hover content for the symbol at `identifier`. User-defined symbols
+  /// show their source text; builtins show their Markdown documentation from
+  /// the static [`BUILTINS`] table.
   #[must_use]
   pub(crate) fn resolve_identifier_hover(
     &self,
@@ -54,7 +52,7 @@ impl<'a> Resolver<'a> {
           Symbol::Builtin(builtin) => builtin.description(),
           Symbol::Function(function) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: function.value.content,
+            value: function.into_inner().content,
           },
           Symbol::FunctionParameter(parameter) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
@@ -66,11 +64,11 @@ impl<'a> Resolver<'a> {
           },
           Symbol::Recipe(recipe) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: recipe.value.content,
+            value: recipe.into_inner().content,
           },
           Symbol::Variable(variable) => lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
-            value: variable.value.content,
+            value: variable.into_inner().content,
           },
         },
       ),
@@ -78,22 +76,20 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Collects every location in the document that references the same
-  /// symbol as `identifier`. The identifier itself is always included.
+  /// Collects every location in the document that references the same symbol as
+  /// `identifier`. The identifier itself is always included.
   ///
-  /// Scoping follows `just`'s semantics: parameters are local to their
-  /// recipe, while variables are global but can be shadowed by a
-  /// same-named parameter. Variable references inside parameter defaults
-  /// (e.g. `a=a`) are treated as belonging to the outer scope, not the
-  /// parameter being defined.
+  /// Scoping follows `just`'s semantics: parameters are local to their recipe,
+  /// while variables are global but can be shadowed by a same-named parameter.
+  /// Variable references inside parameter defaults (e.g. `a=a`) are treated as
+  /// belonging to the outer scope, not the parameter being defined.
   #[must_use]
   pub(crate) fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
-    let name = self.view.document().get_node_text(identifier);
-
-    let Some(symbol) = self.resolve_symbol(identifier) else {
+    let Some(definition) = self.resolve_identifier_definition(identifier)
+    else {
       return Vec::new();
     };
 
@@ -106,108 +102,9 @@ impl<'a> Resolver<'a> {
       .find_all("identifier")
       .into_iter()
       .filter(|candidate| {
-        if candidate.id() == identifier.id() {
-          return true;
-        }
-
-        if self.view.document().get_node_text(candidate) != name {
-          return false;
-        }
-
-        let Some(candidate_parent) = candidate.parent() else {
-          return false;
-        };
-
-        let candidate_parent_kind = candidate_parent.kind();
-
-        match &symbol {
-          Symbol::Builtin(_) => false,
-          Symbol::Function(_) => {
-            candidate_parent_kind == "function_call"
-              || candidate_parent_kind == "function_definition"
-          }
-          Symbol::FunctionParameter(_) => {
-            let in_same_function = matches!(
-              (
-                identifier.get_parent("function_definition"),
-                candidate.get_parent("function_definition"),
-              ),
-              (Some(f1), Some(f2)) if f1.id() == f2.id()
-            );
-
-            in_same_function
-              && ["value", "function_parameters"]
-                .contains(&candidate_parent_kind)
-          }
-          Symbol::Parameter(_) => {
-            let in_same_recipe = matches!(
-              (identifier.get_parent("recipe"), candidate.get_parent("recipe")),
-              (Some(r1), Some(r2)) if r1.id() == r2.id()
-            );
-
-            in_same_recipe
-              && ["value", "parameter", "variadic_parameter"]
-                .contains(&candidate_parent_kind)
-          }
-          Symbol::Recipe(_) => [
-            "alias",
-            "dependency",
-            "dependency_expression",
-            "recipe_header",
-          ]
-          .contains(&candidate_parent_kind),
-          Symbol::Variable(_) => {
-            if candidate_parent_kind == "assignment" {
-              return true;
-            }
-
-            if candidate_parent_kind != "value" {
-              return false;
-            }
-
-            let containing_parameter = candidate
-              .get_parent("parameter")
-              .or_else(|| candidate.get_parent("variadic_parameter"));
-
-            if let Some(containing_parameter) = containing_parameter {
-              let containing_parameter_name =
-                self.view.document().get_node_text(
-                  &containing_parameter.find("identifier").unwrap(),
-                );
-
-              let shadowed_by_preceding_parameter = candidate
-                .get_recipe(self.view.document())
-                .is_some_and(|recipe| {
-                  recipe
-                    .parameters
-                    .iter()
-                    .take_while(|parameter| {
-                      parameter.name != containing_parameter_name
-                    })
-                    .any(|parameter| parameter.name == name)
-                });
-
-              return !shadowed_by_preceding_parameter;
-            }
-
-            if let Some(recipe) = candidate.get_recipe(self.view.document()) {
-              return !recipe
-                .parameters
-                .iter()
-                .any(|parameter| parameter.name == name);
-            }
-
-            if let Some(function) = candidate.get_function(self.view.document())
-            {
-              return !function
-                .parameters
-                .iter()
-                .any(|parameter| parameter.value == name);
-            }
-
-            true
-          }
-        }
+        self
+          .resolve_identifier_definition(candidate)
+          .is_some_and(|resolved| resolved == definition)
       })
       .map(|found| lsp::Location {
         uri: self.view.document().uri.clone(),
@@ -217,15 +114,14 @@ impl<'a> Resolver<'a> {
   }
 
   /// Classifies `identifier` into the [`Symbol`] it refers to, following
-  /// `just`'s name-resolution priority: recipe names, then parameters
-  /// (which shadow globals within their recipe), then variables, then
-  /// builtins.
+  /// `just`'s name-resolution priority: recipe names, then parameters (which
+  /// shadow globals within their recipe), then variables, then builtins.
   ///
-  /// Identifiers at definition sites (the left-hand side of an
-  /// assignment, or a parameter name in a recipe header) are looked up
-  /// through the document so that callers receive a fully-populated
-  /// [`Symbol`] rather than a raw range.
-  fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+  /// Identifiers at definition sites (the left-hand side of an assignment, or a
+  /// parameter name in a recipe header) are looked up through the document so
+  /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
+  #[must_use]
+  pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     let name = self.view.document().get_node_text(identifier);
 
     let parent_kind = identifier.parent()?.kind();
@@ -1019,6 +915,52 @@ mod tests {
   }
 
   #[test]
+  fn resolve_parameter_references_with_defaults() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+
+      baz foo=foo bar=foo:
+        echo {{ foo }}
+
+      qux foo:
+        echo {{ foo }}
+
+      baz foo=foo:
+        echo {{ foo }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("parameter > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 4, 2, 7),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 16, 2, 19),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 10, 3, 13),
+        },
+      ]
+    );
+  }
+
+  #[test]
   fn resolve_recipe_definition() {
     let document = Document::from(indoc! {
       "
@@ -1112,8 +1054,7 @@ mod tests {
           .as_ref()
           .unwrap()
           .root_node()
-          .find("alias > identifier[1]")
-          .unwrap(),
+          .find_all("alias > identifier")[1],
       )
       .unwrap();
 
@@ -1499,6 +1440,8 @@ mod tests {
       foo(x) := x + x
 
       bar(x) := x
+
+      foo(x) := x
       "
     });
 
@@ -1893,6 +1836,46 @@ mod tests {
   }
 
   #[test]
+  fn resolve_variable_references_in_variadic_parameter_defaults() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+
+      baz bar=foo +foo=foo:
+        echo {{ foo }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 3),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 8, 2, 11),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 17, 2, 20),
+        },
+      ]
+    );
+  }
+
+  #[test]
   fn resolve_variadic_parameter_hover() {
     let document = Document::from(indoc! {
       "
@@ -1919,6 +1902,42 @@ mod tests {
         kind: lsp::MarkupKind::PlainText,
         value: "+args".to_string(),
       })
+    );
+  }
+
+  #[test]
+  fn resolve_variadic_parameter_references_with_defaults() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+
+      baz bar=foo +foo=foo:
+        echo {{ foo }}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .as_ref()
+        .unwrap()
+        .root_node()
+        .find("variadic_parameter > parameter > identifier")
+        .unwrap(),
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 13, 2, 16),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 10, 3, 13),
+        },
+      ]
     );
   }
 }

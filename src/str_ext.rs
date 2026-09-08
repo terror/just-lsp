@@ -1,85 +1,49 @@
 use super::*;
 
 pub trait StrExt {
+  /// Returns the closest candidate within two edits.
+  fn find_suggestion<'a>(
+    &self,
+    candidates: impl IntoIterator<Item = &'a str>,
+  ) -> Option<String>;
+
   /// Returns the decoded value of a plain string literal.
   fn literal(&self) -> Option<String>;
 
-  /// Returns a `Point` describing the tree-sitter point that would
-  /// be reached after inserting this UTF-8 text.
+  /// Returns a `Point` describing the tree-sitter point that would be reached
+  /// after inserting this UTF-8 text.
   fn point_delta(&self) -> Point;
 }
 
 impl StrExt for str {
-  fn literal(&self) -> Option<String> {
-    let (quote, value) = if let Some(value) = self
-      .strip_prefix('"')
-      .and_then(|value| value.strip_suffix('"'))
-    {
-      ('"', value)
-    } else {
-      let value = self
-        .strip_prefix('\'')
-        .and_then(|value| value.strip_suffix('\''))?;
+  fn find_suggestion<'a>(
+    &self,
+    candidates: impl IntoIterator<Item = &'a str>,
+  ) -> Option<String> {
+    candidates
+      .into_iter()
+      .map(|candidate| (strsim::levenshtein(self, candidate), candidate))
+      .filter(|(distance, _)| *distance < 3)
+      .min_by(|(left_distance, left), (right_distance, right)| {
+        left_distance
+          .cmp(right_distance)
+          .then_with(|| left.cmp(right))
+      })
+      .map(|(_, candidate)| candidate.to_owned())
+  }
 
-      ('\'', value)
-    };
+  fn literal(&self) -> Option<String> {
+    let quote = self.chars().next()?;
+
+    let value = self.strip_prefix(quote)?.strip_suffix(quote)?;
 
     if value.starts_with(quote) || value.ends_with(quote) {
       return None;
     }
 
-    if quote == '\'' {
-      return Some(value.to_string());
-    }
-
-    let mut cooked = String::new();
-
-    let mut characters = value.chars();
-
-    while let Some(character) = characters.next() {
-      if character != '\\' {
-        cooked.push(character);
-        continue;
-      }
-
-      match characters.next()? {
-        'n' => cooked.push('\n'),
-        'r' => cooked.push('\r'),
-        't' => cooked.push('\t'),
-        '"' => cooked.push('"'),
-        '\\' => cooked.push('\\'),
-        '\n' => {}
-        '\r' => {
-          if characters.next()? != '\n' {
-            return None;
-          }
-        }
-        'u' => {
-          if characters.next()? != '{' {
-            return None;
-          }
-
-          let mut codepoint = String::new();
-
-          loop {
-            match characters.next()? {
-              '}' => break,
-              character if character.is_ascii_hexdigit() => {
-                codepoint.push(character);
-              }
-              _ => return None,
-            }
-          }
-
-          let codepoint = u32::from_str_radix(&codepoint, 16).ok()?;
-
-          cooked.push(char::from_u32(codepoint)?);
-        }
-        _ => return None,
-      }
-    }
-
-    Some(cooked)
+    StringLiteral::parse(self)
+      .ok()?
+      .map(|StringLiteral { cooked, .. }| cooked)
   }
 
   fn point_delta(&self) -> Point {
@@ -97,8 +61,7 @@ impl StrExt for str {
           rows += 1;
           column = 0;
         }
-        '\n' | '\u{000B}' | '\u{000C}' | '\u{0085}' | '\u{2028}'
-        | '\u{2029}' => {
+        '\n' => {
           rows += 1;
           column = 0;
         }
@@ -137,6 +100,24 @@ mod tests {
   }
 
   #[test]
+  fn find_suggestion_finds_close_candidate() {
+    assert_eq!(
+      "shel".find_suggestion(["shell", "export"]),
+      Some("shell".into())
+    );
+  }
+
+  #[test]
+  fn find_suggestion_ignores_distant_candidates() {
+    assert_eq!("unknown".find_suggestion(["shell", "export"]), None);
+  }
+
+  #[test]
+  fn find_suggestion_resolves_ties_lexicographically() {
+    assert_eq!("cat".find_suggestion(["bat", "car"]), Some("bat".into()));
+  }
+
+  #[test]
   fn literal() {
     #[track_caller]
     fn case(source: &str, expected: Option<&str>) {
@@ -150,6 +131,7 @@ mod tests {
     case(r#"f"foo""#, None);
     case(r#"x"foo""#, None);
     case(r#"""foo""""#, None);
+    case("'''foo'''", None);
   }
 
   #[test]
@@ -160,5 +142,16 @@ mod tests {
   #[test]
   fn newline_moves_to_next_row_and_resets_column() {
     assert_eq!("hi\n😊".point_delta(), Point::new(1, "😊".len()));
+  }
+
+  #[test]
+  fn unicode_line_separators_advance_columns() {
+    for separator in
+      ['\u{000B}', '\u{000C}', '\u{0085}', '\u{2028}', '\u{2029}']
+    {
+      let text = format!("foo{separator}bar");
+
+      assert_eq!(text.point_delta(), Point::new(0, text.len()));
+    }
   }
 }

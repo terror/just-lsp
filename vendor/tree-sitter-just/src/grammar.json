@@ -2159,6 +2159,10 @@
             "type": "CHOICE",
             "members": [
               {
+                "type": "STRING",
+                "value": "{{{{"
+              },
+              {
                 "type": "SYMBOL",
                 "name": "interpolation"
               },
@@ -2195,6 +2199,10 @@
           "content": {
             "type": "CHOICE",
             "members": [
+              {
+                "type": "STRING",
+                "value": "{{{{"
+              },
               {
                 "type": "SYMBOL",
                 "name": "interpolation"
@@ -2233,6 +2241,10 @@
             "type": "CHOICE",
             "members": [
               {
+                "type": "STRING",
+                "value": "{{{{"
+              },
+              {
                 "type": "SYMBOL",
                 "name": "interpolation"
               },
@@ -2265,6 +2277,10 @@
           "content": {
             "type": "CHOICE",
             "members": [
+              {
+                "type": "STRING",
+                "value": "{{{{"
+              },
               {
                 "type": "SYMBOL",
                 "name": "interpolation"
@@ -2502,17 +2518,8 @@
     "command_body": {
       "type": "REPEAT1",
       "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "interpolation"
-          },
-          {
-            "type": "PATTERN",
-            "value": "."
-          }
-        ]
+        "type": "PATTERN",
+        "value": "."
       }
     },
     "interpolation": {
@@ -2567,14 +2574,8 @@
     }
   ],
   "conflicts": [
-    [
-      "value",
-      "attribute_named_param"
-    ],
-    [
-      "_name",
-      "unexport"
-    ]
+    ["value", "attribute_named_param"],
+    ["_name", "unexport"]
   ],
   "precedences": [],
   "externals": [
