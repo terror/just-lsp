@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Reports recipe dependencies that reference recipes which don't exist in the
-  /// current document.
+  /// Reports recipe dependencies that reference recipes which don't exist in
+  /// the current document.
   MissingDependencyRule {
     id: "missing-dependencies",
     message: "missing dependency",

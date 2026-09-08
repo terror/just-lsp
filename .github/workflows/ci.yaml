@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
@@ -36,7 +36,7 @@ jobs:
       run: cargo llvm-cov --workspace --all-features --all-targets --lcov --output-path lcov.info
 
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: lcov.info
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - uses: Swatinem/rust-cache@v2
 
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - uses: actions-rust-lang/setup-rust-toolchain@v1
 
@@ -92,9 +92,33 @@ jobs:
     runs-on: ${{matrix.os}}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - uses: Swatinem/rust-cache@v2
 
     - name: Test
       run: cargo test --all
+
+  wasm:
+    runs-on: ubuntu-latest
+
+    env:
+      AR_wasm32_unknown_unknown: llvm-ar
+      CC_wasm32_unknown_unknown: clang
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        target: wasm32-unknown-unknown
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install clang llvm
+
+    - name: Build
+      run: cargo build --package just-lsp-wasm --target wasm32-unknown-unknown --locked

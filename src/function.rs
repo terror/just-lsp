@@ -13,6 +13,6 @@ pub struct Function {
 impl Function {
   #[must_use]
   pub fn is_enabled(&self) -> bool {
-    platform::attributes_enabled(&self.attributes)
+    Attribute::are_enabled(&self.attributes)
   }
 }

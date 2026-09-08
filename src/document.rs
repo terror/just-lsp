@@ -22,14 +22,8 @@ impl Document {
 
           Some(Alias {
             attributes: self.attributes_for_node(alias_node),
-            name: TextNode {
-              value: self.get_node_text(&left_node),
-              range: left_node.get_range(self),
-            },
-            value: TextNode {
-              value: self.get_node_text(&right_node),
-              range: right_node.get_range(self),
-            },
+            name: TextNode::from_node(&left_node, self),
+            value: TextNode::from_node(&right_node, self),
             range: alias_node.get_range(self),
           })
         })
@@ -113,17 +107,11 @@ impl Document {
                     "string" | "expression" | "attribute_named_param"
                   )
               })
-              .map(|argument| TextNode {
-                value: self.get_node_text(&argument),
-                range: argument.get_range(self),
-              })
+              .map(|argument| TextNode::from_node(&argument, self))
               .collect::<Vec<_>>();
 
             Attribute {
-              name: TextNode {
-                value: self.get_node_text(&identifier),
-                range: identifier.get_range(self),
-              },
+              name: TextNode::from_node(&identifier, self),
               arguments,
               target,
               range: attribute.get_range(self),
@@ -134,35 +122,11 @@ impl Document {
       .collect()
   }
 
-  #[must_use]
-  pub fn find_function(&self, name: &str) -> Option<Function> {
-    self
-      .functions()
-      .into_iter()
-      .find(|function| function.name.value == name)
-  }
-
-  #[must_use]
-  pub fn find_recipe(&self, name: &str) -> Option<Recipe> {
-    self
-      .recipes()
-      .into_iter()
-      .find(|recipe| recipe.name.value == name)
-  }
-
-  #[must_use]
-  pub fn find_variable(&self, name: &str) -> Option<Variable> {
-    self
-      .variables()
-      .into_iter()
-      .find(|var| var.name.value == name)
-  }
-
   /// # Errors
   ///
   /// Returns an [`Error`] if formatting fails.
   pub fn format(&self, config: &FormattingConfig) -> Result<String> {
-    let file = if let Ok(path) = self.uri.to_file_path() {
+    let file = if let Ok(path) = self.uri.file_path() {
       tempfile::Builder::new()
         .prefix(".justfile-fmt-")
         .tempfile_in(
@@ -207,6 +171,15 @@ impl Document {
         .root_node()
         .find_all("function_call")
         .into_iter()
+        .filter(|node| {
+          successors(Some(*node), Node::parent)
+            .filter(|ancestor| {
+              AttributeTarget::try_from_kind(ancestor.kind()).is_some()
+            })
+            .all(|ancestor| {
+              Attribute::are_enabled(&self.attributes_for_node(&ancestor))
+            })
+        })
         .filter_map(|function_call_node| {
           let identifier_node = function_call_node.find("identifier")?;
 
@@ -216,19 +189,13 @@ impl Document {
               sequence
                 .find_all("^expression")
                 .into_iter()
-                .map(|argument_node| TextNode {
-                  value: self.get_node_text(&argument_node),
-                  range: argument_node.get_range(self),
-                })
+                .map(|argument_node| TextNode::from_node(&argument_node, self))
                 .collect::<Vec<_>>()
             })
             .unwrap_or_default();
 
           Some(FunctionCall {
-            name: TextNode {
-              value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(self),
-            },
+            name: TextNode::from_node(&identifier_node, self),
             arguments,
             range: function_call_node.get_range(self),
           })
@@ -253,10 +220,7 @@ impl Document {
               params_node
                 .find_all("^identifier")
                 .iter()
-                .map(|param_node| TextNode {
-                  value: self.get_node_text(param_node),
-                  range: param_node.get_range(self),
-                })
+                .map(|param_node| TextNode::from_node(param_node, self))
                 .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -268,10 +232,7 @@ impl Document {
 
           Some(Function {
             attributes: self.attributes_for_node(function_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
+            name: TextNode::from_node(&name_node, self),
             parameters,
             body,
             content: self.get_node_text(function_node).trim().to_string(),
@@ -303,15 +264,10 @@ impl Document {
         .filter_map(|import_node| {
           let path_node = import_node.find("string")?;
 
-          let content = self.get_node_text(import_node);
-
           Some(Import {
             attributes: self.attributes_for_node(import_node),
-            optional: content.contains('?'),
-            path: TextNode {
-              value: self.get_node_text(&path_node),
-              range: path_node.get_range(self),
-            },
+            optional: import_node.find("^?").is_some(),
+            path: TextNode::from_node(&path_node, self),
             range: import_node.get_range(self),
           })
         })
@@ -329,20 +285,14 @@ impl Document {
         .filter_map(|module_node| {
           let name_node = module_node.child_by_field_name("name")?;
 
-          let content = self.get_node_text(module_node);
-
-          let path = module_node.find("string").map(|path_node| TextNode {
-            value: self.get_node_text(&path_node),
-            range: path_node.get_range(self),
-          });
+          let path = module_node
+            .find("string")
+            .map(|path_node| TextNode::from_node(&path_node, self));
 
           Some(Module {
             attributes: self.attributes_for_node(module_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
-            optional: content.contains('?'),
+            name: TextNode::from_node(&name_node, self),
+            optional: module_node.find("^?").is_some(),
             path,
             range: module_node.get_range(self),
           })
@@ -372,7 +322,7 @@ impl Document {
   #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     let tree = self.tree.as_ref()?;
-    let point = position.point(self);
+    let point = self.content.lsp_position_to_position(position).point;
     tree.root_node().descendant_for_point_range(point, point)
   }
 
@@ -405,48 +355,7 @@ impl Document {
         .filter_map(|recipe_node| {
           let name_node = recipe_node.find("recipe_header > identifier")?;
 
-          let recipe_name = TextNode {
-            value: self.get_node_text(&name_node),
-            range: name_node.get_range(self),
-          };
-
-          let attributes = recipe_node
-            .find_all("attribute")
-            .into_iter()
-            .flat_map(|attribute_node| {
-              attribute_node
-                .find_all("^identifier")
-                .into_iter()
-                .map(|identifier_node| {
-                  let arguments = identifier_node
-                    .siblings()
-                    .take_while(|sibling| sibling.kind() != "identifier")
-                    .filter(|sibling| {
-                      sibling.start_byte() != sibling.end_byte()
-                        && matches!(
-                          sibling.kind(),
-                          "string" | "expression" | "attribute_named_param"
-                        )
-                    })
-                    .map(|argument_node| TextNode {
-                      value: self.get_node_text(&argument_node),
-                      range: argument_node.get_range(self),
-                    })
-                    .collect::<Vec<_>>();
-
-                  Attribute {
-                    name: TextNode {
-                      value: self.get_node_text(&identifier_node),
-                      range: identifier_node.get_range(self),
-                    },
-                    arguments,
-                    target: Some(AttributeTarget::Recipe),
-                    range: attribute_node.get_range(self),
-                  }
-                })
-                .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+          let recipe_name = TextNode::from_node(&name_node, self);
 
           let dependencies = recipe_node
             .find("recipe_header > dependencies")
@@ -455,10 +364,6 @@ impl Document {
               let mut phase = DependencyPhase::Prior;
 
               for index in 0..dependencies_node.child_count() {
-                let Ok(index) = index.try_into() else {
-                  continue;
-                };
-
                 let Some(node) = dependencies_node.child(index) else {
                   continue;
                 };
@@ -480,9 +385,6 @@ impl Document {
                     else {
                       continue;
                     };
-
-                    let dependency_name =
-                      self.get_node_text(&dependency_name_node);
 
                     let arguments = dependency_node
                       .find("dependency_expression")
@@ -526,10 +428,7 @@ impl Document {
                       });
 
                     dependencies.push(Dependency {
-                      name: TextNode {
-                        value: dependency_name,
-                        range: dependency_name_node.get_range(self),
-                      },
+                      name: TextNode::from_node(&dependency_name_node, self),
                       arguments,
                       mapped,
                       phase,
@@ -556,17 +455,13 @@ impl Document {
                 .collect()
             });
 
-          let shebang =
-            recipe_node
-              .find("recipe_body > shebang")
-              .map(|shebang_node| TextNode {
-                value: self.get_node_text(&shebang_node),
-                range: shebang_node.get_range(self),
-              });
+          let shebang = recipe_node
+            .find("recipe_body > shebang")
+            .map(|shebang_node| TextNode::from_node(&shebang_node, self));
 
           Some(Recipe {
             name: recipe_name,
-            attributes,
+            attributes: self.attributes_for_node(recipe_node),
             dependencies,
             content: self.get_node_text(recipe_node).trim().to_string(),
             parameters,
@@ -602,10 +497,7 @@ impl Document {
 
           Some(Unexport {
             attributes: self.attributes_for_node(unexport_node),
-            name: TextNode {
-              value: self.get_node_text(&name_node),
-              range: name_node.get_range(self),
-            },
+            name: TextNode::from_node(&name_node, self),
             range: unexport_node.get_range(self),
           })
         })
@@ -630,10 +522,7 @@ impl Document {
 
           Some(Variable {
             attributes: self.attributes_for_node(&attribute_node),
-            name: TextNode {
-              value: self.get_node_text(&identifier_node),
-              range: identifier_node.get_range(self),
-            },
+            name: TextNode::from_node(&identifier_node, self),
             export: identifier_node.get_parent("export").is_some(),
             content: self.get_node_text(assignment_node).trim().to_string(),
             range: assignment_node.get_range(self),
@@ -704,7 +593,7 @@ mod tests {
         version: 2,
       },
       content_changes: vec![lsp::TextDocumentContentChangeEvent {
-        range: Some(lsp::Range::at(1, 7, 1, 13)),
+        range: Some(lsp::Range::at(1, 7, 2, 0)),
         range_length: None,
         text: "\"bar\"".to_string(),
       }],
@@ -760,77 +649,6 @@ mod tests {
         range: lsp::Range::at(1, 6, 2, 0),
       }]
     );
-  }
-
-  #[test]
-  fn find_function() {
-    let document = Document::from(indoc! {
-      "
-      foo(x) := x + \"!\"
-      "
-    });
-
-    assert!(document.find_function("foo").is_some());
-    assert!(document.find_function("bar").is_none());
-  }
-
-  #[test]
-  fn find_nonexistent_recipe() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-      "
-    });
-
-    assert_eq!(document.find_recipe("nonexistent"), None);
-  }
-
-  #[test]
-  fn find_recipe() {
-    let document = Document::from(indoc! {
-      "
-      foo:
-        echo \"foo\"
-
-      bar:
-        echo \"bar\"
-      "
-    });
-
-    assert_eq!(
-      document.find_recipe("foo").unwrap(),
-      Recipe {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
-        parameters: vec![],
-        range: lsp::Range::at(0, 0, 3, 0),
-        shebang: None,
-      }
-    );
-
-    assert_eq!(
-      document.find_recipe("bar").unwrap(),
-      Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        content: "bar:\n  echo \"bar\"".into(),
-        parameters: vec![],
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      }
-    );
-
-    assert!(document.find_recipe("baz").is_none());
   }
 
   #[test]
@@ -2001,35 +1819,33 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 0, 0, 3)
+      document.recipes(),
+      vec![
+        Recipe {
+          name: TextNode {
+            value: "foo".into(),
+            range: lsp::Range::at(0, 0, 0, 3)
+          },
+          attributes: vec![],
+          dependencies: vec![],
+          parameters: vec![],
+          content: "foo:\n  echo \"foo\"".into(),
+          range: lsp::Range::at(0, 0, 3, 0),
+          shebang: None,
         },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![],
-        content: "foo:\n  echo \"foo\"".into(),
-        range: lsp::Range::at(0, 0, 3, 0),
-        shebang: None,
-      })
-    );
-
-    assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
-        name: TextNode {
-          value: "bar".into(),
-          range: lsp::Range::at(3, 0, 3, 3)
-        },
-        attributes: vec![],
-        dependencies: vec![],
-        parameters: vec![],
-        content: "bar:\n  echo \"bar\"".into(),
-        range: lsp::Range::at(3, 0, 5, 0),
-        shebang: None,
-      })
+        Recipe {
+          name: TextNode {
+            value: "bar".into(),
+            range: lsp::Range::at(3, 0, 3, 3)
+          },
+          attributes: vec![],
+          dependencies: vec![],
+          parameters: vec![],
+          content: "bar:\n  echo \"bar\"".into(),
+          range: lsp::Range::at(3, 0, 5, 0),
+          shebang: None,
+        }
+      ]
     );
   }
 
@@ -2086,47 +1902,28 @@ mod tests {
 
   #[test]
   fn optional_import() {
-    let document = Document::from(indoc! {
-      "
-      import? 'foo/bar.just'
-      "
-    });
+    #[track_caller]
+    fn case(source: &str, expected: bool) {
+      assert_eq!(Document::from(source).imports()[0].optional, expected);
+    }
 
-    assert_eq!(
-      document.imports(),
-      vec![Import {
-        attributes: vec![],
-        optional: true,
-        path: TextNode {
-          value: "'foo/bar.just'".into(),
-          range: lsp::Range::at(0, 8, 0, 22),
-        },
-        range: lsp::Range::at(0, 0, 0, 22),
-      }]
-    );
+    case("import 'foo.just'", false);
+    case("import? 'foo.just'", true);
+    case("import 'foo?bar.just'", false);
+    case("import? 'foo?bar.just'", true);
   }
 
   #[test]
   fn optional_module() {
-    let document = Document::from(indoc! {
-      "
-      mod? foo
-      "
-    });
+    #[track_caller]
+    fn case(source: &str, expected: bool) {
+      assert_eq!(Document::from(source).modules()[0].optional, expected);
+    }
 
-    assert_eq!(
-      document.modules(),
-      vec![Module {
-        attributes: vec![],
-        name: TextNode {
-          value: "foo".into(),
-          range: lsp::Range::at(0, 5, 0, 8),
-        },
-        optional: true,
-        path: None,
-        range: lsp::Range::at(0, 0, 0, 8),
-      }]
-    );
+    case("mod foo", false);
+    case("mod? foo", true);
+    case("mod foo 'foo?bar.just'", false);
+    case("mod? foo 'foo?bar.just'", true);
   }
 
   #[test]
@@ -2177,7 +1974,7 @@ mod tests {
       "
     });
 
-    let recipe = document.find_recipe("foo").unwrap();
+    let recipe = &document.recipes()[0];
 
     assert_eq!(recipe.attributes.len(), 3);
 
@@ -2236,7 +2033,7 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo").unwrap().parameters,
+      document.recipes()[0].parameters,
       vec![Parameter {
         name: "triple".into(),
         kind: ParameterKind::Normal,
@@ -2258,8 +2055,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2289,7 +2086,7 @@ mod tests {
             .into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2306,8 +2103,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2327,7 +2124,7 @@ mod tests {
         content: "bar: foo\n  echo \"bar\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2344,8 +2141,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2376,21 +2173,29 @@ mod tests {
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
+  }
+
+  #[test]
+  fn recipe_with_exported_variadic_parameter() {
+    #[track_caller]
+    fn case(source: &str, expected: VariadicType) {
+      let parameter = &Document::from(source).recipes()[0].parameters[0];
+
+      assert!(parameter.export);
+      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
+    }
+
+    case("foo +$args:\n", VariadicType::OneOrMore);
+    case("foo *$args:\n", VariadicType::ZeroOrMore);
   }
 
   #[test]
   fn recipe_with_invalid_parameters() {
     #[track_caller]
     fn case(source: &str) {
-      assert_eq!(
-        Document::from(source)
-          .find_recipe("foo")
-          .unwrap()
-          .parameters,
-        vec![],
-      );
+      assert_eq!(Document::from(source).recipes()[0].parameters, vec![]);
     }
 
     case("foo $:\n");
@@ -2411,8 +2216,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
+      document.recipes()[1],
+      Recipe {
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(3, 0, 3, 3)
@@ -2450,7 +2255,7 @@ mod tests {
         content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2470,8 +2275,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[2],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(6, 0, 6, 3)
@@ -2491,7 +2296,7 @@ mod tests {
         content: "baz: tools::foo\n  echo \"baz\"".into(),
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2511,8 +2316,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[2],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(6, 0, 6, 3)
@@ -2544,7 +2349,7 @@ mod tests {
         content: "baz: foo bar\n  echo \"baz\"".into(),
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2558,8 +2363,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("bar"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2587,7 +2392,7 @@ mod tests {
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2601,7 +2406,7 @@ mod tests {
       "
     });
 
-    let recipe = document.find_recipe("foo").unwrap();
+    let recipe = &document.recipes()[0];
 
     assert_eq!(
       recipe.shebang,
@@ -2614,7 +2419,7 @@ mod tests {
 
   #[test]
   fn recipe_with_subsequent_dependency() {
-    let recipe = Document::from(indoc! {
+    let document = Document::from(indoc! {
       "
       foo:
         echo \"foo\"
@@ -2625,14 +2430,12 @@ mod tests {
       baz: foo && bar
         echo \"baz\"
       "
-    })
-    .find_recipe("baz")
-    .unwrap();
+    });
 
     assert_eq!(
-      recipe
+      document.recipes()[2]
         .dependencies
-        .into_iter()
+        .iter()
         .map(|dependency| dependency.phase)
         .collect::<Vec<_>>(),
       vec![DependencyPhase::Prior, DependencyPhase::Subsequent],
@@ -2649,8 +2452,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("baz"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "baz".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2680,7 +2483,7 @@ mod tests {
             .into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 
@@ -2693,7 +2496,7 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo").unwrap().parameters,
+      document.recipes()[0].parameters,
       vec![Parameter {
         name: "FLAGS".into(),
         kind: ParameterKind::Variadic(VariadicType::ZeroOrMore),
@@ -2706,26 +2509,6 @@ mod tests {
   }
 
   #[test]
-  fn recipe_with_exported_variadic_parameter() {
-    #[track_caller]
-    fn case(source: &str, expected: VariadicType) {
-      let parameter = Document::from(source)
-        .find_recipe("foo")
-        .unwrap()
-        .parameters
-        .into_iter()
-        .next()
-        .unwrap();
-
-      assert!(parameter.export);
-      assert_eq!(parameter.kind, ParameterKind::Variadic(expected));
-    }
-
-    case("foo +$args:\n", VariadicType::OneOrMore);
-    case("foo *$args:\n", VariadicType::ZeroOrMore);
-  }
-
-  #[test]
   fn recipe_without_parameters_or_dependencies() {
     let document = Document::from(indoc! {
       "
@@ -2735,8 +2518,8 @@ mod tests {
     });
 
     assert_eq!(
-      document.find_recipe("foo"),
-      Some(Recipe {
+      document.recipes()[0],
+      Recipe {
         name: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 0, 0, 3)
@@ -2747,7 +2530,7 @@ mod tests {
         content: "foo:\n  echo \"foo\"".into(),
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
-      })
+      }
     );
   }
 }

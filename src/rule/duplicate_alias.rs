@@ -8,20 +8,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut groups = HashMap::<String, GroupSet>::new();
+      let mut conflicts = ConflictTracker::default();
 
       for alias in context.aliases() {
-        let current = GroupSet::from_attributes(&alias.attributes);
-
-        let previous = groups
-          .entry(alias.name.value.clone())
-          .or_default();
-
-        let duplicate = previous.conflicts_with(&current);
-
-        previous.union_with(current);
-
-        if duplicate {
+        if conflicts.record(&alias.name, &alias.attributes) {
           diagnostics.push(Diagnostic::error(
             format!("Duplicate alias `{}`", alias.name.value),
             alias.range,

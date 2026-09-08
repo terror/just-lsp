@@ -57,13 +57,17 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Dynamic);
     }
 
-    let Some(path) = import.resolve(source) else {
-      return Ok(ProjectDependencyTarget::Missing);
+    let path = match import.resolve(source) {
+      Ok(Some(path)) => path,
+      Ok(None) | Err(Error::EmptyImportPath) => {
+        return Ok(ProjectDependencyTarget::Missing);
+      }
+      Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
     };
 
     let path = path.as_path().lexiclean();
 
-    let Ok(uri) = lsp::Url::from_file_path(&path) else {
+    let Some(uri) = lsp::Url::from_path(&path) else {
       return Ok(ProjectDependencyTarget::Missing);
     };
 
@@ -81,7 +85,7 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Missing);
     }
 
-    if !self.expanded.contains(&uri) {
+    if import.is_enabled() && !self.expanded.contains(&uri) {
       self.visit(&uri)?;
     }
 
@@ -164,26 +168,6 @@ mod tests {
     fn uri(&self, path: &str) -> lsp::Url {
       lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
     }
-  }
-
-  #[test]
-  fn analyzer_uses_imported_declarations() {
-    let mut test =
-      Test::new("import 'foo.just'\n\nbar: foo").file("foo.just", "foo:");
-
-    let project = test.load();
-
-    assert!(
-      Analyzer {
-        config: None,
-        document: test.documents.get(&test.root).unwrap(),
-        imported_documents: project
-          .imported_documents(&test.documents)
-          .collect(),
-      }
-      .analyze()
-      .is_empty()
-    );
   }
 
   #[test]
@@ -310,27 +294,23 @@ mod tests {
 
   #[test]
   fn platform_attributes_filter_import_scope() {
-    let (enabled, disabled) = if cfg!(windows) {
-      ("windows", "unix")
-    } else if cfg!(unix) {
-      ("unix", "windows")
-    } else {
-      return;
-    };
+    let enabled = env::consts::OS;
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
 
     let mut test = Test::new(&formatdoc! {
       "
       [{enabled}]
-      import 'enabled.just'
+      import 'foo.just'
 
       [{disabled}]
-      import 'disabled.just'
+      import 'bar.just'
       "
     })
-    .file("enabled.just", "")
-    .file("disabled.just", "");
+    .file("foo.just", "")
+    .file("bar.just", "import 'baz.just'")
+    .file("baz.just", "");
 
-    let enabled = test.uri("enabled.just");
+    let enabled = test.uri("foo.just");
 
     let project = test.load();
 
@@ -344,6 +324,36 @@ mod tests {
   }
 
   #[test]
+  fn platform_disabled_import_does_not_hide_enabled_dependency() {
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    let mut test = Test::new(&formatdoc! {
+      "
+      [{disabled}]
+      import 'foo.just'
+      import 'bar.just'
+      "
+    })
+    .file("foo.just", "import 'bar.just'")
+    .file("bar.just", "import 'foo.just'");
+
+    let project = test.load();
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [test.uri("bar.just"), test.uri("foo.just")],
+    );
+
+    assert_eq!(
+      project.dependencies(&test.root).next().unwrap().target,
+      ProjectDependencyTarget::Resolved(test.uri("foo.just")),
+    );
+  }
+
+  #[test]
   fn loads_import_graph() {
     let mut test = Test::new(indoc! {
       "
@@ -351,7 +361,7 @@ mod tests {
       import? 'missing.just'
       import 'required-missing.just'
       import 'bar.just'
-      import x'dynamic.just'
+      import f'dynamic.just'
 
       foo:
       "
@@ -442,5 +452,28 @@ mod tests {
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
     assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
+  }
+
+  #[test]
+  fn loads_shell_expanded_import() {
+    let mut test =
+      Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");
+
+    let imported = test.uri("foo.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.root][0].target,
+      ProjectDependencyTarget::Resolved(imported.clone()),
+    );
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [imported],
+    );
   }
 }

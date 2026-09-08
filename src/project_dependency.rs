@@ -12,7 +12,7 @@ impl ProjectDependency {
   pub fn is_enabled(&self) -> bool {
     match &self.kind {
       ProjectDependencyKind::Import { attributes, .. } => {
-        platform::attributes_enabled(attributes)
+        Attribute::are_enabled(attributes)
       }
     }
   }

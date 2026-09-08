@@ -1,43 +1,32 @@
-import type { SyntaxNode } from '@/lib/syntax-node';
-import { positionToOffset } from '@/lib/utils';
-import { Text } from '@codemirror/state';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { Node } from 'web-tree-sitter';
 
 interface TreeNodeProps {
-  node: SyntaxNode;
+  node: Node;
   level: number;
-  doc: Text;
-  expandedNodes: Set<SyntaxNode>;
-  toggleExpand: (node: SyntaxNode) => void;
+  collapsedNodes: Set<Node>;
+  toggleExpand: (node: Node) => void;
   onHighlightChange: (range?: { from: number; to: number }) => void;
 }
 
 export const TreeNode: React.FC<TreeNodeProps> = ({
   node,
   level,
-  doc,
-  expandedNodes,
+  collapsedNodes,
   toggleExpand,
   onHighlightChange,
 }) => {
   const hasChildren = node.childCount > 0;
-  const isExpanded = expandedNodes.has(node);
-
-  const handleMouseEnter = () => {
-    const from = positionToOffset(node.startPosition, doc);
-    const to = positionToOffset(node.endPosition, doc);
-
-    if (from !== null && to !== null) {
-      onHighlightChange({ from, to });
-    }
-  };
+  const isExpanded = !collapsedNodes.has(node);
 
   return (
     <>
       <div
         className='tree-node hover:bg-accent flex cursor-pointer items-center py-1 font-mono text-sm whitespace-nowrap'
         style={{ paddingLeft: `${level * 16 + 4}px` }}
-        onMouseEnter={handleMouseEnter}
+        onMouseEnter={() =>
+          onHighlightChange({ from: node.startIndex, to: node.endIndex })
+        }
         onMouseLeave={() => onHighlightChange(undefined)}
         onClick={() => hasChildren && toggleExpand(node)}
       >
@@ -58,13 +47,12 @@ export const TreeNode: React.FC<TreeNodeProps> = ({
       </div>
       {isExpanded &&
         hasChildren &&
-        node.children.map((child, index) => (
+        node.children.map((child) => (
           <TreeNode
-            key={child.id ?? index}
+            key={child.id}
             node={child}
             level={level + 1}
-            doc={doc}
-            expandedNodes={expandedNodes}
+            collapsedNodes={collapsedNodes}
             toggleExpand={toggleExpand}
             onHighlightChange={onHighlightChange}
           />

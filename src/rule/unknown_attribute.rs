@@ -1,7 +1,8 @@
 use super::*;
 
 define_rule! {
-  /// Warns when an attribute name isn't part of the known builtin attribute set.
+  /// Warns when an attribute name isn't part of the known builtin attribute
+  /// set.
   UnknownAttributeRule {
     id: "unknown-attribute",
     message: "unknown attribute",
@@ -11,7 +12,7 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        if context.builtin_attributes(attribute_name).is_empty() {
+        if context.builtin_attribute(attribute_name).is_none() {
           let suggestion = attribute_name.find_suggestion(
             BUILTINS.iter().filter_map(|builtin| match builtin {
               Builtin::Attribute { name, .. } => Some(*name),

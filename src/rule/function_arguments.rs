@@ -9,10 +9,12 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
+      let functions = context.view().resolved_functions();
+
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if let Some(function) = context.function(function_name) {
+        if let Some(function) = functions.get(function_name) {
           let (argument_count, parameter_count) =
             (function_call.arguments.len(), function.parameters.len());
 
@@ -25,10 +27,10 @@ define_rule! {
               function_call.range,
             ));
           }
-        } else if let Some(Builtin::Function { kind, .. }) =
+        } else if let Some(Builtin::Function { signature, .. }) =
           context.builtin_function(function_name.as_str())
         {
-          let range = kind.argument_range();
+          let range = signature.argument_range();
 
           let (min, max) = (*range.start(), *range.end());
 

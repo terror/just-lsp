@@ -6,23 +6,13 @@ define_rule! {
     id: "duplicate-function",
     message: "duplicate function",
     run(context) {
-      let mut groups = HashMap::<String, GroupSet>::new();
+      let mut conflicts = ConflictTracker::default();
 
       context
         .functions()
         .iter()
         .filter(|function| {
-          let current = GroupSet::from_attributes(&function.attributes);
-
-          let previous = groups
-            .entry(function.name.value.clone())
-            .or_default();
-
-          let duplicate = previous.conflicts_with(&current);
-
-          previous.union_with(current);
-
-          duplicate
+          conflicts.record(&function.name, &function.attributes)
         })
         .map(|function| {
           Diagnostic::error(

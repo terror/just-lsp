@@ -2,91 +2,72 @@ use super::*;
 
 #[derive(Debug)]
 pub struct ProjectView<'a> {
-  document: &'a Document,
-  documents: Vec<ProjectViewDocument<'a>>,
+  pub(super) document: &'a Document,
+  pub(super) documents: Vec<ProjectViewDocument<'a>>,
 }
 
 impl<'a> ProjectView<'a> {
+  fn declarations<T>(
+    &self,
+    declarations: impl Fn(&Document) -> Vec<T>,
+    declaration_name: impl Fn(&T) -> &str,
+    declaration_position: impl Fn(&T) -> lsp::Position,
+  ) -> HashMap<String, Located<T>> {
+    let mut candidates = Vec::new();
+
+    for document in &self.documents {
+      for declaration in declarations(document.document) {
+        candidates.push((document, declaration));
+      }
+    }
+
+    candidates.sort_by_key(|(document, declaration)| {
+      (
+        Reverse(document.load_depth),
+        document.traversal_order,
+        declaration_position(declaration),
+      )
+    });
+
+    candidates
+      .into_iter()
+      .map(|(document, value)| {
+        (
+          declaration_name(&value).to_owned(),
+          Located::new(document.document.uri.clone(), value),
+        )
+      })
+      .collect()
+  }
+
   #[must_use]
   pub fn document(&self) -> &'a Document {
     self.document
   }
 
-  fn find<T>(
-    &self,
-    name: &str,
-    declarations: impl Fn(&Document) -> Vec<T>,
-    declaration_name: impl Fn(&T) -> &str,
-    declaration_position: impl Fn(&T) -> lsp::Position,
-  ) -> Option<Located<T>> {
-    let mut candidates = Vec::new();
-
-    for document in &self.documents {
-      for declaration in declarations(document.document) {
-        if declaration_name(&declaration) == name {
-          candidates.push((document, declaration));
-        }
-      }
-    }
-
-    candidates
-      .into_iter()
-      .max_by_key(|(document, declaration)| {
-        (
-          Reverse(document.load_depth),
-          document.traversal_order,
-          declaration_position(declaration),
-        )
-      })
-      .map(|(document, value)| {
-        Located::new(document.document.uri.clone(), value)
-      })
-  }
-
-  #[must_use]
-  pub fn find_enabled_function(&self, name: &str) -> Option<Located<Function>> {
-    self.find(
-      name,
-      |document| {
-        document
-          .functions()
-          .into_iter()
-          .filter(Function::is_enabled)
-          .collect()
-      },
-      |function| &function.name.value,
-      |function| function.range.start,
-    )
+  pub(super) fn documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
+    self.documents.iter().map(|document| document.document)
   }
 
   #[must_use]
   pub fn find_function(&self, name: &str) -> Option<Located<Function>> {
-    self.find(
-      name,
-      Document::functions,
-      |function| &function.name.value,
-      |function| function.range.start,
-    )
+    self.resolved_functions().remove(name)
   }
 
   #[must_use]
   pub fn find_recipe(&self, name: &str) -> Option<Located<Recipe>> {
-    self.find(
-      name,
-      Document::recipes,
-      |recipe| &recipe.name.value,
-      |recipe| recipe.range.start,
-    )
+    self.resolved_recipes().remove(name)
   }
 
   #[must_use]
   pub fn find_variable(&self, name: &str) -> Option<Located<Variable>> {
-    self.find(
-      name,
-      Document::variables,
-      |variable| &variable.name.value,
-      |variable| variable.range.start,
-    )
+    self
+      .declarations(
+        Document::variables,
+        |variable| &variable.name.value,
+        |variable| variable.range.start,
+      )
+      .remove(name)
   }
 
   #[must_use]
@@ -117,6 +98,30 @@ impl<'a> ProjectView<'a> {
       document,
       documents,
     }
+  }
+
+  pub(super) fn resolved_functions(
+    &self,
+  ) -> HashMap<String, Located<Function>> {
+    self.declarations(
+      |document| {
+        document
+          .functions()
+          .into_iter()
+          .filter(Function::is_enabled)
+          .collect()
+      },
+      |function| &function.name.value,
+      |function| function.range.start,
+    )
+  }
+
+  pub(super) fn resolved_recipes(&self) -> HashMap<String, Located<Recipe>> {
+    self.declarations(
+      Document::recipes,
+      |recipe| &recipe.name.value,
+      |recipe| recipe.range.start,
+    )
   }
 }
 
