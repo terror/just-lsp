@@ -1,6 +1,44 @@
+import { ChevronRight } from 'lucide-react';
+
 import { type DocumentationSection } from '../lib/documentation';
 import { cn } from '../lib/utils';
 import { DocumentationMarkdown } from './documentation-markdown';
+
+const DocumentationLink = ({
+  section,
+  root = false,
+}: {
+  section: DocumentationSection;
+  root?: boolean;
+}) => {
+  const link = (
+    <a
+      href={`#${section.id}`}
+      className={cn(
+        'min-w-0 break-words',
+        root
+          ? 'text-base font-semibold hover:underline'
+          : section.children.length
+            ? 'font-medium hover:underline'
+            : 'text-muted-foreground hover:text-foreground block py-1'
+      )}
+    >
+      {section.title}
+    </a>
+  );
+
+  return section.children.length ? (
+    <details open>
+      <summary className='focus-visible:outline-ring flex cursor-pointer list-none items-center gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 [&::-webkit-details-marker]:hidden [[open]>&>svg]:rotate-90'>
+        <ChevronRight aria-hidden='true' className='size-4 shrink-0' />
+        {link}
+      </summary>
+      <DocumentationLinks sections={section.children} />
+    </details>
+  ) : (
+    link
+  );
+};
 
 const DocumentationLinks = ({
   sections,
@@ -17,19 +55,7 @@ const DocumentationLinks = ({
   >
     {sections.map((section) => (
       <li key={section.id}>
-        <a
-          href={`#${section.id}`}
-          className={
-            section.children.length
-              ? 'block font-medium break-words hover:underline'
-              : 'text-muted-foreground hover:text-foreground block py-1 break-words'
-          }
-        >
-          {section.title}
-        </a>
-        {section.children.length > 0 && (
-          <DocumentationLinks sections={section.children} />
-        )}
+        <DocumentationLink section={section} />
       </li>
     ))}
   </ul>
@@ -43,15 +69,7 @@ export const DocumentationNavigation = ({
   <nav aria-label='Documentation navigation' className='space-y-6 text-sm'>
     {sections.map((section) => (
       <div key={section.id}>
-        <a
-          href={`#${section.id}`}
-          className='text-base font-semibold hover:underline'
-        >
-          {section.title}
-        </a>
-        {section.children.length > 0 && (
-          <DocumentationLinks sections={section.children} />
-        )}
+        <DocumentationLink section={section} root />
       </div>
     ))}
   </nav>
