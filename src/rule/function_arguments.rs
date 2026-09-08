@@ -27,10 +27,10 @@ define_rule! {
               function_call.range,
             ));
           }
-        } else if let Some(Builtin::Function { kind, .. }) =
+        } else if let Some(Builtin::Function { signature, .. }) =
           context.builtin_function(function_name.as_str())
         {
-          let range = kind.argument_range();
+          let range = signature.argument_range();
 
           let (min, max) = (*range.start(), *range.end());
 

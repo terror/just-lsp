@@ -15,7 +15,7 @@ pub enum Builtin<'a> {
   Function {
     name: &'a str,
     aliases: &'a [&'a str],
-    kind: FunctionKind,
+    signature: FunctionSignature<'a>,
     description: &'a str,
     deprecated: Option<Deprecation<'a>>,
   },
@@ -95,8 +95,7 @@ impl Builtin<'_> {
 
   fn function_completion_item(&self, name: &str) -> lsp::CompletionItem {
     let Self::Function {
-      name: canonical,
-      kind,
+      signature,
       deprecated,
       ..
     } = self
@@ -106,89 +105,6 @@ impl Builtin<'_> {
 
     let deprecated = deprecated.is_some();
 
-    let snippet = match *canonical {
-      _ if matches!(kind, FunctionKind::Nullary) => format!("{name}()"),
-      "absolute_path" | "blake3_file" | "canonicalize" | "clean"
-      | "extension" | "file_name" | "file_stem" | "parent_directory"
-      | "path_exists" | "read" | "sha256_file" | "without_extension" => {
-        format!("{name}(${{1:path:string}})")
-      }
-      "append" => {
-        format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
-      }
-      "assert" => {
-        format!("{name}(${{1:condition}}${{2:, message:string}})")
-      }
-      "bool" | "len" | "show" => format!("{name}(${{1:value}})"),
-      "join_list" => {
-        format!("{name}(${{1:value}}${{2:, separator:string}})")
-      }
-      "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
-      "capitalize"
-      | "encode_uri_component"
-      | "kebabcase"
-      | "lowercase"
-      | "lowercamelcase"
-      | "quote"
-      | "shoutykebabcase"
-      | "shoutysnakecase"
-      | "snakecase"
-      | "titlecase"
-      | "trim"
-      | "trim_end"
-      | "trim_start"
-      | "uppercamelcase"
-      | "uppercase" => format!("{name}(${{1:s:string}})"),
-      "choose" => {
-        format!("{name}(${{1:n:string}}, ${{2:alphabet:string}})")
-      }
-      "datetime" | "datetime_utc" => {
-        format!("{name}(${{1:format:string}})")
-      }
-      "env" => {
-        format!("{name}(${{1:key:string}}${{2:, default:string}})")
-      }
-      "env_var" => format!("{name}(${{1:key:string}})"),
-      "env_var_or_default" => {
-        format!("{name}(${{1:key:string}}, ${{2:default:string}})")
-      }
-      "error" => format!("{name}(${{1:message:string}})"),
-      "join" => format!(
-        "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
-      ),
-      "prepend" => {
-        format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
-      }
-      "replace" => {
-        format!("{name}(${{1:s:string}}, ${{2:from:string}}, ${{3:to:string}})")
-      }
-      "replace_regex" => {
-        format!(
-          "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})"
-        )
-      }
-      "require" | "which" => {
-        format!("{name}(${{1:name:string}})")
-      }
-      "style" => {
-        format!("{name}(${{1:styles:string}}${{2:, text:string}})")
-      }
-      "semver_matches" => {
-        format!("{name}(${{1:version:string}}, ${{2:requirement:string}})")
-      }
-      "shell" => {
-        format!("{name}(${{1:command:string}}${{2:, args:string...}})")
-      }
-      "split" => {
-        format!("{name}(${{1:string:string}}${{2:, separator:string}})")
-      }
-      "trim_end_match" | "trim_end_matches" | "trim_start_match"
-      | "trim_start_matches" => {
-        format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
-      }
-      _ => format!("{name}(${{1:}})"),
-    };
-
     lsp::CompletionItem {
       label: name.to_string(),
       kind: Some(lsp::CompletionItemKind::FUNCTION),
@@ -196,7 +112,7 @@ impl Builtin<'_> {
         self.description(),
       )),
       deprecated: deprecated.then_some(true),
-      insert_text: Some(snippet),
+      insert_text: Some(signature.snippet(name)),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       sort_text: Some(format!("z{name}")),
       tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
@@ -214,7 +130,7 @@ mod tests {
     let item = Builtin::Function {
       name: "foo",
       aliases: &[],
-      kind: FunctionKind::Nullary,
+      signature: FunctionSignature(&[]),
       description: "",
       deprecated: Some(Deprecation::Replacement("bar")),
     }
@@ -228,43 +144,13 @@ mod tests {
   }
 
   #[test]
-  fn fallback_function_completion_snippet() {
-    let items = Builtin::Function {
-      name: "foo",
-      aliases: &[],
-      kind: FunctionKind::Unary,
-      description: "",
-      deprecated: None,
-    }
-    .completion_items();
-
-    assert_eq!(
-      items,
-      vec![lsp::CompletionItem {
-        label: "foo".into(),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::Markdown,
-            value: String::new()
-          },
-        )),
-        insert_text: Some("foo(${1:})".into()),
-        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-        sort_text: Some("zfoo".into()),
-        ..Default::default()
-      }],
-    );
-  }
-
-  #[test]
   fn function_alias_uses_alias_snippet() {
     #[track_caller]
-    fn case(name: &str, kind: FunctionKind, arguments: &str) {
+    fn case(name: &str, parameters: &[FunctionParameter<'_>], arguments: &str) {
       let items = Builtin::Function {
         name,
         aliases: &["foo"],
-        kind,
+        signature: FunctionSignature(parameters),
         description: "bar",
         deprecated: None,
       }
@@ -289,7 +175,50 @@ mod tests {
       );
     }
 
-    case("bar", FunctionKind::Nullary, "");
-    case("parent_directory", FunctionKind::Unary, "${1:path:string}");
+    case("bar", &[], "");
+
+    case(
+      "parent_directory",
+      &[FunctionParameter::Required("path", Some("string"))],
+      "${1:path:string}",
+    );
+  }
+
+  #[test]
+  fn function_completion_snippet_uses_signature() {
+    let items = Builtin::Function {
+      name: "foo",
+      aliases: &[],
+      signature: FunctionSignature(&[
+        FunctionParameter::Required("value", None),
+        FunctionParameter::Required("separator", Some("string")),
+        FunctionParameter::Optional("default", Some("string")),
+        FunctionParameter::Variadic("rest", Some("string")),
+      ]),
+      description: "",
+      deprecated: None,
+    }
+    .completion_items();
+
+    assert_eq!(
+      items,
+      vec![lsp::CompletionItem {
+        label: "foo".into(),
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        documentation: Some(lsp::Documentation::MarkupContent(
+          lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: String::new()
+          },
+        )),
+        insert_text: Some(
+          "foo(${1:value}, ${2:separator:string}${3:, default:string}${4:, rest:string...})"
+            .into(),
+        ),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        sort_text: Some("zfoo".into()),
+        ..Default::default()
+      }],
+    );
   }
 }
