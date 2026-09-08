@@ -55,16 +55,13 @@ impl Analyze {
 
     let content = document.content.to_string();
 
-    let imported_documents = workspace
-      .projects
-      .get(&uri)
-      .into_iter()
-      .flat_map(|project| project.imported_documents(&workspace.documents));
-
     let analyzer = Analyzer {
       config: None,
-      document,
-      imported_documents: imported_documents.collect(),
+      view: ProjectView::new(
+        document,
+        &workspace.projects[&uri].import_scope,
+        &workspace.documents,
+      ),
     };
 
     let diagnostics = analyzer.analyze();

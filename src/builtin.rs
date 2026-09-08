@@ -15,7 +15,7 @@ pub enum Builtin<'a> {
   Function {
     name: &'a str,
     aliases: &'a [&'a str],
-    kind: FunctionKind,
+    signature: FunctionSignature<'a>,
     description: &'a str,
     deprecated: Option<Deprecation<'a>>,
   },
@@ -94,137 +94,16 @@ impl Builtin<'_> {
   }
 
   fn function_completion_item(&self, name: &str) -> lsp::CompletionItem {
-    let deprecated = matches!(
-      self,
-      Self::Function {
-        deprecated: Some(_),
-        ..
-      }
-    );
-
-    let snippet = match name {
-      "absolute_path" | "blake3_file" | "canonicalize" | "clean"
-      | "extension" | "file_name" | "file_stem" | "parent_dir"
-      | "parent_directory" | "path_exists" | "read" | "sha256_file"
-      | "without_extension" => {
-        format!("{name}(${{1:path:string}})")
-      }
-      "append" => {
-        format!("{name}(${{1:suffix:string}}, ${{2:s:string}})")
-      }
-      "assert" => {
-        format!("{name}(${{1:condition}}${{2:, message:string}})")
-      }
-      "bool" | "len" | "show" => format!("{name}(${{1:value}})"),
-      "join_list" => {
-        format!("{name}(${{1:value}}${{2:, separator:string}})")
-      }
-      "arch"
-      | "num_cpus"
-      | "num_jobs"
-      | "os"
-      | "os_family"
-      | "is_dependency"
-      | "recipe_name"
-      | "invocation_directory"
-      | "invocation_directory_native"
-      | "invocation_dir"
-      | "invocation_dir_native"
-      | "justfile"
-      | "justfile_directory"
-      | "justfile_dir"
-      | "module_file"
-      | "module_directory"
-      | "module_dir"
-      | "module_path"
-      | "source_file"
-      | "source_directory"
-      | "source_dir"
-      | "just_executable"
-      | "just_pid"
-      | "just_version"
-      | "uuid"
-      | "runtime_directory"
-      | "runtime_dir"
-      | "cache_directory"
-      | "cache_dir"
-      | "config_directory"
-      | "config_dir"
-      | "config_local_directory"
-      | "config_local_dir"
-      | "data_directory"
-      | "data_dir"
-      | "data_local_directory"
-      | "data_local_dir"
-      | "executable_directory"
-      | "executable_dir"
-      | "home_directory"
-      | "home_dir" => format!("{name}()"),
-      "blake3" | "sha256" => format!("{name}(${{1:string:string}})"),
-      "capitalize"
-      | "encode_uri_component"
-      | "kebabcase"
-      | "lowercase"
-      | "lowercamelcase"
-      | "quote"
-      | "shoutykebabcase"
-      | "shoutysnakecase"
-      | "snakecase"
-      | "titlecase"
-      | "trim"
-      | "trim_end"
-      | "trim_start"
-      | "uppercamelcase"
-      | "uppercase" => format!("{name}(${{1:s:string}})"),
-      "choose" => {
-        format!("{name}(${{1:n:string}}, ${{2:alphabet:string}})")
-      }
-      "datetime" | "datetime_utc" => {
-        format!("{name}(${{1:format:string}})")
-      }
-      "env" => {
-        format!("{name}(${{1:key:string}}${{2:, default:string}})")
-      }
-      "env_var" => format!("{name}(${{1:key:string}})"),
-      "env_var_or_default" => {
-        format!("{name}(${{1:key:string}}, ${{2:default:string}})")
-      }
-      "error" => format!("{name}(${{1:message:string}})"),
-      "join" => format!(
-        "{name}(${{1:a:string}}, ${{2:b:string}}${{3:, more:string...}})",
-      ),
-      "prepend" => {
-        format!("{name}(${{1:prefix:string}}, ${{2:s:string}})")
-      }
-      "replace" => {
-        format!("{name}(${{1:s:string}}, ${{2:from:string}}, ${{3:to:string}})")
-      }
-      "replace_regex" => {
-        format!(
-          "{name}(${{1:s:string}}, ${{2:regex:string}}, ${{3:replacement:string}})"
-        )
-      }
-      "require" | "which" => {
-        format!("{name}(${{1:name:string}})")
-      }
-      "style" => {
-        format!("{name}(${{1:styles:string}}${{2:, text:string}})")
-      }
-      "semver_matches" => {
-        format!("{name}(${{1:version:string}}, ${{2:requirement:string}})")
-      }
-      "shell" => {
-        format!("{name}(${{1:command:string}}${{2:, args:string...}})")
-      }
-      "split" => {
-        format!("{name}(${{1:string:string}}${{2:, separator:string}})")
-      }
-      "trim_end_match" | "trim_end_matches" | "trim_start_match"
-      | "trim_start_matches" => {
-        format!("{name}(${{1:s:string}}, ${{2:substring:string}})")
-      }
-      _ => format!("{name}(${{1:}})"),
+    let Self::Function {
+      signature,
+      deprecated,
+      ..
+    } = self
+    else {
+      unreachable!();
     };
+
+    let deprecated = deprecated.is_some();
 
     lsp::CompletionItem {
       label: name.to_string(),
@@ -233,7 +112,7 @@ impl Builtin<'_> {
         self.description(),
       )),
       deprecated: deprecated.then_some(true),
-      insert_text: Some(snippet),
+      insert_text: Some(signature.snippet(name)),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       sort_text: Some(format!("z{name}")),
       tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
@@ -251,7 +130,7 @@ mod tests {
     let item = Builtin::Function {
       name: "foo",
       aliases: &[],
-      kind: FunctionKind::Nullary,
+      signature: FunctionSignature(&[]),
       description: "",
       deprecated: Some(Deprecation::Replacement("bar")),
     }
@@ -265,11 +144,57 @@ mod tests {
   }
 
   #[test]
-  fn fallback_function_completion_snippet() {
+  fn function_alias_uses_alias_snippet() {
+    #[track_caller]
+    fn case(name: &str, parameters: &[FunctionParameter<'_>], arguments: &str) {
+      let items = Builtin::Function {
+        name,
+        aliases: &["foo"],
+        signature: FunctionSignature(parameters),
+        description: "bar",
+        deprecated: None,
+      }
+      .completion_items();
+
+      assert_eq!(
+        items,
+        [name, "foo"].map(|name| lsp::CompletionItem {
+          label: name.into(),
+          kind: Some(lsp::CompletionItemKind::FUNCTION),
+          documentation: Some(lsp::Documentation::MarkupContent(
+            lsp::MarkupContent {
+              kind: lsp::MarkupKind::Markdown,
+              value: "bar".into(),
+            },
+          )),
+          insert_text: Some(format!("{name}({arguments})")),
+          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+          sort_text: Some(format!("z{name}")),
+          ..Default::default()
+        }),
+      );
+    }
+
+    case("bar", &[], "");
+
+    case(
+      "parent_directory",
+      &[FunctionParameter::Required("path", Some("string"))],
+      "${1:path:string}",
+    );
+  }
+
+  #[test]
+  fn function_completion_snippet_uses_signature() {
     let items = Builtin::Function {
       name: "foo",
       aliases: &[],
-      kind: FunctionKind::Nullary,
+      signature: FunctionSignature(&[
+        FunctionParameter::Required("value", None),
+        FunctionParameter::Required("separator", Some("string")),
+        FunctionParameter::Optional("default", Some("string")),
+        FunctionParameter::Variadic("rest", Some("string")),
+      ]),
       description: "",
       deprecated: None,
     }
@@ -286,57 +211,14 @@ mod tests {
             value: String::new()
           },
         )),
-        insert_text: Some("foo(${1:})".into()),
+        insert_text: Some(
+          "foo(${1:value}, ${2:separator:string}${3:, default:string}${4:, rest:string...})"
+            .into(),
+        ),
         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
         sort_text: Some("zfoo".into()),
         ..Default::default()
       }],
-    );
-  }
-
-  #[test]
-  fn function_alias_uses_alias_snippet() {
-    let items = Builtin::Function {
-      name: "home_directory",
-      aliases: &["home_dir"],
-      kind: FunctionKind::Nullary,
-      description: "bar",
-      deprecated: None,
-    }
-    .completion_items();
-
-    assert_eq!(
-      items,
-      vec![
-        lsp::CompletionItem {
-          label: "home_directory".into(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: "bar".into(),
-            },
-          )),
-          insert_text: Some("home_directory()".into()),
-          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_directory".into()),
-          ..Default::default()
-        },
-        lsp::CompletionItem {
-          label: "home_dir".into(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::Markdown,
-              value: "bar".into(),
-            },
-          )),
-          insert_text: Some("home_dir()".into()),
-          insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-          sort_text: Some("zhome_dir".into()),
-          ..Default::default()
-        },
-      ],
     );
   }
 }

@@ -40,6 +40,7 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `deprecated-function`             | Deprecated Function             | Warning: function call uses a deprecated builtin function with a replacement.                                                 |
 | `duplicate-function`              | Duplicate Function              | User-defined function name is defined more than once.                                                                         |
 | `function-parameters`             | Function Parameters             | User-defined function parameter list has duplicates.                                                                          |
+| `unstable-feature-gate`           | Unstable Feature Gate           | Warning: `set lists`, user-defined functions, or `[cache]` are used without `set unstable` in the document or its imports.       |
 | `unused-function`                 | Unused Function                 | Warning: user-defined function is never called in the document or its imports.                                                 |
 | `list-features`                   | List Features                   | Syntax and builtins that require `set lists` are used without enabling it.                                                    |
 | `unknown-setting`                 | Unknown Setting                 | `set` statement references an unknown setting.                                                                                |
@@ -55,4 +56,4 @@ the rule’s identifier in the `code` field so editors can group or filter them.
 | `unused-parameters`               | Unused Parameters               | Warning: recipe parameter is never read unless it is exported or available through positional arguments.                       |
 | `dotenv-command-conflict`         | Dotenv Command Conflict         | `dotenv-command` is incompatible with enabled dotenv file-loading settings.                                                   |
 | `dotenv-path-filename-conflict`   | Dotenv Path/Filename Conflict   | Warning: `dotenv-path` overrides `dotenv-filename`; setting both is redundant.                                                |
-| `invalid-import-path`             | Invalid Import Path             | Literal non-optional import path points to a path that does not exist on disk.                                                |
+| `invalid-import-path`             | Invalid Import Path             | Import path cannot be decoded or expanded, or an enabled non-optional import has an empty or missing path.                   |

@@ -5,16 +5,13 @@ type BuiltinRef = &'static Builtin<'static>;
 pub struct RuleContext<'a> {
   aliases: OnceLock<Vec<Alias>>,
   attributes: OnceLock<Vec<Attribute>>,
-  builtin_attributes_map: OnceLock<HashMap<&'static str, Vec<BuiltinRef>>>,
+  builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
-  document: &'a Document,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   functions: OnceLock<Vec<Function>>,
-  imported_documents: Vec<&'a Document>,
   recipe_names: OnceLock<HashSet<String>>,
-  recipe_parameters: OnceLock<HashMap<String, Vec<Parameter>>>,
   recipes: OnceLock<Vec<Recipe>>,
   scope: OnceLock<Scope<'a>>,
   settings: OnceLock<Vec<Setting>>,
@@ -22,6 +19,7 @@ pub struct RuleContext<'a> {
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
   variables: OnceLock<Vec<Variable>>,
+  view: &'a ProjectView<'a>,
 }
 
 impl<'a> RuleContext<'a> {
@@ -35,26 +33,26 @@ impl<'a> RuleContext<'a> {
   pub fn attributes(&self) -> &[Attribute] {
     self
       .attributes
-      .get_or_init(|| self.document.attributes())
+      .get_or_init(|| self.document().attributes())
       .as_slice()
   }
 
-  pub fn builtin_attributes(&self, name: &str) -> &[&'static Builtin<'static>] {
-    self
-      .builtin_attributes_map()
-      .get(name)
-      .map_or(&[], Vec::as_slice)
+  pub fn builtin_attribute(
+    &self,
+    name: &str,
+  ) -> Option<&'static Builtin<'static>> {
+    self.builtin_attribute_map().get(name).copied()
   }
 
-  fn builtin_attributes_map(
+  fn builtin_attribute_map(
     &self,
-  ) -> &HashMap<&'static str, Vec<&'static Builtin<'static>>> {
-    self.builtin_attributes_map.get_or_init(|| {
+  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
+    self.builtin_attribute_map.get_or_init(|| {
       let mut map = HashMap::new();
 
       for builtin in BUILTINS {
         if let Builtin::Attribute { name, .. } = builtin {
-          map.entry(*name).or_insert_with(Vec::new).push(builtin);
+          map.entry(*name).or_insert(builtin);
         }
       }
 
@@ -113,7 +111,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub fn document(&self) -> &'a Document {
-    self.document
+    self.view.document()
   }
 
   pub fn document_variable_names(&self) -> &HashSet<String> {
@@ -127,20 +125,13 @@ impl<'a> RuleContext<'a> {
   }
 
   fn documents(&self) -> impl Iterator<Item = &Document> {
-    once(self.document).chain(self.imported_documents.iter().copied())
-  }
-
-  pub fn function(&self, name: &str) -> Option<&Function> {
-    self
-      .functions()
-      .iter()
-      .find(|function| function.name.value == name)
+    self.view.documents()
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
     self
       .function_calls
-      .get_or_init(|| self.document.function_calls())
+      .get_or_init(|| self.document().function_calls())
       .as_slice()
   }
 
@@ -152,27 +143,21 @@ impl<'a> RuleContext<'a> {
   }
 
   pub fn imported_documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
-    self.imported_documents.iter().copied()
+    self.view.documents().skip(1)
   }
 
   #[must_use]
-  pub fn new(
-    document: &'a Document,
-    imported_documents: impl IntoIterator<Item = &'a Document>,
-  ) -> Self {
+  pub fn new(view: &'a ProjectView<'a>) -> Self {
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
-      builtin_attributes_map: OnceLock::new(),
+      builtin_attribute_map: OnceLock::new(),
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
-      document,
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       functions: OnceLock::new(),
-      imported_documents: imported_documents.into_iter().collect(),
       recipe_names: OnceLock::new(),
-      recipe_parameters: OnceLock::new(),
       recipes: OnceLock::new(),
       scope: OnceLock::new(),
       settings: OnceLock::new(),
@@ -180,14 +165,8 @@ impl<'a> RuleContext<'a> {
       user_function_names: OnceLock::new(),
       variable_and_builtin_names: OnceLock::new(),
       variables: OnceLock::new(),
+      view,
     }
-  }
-
-  pub fn recipe(&self, name: &str) -> Option<&Recipe> {
-    self
-      .recipes()
-      .iter()
-      .find(|recipe| recipe.name.value == name)
   }
 
   pub fn recipe_names(&self) -> &HashSet<String> {
@@ -196,16 +175,6 @@ impl<'a> RuleContext<'a> {
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.clone())
-        .collect()
-    })
-  }
-
-  pub fn recipe_parameters(&self) -> &HashMap<String, Vec<Parameter>> {
-    self.recipe_parameters.get_or_init(|| {
-      self
-        .recipes()
-        .iter()
-        .map(|recipe| (recipe.name.value.clone(), recipe.parameters.clone()))
         .collect()
     })
   }
@@ -236,7 +205,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub fn tree(&self) -> Option<&Tree> {
-    self.document.tree.as_ref()
+    self.document().tree.as_ref()
   }
 
   pub fn unexports(&self) -> &[Unexport] {
@@ -275,6 +244,10 @@ impl<'a> RuleContext<'a> {
       .get_or_init(|| self.documents().flat_map(Document::variables).collect())
       .as_slice()
   }
+
+  pub fn view(&self) -> &ProjectView<'a> {
+    self.view
+  }
 }
 
 #[cfg(test)]
@@ -290,10 +263,11 @@ mod tests {
 
     let project = ProjectLoader::load(&mut documents, &uri).unwrap();
 
-    test(&RuleContext::new(
+    test(&RuleContext::new(&ProjectView::new(
       documents.get(&uri).unwrap(),
-      project.imported_documents(&documents),
-    ));
+      &project.import_scope,
+      &documents,
+    )));
   }
 
   #[test]

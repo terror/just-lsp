@@ -12,51 +12,33 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        let matching = context.builtin_attributes(attribute_name);
-
-        if matching.is_empty() {
+        let Some(Builtin::Attribute { kind, .. }) =
+          context.builtin_attribute(attribute_name)
+        else {
           continue;
-        }
+        };
 
         let argument_count = attribute.arguments.len();
 
-        let ranges = matching
-          .iter()
-          .copied()
-          .filter_map(|attribute| match attribute {
-            Builtin::Attribute { kind, .. } => Some(kind.argument_range()),
-            _ => None,
-          })
-          .collect::<Vec<_>>();
+        let range = kind.argument_range();
 
-        let is_valid = ranges
-          .iter()
-          .any(|range| range.contains(&argument_count));
-
-        if is_valid {
+        if range.contains(&argument_count) {
           continue;
         }
 
-        let min = ranges.iter().map(|range| *range.start()).min().unwrap_or(0);
-
-        let max = ranges
-          .iter()
-          .map(|range| *range.end())
-          .try_fold(0, |acc, max| {
-            if max == usize::MAX { None } else { Some(acc.max(max)) }
-          });
+        let (min, max) = (*range.start(), *range.end());
 
         let expected = match max {
-          Some(max) if min == max => format!("{min}"),
-          Some(max) => format!("{min}-{max}"),
-          None => format!("at least {min}"),
+          usize::MAX => format!("at least {min}"),
+          _ if min == max => format!("{min}"),
+          _ => format!("{min}-{max}"),
         };
 
         diagnostics.push(Diagnostic::error(
           format!(
             "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
             Count("argument", argument_count),
-            if min == 1 && max.is_none_or(|max| max == 1) { "argument" } else { "arguments" },
+            if min == 1 && matches!(max, 1 | usize::MAX) { "argument" } else { "arguments" },
           ),
           attribute.range,
         ));
