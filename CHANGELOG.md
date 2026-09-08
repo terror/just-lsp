@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.8.0](https://github.com/terror/just-lsp/releases/tag/0.8.0) - 2026-09-08
+
+### Added
+
+- Add `unused-function-parameter` rule ([#604](https://github.com/terror/just-lsp/pull/604) by [terror](https://github.com/terror))
+- Add `unused-function` rule ([#605](https://github.com/terror/just-lsp/pull/605) by [terror](https://github.com/terror))
+- Follow shell-expanded imports ([#606](https://github.com/terror/just-lsp/pull/606) by [terror](https://github.com/terror))
+- Add rule for unstable feature gate ([#447](https://github.com/terror/just-lsp/pull/447) by [terror](https://github.com/terror))
+- Allow code actions for recipes that have all default parameters ([#367](https://github.com/terror/just-lsp/pull/367) by [Bretley](https://github.com/Bretley))
+- Add support for the `default-script` setting ([#451](https://github.com/terror/just-lsp/pull/451) by [victorluft](https://github.com/victorluft))
+- Add dark mode to web playground ([#600](https://github.com/terror/just-lsp/pull/600) by [terror](https://github.com/terror))
+- Reject shebangs in backtick expressions ([#599](https://github.com/terror/just-lsp/pull/599) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Reject duplicate group attributes ([#533](https://github.com/terror/just-lsp/pull/533) by [terror](https://github.com/terror))
+- Clamp positions to document bounds ([#628](https://github.com/terror/just-lsp/pull/628) by [terror](https://github.com/terror))
+- Suppress path diagnostics for platform-disabled imports ([#623](https://github.com/terror/just-lsp/pull/623) by [terror](https://github.com/terror))
+- Avoid relying on symlinks when building the vendored parser ([#411](https://github.com/terror/just-lsp/pull/411) by [salim-b](https://github.com/salim-b))
+- Fix optional import and module detection ([#613](https://github.com/terror/just-lsp/pull/613) by [terror](https://github.com/terror))
+- Use resolved symbol identity for references and rename ([#607](https://github.com/terror/just-lsp/pull/607) by [terror](https://github.com/terror))
+- Let user functions shadow builtins ([#602](https://github.com/terror/just-lsp/pull/602) by [terror](https://github.com/terror))
+- Parse escaped braces in format strings ([#598](https://github.com/terror/just-lsp/pull/598) by [terror](https://github.com/terror))
+
+### Misc
+
+- Wrap doc comments to 80 columns ([#627](https://github.com/terror/just-lsp/pull/627) by [terror](https://github.com/terror))
+- Describe builtin signatures as data ([#626](https://github.com/terror/just-lsp/pull/626) by [terror](https://github.com/terror))
+- Unify declaration lookup ([#625](https://github.com/terror/just-lsp/pull/625) by [terror](https://github.com/terror))
+- Extract shared string literal parsing ([#622](https://github.com/terror/just-lsp/pull/622) by [terror](https://github.com/terror))
+- Document `zed` development setup ([#341](https://github.com/terror/just-lsp/pull/341) by [Bretley](https://github.com/Bretley))
+- Simplify snippet preview whitespace handling ([#621](https://github.com/terror/just-lsp/pull/621) by [terror](https://github.com/terror))
+- Remove playwright tests ([#620](https://github.com/terror/just-lsp/pull/620) by [terror](https://github.com/terror))
+- Simplify syntax tree state ([#619](https://github.com/terror/just-lsp/pull/619) by [terror](https://github.com/terror))
+- Centralize text node construction ([#618](https://github.com/terror/just-lsp/pull/618) by [terror](https://github.com/terror))
+- Update dependencies to latest versions ([#617](https://github.com/terror/just-lsp/pull/617) by [terror](https://github.com/terror))
+- Use builtin metadata for completion snippets ([#616](https://github.com/terror/just-lsp/pull/616) by [terror](https://github.com/terror))
+- Simplify recipe dependency cycle traversal ([#615](https://github.com/terror/just-lsp/pull/615) by [terror](https://github.com/terror))
+- Flatten build script ([#614](https://github.com/terror/just-lsp/pull/614) by [terror](https://github.com/terror))
+- Share platform conflict tracking across rules ([#612](https://github.com/terror/just-lsp/pull/612) by [terror](https://github.com/terror))
+- Trim unused selector syntax ([#611](https://github.com/terror/just-lsp/pull/611) by [terror](https://github.com/terror))
+- Remove unnecessary attribute overload handling ([#610](https://github.com/terror/just-lsp/pull/610) by [terror](https://github.com/terror))
+- Reuse attribute parser for recipes ([#609](https://github.com/terror/just-lsp/pull/609) by [terror](https://github.com/terror))
+- Remove redundant server wrapper ([#608](https://github.com/terror/just-lsp/pull/608) by [terror](https://github.com/terror))
+
 ## [0.7.1](https://github.com/terror/just-lsp/releases/tag/0.7.1) - 2026-09-03
 
 ### Fixed
