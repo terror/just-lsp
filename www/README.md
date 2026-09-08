@@ -2,11 +2,18 @@ The documentation site and playground use Bun. From `www`, install dependencies
 with `bun install`, start the development server with `bun run dev`, and build
 with `bun run build`.
 
-React Router serves the home page at `/`, the diagnostic rule documentation at
-`/documentation`, and the playground at `/playground`. The rule overview lives
-in `docs/rules.md`, and individual rules are discovered from `docs/rules/*.md`
-at the repository root. See [`docs/README.md`](../docs/README.md) for the
-frontmatter and example format.
+React Router serves the home page at `/`, the documentation at `/documentation`,
+and the playground at `/playground`. The configuration overview lives in
+`docs/configuration.md`, with subsections in `docs/configuration/*.md` at the
+repository root. Configuration subsections are listed in
+`src/pages/documentation.tsx`, which uses the same entries for navigation and
+headings.
+
+The rule overview lives in `docs/rules.md`, and individual rules are discovered
+from `docs/rules/*.md`. Rule files use YAML frontmatter with `title`,
+`category`, `severity`, and `order` fields, followed by Markdown content. Label
+code fences with `reported` or `corrected` after the language to display paired
+examples.
 
 Run unit tests with `bun run test`.
 

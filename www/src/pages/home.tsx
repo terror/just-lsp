@@ -141,12 +141,12 @@ const Home = () => {
           </h2>
           <ul className='list-disc space-y-2 pl-5'>
             <li className='text-muted-foreground'>
-              <a
-                href='https://github.com/terror/just-lsp#configuration'
+              <Link
+                to='/documentation#configuration'
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Configuration
-              </a>{' '}
+              </Link>{' '}
               — formatting options and diagnostic severity levels.
             </li>
             <li className='text-muted-foreground'>
@@ -156,7 +156,7 @@ const Home = () => {
               >
                 Documentation
               </Link>{' '}
-              — diagnostic rules, examples, and fixes.
+              — configuration, diagnostic rules, examples, and fixes.
             </li>
             <li className='text-muted-foreground'>
               <a
