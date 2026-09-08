@@ -3,17 +3,27 @@ with `bun install`, start the development server with `bun run dev`, and build
 with `bun run build`.
 
 React Router serves the home page at `/`, the documentation at `/documentation`,
-and the playground at `/playground`. The configuration overview lives in
-`docs/configuration.md`, with subsections in `docs/configuration/*.md` at the
-repository root. Configuration subsections are listed in
-`src/pages/documentation.tsx`, which uses the same entries for navigation and
-headings.
+and the playground at `/playground`. Documentation is discovered recursively
+from `docs/**/*.md` at the repository root. Every file uses YAML frontmatter
+with a `title` and a positive integer `order`, followed by optional Markdown
+content. Sibling entries are sorted by `order`, then filename.
 
-The rule overview lives in `docs/rules.md`, and individual rules are discovered
-from `docs/rules/*.md`. Rule files use YAML frontmatter with `title`,
-`category`, `severity`, and `order` fields, followed by Markdown content. Label
-code fences with `reported` or `corrected` after the language to display paired
-examples.
+The directory structure defines the hierarchy: `docs/configuration.md` is a
+top-level section, and `docs/configuration/formatting.md` is one of its
+subsections. Each subdirectory must have a corresponding Markdown document.
+Adding a document automatically adds its content and navigation entry. A parent
+document can contain only frontmatter to provide a heading without introductory
+text.
+
+Rule categories use the same structure. For example, `docs/rules/aliases.md`
+provides the category heading, and `docs/rules/aliases/*.md` contains its rules.
+An optional `severity` (`error` or `warning`) displays a default severity badge
+and the entry's filename as its rule code.
+
+Filenames without `.md` become page anchors and must be unique across the
+documentation. Filenames and directories must start with a lowercase letter and
+contain only lowercase letters, digits, and hyphens. Label code fences with
+`reported` or `corrected` after the language to display paired examples.
 
 Run unit tests with `bun run test`.
 
