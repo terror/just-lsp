@@ -167,29 +167,6 @@ mod tests {
   }
 
   #[test]
-  fn loads_shell_expanded_import() {
-    let mut test =
-      Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");
-
-    let imported = test.uri("foo.just");
-
-    let project = test.load();
-
-    assert_eq!(
-      project.dependencies[&test.root][0].target,
-      ProjectDependencyTarget::Resolved(imported.clone()),
-    );
-
-    assert_eq!(
-      project
-        .imported_documents(&test.documents)
-        .map(|document| document.uri.clone())
-        .collect::<Vec<_>>(),
-      [imported],
-    );
-  }
-
-  #[test]
   fn import_scope_deduplicates_diamond_imports() {
     let mut test = Test::new("import 'left.just'\nimport 'right.just'")
       .file("left.just", "import 'shared.just'")
@@ -410,5 +387,28 @@ mod tests {
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
     assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
+  }
+
+  #[test]
+  fn loads_shell_expanded_import() {
+    let mut test =
+      Test::new("import x'''foo.just'''\n\nbar: foo").file("foo.just", "foo:");
+
+    let imported = test.uri("foo.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.root][0].target,
+      ProjectDependencyTarget::Resolved(imported.clone()),
+    );
+
+    assert_eq!(
+      project
+        .imported_documents(&test.documents)
+        .map(|document| document.uri.clone())
+        .collect::<Vec<_>>(),
+      [imported],
+    );
   }
 }

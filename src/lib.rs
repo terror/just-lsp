@@ -60,7 +60,6 @@ pub use {
   node_ext::NodeExt,
   parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
   point_ext::PointExt,
-  position_ext::PositionExt,
   project::Project,
   project_dependency::ProjectDependency,
   project_dependency_kind::ProjectDependencyKind,
@@ -117,7 +116,6 @@ mod module;
 mod node_ext;
 mod parameter;
 mod point_ext;
-mod position_ext;
 mod project;
 mod project_dependency;
 mod project_dependency_kind;

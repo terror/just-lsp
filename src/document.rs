@@ -313,7 +313,7 @@ impl Document {
   #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     let tree = self.tree.as_ref()?;
-    let point = position.point(self);
+    let point = self.content.lsp_position_to_position(position).point;
     tree.root_node().descendant_for_point_range(point, point)
   }
 
@@ -584,7 +584,7 @@ mod tests {
         version: 2,
       },
       content_changes: vec![lsp::TextDocumentContentChangeEvent {
-        range: Some(lsp::Range::at(1, 7, 1, 13)),
+        range: Some(lsp::Range::at(1, 7, 2, 0)),
         range_length: None,
         text: "\"bar\"".to_string(),
       }],

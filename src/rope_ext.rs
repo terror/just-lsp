@@ -126,21 +126,31 @@ impl RopeExt for Rope {
   /// tree-sitter point so downstream consumers can choose whichever coordinate
   /// space they need.
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
-    let row = position.line as usize;
+    let row = (position.line as usize).min(self.len_lines() - 1);
 
-    let row_char = self.line_to_char(row);
-    let row_byte = self.line_to_byte(row);
+    let line = self.line(row);
 
-    let col_char = self.utf16_cu_to_char(
-      self.char_to_utf16_cu(row_char) + position.character as usize,
-    );
+    let column = if position.line as usize >= self.len_lines() {
+      line.len_chars()
+    } else {
+      let line_break_len = line
+        .chars_at(line.len_chars())
+        .reversed()
+        .take_while(|char| matches!(char, '\r' | '\n'))
+        .count();
 
-    let col_byte = self.char_to_byte(col_char);
+      line.utf16_cu_to_char(
+        (position.character as usize).min(line.len_utf16_cu() - line_break_len),
+      )
+    };
+
+    let char = self.line_to_char(row) + column;
+    let byte = self.char_to_byte(char);
 
     Position {
-      byte: col_byte,
-      char: col_char,
-      point: Point::new(row, col_byte - row_byte),
+      byte,
+      char,
+      point: Point::new(row, byte - self.line_to_byte(row)),
     }
   }
 }
@@ -308,6 +318,100 @@ mod tests {
     rope.apply_edit(&edit);
 
     assert_eq!(rope.to_string(), "🧪\nnew");
+  }
+
+  #[test]
+  fn edits_preserve_unicode_line_separators() {
+    #[track_caller]
+    fn case(separator: char) {
+      let mut rope = Rope::from_str(&format!("foo{separator}bar\nqux"));
+
+      let change = change("baz", lsp::Range::at(0, 4, 0, 7));
+
+      let edit = rope.build_edit(&change);
+
+      rope.apply_edit(&edit);
+
+      assert_eq!(rope.to_string(), format!("foo{separator}baz\nqux"));
+
+      let position = lsp::Position::new(1, 3);
+
+      assert_eq!(rope.byte_to_lsp_position(rope.len_bytes()), position);
+
+      assert_eq!(
+        rope.lsp_position_to_position(position).byte,
+        rope.len_bytes()
+      );
+    }
+
+    for separator in
+      ['\u{000B}', '\u{000C}', '\u{0085}', '\u{2028}', '\u{2029}']
+    {
+      case(separator);
+    }
+  }
+
+  #[test]
+  fn lsp_position_to_position_clamps_out_of_bounds_positions() {
+    #[track_caller]
+    fn case(source: &str, position: lsp::Position, expected: &Position) {
+      assert_eq!(
+        Rope::from_str(source).lsp_position_to_position(position),
+        *expected
+      );
+    }
+
+    for source in ["foo─🧪", "foo─🧪\nbar", "foo─🧪\r\nbar"] {
+      for character in [6, 7, u32::MAX] {
+        case(
+          source,
+          lsp::Position::new(0, character),
+          &Position {
+            byte: 10,
+            char: 5,
+            point: Point::new(0, 10),
+          },
+        );
+      }
+    }
+
+    for position in [
+      lsp::Position::new(1, u32::MAX),
+      lsp::Position::new(2, 0),
+      lsp::Position::new(u32::MAX, u32::MAX),
+    ] {
+      case(
+        "🧪\nfoo─",
+        position,
+        &Position {
+          byte: 11,
+          char: 6,
+          point: Point::new(1, 6),
+        },
+      );
+    }
+
+    for source in ["", "\nbar", "\r\nbar"] {
+      case(
+        source,
+        lsp::Position::new(0, u32::MAX),
+        &Position {
+          byte: 0,
+          char: 0,
+          point: Point::new(0, 0),
+        },
+      );
+    }
+
+    case(
+      "foo🧪\n",
+      lsp::Position::new(u32::MAX, 0),
+      &Position {
+        byte: 8,
+        char: 5,
+        point: Point::new(1, 0),
+      },
+    );
   }
 
   #[test]
