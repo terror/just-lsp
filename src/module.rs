@@ -60,7 +60,7 @@ impl Module {
       }
 
       let path = match raw.strip_prefix("~/") {
-        Some(rest) => dirs::home_dir()?.join(rest),
+        Some(rest) => env::home_dir()?.join(rest),
         None => base_dir.join(raw),
       };
 
@@ -166,7 +166,7 @@ mod tests {
 
     assert_eq!(
       module("foo", Some("'~/bar.just'")).resolve(&base).unwrap(),
-      dirs::home_dir().unwrap().join("bar.just"),
+      env::home_dir().unwrap().join("bar.just"),
     );
   }
 

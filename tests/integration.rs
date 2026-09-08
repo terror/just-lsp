@@ -261,6 +261,29 @@ fn analyze_accepts_deprecated_setting_in_import() -> Result {
 }
 
 #[test]
+fn analyze_accepts_home_directory_import() -> Result {
+  #[track_caller]
+  fn case(source: &str) -> Result {
+    let test = Test::new()?;
+
+    let directory = test.tempdir.path().join("foo").display().to_string();
+
+    let variable = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+
+    test
+      .file("foo/bar.just", "foo:\n")
+      .file("justfile", source)
+      .environment(variable, &directory)
+      .environment("JUST_LSP_TEST_IMPORT", "bar.just")
+      .argument("justfile")
+      .run()
+  }
+
+  case("import '~/bar.just'\n\nbar: foo\n")?;
+  case("import x'~/$JUST_LSP_TEST_IMPORT'\n\nbar: foo\n")
+}
+
+#[test]
 fn analyze_accepts_imported_recipe() -> Result {
   Test::new()?
     .file("foo.just", "foo:\n")
