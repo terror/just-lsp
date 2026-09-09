@@ -24,11 +24,16 @@ export function useEditorExtensions({
 }: UseEditorExtensionsOptions): Extension[] {
   const { settings } = useEditorSettings();
 
+  const syntaxHighlighting = useMemo(
+    () => createJustSyntaxHighlightingExtension(language),
+    [language]
+  );
+
   return useMemo(() => {
     const extensions: Extension[] = [
       darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
-      ...createJustSyntaxHighlightingExtension(language),
+      ...syntaxHighlighting,
       highlightExtension(highlight),
     ];
 
@@ -45,7 +50,7 @@ export function useEditorExtensions({
     settings.tabSize,
     settings.keybindings,
     settings.lineWrapping,
-    language,
+    syntaxHighlighting,
     highlight,
     darkMode,
   ]);
