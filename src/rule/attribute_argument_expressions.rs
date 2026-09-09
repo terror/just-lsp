@@ -9,11 +9,8 @@ define_rule! {
     id: "attribute-argument-expressions",
     message: "invalid attribute argument expression",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
-      tree
+      context
+        .tree()
         .root_node()
         .find_all("attribute")
         .into_iter()

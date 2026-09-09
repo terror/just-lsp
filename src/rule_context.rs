@@ -204,8 +204,8 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub fn tree(&self) -> Option<&Tree> {
-    self.document().tree.as_ref()
+  pub fn tree(&self) -> &Tree {
+    &self.document().tree
   }
 
   pub fn unexports(&self) -> &[Unexport] {

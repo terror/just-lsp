@@ -22,10 +22,6 @@ define_rule! {
     id: "duplicate-attribute",
     message: "duplicate attribute",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
       let document = context.document();
 
       let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
@@ -50,7 +46,7 @@ define_rule! {
 
       let mut seen = HashSet::new();
 
-      for attribute_node in tree.root_node().find_all("attribute") {
+      for attribute_node in context.tree().root_node().find_all("attribute") {
         let Some(parent) = attribute_node.parent() else {
           continue;
         };

@@ -3,7 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub struct Document {
   pub content: Rope,
-  pub tree: Option<Tree>,
+  pub tree: Tree,
   pub uri: lsp::Url,
   pub version: i32,
 }
@@ -11,24 +11,26 @@ pub struct Document {
 impl Document {
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("alias")
-        .iter()
-        .filter_map(|alias_node| {
-          let left_node = alias_node.child_by_field_name("left")?;
-          let right_node = alias_node.child_by_field_name("right")?;
-
-          Some(Alias {
-            attributes: self.attributes_for_node(alias_node),
-            name: TextNode::from_node(&left_node, self),
-            value: TextNode::from_node(&right_node, self),
-            range: alias_node.get_range(self),
-          })
+    self
+      .tree
+      .root_node()
+      .find_all("alias")
+      .iter()
+      .filter_map(|alias_node| {
+        Some(Alias {
+          attributes: self.attributes_for_node(alias_node),
+          name: TextNode::from_node(
+            &alias_node.child_by_field_name("left")?,
+            self,
+          ),
+          value: TextNode::from_node(
+            &alias_node.child_by_field_name("right")?,
+            self,
+          ),
+          range: alias_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   /// Applies incremental edits from the client and reparses the syntax tree.
@@ -53,9 +55,7 @@ impl Document {
 
       self.content.apply_edit(&edit);
 
-      if let Some(tree) = &mut self.tree {
-        tree.edit(&edit.input_edit);
-      }
+      self.tree.edit(&edit.input_edit);
     }
 
     self.parse()?;
@@ -65,14 +65,13 @@ impl Document {
 
   #[must_use]
   pub fn attributes(&self) -> Vec<Attribute> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("attribute")
-        .into_iter()
-        .flat_map(|node| self.attributes_for_node(&node))
-        .collect()
-    })
+    self
+      .tree
+      .root_node()
+      .find_all("attribute")
+      .into_iter()
+      .flat_map(|node| self.attributes_for_node(&node))
+      .collect()
   }
 
   pub(super) fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
@@ -166,72 +165,70 @@ impl Document {
 
   #[must_use]
   pub fn function_calls(&self) -> Vec<FunctionCall> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("function_call")
-        .into_iter()
-        .filter_map(|function_call_node| {
-          let identifier_node = function_call_node.find("identifier")?;
+    self
+      .tree
+      .root_node()
+      .find_all("function_call")
+      .into_iter()
+      .filter_map(|function_call_node| {
+        let identifier_node = function_call_node.find("identifier")?;
 
-          let arguments = function_call_node
-            .find("sequence")
-            .map(|sequence| {
-              sequence
-                .find_all("^expression")
-                .into_iter()
-                .map(|argument_node| TextNode::from_node(&argument_node, self))
-                .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-          Some(FunctionCall {
-            name: TextNode::from_node(&identifier_node, self),
-            arguments,
-            range: function_call_node.get_range(self),
+        let arguments = function_call_node
+          .find("sequence")
+          .map(|sequence| {
+            sequence
+              .find_all("^expression")
+              .into_iter()
+              .map(|argument_node| TextNode::from_node(&argument_node, self))
+              .collect::<Vec<_>>()
           })
+          .unwrap_or_default();
+
+        Some(FunctionCall {
+          name: TextNode::from_node(&identifier_node, self),
+          arguments,
+          range: function_call_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   #[must_use]
   pub fn functions(&self) -> Vec<Function> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("function_definition")
-        .iter()
-        .filter_map(|function_node| {
-          let name_node = function_node.child_by_field_name("name")?;
+    self
+      .tree
+      .root_node()
+      .find_all("function_definition")
+      .iter()
+      .filter_map(|function_node| {
+        let name_node = function_node.child_by_field_name("name")?;
 
-          let parameters = function_node
-            .child_by_field_name("parameters")
-            .map(|params_node| {
-              params_node
-                .find_all("^identifier")
-                .iter()
-                .map(|param_node| TextNode::from_node(param_node, self))
-                .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-          let body = function_node
-            .child_by_field_name("body")
-            .map(|body_node| self.get_node_text(&body_node))
-            .unwrap_or_default();
-
-          Some(Function {
-            attributes: self.attributes_for_node(function_node),
-            name: TextNode::from_node(&name_node, self),
-            parameters,
-            body,
-            content: self.get_node_text(function_node).trim().to_string(),
-            range: function_node.get_range(self),
+        let parameters = function_node
+          .child_by_field_name("parameters")
+          .map(|params_node| {
+            params_node
+              .find_all("^identifier")
+              .iter()
+              .map(|param_node| TextNode::from_node(param_node, self))
+              .collect::<Vec<_>>()
           })
+          .unwrap_or_default();
+
+        let body = function_node
+          .child_by_field_name("body")
+          .map(|body_node| self.get_node_text(&body_node))
+          .unwrap_or_default();
+
+        Some(Function {
+          attributes: self.attributes_for_node(function_node),
+          name: TextNode::from_node(&name_node, self),
+          parameters,
+          body,
+          content: self.get_node_text(function_node).trim().to_string(),
+          range: function_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   #[must_use]
@@ -247,49 +244,47 @@ impl Document {
 
   #[must_use]
   pub fn imports(&self) -> Vec<Import> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("import")
-        .iter()
-        .filter_map(|import_node| {
-          let path_node = import_node.find("string")?;
+    self
+      .tree
+      .root_node()
+      .find_all("import")
+      .iter()
+      .filter_map(|import_node| {
+        let path_node = import_node.find("string")?;
 
-          Some(Import {
-            attributes: self.attributes_for_node(import_node),
-            optional: import_node.find("^?").is_some(),
-            path: TextNode::from_node(&path_node, self),
-            range: import_node.get_range(self),
-          })
+        Some(Import {
+          attributes: self.attributes_for_node(import_node),
+          optional: import_node.find("^?").is_some(),
+          path: TextNode::from_node(&path_node, self),
+          range: import_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   #[must_use]
   pub fn modules(&self) -> Vec<Module> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("module")
-        .iter()
-        .filter_map(|module_node| {
-          let name_node = module_node.child_by_field_name("name")?;
+    self
+      .tree
+      .root_node()
+      .find_all("module")
+      .iter()
+      .filter_map(|module_node| {
+        let name_node = module_node.child_by_field_name("name")?;
 
-          let path = module_node
-            .find("string")
-            .map(|path_node| TextNode::from_node(&path_node, self));
+        let path = module_node
+          .find("string")
+          .map(|path_node| TextNode::from_node(&path_node, self));
 
-          Some(Module {
-            attributes: self.attributes_for_node(module_node),
-            name: TextNode::from_node(&name_node, self),
-            optional: module_node.find("^?").is_some(),
-            path,
-            range: module_node.get_range(self),
-          })
+        Some(Module {
+          attributes: self.attributes_for_node(module_node),
+          name: TextNode::from_node(&name_node, self),
+          optional: module_node.find("^?").is_some(),
+          path,
+          range: module_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   /// # Errors
@@ -297,24 +292,27 @@ impl Document {
   /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
   /// contents fail to parse.
   pub fn new(source: &str, uri: lsp::Url) -> Result<Self> {
-    let mut document = Self {
-      content: Rope::from_str(source),
-      tree: None,
+    let content = Rope::from_str(source);
+
+    let tree = Self::parse_tree(&content, None)?;
+
+    Ok(Self {
+      content,
+      tree,
       uri,
       version: 0,
-    };
-
-    document.parse()?;
-
-    Ok(document)
+    })
   }
 
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
-    let tree = self.tree.as_ref()?;
     let point = self.content.lsp_position_to_position(position).point;
-    tree.root_node().descendant_for_point_range(point, point)
+
+    self
+      .tree
+      .root_node()
+      .descendant_for_point_range(point, point)
   }
 
   /// Parses the current document contents and updates the cached syntax tree.
@@ -324,218 +322,211 @@ impl Document {
   /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
   /// contents fail to parse.
   pub fn parse(&mut self) -> Result {
+    self.tree = Self::parse_tree(&self.content, Some(&self.tree))?;
+
+    Ok(())
+  }
+
+  fn parse_tree(content: &Rope, old_tree: Option<&Tree>) -> Result<Tree> {
     let mut parser = Parser::new();
 
     // SAFETY: tree_sitter_just returns a static language definition.
     parser.set_language(&unsafe { tree_sitter_just() })?;
 
-    let old_tree = self.tree.take();
-
-    self.tree = parser.parse(self.content.to_string(), old_tree.as_ref());
-
-    Ok(())
+    parser
+      .parse(content.to_string(), old_tree)
+      .ok_or(Error::Parse)
   }
 
   #[must_use]
   pub fn recipes(&self) -> Vec<Recipe> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("recipe")
-        .iter()
-        .filter_map(|recipe_node| {
-          let name_node = recipe_node.find("recipe_header > identifier")?;
+    self
+      .tree
+      .root_node()
+      .find_all("recipe")
+      .iter()
+      .filter_map(|recipe_node| {
+        let name_node = recipe_node.find("recipe_header > identifier")?;
 
-          let recipe_name = TextNode::from_node(&name_node, self);
+        let recipe_name = TextNode::from_node(&name_node, self);
 
-          let dependencies = recipe_node
-            .find("recipe_header > dependencies")
-            .map(|dependencies_node| {
-              let mut dependencies = Vec::new();
-              let mut phase = DependencyPhase::Prior;
+        let dependencies = recipe_node
+          .find("recipe_header > dependencies")
+          .map(|dependencies_node| {
+            let mut dependencies = Vec::new();
+            let mut phase = DependencyPhase::Prior;
 
-              for index in 0..dependencies_node.child_count() {
-                let Some(node) = dependencies_node.child(index) else {
-                  continue;
-                };
+            for index in 0..dependencies_node.child_count() {
+              let Some(node) = dependencies_node.child(index) else {
+                continue;
+              };
 
-                match node.kind() {
-                  "&&" => {
-                    phase = DependencyPhase::Subsequent;
-                  }
-                  "dependency" => {
-                    let dependency_node = node;
-
-                    let Some(dependency_name_node) = dependency_node
-                      .child_by_field_name("name")
-                      .or_else(|| {
-                        dependency_node
-                          .find("dependency_expression")
-                          .and_then(|node| node.child_by_field_name("name"))
-                      })
-                    else {
-                      continue;
-                    };
-
-                    let arguments = dependency_node
-                      .find("dependency_expression")
-                      .map(|dependency_expression_node| {
-                        let mut cursor = dependency_expression_node.walk();
-
-                        dependency_expression_node
-                          .named_children(&mut cursor)
-                          .filter_map(|argument_node| {
-                            match argument_node.kind() {
-                              "expression" => Some(DependencyArgument {
-                                value: self.get_node_text(&argument_node),
-                                range: argument_node.get_range(self),
-                                starred: None,
-                              }),
-                              "starred_dependency_argument" => {
-                                let value_node = argument_node
-                                  .child_by_field_name("argument")?;
-
-                                Some(DependencyArgument {
-                                  value: self.get_node_text(&value_node),
-                                  range: value_node.get_range(self),
-                                  starred: argument_node
-                                    .child_by_field_name("star")
-                                    .map(|node| node.get_range(self)),
-                                })
-                              }
-                              _ => None,
-                            }
-                          })
-                          .collect()
-                      })
-                      .unwrap_or_default();
-
-                    let mapped = dependency_node
-                      .find("dependency_expression")
-                      .and_then(|dependency_expression_node| {
-                        dependency_expression_node
-                          .child_by_field_name("map")
-                          .map(|node| node.get_range(self))
-                      });
-
-                    dependencies.push(Dependency {
-                      name: TextNode::from_node(&dependency_name_node, self),
-                      arguments,
-                      mapped,
-                      phase,
-                      range: dependency_node.get_range(self),
-                    });
-                  }
-                  _ => {}
+              match node.kind() {
+                "&&" => {
+                  phase = DependencyPhase::Subsequent;
                 }
+                "dependency" => {
+                  let dependency_node = node;
+
+                  let Some(dependency_name_node) =
+                    dependency_node.child_by_field_name("name").or_else(|| {
+                      dependency_node
+                        .find("dependency_expression")
+                        .and_then(|node| node.child_by_field_name("name"))
+                    })
+                  else {
+                    continue;
+                  };
+
+                  let arguments = dependency_node
+                    .find("dependency_expression")
+                    .map(|dependency_expression_node| {
+                      let mut cursor = dependency_expression_node.walk();
+
+                      dependency_expression_node
+                        .named_children(&mut cursor)
+                        .filter_map(|argument_node| {
+                          match argument_node.kind() {
+                            "expression" => Some(DependencyArgument {
+                              value: self.get_node_text(&argument_node),
+                              range: argument_node.get_range(self),
+                              starred: None,
+                            }),
+                            "starred_dependency_argument" => {
+                              let value_node = argument_node
+                                .child_by_field_name("argument")?;
+
+                              Some(DependencyArgument {
+                                value: self.get_node_text(&value_node),
+                                range: value_node.get_range(self),
+                                starred: argument_node
+                                  .child_by_field_name("star")
+                                  .map(|node| node.get_range(self)),
+                              })
+                            }
+                            _ => None,
+                          }
+                        })
+                        .collect()
+                    })
+                    .unwrap_or_default();
+
+                  let mapped = dependency_node
+                    .find("dependency_expression")
+                    .and_then(|dependency_expression_node| {
+                      dependency_expression_node
+                        .child_by_field_name("map")
+                        .map(|node| node.get_range(self))
+                    });
+
+                  dependencies.push(Dependency {
+                    name: TextNode::from_node(&dependency_name_node, self),
+                    arguments,
+                    mapped,
+                    phase,
+                    range: dependency_node.get_range(self),
+                  });
+                }
+                _ => {}
               }
+            }
 
-              dependencies
-            })
-            .unwrap_or_default();
-
-          let parameters = recipe_node
-            .find("recipe_header > parameters")
-            .map_or_else(Vec::new, |parameters_node| {
-              parameters_node
-                .find_all("^parameter, ^variadic_parameter")
-                .iter()
-                .filter_map(|parameter_node| {
-                  Parameter::from_node(parameter_node, self)
-                })
-                .collect()
-            });
-
-          let shebang = recipe_node
-            .find("recipe_body > shebang")
-            .map(|shebang_node| TextNode::from_node(&shebang_node, self));
-
-          Some(Recipe {
-            name: recipe_name,
-            attributes: self.attributes_for_node(recipe_node),
-            dependencies,
-            content: self.get_node_text(recipe_node).trim().to_string(),
-            parameters,
-            range: recipe_node.get_range(self),
-            shebang,
+            dependencies
           })
+          .unwrap_or_default();
+
+        let parameters = recipe_node
+          .find("recipe_header > parameters")
+          .map_or_else(Vec::new, |parameters_node| {
+            parameters_node
+              .find_all("^parameter, ^variadic_parameter")
+              .iter()
+              .filter_map(|parameter_node| {
+                Parameter::from_node(parameter_node, self)
+              })
+              .collect()
+          });
+
+        let shebang = recipe_node
+          .find("recipe_body > shebang")
+          .map(|shebang_node| TextNode::from_node(&shebang_node, self));
+
+        Some(Recipe {
+          name: recipe_name,
+          attributes: self.attributes_for_node(recipe_node),
+          dependencies,
+          content: self.get_node_text(recipe_node).trim().to_string(),
+          parameters,
+          range: recipe_node.get_range(self),
+          shebang,
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   #[must_use]
   pub fn settings(&self) -> Vec<Setting> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("setting")
-        .iter()
-        .filter_map(|setting_node| Setting::from_node(setting_node, self))
-        .collect()
-    })
+    self
+      .tree
+      .root_node()
+      .find_all("setting")
+      .iter()
+      .filter_map(|setting_node| Setting::from_node(setting_node, self))
+      .collect()
   }
 
   #[must_use]
   pub fn unexports(&self) -> Vec<Unexport> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("unexport")
-        .iter()
-        .filter_map(|unexport_node| {
-          let name_node = unexport_node.child_by_field_name("name")?;
+    self
+      .tree
+      .root_node()
+      .find_all("unexport")
+      .iter()
+      .filter_map(|unexport_node| {
+        let name_node = unexport_node.child_by_field_name("name")?;
 
-          Some(Unexport {
-            attributes: self.attributes_for_node(unexport_node),
-            name: TextNode::from_node(&name_node, self),
-            range: unexport_node.get_range(self),
-          })
+        Some(Unexport {
+          attributes: self.attributes_for_node(unexport_node),
+          name: TextNode::from_node(&name_node, self),
+          range: unexport_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 
   #[must_use]
   pub fn variables(&self) -> Vec<Variable> {
-    self.tree.as_ref().map_or(Vec::new(), |tree| {
-      tree
-        .root_node()
-        .find_all("assignment")
-        .iter()
-        .filter_map(|assignment_node| {
-          let identifier_node = assignment_node.child_by_field_name("left")?;
+    self
+      .tree
+      .root_node()
+      .find_all("assignment")
+      .iter()
+      .filter_map(|assignment_node| {
+        let identifier_node = assignment_node.child_by_field_name("left")?;
 
-          let attribute_node = assignment_node
-            .parent()
-            .filter(|parent| matches!(parent.kind(), "eager" | "export"))
-            .unwrap_or(*assignment_node);
+        let attribute_node = assignment_node
+          .parent()
+          .filter(|parent| matches!(parent.kind(), "eager" | "export"))
+          .unwrap_or(*assignment_node);
 
-          Some(Variable {
-            attributes: self.attributes_for_node(&attribute_node),
-            name: TextNode::from_node(&identifier_node, self),
-            export: identifier_node.get_parent("export").is_some(),
-            content: self.get_node_text(assignment_node).trim().to_string(),
-            range: assignment_node.get_range(self),
-          })
+        Some(Variable {
+          attributes: self.attributes_for_node(&attribute_node),
+          name: TextNode::from_node(&identifier_node, self),
+          export: identifier_node.get_parent("export").is_some(),
+          content: self.get_node_text(assignment_node).trim().to_string(),
+          range: assignment_node.get_range(self),
         })
-        .collect()
-    })
+      })
+      .collect()
   }
 }
 
 impl From<&str> for Document {
   fn from(value: &str) -> Self {
-    let mut document = Self {
-      content: value.into(),
-      tree: None,
-      uri: lsp::Url::parse("file:///test.just").unwrap(),
+    Self {
       version: 1,
-    };
-
-    document.parse().unwrap();
-
-    document
+      ..Self::new(value, lsp::Url::parse("file:///test.just").unwrap()).unwrap()
+    }
   }
 }
 
@@ -547,16 +538,10 @@ impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
       text, uri, version, ..
     } = params.text_document;
 
-    let mut document = Self {
-      content: Rope::from_str(&text),
-      tree: None,
-      uri,
+    Ok(Self {
       version,
-    };
-
-    document.parse()?;
-
-    Ok(document)
+      ..Self::new(&text, uri)?
+    })
   }
 }
 
@@ -594,20 +579,80 @@ mod tests {
 
     assert_ne!(document.content.to_string(), original_content);
     assert_eq!(document.content.to_string(), "foo:\n  echo \"bar\"");
+    assert_eq!(document.recipes()[0].content, "foo:\n  echo \"bar\"");
+    assert_eq!(document.version, 2);
+    assert!(!document.tree.root_node().has_error());
+  }
+
+  #[test]
+  fn apply_change_reparses_syntax_errors() {
+    let mut document = Document::from("foo :=\n");
+
+    assert!(document.tree.root_node().has_error());
+
+    document
+      .apply_change(lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+          uri: document.uri.clone(),
+          version: 2,
+        },
+        content_changes: vec![lsp::TextDocumentContentChangeEvent {
+          range: Some(lsp::Range::at(0, 6, 0, 6)),
+          range_length: None,
+          text: " 'bar'".into(),
+        }],
+      })
+      .unwrap();
+
+    assert!(!document.tree.root_node().has_error());
+    assert_eq!(document.variables()[0].content, "foo := 'bar'");
   }
 
   #[test]
   fn create_document() {
-    let content = indoc! {"
-      foo:
-        echo foo
-    "};
+    #[track_caller]
+    fn case(source: &str, has_error: bool) {
+      let uri = lsp::Url::parse("file:///foo.just").unwrap();
 
-    let document = Document::from(content);
+      let document = Document::new(source, uri.clone()).unwrap();
 
-    assert_eq!(document.content.to_string(), content);
+      assert_eq!(document.content.to_string(), source);
+      assert_eq!(document.tree.root_node().has_error(), has_error);
+      assert_eq!(document.uri, uri);
+      assert_eq!(document.version, 0);
+    }
 
-    assert!(document.tree.is_some());
+    case("", false);
+    case("foo:\n  echo foo\n", false);
+    case("foo :=\n", true);
+  }
+
+  #[test]
+  fn create_document_from_open_params() {
+    let uri = lsp::Url::parse("file:///foo.just").unwrap();
+
+    let document = Document::try_from(lsp::DidOpenTextDocumentParams {
+      text_document: lsp::TextDocumentItem {
+        uri: uri.clone(),
+        language_id: "just".into(),
+        version: 2,
+        text: "foo:".into(),
+      },
+    })
+    .unwrap();
+
+    assert_eq!(document.recipes()[0].name.value, "foo");
+    assert_eq!(document.uri, uri);
+    assert_eq!(document.version, 2);
+  }
+
+  #[test]
+  fn create_document_from_str() {
+    let document = Document::from("foo:");
+
+    assert_eq!(document.recipes()[0].name.value, "foo");
+    assert_eq!(document.uri.as_str(), "file:///test.just");
+    assert_eq!(document.version, 1);
   }
 
   #[test]

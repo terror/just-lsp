@@ -93,12 +93,11 @@ impl<'a> Resolver<'a> {
       return Vec::new();
     };
 
-    let root = match &self.view.document().tree {
-      Some(tree) => tree.root_node(),
-      None => return Vec::new(),
-    };
-
-    root
+    self
+      .view
+      .document()
+      .tree
+      .root_node()
       .find_all("identifier")
       .into_iter()
       .filter(|candidate| {
@@ -268,8 +267,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("assert_expression > identifier")
           .unwrap(),
@@ -298,8 +295,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("assert_expression > identifier")
           .unwrap(),
@@ -340,8 +335,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("attribute > identifier")
           .unwrap(),
@@ -388,8 +381,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -425,8 +416,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("function_call > identifier")
           .unwrap(),
@@ -469,8 +458,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("function_call > identifier")
           .unwrap(),
@@ -501,8 +488,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("setting > identifier")
           .unwrap(),
@@ -555,8 +540,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("dependency_expression > expression > value > identifier")
         .unwrap(),
@@ -593,8 +576,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("dependency_expression > identifier")
           .unwrap(),
@@ -626,8 +607,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("dependency_expression > identifier")
           .unwrap(),
@@ -658,8 +637,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("dependency_expression > identifier")
         .unwrap(),
@@ -694,8 +671,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("dependency > identifier")
         .unwrap(),
@@ -729,8 +704,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -761,8 +734,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -788,13 +759,7 @@ mod tests {
     });
 
     let hover = Resolver::new(&document).resolve_identifier_hover(
-      &document
-        .tree
-        .as_ref()
-        .unwrap()
-        .root_node()
-        .find("text")
-        .unwrap(),
+      &document.tree.root_node().find("text").unwrap(),
     );
 
     assert_eq!(hover, None);
@@ -812,8 +777,6 @@ mod tests {
     let hover = Resolver::new(&document).resolve_identifier_hover(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("value > identifier")
         .unwrap(),
@@ -835,8 +798,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -865,8 +826,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -897,8 +856,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -934,8 +891,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("parameter > identifier")
         .unwrap(),
@@ -976,8 +931,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("dependency > identifier")
           .unwrap(),
@@ -1007,7 +960,7 @@ mod tests {
 
     let resolver = Resolver::new(&document);
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let hover = resolver
       .resolve_identifier_hover(
@@ -1049,12 +1002,7 @@ mod tests {
 
     let hover = Resolver::new(&document)
       .resolve_identifier_hover(
-        &document
-          .tree
-          .as_ref()
-          .unwrap()
-          .root_node()
-          .find_all("alias > identifier")[1],
+        &document.tree.root_node().find_all("alias > identifier")[1],
       )
       .unwrap();
 
@@ -1087,8 +1035,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("parameter > identifier")
         .unwrap(),
@@ -1130,8 +1076,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("recipe_header > identifier")
         .unwrap(),
@@ -1170,7 +1114,7 @@ mod tests {
 
     let resolver = Resolver::new(&document);
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let hover = resolver
       .resolve_identifier_hover(&root.find("value > identifier").unwrap())
@@ -1226,8 +1170,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("recipe_header > identifier")
           .unwrap(),
@@ -1258,8 +1200,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("parameter > value > identifier")
           .unwrap(),
@@ -1289,8 +1229,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1326,8 +1264,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("function_call > identifier")
           .unwrap(),
@@ -1358,8 +1294,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("function_call > identifier")
           .unwrap(),
@@ -1387,8 +1321,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -1416,8 +1348,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -1448,8 +1378,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("function_parameters > identifier")
         .unwrap(),
@@ -1489,8 +1417,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("function_definition > identifier")
         .unwrap(),
@@ -1529,8 +1455,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("value > identifier")
         .unwrap(),
@@ -1562,8 +1486,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("value > identifier")
         .unwrap(),
@@ -1603,8 +1525,6 @@ mod tests {
       .resolve_identifier_definition(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -1635,8 +1555,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1664,8 +1582,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1695,8 +1611,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -1736,8 +1650,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1778,8 +1690,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1813,8 +1723,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1849,8 +1757,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
@@ -1888,8 +1794,6 @@ mod tests {
       .resolve_identifier_hover(
         &document
           .tree
-          .as_ref()
-          .unwrap()
           .root_node()
           .find("value > identifier")
           .unwrap(),
@@ -1919,8 +1823,6 @@ mod tests {
     let references = Resolver::new(&document).resolve_identifier_references(
       &document
         .tree
-        .as_ref()
-        .unwrap()
         .root_node()
         .find("variadic_parameter > parameter > identifier")
         .unwrap(),

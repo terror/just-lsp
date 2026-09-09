@@ -14,14 +14,10 @@ define_rule! {
         return diagnostics;
       }
 
-      let Some(tree) = context.tree() else {
-        return diagnostics;
-      };
-
       Self::validate_node(
         context,
         context.document(),
-        tree.root_node(),
+        context.tree().root_node(),
         &mut diagnostics,
       );
 

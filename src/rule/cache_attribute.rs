@@ -7,15 +7,11 @@ define_rule! {
     id: "cache-attribute",
     message: "invalid cache attribute",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
       let document = context.document();
 
       let mut diagnostics = Vec::new();
 
-      for attribute in tree.root_node().find_all("attribute") {
+      for attribute in context.tree().root_node().find_all("attribute") {
         for identifier in attribute.find_all("^identifier") {
           if document.get_node_text(&identifier) != "cache" {
             continue;

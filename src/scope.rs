@@ -111,11 +111,7 @@ impl<'a> Scope<'a> {
     // any other, so each document starts with an empty local scope.
     self.locals.clear();
 
-    let Some(tree) = document.tree.as_ref() else {
-      return;
-    };
-
-    let root_node = tree.root_node();
+    let root_node = document.tree.root_node();
 
     for node in root_node.find_all("recipe") {
       self.walk_recipe(node);
