@@ -12,16 +12,12 @@ define_rule! {
     id: "arg-attribute",
     message: "invalid arg attribute",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
       let document = context.document();
 
       let mut diagnostics = Vec::new();
       let mut seen = HashSet::new();
 
-      for attribute in tree.root_node().find_all("attribute") {
+      for attribute in context.tree().root_node().find_all("attribute") {
         for identifier in attribute.find_all("^identifier") {
           if document.get_node_text(&identifier) != "arg" {
             continue;

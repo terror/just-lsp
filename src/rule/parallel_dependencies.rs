@@ -47,7 +47,7 @@ impl ParallelDependenciesRule {
     attribute: &Attribute,
     document: &Document,
   ) -> Option<Quickfix> {
-    let root = document.tree.as_ref()?.root_node();
+    let root = document.tree.root_node();
 
     let attribute_node = root
       .find_all("attribute")

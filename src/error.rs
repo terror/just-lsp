@@ -14,6 +14,8 @@ pub enum Error {
   Io(#[from] std::io::Error),
   #[error(transparent)]
   LanguageError(#[from] tree_sitter::LanguageError),
+  #[error("tree-sitter failed to parse document")]
+  Parse,
   #[error("Shell expansion failed: {0}")]
   ShellExpansion(#[from] shellexpand::LookupError<std::env::VarError>),
 }

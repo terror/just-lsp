@@ -7,13 +7,10 @@ define_rule! {
     id: "backtick-shebang",
     message: "backtick shebang",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
       let document = context.document();
 
-      tree
+      context
+        .tree()
         .root_node()
         .find_all("external_command")
         .into_iter()

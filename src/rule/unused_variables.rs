@@ -9,10 +9,6 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      if context.tree().is_none() {
-        return diagnostics;
-      }
-
       let exported = context.setting_enabled("export");
 
       let view = ProjectView::from(context.document());

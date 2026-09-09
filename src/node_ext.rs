@@ -133,7 +133,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let recipes = root.find_all("recipe");
 
@@ -172,7 +172,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let identifier_texts = root
       .find_all("identifier")
@@ -204,7 +204,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let identifiers = root.find_all("recipe_header > identifier");
 
@@ -244,7 +244,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let second_recipe = root.find_all("recipe")[1];
 
@@ -275,7 +275,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let identifier =
       root.find("dependency_expression > expression > value > identifier");
@@ -290,7 +290,7 @@ mod tests {
     #[track_caller]
     fn case(selector: &str) {
       let document = Document::from("foo:\n");
-      let root = document.tree.as_ref().unwrap().root_node();
+      let root = document.tree.root_node();
 
       assert!(root.find(selector).is_none());
       assert!(root.find_all(selector).is_empty());
@@ -320,7 +320,7 @@ mod tests {
       "
     });
 
-    let root = document.tree.as_ref().unwrap().root_node();
+    let root = document.tree.root_node();
 
     let recipes_and_assignments = root.find_all("recipe, assignment");
 

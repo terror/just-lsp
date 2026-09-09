@@ -5,13 +5,10 @@ define_rule! {
     id: "unused-function-parameter",
     message: "unused function parameter",
     run(context) {
-      let Some(tree) = context.tree() else {
-        return Vec::new();
-      };
-
       let document = context.document();
 
-      tree
+      context
+        .tree()
         .root_node()
         .find_all("function_parameters > identifier")
         .into_iter()
