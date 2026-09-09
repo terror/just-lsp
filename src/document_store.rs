@@ -143,6 +143,18 @@ mod tests {
     }
   }
 
+  fn entry(name: &str, open: bool) -> (lsp::Url, DocumentEntry) {
+    let uri = lsp::Url::parse(&format!("file:///{name}")).unwrap();
+
+    (
+      uri.clone(),
+      DocumentEntry {
+        document: Document::new("", uri).unwrap(),
+        open,
+      },
+    )
+  }
+
   fn open(
     uri: lsp::Url,
     version: i32,
@@ -237,23 +249,23 @@ mod tests {
 
   #[test]
   fn retain_closed_documents() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let foo = uri(&tempdir.path().join("foo.just"));
-    let bar = uri(&tempdir.path().join("bar.just"));
-    let baz = uri(&tempdir.path().join("baz.just"));
+    let mut store = DocumentStore {
+      documents: HashMap::from([
+        entry("foo", false),
+        entry("bar", false),
+        entry("baz", true),
+      ]),
+    };
 
-    fs::write(foo.to_file_path().unwrap(), "foo:\n").unwrap();
-    fs::write(bar.to_file_path().unwrap(), "bar:\n").unwrap();
+    store.retain_closed(|uri| uri.as_str() == "file:///foo");
 
-    let mut store = DocumentStore::default();
-
-    store.load(&foo).unwrap();
-    store.load(&bar).unwrap();
-    store.open(open(baz.clone(), 1, "baz:\n")).unwrap();
-    store.retain_closed(|uri| uri == &foo);
-
-    assert_eq!(store.get(&foo).unwrap().content.to_string(), "foo:\n");
-    assert!(store.get(&bar).is_none());
-    assert_eq!(store.get_open(&baz).unwrap().content.to_string(), "baz:\n");
+    assert_eq!(
+      store
+        .documents
+        .iter()
+        .map(|(uri, entry)| (uri.as_str(), entry.open))
+        .collect::<BTreeMap<_, _>>(),
+      BTreeMap::from([("file:///baz", true), ("file:///foo", false)]),
+    );
   }
 }
