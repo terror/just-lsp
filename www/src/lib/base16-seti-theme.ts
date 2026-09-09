@@ -35,7 +35,6 @@ const lightEditor = {
   keyword: '#8055a5',
   namespace: '#168a78',
   punctuation: '#70828b',
-  selectionBackground: '#cfe9f2',
   string: '#5d861e',
 };
 
@@ -55,7 +54,6 @@ const darkEditor = {
   keyword: base16Seti.base0E,
   namespace: base16Seti.base0C,
   punctuation: '#91a7b0',
-  selectionBackground: '#315f70',
   string: base16Seti.base0B,
 };
 
@@ -91,9 +89,9 @@ const createBase16SetiTheme = (editor: typeof lightEditor, dark: boolean) =>
       '&.cm-focused .cm-cursor': {
         borderLeftColor: editor.cursor,
       },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
+      '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content::selection, .cm-content ::selection':
         {
-          backgroundColor: editor.selectionBackground,
+          backgroundColor: 'var(--selection-background)',
         },
       '.cm-activeLine': {
         backgroundColor: editor.activeLine,
