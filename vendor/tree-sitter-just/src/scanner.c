@@ -307,22 +307,8 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
             advance(lexer);
           }
 
-          // scan till a balanced pair of }} are found, then assume it's a valid
-          // interpolation
-          while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
-            advance(lexer);
-            if (lexer->lookahead == '}') {
-              advance(lexer);
-              if (lexer->lookahead == '}') {
-                lexer->result_symbol = TEXT;
-                return advanced_once;
-              }
-            }
-          }
-
-          if (!advanced_once) {
-            return false;
-          }
+          lexer->result_symbol = TEXT;
+          return advanced_once;
         }
       }
     }
