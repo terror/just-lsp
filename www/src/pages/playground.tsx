@@ -45,7 +45,6 @@ const Playground = () => {
 
   const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
     parser,
-    language: justLanguage,
     code: doc,
   });
 
