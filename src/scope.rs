@@ -273,10 +273,9 @@ mod tests {
         documents: once(&self.document)
           .chain(&self.imported_documents)
           .enumerate()
-          .map(|(traversal_order, document)| ProjectViewDocument {
+          .map(|(index, document)| ProjectViewDocument {
             document,
-            load_depth: usize::from(traversal_order > 0),
-            traversal_order,
+            load_depth: usize::from(index > 0),
           })
           .collect(),
       };

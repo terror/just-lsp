@@ -15,23 +15,23 @@ impl<'a> ProjectView<'a> {
   ) -> HashMap<String, Located<T>> {
     let mut candidates = Vec::new();
 
-    for document in &self.documents {
+    for (traversal_order, document) in self.documents.iter().enumerate() {
       for declaration in declarations(document.document) {
-        candidates.push((document, declaration));
+        candidates.push((traversal_order, document, declaration));
       }
     }
 
-    candidates.sort_by_key(|(document, declaration)| {
+    candidates.sort_by_key(|(traversal_order, document, declaration)| {
       (
         Reverse(document.load_depth),
-        document.traversal_order,
+        *traversal_order,
         declaration_position(declaration),
       )
     });
 
     candidates
       .into_iter()
-      .map(|(document, value)| {
+      .map(|(_, document, value)| {
         (
           declaration_name(&value).to_owned(),
           Located::new(document.document.uri.clone(), value),
@@ -89,7 +89,6 @@ impl<'a> ProjectView<'a> {
         Some(ProjectViewDocument {
           document: scoped_document,
           load_depth: scope_document.load_depth,
-          traversal_order: scope_document.traversal_order,
         })
       })
       .collect();
@@ -126,7 +125,6 @@ impl<'a> From<&'a Document> for ProjectView<'a> {
       documents: vec![ProjectViewDocument {
         document,
         load_depth: 0,
-        traversal_order: 0,
       }],
     }
   }
@@ -169,17 +167,14 @@ mod tests {
         ProjectViewDocument {
           document: &root,
           load_depth: 0,
-          traversal_order: 0,
         },
         ProjectViewDocument {
           document: &direct,
           load_depth: 1,
-          traversal_order: 1,
         },
         ProjectViewDocument {
           document: &nested,
           load_depth: 2,
-          traversal_order: 2,
         },
       ],
     };
@@ -222,17 +217,14 @@ mod tests {
         ProjectViewDocument {
           document: &root,
           load_depth: 0,
-          traversal_order: 0,
         },
         ProjectViewDocument {
           document: &second,
           load_depth: 1,
-          traversal_order: 1,
         },
         ProjectViewDocument {
           document: &first,
           load_depth: 1,
-          traversal_order: 2,
         },
       ],
     };
@@ -297,12 +289,10 @@ mod tests {
         ProjectViewDocument {
           document: &root,
           load_depth: 0,
-          traversal_order: 0,
         },
         ProjectViewDocument {
           document: &imported,
           load_depth: 1,
-          traversal_order: 1,
         },
       ],
     };
