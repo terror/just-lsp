@@ -70,12 +70,12 @@ const Home = () => {
               Pre-built binaries
             </a>{' '}
             and{' '}
-            <a
-              href='https://github.com/terror/just-lsp#installation'
+            <Link
+              to='/documentation#installation'
               className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
             >
               other packages
-            </a>{' '}
+            </Link>{' '}
             are also available.
           </p>
         </section>
@@ -97,12 +97,12 @@ const Home = () => {
           </p>
           <ul className='mt-4 list-disc space-y-2 pl-5'>
             <li className='text-muted-foreground'>
-              <a
-                href='https://github.com/terror/just-lsp#neovim'
+              <Link
+                to='/documentation#neovim'
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Neovim
-              </a>
+              </Link>
               : with Neovim 0.11.3+ and nvim-lspconfig installed, add the
               following to your configuration.
               <pre className='bg-muted my-4 overflow-x-auto rounded-md border px-4 py-3'>
@@ -159,12 +159,12 @@ const Home = () => {
               — configuration, diagnostic rules, examples, and fixes.
             </li>
             <li className='text-muted-foreground'>
-              <a
-                href='https://github.com/terror/just-lsp#cli'
+              <Link
+                to='/documentation#cli'
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Command line
-              </a>{' '}
+              </Link>{' '}
               — check a justfile with{' '}
               <code className='text-foreground font-mono text-sm'>
                 just-lsp analyze
