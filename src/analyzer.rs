@@ -68,9 +68,8 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
-    document: Document,
-    imported_documents: Vec<Document>,
     messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
+    project: TestProject,
   }
 
   impl Test {
@@ -78,36 +77,18 @@ mod tests {
       Self { config, ..self }
     }
 
-    fn error(self, message: &'static str, range: lsp::Range) -> Self {
-      Self {
-        messages: self
-          .messages
-          .into_iter()
-          .chain([(message, range, Some(lsp::DiagnosticSeverity::ERROR))])
-          .collect(),
-        ..self
-      }
+    fn error(mut self, message: &'static str, range: lsp::Range) -> Self {
+      self.messages.push((
+        message,
+        range,
+        Some(lsp::DiagnosticSeverity::ERROR),
+      ));
+      self
     }
 
-    fn imported_document(self, content: &str) -> Self {
-      let document = Document::new(
-        content,
-        lsp::Url::parse(&format!(
-          "file:///foo{}.just",
-          self.imported_documents.len()
-        ))
-        .unwrap(),
-      )
-      .unwrap();
-
-      Self {
-        imported_documents: self
-          .imported_documents
-          .into_iter()
-          .chain([document])
-          .collect(),
-        ..self
-      }
+    fn imported_document(mut self, content: &str) -> Self {
+      self.project.imported_document(content);
+      self
     }
 
     fn new(content: &str) -> Self {
@@ -119,75 +100,47 @@ mod tests {
 
       Self {
         config: Config::default(),
-        document: Document::try_from(lsp::DidOpenTextDocumentParams {
-          text_document: lsp::TextDocumentItem {
-            uri: lsp::Url::parse(uri).unwrap(),
-            language_id: "just".to_string(),
-            version: 1,
-            text: content.to_string(),
-          },
-        })
-        .unwrap(),
-        imported_documents: Vec::new(),
         messages: Vec::new(),
+        project: TestProject::new(Document {
+          version: 1,
+          ..Document::new(content, lsp::Url::parse(uri).unwrap()).unwrap()
+        }),
       }
     }
 
+    #[track_caller]
     fn run(self) {
-      let Test {
-        config,
-        document,
-        imported_documents,
-        messages,
-      } = self;
-
       let analyzer = Analyzer {
-        config: Some(&config),
-        view: ProjectView {
-          document: &document,
-          documents: once(&document)
-            .chain(&imported_documents)
-            .enumerate()
-            .map(|(index, document)| ProjectViewDocument {
-              document,
-              load_depth: usize::from(index > 0),
-            })
-            .collect(),
-        },
+        config: Some(&self.config),
+        view: self.project.view(),
       };
 
       let diagnostics = analyzer
         .analyze()
         .into_iter()
         .map(lsp::Diagnostic::from)
-        .collect::<Vec<lsp::Diagnostic>>();
+        .collect::<Vec<_>>();
 
       assert_eq!(
-        diagnostics.len(),
-        messages.len(),
-        "Expected diagnostics {:?} but got {:?}",
-        messages,
-        diagnostics,
+        diagnostics
+          .iter()
+          .map(|diagnostic| (
+            diagnostic.message.as_str(),
+            diagnostic.range,
+            diagnostic.severity,
+          ))
+          .collect::<Vec<_>>(),
+        self.messages
       );
-
-      for (diagnostic, (expected_message, expected_range, expected_severity)) in
-        diagnostics.into_iter().zip(messages)
-      {
-        assert_eq!(diagnostic.severity, expected_severity, "{diagnostic:?}");
-        assert_eq!(diagnostic.message, expected_message);
-        assert_eq!(diagnostic.range, expected_range);
-      }
     }
 
-    fn warning(self, message: &'static str, range: lsp::Range) -> Self {
-      Self {
-        messages: self
-          .messages
-          .into_iter()
-          .chain([(message, range, Some(lsp::DiagnosticSeverity::WARNING))])
-          .collect(),
-        ..self
-      }
+    fn warning(mut self, message: &'static str, range: lsp::Range) -> Self {
+      self.messages.push((
+        message,
+        range,
+        Some(lsp::DiagnosticSeverity::WARNING),
+      ));
+      self
     }
   }
 

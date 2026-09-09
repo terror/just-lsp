@@ -65,8 +65,7 @@ mod tests {
   struct Test {
     config: Config,
     diagnostics: Option<Vec<Diagnostic>>,
-    document: Document,
-    imported_documents: Vec<Document>,
+    project: TestProject,
     quickfixes: Vec<Quickfix>,
     range: lsp::Range,
   }
@@ -83,62 +82,43 @@ mod tests {
       }
     }
 
-    fn imported_document(self, content: &str) -> Self {
-      let document = Document::new(
-        content,
-        lsp::Url::parse(&format!(
-          "file:///foo{}.just",
-          self.imported_documents.len()
-        ))
-        .unwrap(),
-      )
-      .unwrap();
-
-      Self {
-        imported_documents: self
-          .imported_documents
-          .into_iter()
-          .chain([document])
-          .collect(),
-        ..self
-      }
+    fn imported_document(mut self, content: &str) -> Self {
+      self.project.imported_document(content);
+      self
     }
 
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
         diagnostics: None,
-        document: Document::from(content),
-        imported_documents: Vec::new(),
+        project: TestProject::new(Document::from(content)),
         quickfixes: Vec::new(),
         range: lsp::Range::at(0, 0, 0, 0),
       }
     }
 
-    fn quickfix(self, quickfix: Quickfix) -> Self {
-      Self {
-        quickfixes: self.quickfixes.into_iter().chain([quickfix]).collect(),
-        ..self
-      }
+    fn quickfix(mut self, quickfix: Quickfix) -> Self {
+      self.quickfixes.push(quickfix);
+      self
     }
 
     fn range(self, range: lsp::Range) -> Self {
       Self { range, ..self }
     }
 
+    #[track_caller]
     fn run(self) {
       let Test {
         config,
         diagnostics,
-        document,
-        imported_documents,
+        project,
         quickfixes,
         range,
       } = self;
 
       let parameters = lsp::CodeActionParams {
         text_document: lsp::TextDocumentIdentifier {
-          uri: document.uri.clone(),
+          uri: project.document.uri.clone(),
         },
         range,
         context: lsp::CodeActionContext {
@@ -151,17 +131,7 @@ mod tests {
 
       let analyzer = Analyzer {
         config: Some(&config),
-        view: ProjectView {
-          document: &document,
-          documents: once(&document)
-            .chain(&imported_documents)
-            .enumerate()
-            .map(|(index, document)| ProjectViewDocument {
-              document,
-              load_depth: usize::from(index > 0),
-            })
-            .collect(),
-        },
+        view: project.view(),
       };
 
       let actual_diagnostics = analyzer
@@ -181,30 +151,26 @@ mod tests {
 
       let actions = quickfixer.collect();
 
-      assert_eq!(actions.len(), quickfixes.len());
-
-      for (action, quickfix) in actions.into_iter().zip(quickfixes) {
-        let lsp::CodeActionOrCommand::CodeAction(action) = action else {
-          unreachable!("expected CodeAction");
-        };
-
-        assert_eq!(
-          action,
-          lsp::CodeAction {
+      let expected = quickfixes
+        .into_iter()
+        .map(|quickfix| {
+          lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
             title: quickfix.title().to_string(),
             kind: Some(lsp::CodeActionKind::QUICKFIX),
             diagnostics: None,
             edit: Some(lsp::WorkspaceEdit {
               changes: Some(HashMap::from([(
-                document.uri.clone(),
+                project.document.uri.clone(),
                 quickfix.edits().to_vec(),
               )])),
               ..Default::default()
             }),
             ..Default::default()
-          }
-        );
-      }
+          })
+        })
+        .collect::<Vec<_>>();
+
+      assert_eq!(actions, expected);
     }
   }
 

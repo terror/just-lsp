@@ -960,20 +960,8 @@ mod tests {
   }
 
   impl Test {
-    fn change(self, uri: &lsp::Url, version: i32, text: &str) -> Self {
-      self.notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            uri.clone(),
-            version,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: text.into(),
-          }],
-        },
-      )
+    fn change(self, path: &str, version: i32, text: &str) -> Self {
+      self.edit(path, version, None, text)
     }
 
     fn client_notification<N: notification::Notification>(
@@ -990,43 +978,93 @@ mod tests {
       self
     }
 
-    fn close(self, uri: &lsp::Url) -> Self {
+    fn close(self, path: &str) -> Self {
+      let uri = self.uri(path);
+
       self.notification::<notification::DidCloseTextDocument>(
         lsp::DidCloseTextDocumentParams {
-          text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
+          text_document: lsp::TextDocumentIdentifier::new(uri),
         },
       )
     }
 
     fn code_actions(
       self,
-      uri: &lsp::Url,
+      path: &str,
       range: lsp::Range,
-      actions: Vec<lsp::CodeActionOrCommand>,
+      actions: impl IntoIterator<Item = lsp::CodeActionOrCommand>,
     ) -> Self {
+      let uri = self.uri(path);
+
       self.request::<request::CodeActionRequest>(
         lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
+          text_document: lsp::TextDocumentIdentifier::new(uri),
           range,
           context: lsp::CodeActionContext::default(),
           work_done_progress_params: lsp::WorkDoneProgressParams::default(),
           partial_result_params: lsp::PartialResultParams::default(),
         },
-        Ok(Some(actions)),
+        Ok(Some(actions.into_iter().collect())),
+      )
+    }
+
+    fn definition(
+      self,
+      path: &str,
+      position: lsp::Position,
+      expected: Option<lsp::GotoDefinitionResponse>,
+    ) -> Self {
+      let uri = self.uri(path);
+
+      self.request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(uri),
+            position,
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(expected),
       )
     }
 
     fn diagnostics(
       self,
-      uri: &lsp::Url,
+      path: &str,
       version: Option<i32>,
-      diagnostics: Vec<lsp::Diagnostic>,
+      diagnostics: impl IntoIterator<Item = lsp::Diagnostic>,
     ) -> Self {
+      let uri = self.uri(path);
+
       self.client_notification::<notification::PublishDiagnostics>(
         lsp::PublishDiagnosticsParams {
-          uri: uri.clone(),
-          diagnostics,
+          uri,
+          diagnostics: diagnostics.into_iter().collect(),
           version,
+        },
+      )
+    }
+
+    fn edit(
+      self,
+      path: &str,
+      version: i32,
+      range: impl Into<Option<lsp::Range>>,
+      text: &str,
+    ) -> Self {
+      let uri = self.uri(path);
+
+      self.notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            uri, version,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: range.into(),
+            range_length: None,
+            text: text.into(),
+          }],
         },
       )
     }
@@ -1048,6 +1086,26 @@ mod tests {
       self
     }
 
+    fn hover(
+      self,
+      path: &str,
+      position: lsp::Position,
+      expected: Option<lsp::Hover>,
+    ) -> Self {
+      let uri = self.uri(path);
+
+      self.request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(uri),
+            position,
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(expected),
+      )
+    }
+
     fn initialize(self) -> Self {
       self.request::<request::Initialize>(
         lsp::InitializeParams::default(),
@@ -1059,17 +1117,6 @@ mod tests {
           capabilities: Server::capabilities(),
         }),
       )
-    }
-
-    fn initialized(self) -> Self {
-      self
-        .notification::<notification::Initialized>(lsp::InitializedParams {})
-        .client_notification::<notification::LogMessage>(
-          lsp::LogMessageParams {
-            typ: lsp::MessageType::INFO,
-            message: format!("{} initialized", env!("CARGO_PKG_NAME")),
-          },
-        )
     }
 
     fn message(
@@ -1085,6 +1132,14 @@ mod tests {
       } else {
         request.params(params)
       }
+    }
+
+    fn missing_recipe(name: &str, range: lsp::Range) -> lsp::Diagnostic {
+      Self::error(
+        "missing-dependencies",
+        &format!("Recipe `{name}` not found"),
+        range,
+      )
     }
 
     fn new() -> Self {
@@ -1111,17 +1166,56 @@ mod tests {
       self
     }
 
-    fn open(self, uri: &str, text: &str) -> Self {
+    fn open(self, path: &str, text: &str) -> Self {
+      let uri = self.uri(path);
+
       self.notification::<notification::DidOpenTextDocument>(
         lsp::DidOpenTextDocumentParams {
           text_document: lsp::TextDocumentItem::new(
-            uri.parse().unwrap(),
+            uri,
             "just".into(),
             1,
             text.into(),
           ),
         },
       )
+    }
+
+    fn quickfixes(
+      self,
+      path: &str,
+      range: lsp::Range,
+      quickfixes: impl IntoIterator<Item = Quickfix>,
+    ) -> Self {
+      let uri = self.uri(path);
+      let actions = quickfixes.into_iter().map(|quickfix| {
+        lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+          title: quickfix.title().into(),
+          kind: Some(lsp::CodeActionKind::QUICKFIX),
+          edit: Some(lsp::WorkspaceEdit {
+            changes: Some(HashMap::from([(
+              uri.clone(),
+              quickfix.edits().to_vec(),
+            )])),
+            ..Default::default()
+          }),
+          ..Default::default()
+        })
+      });
+
+      self.code_actions(path, range, actions)
+    }
+
+    fn ready(self) -> Self {
+      self
+        .initialize()
+        .notification::<notification::Initialized>(lsp::InitializedParams {})
+        .client_notification::<notification::LogMessage>(
+          lsp::LogMessageParams {
+            typ: lsp::MessageType::INFO,
+            message: format!("{} initialized", env!("CARGO_PKG_NAME")),
+          },
+        )
     }
 
     fn request<R: request::Request>(
@@ -1183,60 +1277,32 @@ mod tests {
     }
 
     fn uri(&self, path: &str) -> lsp::Url {
-      lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
+      path.parse().unwrap_or_else(|_| {
+        lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
+      })
     }
   }
 
   #[tokio::test]
   async fn closing_imported_buffer_restores_disk_project() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let root =
-      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
-
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
-
-    let target =
-      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
-
-    std::fs::write(imported.to_file_path().unwrap(), "import 'bar.just'")?;
-    std::fs::write(target.to_file_path().unwrap(), "bar:")?;
-
     Test::new()
+      .file("foo.just", "import 'bar.just'")
+      .file("bar.just", "bar:")
       .initialize()
-      .open(root.as_str(), "import 'foo.just'\n\nfoo: bar")
-      .open(imported.as_str(), "")
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(None),
-      )
-      .notification::<notification::DidCloseTextDocument>(
-        lsp::DidCloseTextDocumentParams {
-          text_document: lsp::TextDocumentIdentifier::new(imported.clone()),
-        },
-      )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .open("justfile", "import 'foo.just'\n\nfoo: bar")
+      .open("foo.just", "")
+      .hover("justfile", lsp::Position::new(2, 5), None)
+      .close("foo.just")
+      .hover(
+        "justfile",
+        lsp::Position::new(2, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "bar:".into(),
           }),
           range: Some(lsp::Range::at(2, 5, 2, 8)),
-        })),
+        }),
       )
       .run()
       .await
@@ -1250,33 +1316,14 @@ mod tests {
         "file:///test.just",
         "foo := env_var_or_default(\"BAR\", \"baz\")\n",
       )
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 10, 0, 10),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
-          lsp::CodeAction {
-            title: "Replace `env_var_or_default` with `env`".into(),
-            kind: Some(lsp::CodeActionKind::QUICKFIX),
-            edit: Some(lsp::WorkspaceEdit {
-              changes: Some(HashMap::from([(
-                "file:///test.just".parse().unwrap(),
-                vec![lsp::TextEdit {
-                  range: lsp::Range::at(0, 7, 0, 25),
-                  new_text: "env".into(),
-                }],
-              )])),
-              ..Default::default()
-            }),
-            ..Default::default()
-          },
-        )])),
+      .quickfixes(
+        "file:///test.just",
+        lsp::Range::at(0, 10, 0, 10),
+        [Quickfix::edit(
+          "Replace `env_var_or_default` with `env`",
+          lsp::Range::at(0, 7, 0, 25),
+          "env",
+        )],
       )
       .run()
       .await
@@ -1287,18 +1334,7 @@ mod tests {
     Test::new()
       .initialize()
       .open("file:///test.just", "foo := env_var(\"BAR\")\n")
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 0, 0, 3),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![])),
-      )
+      .code_actions("file:///test.just", lsp::Range::at(0, 0, 0, 3), [])
       .run()
       .await
   }
@@ -1308,72 +1344,23 @@ mod tests {
     Test::new()
       .initialize()
       .open("file:///test.just", "foo := env(\"BAR\")\n")
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-            2,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(0, 7, 0, 10)),
-            range_length: None,
-            text: "env_var".into(),
-          }],
-        },
+      .edit(
+        "file:///test.just",
+        2,
+        lsp::Range::at(0, 7, 0, 10),
+        "env_var",
       )
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 10, 0, 10),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
-          lsp::CodeAction {
-            title: "Replace `env_var` with `env`".into(),
-            kind: Some(lsp::CodeActionKind::QUICKFIX),
-            edit: Some(lsp::WorkspaceEdit {
-              changes: Some(HashMap::from([(
-                "file:///test.just".parse().unwrap(),
-                vec![lsp::TextEdit {
-                  range: lsp::Range::at(0, 7, 0, 14),
-                  new_text: "env".into(),
-                }],
-              )])),
-              ..Default::default()
-            }),
-            ..Default::default()
-          },
-        )])),
+      .quickfixes(
+        "file:///test.just",
+        lsp::Range::at(0, 10, 0, 10),
+        [Quickfix::edit(
+          "Replace `env_var` with `env`",
+          lsp::Range::at(0, 7, 0, 14),
+          "env",
+        )],
       )
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-            3,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(0, 7, 0, 14)),
-            range_length: None,
-            text: "env".into(),
-          }],
-        },
-      )
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 8, 0, 8),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![])),
-      )
+      .edit("file:///test.just", 3, lsp::Range::at(0, 7, 0, 14), "env")
+      .code_actions("file:///test.just", lsp::Range::at(0, 8, 0, 8), [])
       .run()
       .await
   }
@@ -1383,28 +1370,13 @@ mod tests {
     Test::new()
       .initialize()
       .open("file:///empty.just", "")
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///empty.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 0, 0, 0),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![])),
-      )
+      .code_actions("file:///empty.just", lsp::Range::at(0, 0, 0, 0), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn code_action_shared_import_requires_matching_quickfixes() -> Result {
-    let test = Test::new().file("foo.just", "_foo := bar\n");
-    let first = test.uri("bar.just");
-    let second = test.uri("baz.just");
-    let imported = test.uri("foo.just");
     let range = lsp::Range::at(0, 8, 0, 11);
     let diagnostic = Test::error(
       "undefined-identifiers",
@@ -1412,18 +1384,18 @@ mod tests {
       range,
     );
 
-    test
-      .initialize()
-      .initialized()
-      .open(first.as_str(), "import 'foo.just'\nbar := 'foo'\n")
-      .diagnostics(&first, Some(1), vec![])
-      .diagnostics(&imported, None, vec![])
-      .open(second.as_str(), "import 'foo.just'\nexport baz := 'foo'\n")
-      .diagnostics(&second, Some(1), vec![])
-      .diagnostics(&imported, None, vec![diagnostic.clone()])
-      .open(imported.as_str(), "_foo := bar\n")
-      .diagnostics(&imported, Some(1), vec![diagnostic])
-      .code_actions(&imported, range, vec![])
+    Test::new()
+      .file("foo.just", "_foo := bar\n")
+      .ready()
+      .open("bar.just", "import 'foo.just'\nbar := 'foo'\n")
+      .diagnostics("bar.just", Some(1), [])
+      .diagnostics("foo.just", None, [])
+      .open("baz.just", "import 'foo.just'\nexport baz := 'foo'\n")
+      .diagnostics("baz.just", Some(1), [])
+      .diagnostics("foo.just", None, [diagnostic.clone()])
+      .open("foo.just", "_foo := bar\n")
+      .diagnostics("foo.just", Some(1), [diagnostic])
+      .code_actions("foo.just", range, [])
       .run()
       .await
   }
@@ -1444,17 +1416,10 @@ mod tests {
           "
         },
       )
-      .request::<request::CodeActionRequest>(
-        lsp::CodeActionParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-          ),
-          range: lsp::Range::at(0, 0, 0, 0),
-          context: lsp::CodeActionContext::default(),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![
+      .code_actions(
+        "file:///test.just",
+        lsp::Range::at(0, 0, 0, 0),
+        [
           lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
             title: "foo".into(),
             kind: Some(lsp::CodeActionKind::SOURCE),
@@ -1492,7 +1457,7 @@ mod tests {
             }),
             ..Default::default()
           }),
-        ])),
+        ],
       )
       .run()
       .await
@@ -1579,138 +1544,100 @@ mod tests {
 
   #[tokio::test]
   async fn dependency_open_republishes_root_diagnostics() -> Result {
-    let test = Test::new().file("foo.just", "");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n\nbar: foo")
-      .diagnostics(&imported, None, vec![])
+    Test::new()
+      .file("foo.just", "")
+      .ready()
+      .open("justfile", "import 'foo.just'\n\nbar: foo")
+      .diagnostics("foo.just", None, [])
       .diagnostics(
-        &root,
+        "justfile",
         Some(1),
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `foo` not found",
-          lsp::Range::at(2, 5, 2, 8),
-        )],
+        [Test::missing_recipe("foo", lsp::Range::at(2, 5, 2, 8))],
       )
-      .open(imported.as_str(), "foo:")
-      .diagnostics(&imported, Some(1), vec![])
-      .diagnostics(&root, Some(1), vec![])
+      .open("foo.just", "foo:")
+      .diagnostics("foo.just", Some(1), [])
+      .diagnostics("justfile", Some(1), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_clear_closed_projects() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(1), vec![])
-      .close(&root)
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, None, vec![])
+      .diagnostics("justfile", Some(1), [])
+      .close("justfile")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", None, [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_clear_removed_imports() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(1), vec![])
-      .change(&root, 2, "")
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(2), vec![])
+      .diagnostics("justfile", Some(1), [])
+      .change("justfile", 2, "")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(2), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_closing_root_preserves_import_scope() -> Result {
-    let test = Test::new()
+    Test::new()
       .file("foo.just", "foo: bar\n")
-      .file("justfile", "import 'foo.just'\nbar:\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
-      .open(imported.as_str(), "foo: bar\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .close(&root)
-      .diagnostics(&root, None, vec![])
-      .change(&imported, 2, "foo: bar\n")
-      .diagnostics(&imported, Some(2), vec![])
-      .close(&imported)
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, None, vec![])
+      .file("justfile", "import 'foo.just'\nbar:\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "foo: bar\n")
+      .diagnostics("foo.just", Some(1), [])
+      .close("justfile")
+      .diagnostics("justfile", None, [])
+      .change("foo.just", 2, "foo: bar\n")
+      .diagnostics("foo.just", Some(2), [])
+      .close("foo.just")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", None, [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_closing_root_removes_import() -> Result {
-    let test = Test::new()
+    Test::new()
       .file("foo.just", "foo: bar\n")
-      .file("justfile", "");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
-      .open(imported.as_str(), "foo: bar\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .close(&root)
-      .diagnostics(&root, None, vec![])
+      .file("justfile", "")
+      .ready()
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "foo: bar\n")
+      .diagnostics("foo.just", Some(1), [])
+      .close("justfile")
+      .diagnostics("justfile", None, [])
       .diagnostics(
-        &imported,
+        "foo.just",
         Some(1),
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
       .run()
       .await
@@ -1718,41 +1645,28 @@ mod tests {
 
   #[tokio::test]
   async fn diagnostics_closing_root_restores_disk_scope() -> Result {
-    let test = Test::new()
+    Test::new()
       .file("foo.just", "foo: bar\n")
-      .file("justfile", "import 'foo.just'\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
-      .open(imported.as_str(), "foo: bar\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .close(&root)
+      .file("justfile", "import 'foo.just'\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "foo: bar\n")
+      .diagnostics("foo.just", Some(1), [])
+      .close("justfile")
       .diagnostics(
-        &imported,
+        "foo.just",
         Some(1),
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, None, vec![])
+      .diagnostics("justfile", None, [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_deduplicate_shared_import_quickfixes() -> Result {
-    let test = Test::new().file("foo.just", "set windows-shell := ['foo']\n");
-    let first = test.uri("bar.just");
-    let second = test.uri("baz.just");
-    let imported = test.uri("foo.just");
     let range = lsp::Range::at(0, 4, 0, 17);
     let diagnostic = lsp::Diagnostic {
       severity: Some(lsp::DiagnosticSeverity::WARNING),
@@ -1762,161 +1676,120 @@ mod tests {
         range,
       )
     };
-    let actions = vec![lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: "Replace `windows-shell` with `[windows] set shell`".into(),
-      kind: Some(lsp::CodeActionKind::QUICKFIX),
-      edit: Some(lsp::WorkspaceEdit {
-        changes: Some(HashMap::from([(
-          imported.clone(),
-          vec![lsp::TextEdit {
-            range: lsp::Range::at(0, 0, 1, 0),
-            new_text: "[windows]\nset shell := ['foo']\n".into(),
-          }],
-        )])),
-        ..Default::default()
-      }),
-      ..Default::default()
-    })];
 
-    test
-      .initialize()
-      .initialized()
+    Test::new()
+      .file("foo.just", "set windows-shell := ['foo']\n")
+      .ready()
       .open(
-        first.as_str(),
+        "bar.just",
         "[windows]\nset shell := ['bar']\nimport 'foo.just'\n",
       )
-      .diagnostics(&first, Some(1), vec![])
-      .diagnostics(&imported, None, vec![diagnostic.clone()])
-      .open(second.as_str(), "import 'foo.just'\n")
-      .diagnostics(&second, Some(1), vec![])
-      .open(imported.as_str(), "set windows-shell := ['foo']\n")
-      .diagnostics(&imported, Some(1), vec![diagnostic])
-      .code_actions(&imported, range, vec![])
-      .change(&first, 2, "import 'foo.just'\n")
-      .diagnostics(&first, Some(2), vec![])
-      .code_actions(&imported, range, actions)
+      .diagnostics("bar.just", Some(1), [])
+      .diagnostics("foo.just", None, [diagnostic.clone()])
+      .open("baz.just", "import 'foo.just'\n")
+      .diagnostics("baz.just", Some(1), [])
+      .open("foo.just", "set windows-shell := ['foo']\n")
+      .diagnostics("foo.just", Some(1), [diagnostic])
+      .code_actions("foo.just", range, [])
+      .change("bar.just", 2, "import 'foo.just'\n")
+      .diagnostics("bar.just", Some(2), [])
+      .quickfixes(
+        "foo.just",
+        range,
+        [Quickfix::edit(
+          "Replace `windows-shell` with `[windows] set shell`",
+          lsp::Range::at(0, 0, 1, 0),
+          "[windows]\nset shell := ['foo']\n",
+        )],
+      )
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_follow_import_conditions() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
     let disabled = if cfg!(windows) { "unix" } else { "windows" };
 
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(1), vec![])
-      .change(&root, 2, &format!("[{disabled}]\nimport 'foo.just'\n"))
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(2), vec![])
-      .change(&root, 3, "import 'foo.just'\n")
+      .diagnostics("justfile", Some(1), [])
+      .change("justfile", 2, &format!("[{disabled}]\nimport 'foo.just'\n"))
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(2), [])
+      .change("justfile", 3, "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(3), vec![])
+      .diagnostics("justfile", Some(3), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_handle_import_cycles() -> Result {
-    let test = Test::new()
+    Test::new()
       .file("foo.just", "import 'bar.just'\nfoo: bar\n")
-      .file("bar.just", "import 'foo.just'\nbar:\n");
-    let first = test.uri("foo.just");
-    let second = test.uri("bar.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(first.as_str(), "import 'bar.just'\nfoo: bar\n")
-      .diagnostics(&second, None, vec![])
-      .diagnostics(&first, Some(1), vec![])
-      .open(second.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&second, Some(1), vec![])
+      .file("bar.just", "import 'foo.just'\nbar:\n")
+      .ready()
+      .open("foo.just", "import 'bar.just'\nfoo: bar\n")
+      .diagnostics("bar.just", None, [])
+      .diagnostics("foo.just", Some(1), [])
+      .open("bar.just", "import 'foo.just'\nbar:\n")
+      .diagnostics("bar.just", Some(1), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_include_unopened_nested_imports() -> Result {
-    let test = Test::new()
+    Test::new()
       .file("foo.just", "import 'bar.just'\n")
-      .file("bar.just", "foo bar bar:\n  echo {{bar}}\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-    let nested = test.uri("bar.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n")
+      .file("bar.just", "foo bar bar:\n  echo {{bar}}\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\n")
       .diagnostics(
-        &nested,
+        "bar.just",
         None,
-        vec![Test::error(
+        [Test::error(
           "duplicate-recipe-parameters",
           "Duplicate parameter `bar`",
           lsp::Range::at(0, 8, 0, 11),
         )],
       )
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_keep_closed_imports() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(1), vec![])
-      .open(imported.as_str(), "foo:\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .close(&imported)
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "foo:\n")
+      .diagnostics("foo.just", Some(1), [])
+      .close("foo.just")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
       .run()
       .await
@@ -1924,68 +1797,50 @@ mod tests {
 
   #[tokio::test]
   async fn diagnostics_keep_shared_imports() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let first = test.uri("bar.just");
-    let second = test.uri("baz.just");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(first.as_str(), "import 'foo.just'\n")
-      .diagnostics(&first, Some(1), vec![])
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("bar.just", "import 'foo.just'\n")
+      .diagnostics("bar.just", Some(1), [])
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .open(second.as_str(), "import 'foo.just'\n")
-      .diagnostics(&second, Some(1), vec![])
-      .close(&first)
-      .diagnostics(&first, None, vec![])
-      .close(&second)
-      .diagnostics(&second, None, vec![])
-      .diagnostics(&imported, None, vec![])
+      .open("baz.just", "import 'foo.just'\n")
+      .diagnostics("baz.just", Some(1), [])
+      .close("bar.just")
+      .diagnostics("bar.just", None, [])
+      .close("baz.just")
+      .diagnostics("baz.just", None, [])
+      .diagnostics("foo.just", None, [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_open_import_uses_root_scope() -> Result {
-    let test = Test::new().file("foo.just", "_foo() := bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
+    Test::new()
+      .file("foo.just", "_foo() := bar\n")
+      .ready()
       .open(
-        root.as_str(),
+        "justfile",
         "set unstable\nbar := 'foo'\nimport 'foo.just'\n",
       )
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
-      .open(imported.as_str(), "_foo() := bar\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(imported.clone()),
-            lsp::Position::new(0, 10),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "_foo() := bar\n")
+      .diagnostics("foo.just", Some(1), [])
+      .hover(
+        "foo.just",
+        lsp::Position::new(0, 10),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "bar := 'foo'".into(),
           }),
           range: Some(lsp::Range::at(0, 10, 0, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -1993,53 +1848,37 @@ mod tests {
 
   #[tokio::test]
   async fn diagnostics_refresh_imports_when_root_changes() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(root.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&imported, None, vec![])
-      .diagnostics(&root, Some(1), vec![])
-      .change(&root, 2, "import 'foo.just'\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .change("justfile", 2, "import 'foo.just'\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         None,
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .diagnostics(&root, Some(2), vec![])
+      .diagnostics("justfile", Some(2), [])
       .run()
       .await
   }
 
   #[tokio::test]
   async fn diagnostics_root_open_replaces_import_scope() -> Result {
-    let test = Test::new().file("foo.just", "foo: bar\n");
-    let root = test.uri("justfile");
-    let imported = test.uri("foo.just");
-
-    test
-      .initialize()
-      .initialized()
-      .open(imported.as_str(), "foo: bar\n")
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .ready()
+      .open("foo.just", "foo: bar\n")
       .diagnostics(
-        &imported,
+        "foo.just",
         Some(1),
-        vec![Test::error(
-          "missing-dependencies",
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )],
+        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
       )
-      .open(root.as_str(), "import 'foo.just'\nbar:\n")
-      .diagnostics(&imported, Some(1), vec![])
-      .diagnostics(&root, Some(1), vec![])
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", Some(1), [])
+      .diagnostics("justfile", Some(1), [])
       .run()
       .await
   }
@@ -2069,23 +1908,16 @@ mod tests {
           ],
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///foo.just".parse().unwrap(),
-            ),
-            lsp::Position::new(1, 1),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///foo.just",
+        lsp::Position::new(1, 1),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo '🧪bar'".into(),
           }),
           range: Some(lsp::Range::at(1, 0, 1, 3)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2099,36 +1931,22 @@ mod tests {
         "file:///foo.just",
         "foo:\n  echo 'foo\u{2028}bar'\n\nbaz: foo",
       )
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            "file:///foo.just".parse().unwrap(),
-            2,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(1, 12, 1, 15)),
-            range_length: None,
-            text: "baz\u{2029}qux".into(),
-          }],
-        },
+      .edit(
+        "file:///foo.just",
+        2,
+        lsp::Range::at(1, 12, 1, 15),
+        "baz\u{2029}qux",
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///foo.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 6),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///foo.just",
+        lsp::Position::new(3, 6),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo 'foo\u{2028}baz\u{2029}qux'".into(),
           }),
           range: Some(lsp::Range::at(3, 5, 3, 8)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2147,36 +1965,22 @@ mod tests {
           "
         },
       )
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            "file:///test.just".parse().unwrap(),
-            2,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(1, 7, 2, 0)),
-            range_length: None,
-            text: "\"updated\"".into(),
-          }],
-        },
+      .edit(
+        "file:///test.just",
+        2,
+        lsp::Range::at(1, 7, 2, 0),
+        "\"updated\"",
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(0, 1),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(0, 1),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo \"updated\"".into(),
           }),
           range: Some(lsp::Range::at(0, 0, 0, 3)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2186,18 +1990,11 @@ mod tests {
   async fn did_change_without_open_document_is_ignored() -> Result {
     Test::new()
       .initialize()
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            "file:///missing.just".parse().unwrap(),
-            2,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(0, 0, 0, 0)),
-            range_length: None,
-            text: "\"updated\"".into(),
-          }],
-        },
+      .edit(
+        "file:///missing.just",
+        2,
+        lsp::Range::at(0, 0, 0, 0),
+        "\"updated\"",
       )
       .open(
         "file:///missing.just",
@@ -2211,23 +2008,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///missing.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///missing.just",
+        lsp::Position::new(3, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo \"foo\"".into(),
           }),
           range: Some(lsp::Range::at(3, 5, 3, 8)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2612,31 +2402,19 @@ mod tests {
 
   #[tokio::test]
   async fn goto_import_definition() -> Result {
-    let tempdir = tempfile::tempdir()?;
+    let test = Test::new().file("foo.just", "foo:");
+    let target = test.uri("foo.just");
 
-    let root = tempdir.path().join("justfile");
-    let target = tempdir.path().join("foo.just");
-
-    std::fs::write(&target, "foo:")?;
-
-    let root = lsp::Url::from_file_path(root).unwrap();
-
-    Test::new()
+    test
       .initialize()
-      .open(root.as_str(), "import 'foo.just'")
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(0, 9),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
-          uri: lsp::Url::from_file_path(target).unwrap(),
+      .open("justfile", "import 'foo.just'")
+      .definition(
+        "justfile",
+        lsp::Position::new(0, 9),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
           range: lsp::Range::at(0, 0, 0, 0),
-        }))),
+        })),
       )
       .run()
       .await
@@ -2658,21 +2436,13 @@ mod tests {
           "
         },
       )
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+      .definition(
+        "file:///test.just",
+        lsp::Position::new(3, 5),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
           uri: "file:///test.just".parse().unwrap(),
           range: lsp::Range::at(0, 0, 3, 0),
-        }))),
+        })),
       )
       .run()
       .await
@@ -2692,17 +2462,10 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(0, 3),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(0, 3),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
@@ -2726,7 +2489,7 @@ mod tests {
             .into(),
           }),
           range: Some(lsp::Range::at(0, 1, 0, 6)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2745,17 +2508,10 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(1, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(1, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
@@ -2775,7 +2531,7 @@ mod tests {
             .into(),
           }),
           range: Some(lsp::Range::at(1, 9, 1, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2797,17 +2553,10 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(1, 12),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(1, 12),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
@@ -2825,7 +2574,7 @@ mod tests {
             .into(),
           }),
           range: Some(lsp::Range::at(1, 10, 1, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2847,23 +2596,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(4, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(4, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "arg='cool'".into(),
           }),
           range: Some(lsp::Range::at(4, 10, 4, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2885,23 +2627,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(3, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "arg='cool'".into(),
           }),
           range: Some(lsp::Range::at(3, 10, 3, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2923,23 +2658,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(3, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo \"foo\"".into(),
           }),
           range: Some(lsp::Range::at(3, 5, 3, 8)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2958,23 +2686,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(1, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(1, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "arg='cool'".into(),
           }),
           range: Some(lsp::Range::at(1, 10, 1, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -2996,35 +2717,21 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(3, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "arch:\n  echo \"foo\"".into(),
           }),
           range: Some(lsp::Range::at(3, 5, 3, 9)),
-        })),
+        }),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(4, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(4, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
@@ -3044,7 +2751,7 @@ mod tests {
             .into(),
           }),
           range: Some(lsp::Range::at(4, 10, 4, 14)),
-        })),
+        }),
       )
       .run()
       .await
@@ -3065,17 +2772,10 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(0, 4),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(0, 4),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
@@ -3101,7 +2801,7 @@ mod tests {
             .into(),
           }),
           range: Some(lsp::Range::at(0, 4, 0, 10)),
-        })),
+        }),
       )
       .run()
       .await
@@ -3122,23 +2822,16 @@ mod tests {
           "
         },
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(
-              "file:///test.just".parse().unwrap(),
-            ),
-            lsp::Position::new(3, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "file:///test.just",
+        lsp::Position::new(3, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo := 'foo'".into(),
           }),
           range: Some(lsp::Range::at(3, 10, 3, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -3146,13 +2839,8 @@ mod tests {
 
   #[tokio::test]
   async fn imported_symbol_navigation() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let root = tempdir.path().join("justfile");
-    let target = tempdir.path().join("foo.just");
-
-    std::fs::write(
-      &target,
+    let test = Test::new().file(
+      "foo.just",
       indoc! {
         "
         qux:
@@ -3163,15 +2851,13 @@ mod tests {
         qux() := 'quux'
         "
       },
-    )?;
+    );
+    let target = test.uri("foo.just");
 
-    let root = lsp::Url::from_file_path(root).unwrap();
-    let target = lsp::Url::from_file_path(target).unwrap();
-
-    Test::new()
+    test
       .initialize()
       .open(
-        root.as_str(),
+        "justfile",
         indoc! {
           "
           import 'foo.just'
@@ -3185,111 +2871,73 @@ mod tests {
           "
         },
       )
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 18),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+      .definition(
+        "justfile",
+        lsp::Position::new(2, 18),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
           uri: target.clone(),
           range: lsp::Range::at(0, 0, 3, 0),
-        }))),
+        })),
       )
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(4, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+      .definition(
+        "justfile",
+        lsp::Position::new(4, 11),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
           uri: target.clone(),
           range: lsp::Range::at(5, 0, 5, 3),
-        }))),
+        })),
       )
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(7, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
-          uri: target.clone(),
+      .definition(
+        "justfile",
+        lsp::Position::new(7, 11),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
           range: lsp::Range::at(3, 0, 4, 0),
-        }))),
+        })),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 18),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "justfile",
+        lsp::Position::new(2, 18),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "qux:\n  echo foo".into(),
           }),
           range: Some(lsp::Range::at(2, 17, 2, 20)),
-        })),
+        }),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(4, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "justfile",
+        lsp::Position::new(4, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "qux() := 'quux'".into(),
           }),
           range: Some(lsp::Range::at(4, 10, 4, 13)),
-        })),
+        }),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(7, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "justfile",
+        lsp::Position::new(7, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "bar := 'baz'".into(),
           }),
           range: Some(lsp::Range::at(7, 10, 7, 13)),
-        })),
+        }),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(3, 11),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "justfile",
+        lsp::Position::new(3, 11),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "bar='local'".into(),
           }),
           range: Some(lsp::Range::at(3, 10, 3, 13)),
-        })),
+        }),
       )
       .run()
       .await
@@ -3297,81 +2945,35 @@ mod tests {
 
   #[tokio::test]
   async fn imported_symbol_navigation_rebuilds_affected_roots() -> Result {
-    let tempdir = tempfile::tempdir()?;
-
-    let first =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
-
-    let second =
-      lsp::Url::from_file_path(tempdir.path().join("bar.just")).unwrap();
-
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("baz.just")).unwrap();
-
-    let target =
-      lsp::Url::from_file_path(tempdir.path().join("qux.just")).unwrap();
-
-    std::fs::write(target.to_file_path().unwrap(), "qux:")?;
-
     Test::new()
+      .file("qux.just", "qux:")
       .initialize()
-      .open(first.as_str(), "import 'baz.just'\n\nfoo: qux")
-      .open(second.as_str(), "import 'baz.just'\n\nbar: qux")
-      .open(imported.as_str(), "")
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(first.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(None),
-      )
-      .notification::<notification::DidChangeTextDocument>(
-        lsp::DidChangeTextDocumentParams {
-          text_document: lsp::VersionedTextDocumentIdentifier::new(
-            imported.clone(),
-            2,
-          ),
-          content_changes: vec![lsp::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: "import 'qux.just'".into(),
-          }],
-        },
-      )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(first.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .open("foo.just", "import 'baz.just'\n\nfoo: qux")
+      .open("bar.just", "import 'baz.just'\n\nbar: qux")
+      .open("baz.just", "")
+      .hover("foo.just", lsp::Position::new(2, 5), None)
+      .change("baz.just", 2, "import 'qux.just'")
+      .hover(
+        "foo.just",
+        lsp::Position::new(2, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "qux:".into(),
           }),
           range: Some(lsp::Range::at(2, 5, 2, 8)),
-        })),
+        }),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(second.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "bar.just",
+        lsp::Position::new(2, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "qux:".into(),
           }),
           range: Some(lsp::Range::at(2, 5, 2, 8)),
-        })),
+        }),
       )
       .run()
       .await
@@ -3379,49 +2981,31 @@ mod tests {
 
   #[tokio::test]
   async fn imported_symbol_navigation_uses_open_buffer() -> Result {
-    let tempdir = tempfile::tempdir()?;
+    let test = Test::new().file("foo.just", "foo:\n  echo disk");
+    let target = test.uri("foo.just");
 
-    let root = tempdir.path().join("justfile");
-    let target = tempdir.path().join("foo.just");
-
-    std::fs::write(&target, "foo:\n  echo disk")?;
-
-    let root = lsp::Url::from_file_path(root).unwrap();
-    let target = lsp::Url::from_file_path(target).unwrap();
-
-    Test::new()
+    test
       .initialize()
-      .open(root.as_str(), "import 'foo.just'\n\nbar: foo")
-      .open(target.as_str(), "\nfoo:\n  echo buffer")
-      .request::<request::GotoDefinition>(
-        lsp::GotoDefinitionParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
-          uri: target.clone(),
+      .open("justfile", "import 'foo.just'\n\nbar: foo")
+      .open("foo.just", "\nfoo:\n  echo buffer")
+      .definition(
+        "justfile",
+        lsp::Position::new(2, 5),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
           range: lsp::Range::at(1, 0, 2, 13),
-        }))),
+        })),
       )
-      .request::<request::HoverRequest>(
-        lsp::HoverParams {
-          text_document_position_params: lsp::TextDocumentPositionParams::new(
-            lsp::TextDocumentIdentifier::new(root.clone()),
-            lsp::Position::new(2, 5),
-          ),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-        },
-        Ok(Some(lsp::Hover {
+      .hover(
+        "justfile",
+        lsp::Position::new(2, 5),
+        Some(lsp::Hover {
           contents: lsp::HoverContents::Markup(lsp::MarkupContent {
             kind: lsp::MarkupKind::PlainText,
             value: "foo:\n  echo buffer".into(),
           }),
           range: Some(lsp::Range::at(2, 5, 2, 8)),
-        })),
+        }),
       )
       .run()
       .await

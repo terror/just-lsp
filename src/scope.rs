@@ -219,8 +219,7 @@ mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   struct Test {
-    document: Document,
-    imported_documents: Vec<Document>,
+    project: TestProject,
     recipe_usage: Vec<(&'static str, Vec<&'static str>)>,
     unresolved: Vec<&'static str>,
     unused: Vec<&'static str>,
@@ -228,31 +227,14 @@ mod tests {
   }
 
   impl Test {
-    fn imported_document(self, content: &str) -> Self {
-      let document = Document::new(
-        content,
-        lsp::Url::parse(&format!(
-          "file:///foo{}.just",
-          self.imported_documents.len()
-        ))
-        .unwrap(),
-      )
-      .unwrap();
-
-      Self {
-        imported_documents: self
-          .imported_documents
-          .into_iter()
-          .chain([document])
-          .collect(),
-        ..self
-      }
+    fn imported_document(mut self, content: &str) -> Self {
+      self.project.imported_document(content);
+      self
     }
 
     fn new(content: &str) -> Self {
       Self {
-        document: Document::from(content),
-        imported_documents: Vec::new(),
+        project: TestProject::new(Document::from(content)),
         recipe_usage: Vec::new(),
         unresolved: Vec::new(),
         unused: Vec::new(),
@@ -261,32 +243,17 @@ mod tests {
     }
 
     fn recipe_usage(
-      self,
+      mut self,
       recipe: &'static str,
       names: &[&'static str],
     ) -> Self {
-      Self {
-        recipe_usage: self
-          .recipe_usage
-          .into_iter()
-          .chain(once((recipe, names.to_vec())))
-          .collect(),
-        ..self
-      }
+      self.recipe_usage.push((recipe, names.to_vec()));
+      self
     }
 
+    #[track_caller]
     fn run(self) {
-      let view = ProjectView {
-        document: &self.document,
-        documents: once(&self.document)
-          .chain(&self.imported_documents)
-          .enumerate()
-          .map(|(index, document)| ProjectViewDocument {
-            document,
-            load_depth: usize::from(index > 0),
-          })
-          .collect(),
-      };
+      let view = self.project.view();
 
       let scope = Scope::analyze(&RuleContext::new(&view));
 
