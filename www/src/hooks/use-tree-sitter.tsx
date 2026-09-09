@@ -32,6 +32,8 @@ export function useTreeSitter(): UseTreeSitter {
           `${import.meta.env.BASE_URL}tree-sitter-just.wasm`
         );
 
+        parserInstance.setLanguage(loadedLanguage);
+
         setParser(parserInstance);
         setLanguage(loadedLanguage);
       } catch (err) {

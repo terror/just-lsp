@@ -1,10 +1,8 @@
-import { parse } from '@/lib/utils';
 import { useCallback, useMemo, useState } from 'react';
-import type { Language, Node, Parser } from 'web-tree-sitter';
+import type { Node, Parser } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
   parser: Parser | undefined;
-  language: Language | undefined;
   code: string;
 }
 
@@ -16,18 +14,9 @@ interface UseSyntaxTree {
 
 export function useSyntaxTree({
   parser,
-  language,
   code,
 }: UseSyntaxTreeOptions): UseSyntaxTree {
-  const root = useMemo(() => {
-    if (!parser || !language) {
-      return undefined;
-    }
-
-    const tree = parse({ parser, language, code });
-
-    return tree?.rootNode ?? undefined;
-  }, [parser, language, code]);
+  const root = useMemo(() => parser?.parse(code)?.rootNode, [parser, code]);
 
   const [collapsed, setCollapsed] = useState<{
     root: Node | undefined;
