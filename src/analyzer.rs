@@ -3149,7 +3149,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_allow_shadowed_functions_without_lists() {
+  fn list_feature_gate_allow_shadowed_functions_without_lists() {
     Test::new(indoc! {
       "
       set unstable
@@ -3184,7 +3184,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_bool_function_requires_lists() {
+  fn list_feature_gate_bool_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := bool('true')
@@ -3201,7 +3201,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_comparison_as_value_requires_lists() {
+  fn list_feature_gate_comparison_as_value_requires_lists() {
     Test::new(indoc! {
       "
       foo := 'a' == 'b'
@@ -3218,7 +3218,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_if_without_else_requires_lists() {
+  fn list_feature_gate_if_without_else_requires_lists() {
     Test::new(indoc! {
       "
       foo := if 'a' == 'b' { 'c' }
@@ -3235,7 +3235,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_join_list_function_requires_lists() {
+  fn list_feature_gate_join_list_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := join_list('bar')
@@ -3252,7 +3252,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_len_function_accepts_scalar_without_lists() {
+  fn list_feature_gate_len_function_accepts_scalar_without_lists() {
     Test::new(indoc! {
       "
       foo := len('bar')
@@ -3265,7 +3265,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_list_concatenation_requires_lists() {
+  fn list_feature_gate_list_concatenation_requires_lists() {
     Test::new(indoc! {
       "
       foo := 'a' ++ 'b'
@@ -3282,7 +3282,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_list_literals_require_lists() {
+  fn list_feature_gate_list_literals_require_lists() {
     Test::new(indoc! {
       "
       foo := ['bar']
@@ -3299,7 +3299,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_logical_and_requires_lists() {
+  fn list_feature_gate_logical_and_requires_lists() {
     Test::new(indoc! {
       "
       foo := 'foo' && 'bar'
@@ -3316,7 +3316,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_logical_or_requires_lists() {
+  fn list_feature_gate_logical_or_requires_lists() {
     Test::new(indoc! {
       "
       foo := '' || 'bar'
@@ -3333,7 +3333,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_negation_requires_lists() {
+  fn list_feature_gate_negation_requires_lists() {
     Test::new(indoc! {
       "
       foo bar:
@@ -3348,7 +3348,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_non_comparison_assert_condition_requires_lists() {
+  fn list_feature_gate_non_comparison_assert_condition_requires_lists() {
     Test::new(indoc! {
       "
       foo:
@@ -3363,7 +3363,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_non_comparison_if_condition_requires_lists() {
+  fn list_feature_gate_non_comparison_if_condition_requires_lists() {
     Test::new(indoc! {
       "
       foo := if 'a' { 'b' } else { 'c' }
@@ -3380,7 +3380,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_num_jobs_function_requires_lists() {
+  fn list_feature_gate_num_jobs_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := num_jobs()
@@ -3397,7 +3397,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_show_function_requires_lists() {
+  fn list_feature_gate_show_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := show('bar')
@@ -3414,7 +3414,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_split_function_requires_lists() {
+  fn list_feature_gate_split_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := split('bar')
@@ -3431,7 +3431,7 @@ mod tests {
   }
 
   #[test]
-  fn list_features_which_function_requires_lists() {
+  fn list_feature_gate_which_function_requires_lists() {
     Test::new(indoc! {
       "
       foo := which('bar')
@@ -4913,6 +4913,7 @@ mod tests {
       "duplicate-recipe-parameters",
       "foo bar bar:\n  echo {{bar}}\n",
     );
+    case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
   }
