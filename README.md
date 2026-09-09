@@ -22,12 +22,16 @@ hover docs, diagnostics, navigation, renaming, formatting, and running recipes.
 
 ## Installation
 
+The easiest way to install it is by using
+[cargo](https://doc.rust-lang.org/cargo/index.html), the Rust package manager:
+
 ```bash
 cargo install just-lsp
 ```
 
-See the [installation guide](https://just-lsp.vercel.app/documentation#installation)
-for other package managers and pre-built binaries.
+See the
+[installation guide](https://just-lsp.vercel.app/documentation#installation) for
+other package managers and pre-built binaries.
 
 ## Usage
 
@@ -39,8 +43,8 @@ See the documentation for
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, editor setup
-for local development, and parser changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, editor setup for
+local development, and parser changes.
 
 ## Support
 
