@@ -3,6 +3,7 @@ use super::*;
 pub(crate) struct Server {
   client: Client,
   config: RwLock<Config>,
+  diagnostics: Mutex<BTreeMap<lsp::Url, lsp::PublishDiagnosticsParams>>,
   executor: Executor,
   initialized: AtomicBool,
   workspace: RwLock<Workspace>,
@@ -75,45 +76,70 @@ impl Server {
     Self {
       client,
       config: RwLock::new(Config::default()),
+      diagnostics: Mutex::new(BTreeMap::new()),
       executor,
       initialized: AtomicBool::new(false),
       workspace: RwLock::new(Workspace::default()),
     }
   }
 
-  async fn publish_diagnostics(&self, uri: &lsp::Url) {
+  async fn publish_diagnostics(&self) {
     if !self.initialized.load(Ordering::Relaxed) {
       return;
     }
 
-    let config = self.config.read().await;
+    let mut previous = self.diagnostics.lock().await;
 
-    let workspace = self.workspace.read().await;
+    let diagnostics = {
+      let config = self.config.read().await;
+      let workspace = self.workspace.read().await;
 
-    let Some(view) = workspace.project_view(uri) else {
-      return;
+      workspace
+        .diagnostics(Some(&config))
+        .into_iter()
+        .map(|(uri, diagnostics)| {
+          let version = workspace
+            .documents
+            .get_open(&uri)
+            .map(|document| document.version);
+
+          let params = lsp::PublishDiagnosticsParams {
+            uri: uri.clone(),
+            diagnostics: diagnostics
+              .into_iter()
+              .map(lsp::Diagnostic::from)
+              .collect(),
+            version,
+          };
+
+          (uri, params)
+        })
+        .collect::<BTreeMap<_, _>>()
     };
 
-    let version = view.document().version;
+    for uri in previous.keys() {
+      if !diagnostics.contains_key(uri) {
+        self
+          .client
+          .publish_diagnostics(uri.clone(), Vec::new(), None)
+          .await;
+      }
+    }
 
-    let analyzer = Analyzer {
-      config: Some(&config),
-      view,
-    };
+    for (uri, params) in &diagnostics {
+      if previous.get(uri) != Some(params) {
+        self
+          .client
+          .publish_diagnostics(
+            uri.clone(),
+            params.diagnostics.clone(),
+            params.version,
+          )
+          .await;
+      }
+    }
 
-    let diagnostics = analyzer.analyze();
-
-    drop(config);
-    drop(workspace);
-
-    self
-      .client
-      .publish_diagnostics(
-        uri.clone(),
-        diagnostics.into_iter().map(lsp::Diagnostic::from).collect(),
-        Some(version),
-      )
-      .await;
+    *previous = diagnostics;
   }
 
   pub(crate) async fn run() -> Result {
@@ -134,7 +160,7 @@ impl Server {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    {
       let mut workspace = self.workspace.write().await;
 
       if !workspace.documents.is_open(&uri) {
@@ -145,13 +171,9 @@ impl Server {
 
       workspace.documents.change(params)?;
       workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
     }
+
+    self.publish_diagnostics().await;
 
     Ok(())
   }
@@ -162,7 +184,7 @@ impl Server {
   ) -> Result {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    {
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
@@ -170,13 +192,9 @@ impl Server {
 
       workspace.documents.open(params)?;
       workspace.load_projects(roots.iter().cloned())?;
-
-      roots
-    };
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
     }
+
+    self.publish_diagnostics().await;
 
     Ok(())
   }
@@ -202,11 +220,11 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    let Some(view) = workspace.project_view(&params.text_document.uri) else {
+    let Some(document) =
+      workspace.documents.get_open(&params.text_document.uri)
+    else {
       return Ok(None);
     };
-
-    let document = view.document();
 
     let mut actions = Vec::new();
 
@@ -235,13 +253,10 @@ impl LanguageServer for Server {
       }));
     }
 
-    let analyzer = Analyzer {
-      config: Some(&config),
-      view,
-    };
-
-    let diagnostics = analyzer
-      .analyze()
+    let diagnostics = workspace
+      .diagnostics(Some(&config))
+      .remove(&params.text_document.uri)
+      .unwrap_or_default()
       .into_iter()
       .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
       .collect::<Vec<_>>();
@@ -393,31 +408,27 @@ impl LanguageServer for Server {
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
 
-    let roots = {
+    {
       let mut workspace = self.workspace.write().await;
       let mut roots = workspace.affected_roots(&uri);
 
       let closed = workspace.documents.close(&params);
 
-      workspace.projects.remove(&uri);
-      roots.remove(&uri);
-
       if !closed {
         return;
+      }
+
+      if workspace.documents.get(&uri).is_none() {
+        workspace.projects.remove(&uri);
+        roots.remove(&uri);
       }
 
       if let Err(error) = workspace.load_projects(roots.iter().cloned()) {
         warn!(%error, "failed to rebuild affected projects");
       }
-
-      roots
-    };
-
-    self.client.publish_diagnostics(uri, vec![], None).await;
-
-    for root in roots {
-      self.publish_diagnostics(&root).await;
     }
+
+    self.publish_diagnostics().await;
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
@@ -931,16 +942,115 @@ mod tests {
     pretty_assertions::assert_eq,
     serde_json::json,
     tokio_stream::StreamExt,
+    tower_lsp::ClientSocket,
     tower_test::mock::Spawn,
   };
 
   #[derive(Debug)]
   struct Test {
-    messages: Vec<(jsonrpc::Request, Option<jsonrpc::Response>)>,
+    messages: Vec<TestMessage>,
     service: Spawn<LspService<Server>>,
+    socket: ClientSocket,
+    tempdir: tempfile::TempDir,
+  }
+
+  #[derive(Debug)]
+  struct TestMessage {
+    expected: Option<jsonrpc::Response>,
+    notifications: Option<Vec<jsonrpc::Request>>,
+    request: jsonrpc::Request,
   }
 
   impl Test {
+    fn change(self, uri: &lsp::Url, version: i32, text: &str) -> Self {
+      self.notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            uri.clone(),
+            version,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: text.into(),
+          }],
+        },
+      )
+    }
+
+    fn client_notification<N: notification::Notification>(
+      mut self,
+      params: N::Params,
+    ) -> Self {
+      self
+        .messages
+        .last_mut()
+        .unwrap()
+        .notifications
+        .get_or_insert_with(Vec::new)
+        .push(Self::message(N::METHOD, params).finish());
+
+      self
+    }
+
+    fn close(self, uri: &lsp::Url) -> Self {
+      self.notification::<notification::DidCloseTextDocument>(
+        lsp::DidCloseTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
+        },
+      )
+    }
+
+    fn code_actions(
+      self,
+      uri: &lsp::Url,
+      range: lsp::Range,
+      actions: Vec<lsp::CodeActionOrCommand>,
+    ) -> Self {
+      self.request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
+          range,
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(actions)),
+      )
+    }
+
+    fn diagnostics(
+      self,
+      uri: &lsp::Url,
+      version: Option<i32>,
+      diagnostics: Vec<lsp::Diagnostic>,
+    ) -> Self {
+      self.client_notification::<notification::PublishDiagnostics>(
+        lsp::PublishDiagnosticsParams {
+          uri: uri.clone(),
+          diagnostics,
+          version,
+        },
+      )
+    }
+
+    fn error(id: &str, message: &str, range: lsp::Range) -> lsp::Diagnostic {
+      Diagnostic {
+        id: id.into(),
+        ..Diagnostic::error(message, range)
+      }
+      .into()
+    }
+
+    fn file(self, path: &str, content: &str) -> Self {
+      let path = self.tempdir.path().join(path);
+
+      fs::create_dir_all(path.parent().unwrap()).unwrap();
+      fs::write(path, content).unwrap();
+
+      self
+    }
+
     fn initialize(self) -> Self {
       self.request::<request::Initialize>(
         lsp::InitializeParams::default(),
@@ -952,6 +1062,17 @@ mod tests {
           capabilities: Server::capabilities(),
         }),
       )
+    }
+
+    fn initialized(self) -> Self {
+      self
+        .notification::<notification::Initialized>(lsp::InitializedParams {})
+        .client_notification::<notification::LogMessage>(
+          lsp::LogMessageParams {
+            typ: lsp::MessageType::INFO,
+            message: format!("{} initialized", env!("CARGO_PKG_NAME")),
+          },
+        )
     }
 
     fn message(
@@ -970,11 +1091,13 @@ mod tests {
     }
 
     fn new() -> Self {
-      let (service, _) = LspService::new(Server::new);
+      let (service, socket) = LspService::new(Server::new);
 
       Self {
         messages: Vec::new(),
         service: Spawn::new(service),
+        socket,
+        tempdir: tempfile::tempdir().unwrap(),
       }
     }
 
@@ -982,9 +1105,11 @@ mod tests {
       mut self,
       params: N::Params,
     ) -> Self {
-      self
-        .messages
-        .push((Self::message(N::METHOD, params).finish(), None));
+      self.messages.push(TestMessage {
+        expected: None,
+        notifications: None,
+        request: Self::message(N::METHOD, params).finish(),
+      });
 
       self
     }
@@ -1009,25 +1134,61 @@ mod tests {
     ) -> Self {
       let id = i64::try_from(self.messages.len()).unwrap();
 
-      self.messages.push((
-        Self::message(R::METHOD, params).id(id).finish(),
-        Some(jsonrpc::Response::from_parts(
+      self.messages.push(TestMessage {
+        expected: Some(jsonrpc::Response::from_parts(
           id.into(),
           expected.map(|result| serde_json::to_value(result).unwrap()),
         )),
-      ));
+        notifications: None,
+        request: Self::message(R::METHOD, params).id(id).finish(),
+      });
 
       self
     }
 
     async fn run(mut self) -> Result {
-      for (request, expected) in self.messages {
+      for TestMessage {
+        expected,
+        notifications,
+        request,
+      } in self.messages
+      {
         let method = request.method().to_owned();
 
-        assert_eq!(self.service.call(request).await?, expected, "{method}");
+        let response = self.service.call(request);
+
+        tokio::pin!(response);
+
+        let mut actual = Vec::new();
+
+        let response = loop {
+          select! {
+            biased;
+            Some(notification) = self.socket.next() => actual.push(notification),
+            response = &mut response => break response,
+          }
+        };
+
+        loop {
+          select! {
+            biased;
+            Some(notification) = self.socket.next() => actual.push(notification),
+            () = async {} => break,
+          }
+        }
+
+        assert_eq!(response?, expected, "{method}");
+
+        if let Some(notifications) = notifications {
+          assert_eq!(actual, notifications, "{method}");
+        }
       }
 
       Ok(())
+    }
+
+    fn uri(&self, path: &str) -> lsp::Url {
+      lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
     }
   }
 
@@ -1244,6 +1405,53 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn code_action_shared_import_scope() -> Result {
+    let test = Test::new().file("foo.just", "_foo := bar\n");
+    let first = test.uri("bar.just");
+    let second = test.uri("baz.just");
+    let imported = test.uri("foo.just");
+    let range = lsp::Range::at(0, 8, 0, 11);
+    let diagnostic = Test::error(
+      "undefined-identifiers",
+      "Variable `bar` not found. Did you mean `baz`?",
+      range,
+    );
+
+    test
+      .initialize()
+      .initialized()
+      .open(first.as_str(), "import 'foo.just'\nbar := 'foo'\n")
+      .diagnostics(&first, Some(1), vec![])
+      .diagnostics(&imported, None, vec![])
+      .open(second.as_str(), "import 'foo.just'\nexport baz := 'foo'\n")
+      .diagnostics(&second, Some(1), vec![])
+      .diagnostics(&imported, None, vec![diagnostic.clone()])
+      .open(imported.as_str(), "_foo := bar\n")
+      .diagnostics(&imported, Some(1), vec![diagnostic])
+      .code_actions(
+        &imported,
+        range,
+        vec![lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+          title: "Replace `bar` with `baz`".into(),
+          kind: Some(lsp::CodeActionKind::QUICKFIX),
+          edit: Some(lsp::WorkspaceEdit {
+            changes: Some(HashMap::from([(
+              imported.clone(),
+              vec![lsp::TextEdit {
+                range,
+                new_text: "baz".into(),
+              }],
+            )])),
+            ..Default::default()
+          }),
+          ..Default::default()
+        })],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn code_action_with_recipes() -> Result {
     Test::new()
       .initialize()
@@ -1394,104 +1602,469 @@ mod tests {
 
   #[tokio::test]
   async fn dependency_open_republishes_root_diagnostics() -> Result {
-    let tempdir = tempfile::tempdir()?;
+    let test = Test::new().file("foo.just", "");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
 
-    let root =
-      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
-
-    let imported =
-      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
-
-    std::fs::write(imported.to_file_path().unwrap(), "")?;
-
-    let (service, mut socket) = LspService::new(Server::new);
-
-    let mut service = Spawn::new(service);
-
-    service
-      .call(
-        Test::message("initialize", lsp::InitializeParams::default())
-          .id(1)
-          .finish(),
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n\nbar: foo")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(
+        &root,
+        Some(1),
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `foo` not found",
+          lsp::Range::at(2, 5, 2, 8),
+        )],
       )
-      .await?;
+      .open(imported.as_str(), "foo:")
+      .diagnostics(&imported, Some(1), vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .run()
+      .await
+  }
 
-    let initialized = service
-      .call(Test::message("initialized", lsp::InitializedParams {}).finish());
+  #[tokio::test]
+  async fn diagnostics_clear_closed_projects() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
 
-    let (response, _) = tokio::join!(initialized, socket.next());
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, Some(1), vec![])
+      .close(&root)
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, None, vec![])
+      .run()
+      .await
+  }
 
-    response?;
+  #[tokio::test]
+  async fn diagnostics_clear_removed_imports() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
 
-    let open = service.call(
-      Test::message(
-        "textDocument/didOpen",
-        lsp::DidOpenTextDocumentParams {
-          text_document: lsp::TextDocumentItem::new(
-            root.clone(),
-            "just".into(),
-            1,
-            "import 'foo.just'\n\nbar: foo".into(),
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, Some(1), vec![])
+      .change(&root, 2, "")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(2), vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_closing_root_preserves_import_scope() -> Result {
+    let test = Test::new()
+      .file("foo.just", "foo: bar\n")
+      .file("justfile", "import 'foo.just'\nbar:\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .open(imported.as_str(), "foo: bar\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .close(&root)
+      .diagnostics(&root, None, vec![])
+      .change(&imported, 2, "foo: bar\n")
+      .diagnostics(&imported, Some(2), vec![])
+      .close(&imported)
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, None, vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_closing_root_removes_import() -> Result {
+    let test = Test::new()
+      .file("foo.just", "foo: bar\n")
+      .file("justfile", "");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .open(imported.as_str(), "foo: bar\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .close(&root)
+      .diagnostics(&root, None, vec![])
+      .diagnostics(
+        &imported,
+        Some(1),
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_closing_root_restores_disk_scope() -> Result {
+    let test = Test::new()
+      .file("foo.just", "foo: bar\n")
+      .file("justfile", "import 'foo.just'\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .open(imported.as_str(), "foo: bar\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .close(&root)
+      .diagnostics(
+        &imported,
+        Some(1),
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, None, vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_deduplicate_shared_import_quickfixes() -> Result {
+    let test = Test::new().file("foo.just", "set windows-shell := ['foo']\n");
+    let first = test.uri("bar.just");
+    let second = test.uri("baz.just");
+    let imported = test.uri("foo.just");
+    let range = lsp::Range::at(0, 4, 0, 17);
+    let diagnostic = lsp::Diagnostic {
+      severity: Some(lsp::DiagnosticSeverity::WARNING),
+      ..Test::error(
+        "deprecated-setting",
+        "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        range,
+      )
+    };
+    let actions = vec![lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+      title: "Replace `windows-shell` with `[windows] set shell`".into(),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      edit: Some(lsp::WorkspaceEdit {
+        changes: Some(HashMap::from([(
+          imported.clone(),
+          vec![lsp::TextEdit {
+            range: lsp::Range::at(0, 0, 1, 0),
+            new_text: "[windows]\nset shell := ['foo']\n".into(),
+          }],
+        )])),
+        ..Default::default()
+      }),
+      ..Default::default()
+    })];
+
+    test
+      .initialize()
+      .initialized()
+      .open(
+        first.as_str(),
+        "[windows]\nset shell := ['bar']\nimport 'foo.just'\n",
+      )
+      .diagnostics(&first, Some(1), vec![])
+      .diagnostics(&imported, None, vec![diagnostic.clone()])
+      .open(second.as_str(), "import 'foo.just'\n")
+      .diagnostics(&second, Some(1), vec![])
+      .open(imported.as_str(), "set windows-shell := ['foo']\n")
+      .diagnostics(&imported, Some(1), vec![diagnostic])
+      .code_actions(&imported, range, actions.clone())
+      .change(&first, 2, "import 'foo.just'\n")
+      .diagnostics(&first, Some(2), vec![])
+      .code_actions(&imported, range, actions)
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_follow_import_conditions() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, Some(1), vec![])
+      .change(&root, 2, &format!("[{disabled}]\nimport 'foo.just'\n"))
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(2), vec![])
+      .change(&root, 3, "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, Some(3), vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_handle_import_cycles() -> Result {
+    let test = Test::new()
+      .file("foo.just", "import 'bar.just'\nfoo: bar\n")
+      .file("bar.just", "import 'foo.just'\nbar:\n");
+    let first = test.uri("foo.just");
+    let second = test.uri("bar.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(first.as_str(), "import 'bar.just'\nfoo: bar\n")
+      .diagnostics(&second, None, vec![])
+      .diagnostics(&first, Some(1), vec![])
+      .open(second.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&second, Some(1), vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_include_unopened_nested_imports() -> Result {
+    let test = Test::new()
+      .file("foo.just", "import 'bar.just'\n")
+      .file("bar.just", "foo bar bar:\n  echo {{bar}}\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+    let nested = test.uri("bar.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n")
+      .diagnostics(
+        &nested,
+        None,
+        vec![Test::error(
+          "duplicate-recipe-parameters",
+          "Duplicate parameter `bar`",
+          lsp::Range::at(0, 8, 0, 11),
+        )],
+      )
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_keep_closed_imports() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .diagnostics(&root, Some(1), vec![])
+      .open(imported.as_str(), "foo:\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .close(&imported)
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_keep_shared_imports() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let first = test.uri("bar.just");
+    let second = test.uri("baz.just");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(first.as_str(), "import 'foo.just'\n")
+      .diagnostics(&first, Some(1), vec![])
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .open(second.as_str(), "import 'foo.just'\n")
+      .diagnostics(&second, Some(1), vec![])
+      .close(&first)
+      .diagnostics(&first, None, vec![])
+      .close(&second)
+      .diagnostics(&second, None, vec![])
+      .diagnostics(&imported, None, vec![])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_open_import_uses_root_scope() -> Result {
+    let test = Test::new().file("foo.just", "_foo() := bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
+
+    test
+      .initialize()
+      .initialized()
+      .open(
+        root.as_str(),
+        "set unstable\nbar := 'foo'\nimport 'foo.just'\n",
+      )
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .open(imported.as_str(), "_foo() := bar\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(imported.clone()),
+            lsp::Position::new(0, 10),
           ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
         },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "bar := 'foo'".into(),
+          }),
+          range: Some(lsp::Range::at(0, 10, 0, 13)),
+        })),
       )
-      .finish(),
-    );
+      .run()
+      .await
+  }
 
-    let (response, diagnostics) = tokio::join!(open, socket.next());
+  #[tokio::test]
+  async fn diagnostics_refresh_imports_when_root_changes() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
 
-    response?;
-
-    let diagnostics = diagnostics.unwrap();
-
-    assert_eq!(diagnostics.method(), "textDocument/publishDiagnostics");
-
-    let diagnostics = serde_json::from_value::<lsp::PublishDiagnosticsParams>(
-      diagnostics.params().unwrap().clone(),
-    )?;
-
-    assert_eq!(diagnostics.uri, root);
-    assert!(!diagnostics.diagnostics.is_empty());
-
-    let open = service.call(
-      Test::message(
-        "textDocument/didOpen",
-        lsp::DidOpenTextDocumentParams {
-          text_document: lsp::TextDocumentItem::new(
-            imported.clone(),
-            "just".into(),
-            1,
-            "foo:".into(),
-          ),
-        },
+    test
+      .initialize()
+      .initialized()
+      .open(root.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&imported, None, vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .change(&root, 2, "import 'foo.just'\n")
+      .diagnostics(
+        &imported,
+        None,
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
       )
-      .finish(),
-    );
+      .diagnostics(&root, Some(2), vec![])
+      .run()
+      .await
+  }
 
-    let diagnostics =
-      async { [socket.next().await.unwrap(), socket.next().await.unwrap()] };
+  #[tokio::test]
+  async fn diagnostics_root_open_replaces_import_scope() -> Result {
+    let test = Test::new().file("foo.just", "foo: bar\n");
+    let root = test.uri("justfile");
+    let imported = test.uri("foo.just");
 
-    let (response, diagnostics) = tokio::join!(open, diagnostics);
-
-    response?;
-
-    let diagnostics = diagnostics
-      .into_iter()
-      .map(|diagnostics| {
-        serde_json::from_value::<lsp::PublishDiagnosticsParams>(
-          diagnostics.params().unwrap().clone(),
-        )
-      })
-      .collect::<serde_json::Result<Vec<_>>>()?;
-
-    let diagnostics = diagnostics
-      .iter()
-      .find(|diagnostics| diagnostics.uri == root)
-      .unwrap();
-
-    assert!(diagnostics.diagnostics.is_empty());
-
-    Ok(())
+    test
+      .initialize()
+      .initialized()
+      .open(imported.as_str(), "foo: bar\n")
+      .diagnostics(
+        &imported,
+        Some(1),
+        vec![Test::error(
+          "missing-dependencies",
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )],
+      )
+      .open(root.as_str(), "import 'foo.just'\nbar:\n")
+      .diagnostics(&imported, Some(1), vec![])
+      .diagnostics(&root, Some(1), vec![])
+      .run()
+      .await
   }
 
   #[tokio::test]

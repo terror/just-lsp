@@ -13,7 +13,7 @@ use {
   server::Server,
   std::{
     backtrace::BacktraceStatus,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
@@ -33,7 +33,7 @@ use {
     io::{AsyncBufReadExt, BufReader},
     process::Command as AsyncCommand,
     select,
-    sync::RwLock,
+    sync::{Mutex, RwLock},
   },
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
   tracing::{Level, info, warn},
