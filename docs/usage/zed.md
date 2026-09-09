@@ -21,7 +21,7 @@ under `lsp.just-lsp` in your Zed `settings.json`:
         },
         "rules": {
           "unused-variables": "off",
-          "unused-parameters": { "level": "warning" }
+          "unused-recipe-parameters": { "level": "warning" }
         }
       }
     }

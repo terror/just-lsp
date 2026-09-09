@@ -4897,23 +4897,20 @@ mod tests {
 
   #[test]
   fn rule_config_off_suppresses_diagnostic() {
-    let config = serde_json::from_value::<Config>(serde_json::json!({
-      "rules": {
-        "unused-variables": "off"
-      }
-    }))
-    .unwrap();
+    #[track_caller]
+    fn case(rule: &str, source: &str) {
+      let config = serde_json::from_value::<Config>(serde_json::json!({
+        "rules": {
+          rule: "off"
+        }
+      }))
+      .unwrap();
 
-    Test::new(indoc! {
-      "
-      foo := \"unused value\"
+      Test::new(source).config(config).run();
+    }
 
-      recipe:
-        echo foo
-      "
-    })
-    .config(config)
-    .run();
+    case("unused-recipe-parameters", "foo bar:\n");
+    case("unused-variables", "foo := 'bar'\n");
   }
 
   #[test]
