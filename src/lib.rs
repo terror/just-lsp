@@ -10,7 +10,7 @@ use {
   serde::{Deserialize, Serialize},
   std::{
     cmp::Reverse,
-    collections::{BTreeMap, HashMap, HashSet, hash_map::Entry},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, hash_map::Entry},
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,

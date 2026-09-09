@@ -17,60 +17,109 @@ impl Workspace {
       .collect()
   }
 
-  #[must_use]
-  pub fn diagnostics(
+  fn analyze_document(
     &self,
+    document: &Document,
     config: Option<&Config>,
-  ) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
-    let mut diagnostics = BTreeMap::<_, Vec<Diagnostic>>::new();
-
-    for project in self.root_projects() {
-      for document in project.import_scope.documents() {
-        let Some(document) = self.documents.get(&document.uri) else {
-          continue;
-        };
-
-        let analyzer = Analyzer {
+    projects: &[&Project],
+  ) -> Vec<Diagnostic> {
+    let analyses = projects
+      .iter()
+      .filter(|project| project.import_scope.contains(&document.uri))
+      .map(|project| {
+        Analyzer {
           config,
           view: ProjectView::new(
             document,
             &project.import_scope,
             &self.documents,
           ),
-        };
-
-        let diagnostics = diagnostics.entry(document.uri.clone()).or_default();
-
-        for diagnostic in analyzer.analyze() {
-          if let Some(previous) = diagnostics.iter_mut().find(|previous| {
-            previous.id == diagnostic.id
-              && previous.message == diagnostic.message
-              && previous.range == diagnostic.range
-              && previous.severity == diagnostic.severity
-          }) {
-            for quickfix in diagnostic.quickfixes {
-              if !previous.quickfixes.contains(&quickfix) {
-                previous.quickfixes.push(quickfix);
-              }
-            }
-          } else {
-            diagnostics.push(diagnostic);
-          }
         }
-      }
-    }
+        .analyze()
+      })
+      .collect::<Vec<_>>();
 
-    for diagnostics in diagnostics.values_mut() {
-      diagnostics.sort_by(|left, right| {
-        left
-          .range
-          .start
-          .cmp(&right.range.start)
-          .then_with(|| left.message.cmp(&right.message))
+    let mut quickfixes = analyses
+      .first()
+      .into_iter()
+      .flatten()
+      .flat_map(|diagnostic| diagnostic.quickfixes.iter().cloned())
+      .collect::<Vec<_>>();
+
+    for diagnostics in analyses.iter().skip(1) {
+      quickfixes.retain(|quickfix| {
+        diagnostics
+          .iter()
+          .any(|diagnostic| diagnostic.quickfixes.contains(quickfix))
       });
     }
 
+    let mut diagnostics = Vec::<Diagnostic>::new();
+
+    for mut diagnostic in analyses.into_iter().flatten() {
+      diagnostic
+        .quickfixes
+        .retain(|quickfix| quickfixes.contains(quickfix));
+
+      if let Some(previous) = diagnostics.iter_mut().find(|previous| {
+        previous.id == diagnostic.id
+          && previous.message == diagnostic.message
+          && previous.range == diagnostic.range
+          && previous.severity == diagnostic.severity
+      }) {
+        for quickfix in diagnostic.quickfixes {
+          if !previous.quickfixes.contains(&quickfix) {
+            previous.quickfixes.push(quickfix);
+          }
+        }
+      } else {
+        diagnostics.push(diagnostic);
+      }
+    }
+
+    diagnostics.sort_by(|left, right| {
+      left
+        .range
+        .start
+        .cmp(&right.range.start)
+        .then_with(|| left.message.cmp(&right.message))
+    });
+
     diagnostics
+  }
+
+  #[must_use]
+  pub fn diagnostics(
+    &self,
+    config: Option<&Config>,
+  ) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
+    let projects = self.root_projects();
+
+    projects
+      .iter()
+      .flat_map(|project| project.import_scope.documents())
+      .map(|document| &document.uri)
+      .collect::<BTreeSet<_>>()
+      .into_iter()
+      .filter_map(|uri| self.documents.get(uri))
+      .map(|document| {
+        (
+          document.uri.clone(),
+          self.analyze_document(document, config, &projects),
+        )
+      })
+      .collect()
+  }
+
+  #[must_use]
+  pub fn document_diagnostics(
+    &self,
+    uri: &lsp::Url,
+    config: Option<&Config>,
+  ) -> Vec<Diagnostic> {
+    self.documents.get(uri).map_or_else(Vec::new, |document| {
+      self.analyze_document(document, config, &self.root_projects())
+    })
   }
 
   /// # Errors

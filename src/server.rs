@@ -254,9 +254,7 @@ impl LanguageServer for Server {
     }
 
     let diagnostics = workspace
-      .diagnostics(Some(&config))
-      .remove(&params.text_document.uri)
-      .unwrap_or_default()
+      .document_diagnostics(&params.text_document.uri, Some(&config))
       .into_iter()
       .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
       .collect::<Vec<_>>();
@@ -957,7 +955,7 @@ mod tests {
   #[derive(Debug)]
   struct TestMessage {
     expected: Option<jsonrpc::Response>,
-    notifications: Option<Vec<jsonrpc::Request>>,
+    notifications: Vec<jsonrpc::Request>,
     request: jsonrpc::Request,
   }
 
@@ -987,7 +985,6 @@ mod tests {
         .last_mut()
         .unwrap()
         .notifications
-        .get_or_insert_with(Vec::new)
         .push(Self::message(N::METHOD, params).finish());
 
       self
@@ -1107,7 +1104,7 @@ mod tests {
     ) -> Self {
       self.messages.push(TestMessage {
         expected: None,
-        notifications: None,
+        notifications: Vec::new(),
         request: Self::message(N::METHOD, params).finish(),
       });
 
@@ -1139,7 +1136,7 @@ mod tests {
           id.into(),
           expected.map(|result| serde_json::to_value(result).unwrap()),
         )),
-        notifications: None,
+        notifications: Vec::new(),
         request: Self::message(R::METHOD, params).id(id).finish(),
       });
 
@@ -1179,9 +1176,7 @@ mod tests {
 
         assert_eq!(response?, expected, "{method}");
 
-        if let Some(notifications) = notifications {
-          assert_eq!(actual, notifications, "{method}");
-        }
+        assert_eq!(actual, notifications, "{method}");
       }
 
       Ok(())
@@ -1405,7 +1400,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn code_action_shared_import_scope() -> Result {
+  async fn code_action_shared_import_requires_matching_quickfixes() -> Result {
     let test = Test::new().file("foo.just", "_foo := bar\n");
     let first = test.uri("bar.just");
     let second = test.uri("baz.just");
@@ -1428,25 +1423,7 @@ mod tests {
       .diagnostics(&imported, None, vec![diagnostic.clone()])
       .open(imported.as_str(), "_foo := bar\n")
       .diagnostics(&imported, Some(1), vec![diagnostic])
-      .code_actions(
-        &imported,
-        range,
-        vec![lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-          title: "Replace `bar` with `baz`".into(),
-          kind: Some(lsp::CodeActionKind::QUICKFIX),
-          edit: Some(lsp::WorkspaceEdit {
-            changes: Some(HashMap::from([(
-              imported.clone(),
-              vec![lsp::TextEdit {
-                range,
-                new_text: "baz".into(),
-              }],
-            )])),
-            ..Default::default()
-          }),
-          ..Default::default()
-        })],
-      )
+      .code_actions(&imported, range, vec![])
       .run()
       .await
   }
@@ -1814,7 +1791,7 @@ mod tests {
       .diagnostics(&second, Some(1), vec![])
       .open(imported.as_str(), "set windows-shell := ['foo']\n")
       .diagnostics(&imported, Some(1), vec![diagnostic])
-      .code_actions(&imported, range, actions.clone())
+      .code_actions(&imported, range, vec![])
       .change(&first, 2, "import 'foo.just'\n")
       .diagnostics(&first, Some(2), vec![])
       .code_actions(&imported, range, actions)
