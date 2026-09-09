@@ -1,7 +1,6 @@
 ---
-title: Duplicate attribute
 severity: error
-order: 140
+order: 10
 ---
 
 Reports repeated attributes that must be unique, repeated group values, or more than one default recipe for overlapping platforms.

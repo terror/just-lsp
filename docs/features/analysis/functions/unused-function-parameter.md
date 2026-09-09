@@ -1,7 +1,6 @@
 ---
-title: Unused function parameter
 severity: warning
-order: 370
+order: 10
 ---
 
 Reports a user-defined function parameter that is never referenced in the function body.

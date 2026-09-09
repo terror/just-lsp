@@ -1,7 +1,6 @@
 ---
-title: Alias and recipe conflict
 severity: error
-order: 60
+order: 10
 ---
 
 Reports an alias and a recipe that share the same name.

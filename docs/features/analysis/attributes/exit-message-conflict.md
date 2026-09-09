@@ -1,7 +1,6 @@
 ---
-title: Exit message conflict
 severity: error
-order: 210
+order: 10
 ---
 
 Reports a recipe that combines `[exit-message]` with `[no-exit-message]`.

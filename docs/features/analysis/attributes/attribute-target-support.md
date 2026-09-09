@@ -1,7 +1,6 @@
 ---
-title: Unsupported attribute target
 severity: error
-order: 130
+order: 10
 ---
 
 Reports a known attribute attached to a declaration kind that the attribute does not support.

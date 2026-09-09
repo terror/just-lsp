@@ -1,7 +1,6 @@
 ---
-title: Continue signals
 severity: error
-order: 160
+order: 10
 ---
 
 Reports an unsupported signal name passed to `[continue]`.

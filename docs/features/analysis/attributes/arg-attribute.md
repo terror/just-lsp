@@ -1,7 +1,6 @@
 ---
-title: Arg attribute
 severity: error
-order: 150
+order: 10
 ---
 
 Validates the parameter name and keyword arguments in `[arg(NAME, ...)]`.

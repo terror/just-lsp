@@ -1,7 +1,6 @@
 ---
-title: Cache attribute
 severity: error
-order: 170
+order: 10
 ---
 
 Reports invalid arguments to `[cache]`.

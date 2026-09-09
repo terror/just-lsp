@@ -1,4 +1,4 @@
 ---
 title: Attributes
-order: 30
+order: 10
 ---

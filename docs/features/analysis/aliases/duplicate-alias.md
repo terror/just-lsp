@@ -1,7 +1,6 @@
 ---
-title: Duplicate alias
 severity: error
-order: 70
+order: 10
 ---
 
 Reports multiple aliases with the same name when their platform constraints overlap.

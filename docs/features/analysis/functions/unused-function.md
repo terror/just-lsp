@@ -1,7 +1,6 @@
 ---
-title: Unused function
 severity: warning
-order: 360
+order: 10
 ---
 
 Reports a user-defined function that is never called in the document or its imports.

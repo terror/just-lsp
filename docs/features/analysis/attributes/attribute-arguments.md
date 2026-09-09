@@ -1,7 +1,6 @@
 ---
-title: Attribute arguments
 severity: error
-order: 100
+order: 10
 ---
 
 Reports an attribute invocation with too few or too many positional arguments.

@@ -1,7 +1,6 @@
 ---
-title: Duplicate function
 severity: error
-order: 340
+order: 10
 ---
 
 Reports user-defined functions that share a name and have overlapping platform constraints.

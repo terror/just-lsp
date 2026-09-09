@@ -1,7 +1,6 @@
 ---
-title: Attribute argument expressions
 severity: error
-order: 110
+order: 10
 ---
 
 Reports an expression where an attribute requires a string literal or a constant expression.
