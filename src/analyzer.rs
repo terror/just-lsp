@@ -3558,6 +3558,23 @@ mod tests {
   }
 
   #[test]
+  fn parameters_do_not_leak_into_assignments() {
+    #[track_caller]
+    fn case(definition: &str) {
+      Test::new(&format!(
+        "set unstable\n{definition}bar := foobar + foobaz\n"
+      ))
+      .warning("Variable `bar` appears unused", lsp::Range::at(3, 0, 3, 3))
+      .error("Variable `foobar` not found", lsp::Range::at(3, 7, 3, 13))
+      .error("Variable `foobaz` not found", lsp::Range::at(3, 16, 3, 22))
+      .run();
+    }
+
+    case("_foo foobar:\n  echo {{foobar}}\n");
+    case("_foo(foobar) := foobar\n\n");
+  }
+
+  #[test]
   fn parenthesized_expression_default_uses_global_variable() {
     Test::new(indoc! {
       "
