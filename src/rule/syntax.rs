@@ -9,9 +9,9 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let document = context.document();
       let mut cursor = context.tree().root_node().walk();
-      SyntaxRule::collect(document, &mut cursor, &mut diagnostics);
+
+      SyntaxRule::collect(context.document(), &mut cursor, &mut diagnostics);
 
       diagnostics
     }
