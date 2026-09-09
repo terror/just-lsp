@@ -26,6 +26,39 @@ baz: foo \
               (identifier))))))))
 
 ================================================================================
+multiline recipe interpolations after text
+================================================================================
+
+foo:
+  bar {{'
+baz
+'}} qux {{'
+quux
+'}}
+  corge
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (string))))
+        (text)
+        (interpolation
+          (expression
+            (value
+              (string)))))
+      (recipe_line
+        (text)))))
+
+================================================================================
 smooshed recipes
 ================================================================================
 

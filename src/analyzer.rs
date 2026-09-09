@@ -3719,6 +3719,23 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_multiline_recipe_interpolations() {
+    #[track_caller]
+    fn case(expression: &str) {
+      for prefix in ["bar ", "{{'bar'}}", "{{{{ "] {
+        Test::new(&format!(
+          "foo:\n  {prefix}{{{{{expression}}}}} qux\n  quux\n"
+        ))
+        .run();
+      }
+    }
+
+    case("'\nbaz\n'");
+    case("\"\nbaz\n\"");
+    case("`\nbaz\n`");
+  }
+
+  #[test]
   fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
     Test::new(indoc! {
       r#"
