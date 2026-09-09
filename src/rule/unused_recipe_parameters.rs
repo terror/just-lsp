@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Highlights recipe parameters that never get read anywhere in the recipe
   /// body (unless `set export` is on).
-  UnusedParameterRule {
-    id: "unused-parameters",
+  UnusedRecipeParameterRule {
+    id: "unused-recipe-parameters",
     message: "unused parameter",
     run(context) {
       let default_script = context.setting_enabled("default-script");
@@ -30,9 +30,9 @@ define_rule! {
 
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
             (
-              UnusedParameterRule::positional_argument_indices(recipe),
+              UnusedRecipeParameterRule::positional_argument_indices(recipe),
               recipe.runs_as_script(default_script)
-                || UnusedParameterRule::uses_all_positional_arguments(recipe),
+                || UnusedRecipeParameterRule::uses_all_positional_arguments(recipe),
             )
           } else {
             (HashSet::new(), false)
@@ -59,7 +59,7 @@ define_rule! {
   }
 }
 
-impl UnusedParameterRule {
+impl UnusedRecipeParameterRule {
   fn is_unescaped_dollar(bytes: &[u8], i: usize) -> bool {
     bytes[i] == b'$' && (i == 0 || bytes[i - 1] != b'\\')
   }
@@ -140,23 +140,32 @@ mod tests {
 
   #[test]
   fn parse_positional_rejects_incomplete_braced() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"{56", true), None);
+    assert_eq!(
+      UnusedRecipeParameterRule::parse_positional(b"{56", true),
+      None
+    );
   }
 
   #[test]
   fn parse_positional_rejects_missing_digits() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"rest", false), None);
+    assert_eq!(
+      UnusedRecipeParameterRule::parse_positional(b"rest", false),
+      None
+    );
   }
 
   #[test]
   fn parse_positional_rejects_zero() {
-    assert_eq!(UnusedParameterRule::parse_positional(b"0", false), None);
+    assert_eq!(
+      UnusedRecipeParameterRule::parse_positional(b"0", false),
+      None
+    );
   }
 
   #[test]
   fn parse_positional_with_braces_extracts_number() {
     assert_eq!(
-      UnusedParameterRule::parse_positional(b"{34}", true),
+      UnusedRecipeParameterRule::parse_positional(b"{34}", true),
       Some(34)
     );
   }
@@ -164,7 +173,7 @@ mod tests {
   #[test]
   fn parse_positional_without_braces_extracts_number() {
     assert_eq!(
-      UnusedParameterRule::parse_positional(b"12", false),
+      UnusedRecipeParameterRule::parse_positional(b"12", false),
       Some(12)
     );
   }
@@ -172,7 +181,7 @@ mod tests {
   #[test]
   fn positional_argument_indices_detects_braced_arguments() {
     assert_eq!(
-      UnusedParameterRule::positional_argument_indices(&recipe(
+      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
         "graph log:\n  ./bin/graph ${3} ${4}"
       )),
       HashSet::from([3, 4])
@@ -182,7 +191,7 @@ mod tests {
   #[test]
   fn positional_argument_indices_detects_unbraced_arguments() {
     assert_eq!(
-      UnusedParameterRule::positional_argument_indices(&recipe(
+      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
         "graph log:\n  ./bin/graph $1 $2 text"
       )),
       HashSet::from([1, 2])
@@ -192,7 +201,7 @@ mod tests {
   #[test]
   fn positional_argument_indices_ignores_invalid_variants() {
     assert_eq!(
-      UnusedParameterRule::positional_argument_indices(&recipe(
+      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
         "graph log:\n  echo $0 $foo ${bar} ${5} \\$6 ${7"
       )),
       HashSet::from([5])
@@ -201,42 +210,42 @@ mod tests {
 
   #[test]
   fn uses_all_positional_arguments_detects_braced_at() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo \"${@}\""
-    )));
+    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo \"${@}\"")
+    ));
   }
 
   #[test]
   fn uses_all_positional_arguments_detects_braced_star() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo ${*}"
-    )));
+    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo ${*}")
+    ));
   }
 
   #[test]
   fn uses_all_positional_arguments_detects_dollar_at() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo \"$@\""
-    )));
+    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo \"$@\"")
+    ));
   }
 
   #[test]
   fn uses_all_positional_arguments_detects_dollar_star() {
-    assert!(UnusedParameterRule::uses_all_positional_arguments(&recipe(
-      "run *args:\n  echo $*"
-    )));
+    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
+      &recipe("run *args:\n  echo $*")
+    ));
   }
 
   #[test]
   fn uses_all_positional_arguments_ignores_escaped() {
-    assert!(!UnusedParameterRule::uses_all_positional_arguments(
+    assert!(!UnusedRecipeParameterRule::uses_all_positional_arguments(
       &recipe("run *args:\n  echo \\$@")
     ));
   }
 
   #[test]
   fn uses_all_positional_arguments_returns_false_when_absent() {
-    assert!(!UnusedParameterRule::uses_all_positional_arguments(
+    assert!(!UnusedRecipeParameterRule::uses_all_positional_arguments(
       &recipe("run *args:\n  echo $1 $2")
     ));
   }

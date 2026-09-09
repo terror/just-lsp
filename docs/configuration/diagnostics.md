@@ -11,7 +11,7 @@ string or an object with a `level` field:
 {
   "rules": {
     "unused-variables": "off",
-    "unused-parameters": { "level": "error" }
+    "unused-recipe-parameters": { "level": "error" }
   }
 }
 ```

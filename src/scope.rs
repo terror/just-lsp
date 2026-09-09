@@ -56,7 +56,7 @@ impl<'a> Scope<'a> {
   ///
   /// Recipe identifier usage is recorded unconditionally before resolution, so
   /// parameter self-references like `foo foo` still count as usage for the
-  /// `unused-parameters` rule. Unresolved identifiers are only recorded from
+  /// `unused-recipe-parameters` rule. Unresolved identifiers are only recorded from
   /// the analyzed document: usage in imported documents still counts, since
   /// `just` imports are textual inclusions, but a range from an imported
   /// document would not be valid in the analyzed document.
