@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Validates recipe parameter lists for duplicate names, ordering mistakes,
   /// and illegal variadic/default combinations.
-  RecipeParameterRule {
-    id: "recipe-parameters",
+  DuplicateRecipeParameterRule {
+    id: "duplicate-recipe-parameters",
     message: "invalid recipe parameters",
     run(context) {
       let mut diagnostics = Vec::new();
