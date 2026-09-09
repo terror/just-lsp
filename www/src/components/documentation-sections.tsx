@@ -29,7 +29,7 @@ const DocumentationLink = ({
 
   return section.children.length ? (
     <details open>
-      <summary className='focus-visible:outline-ring flex cursor-pointer list-none items-center gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 [&::-webkit-details-marker]:hidden [[open]>&>svg]:rotate-90'>
+      <summary className='focus-visible:outline-ring flex cursor-pointer list-none items-center gap-1 rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-4 [&::-webkit-details-marker]:hidden [[open]>&>svg]:rotate-90'>
         <ChevronRight aria-hidden='true' className='size-4 shrink-0' />
         {link}
       </summary>
@@ -45,14 +45,7 @@ const DocumentationLinks = ({
 }: {
   sections: DocumentationSection[];
 }) => (
-  <ul
-    className={cn(
-      'mt-3 border-l pl-3',
-      sections.some((section) => section.children.length)
-        ? 'space-y-4'
-        : 'space-y-1'
-    )}
-  >
+  <ul className='mt-3 space-y-1 border-l pl-3'>
     {sections.map((section) => (
       <li key={section.id}>
         <DocumentationLink section={section} />
