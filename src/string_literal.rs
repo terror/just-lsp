@@ -122,6 +122,43 @@ impl StringLiteral {
     }))
   }
 
+  pub(crate) fn resolve_path(
+    source: &str,
+    base_uri: &lsp::Url,
+  ) -> Result<Option<PathBuf>> {
+    let Some(Self {
+      cooked,
+      shell_expanded,
+    }) = Self::parse(source)?
+    else {
+      return Ok(None);
+    };
+
+    let raw = if shell_expanded {
+      shellexpand::full_with_context(
+        &cooked,
+        || env::home_dir()?.into_os_string().into_string().ok(),
+        |name| env::var(name).map(Some),
+      )?
+      .into_owned()
+    } else {
+      cooked
+    };
+
+    if raw.is_empty() {
+      return Err(Error::EmptyImportPath);
+    }
+
+    Ok(if let Some(rest) = raw.strip_prefix("~/") {
+      env::home_dir().map(|home| home.join(rest))
+    } else {
+      base_uri
+        .file_path()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.join(raw)))
+    })
+  }
+
   fn unindent(source: &str) -> String {
     fn blank(line: &str) -> bool {
       line.trim_matches([' ', '\t', '\r', '\n']).is_empty()

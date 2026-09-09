@@ -53,16 +53,8 @@ impl Module {
     let base_dir = base_uri.file_path().ok()?.parent()?.to_path_buf();
 
     if let Some(path_node) = &self.path {
-      let raw = path_node.value.trim_matches(|c| c == '\'' || c == '"');
-
-      if raw.is_empty() {
-        return None;
-      }
-
-      let path = match raw.strip_prefix("~/") {
-        Some(rest) => env::home_dir()?.join(rest),
-        None => base_dir.join(raw),
-      };
+      let path =
+        StringLiteral::resolve_path(&path_node.value, base_uri).ok()??;
 
       return if path.is_dir() {
         Self::find_file(&path, &Self::DIRECTORY_CANDIDATES)
@@ -105,19 +97,26 @@ mod tests {
 
   #[test]
   fn empty_explicit_path_returns_none() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(module("foo", Some("''")).resolve(&base), None);
-    assert_eq!(module("foo", Some("\"\"")).resolve(&base), None);
+      assert_eq!(module("foo", Some(source)).resolve(&base), None);
+    }
+
+    case("''");
+    case("\"\"");
+    case("x''");
+    case("'''  '''");
   }
 
   #[test]
   fn explicit_directory() {
     #[track_caller]
-    fn case(file: &str) {
+    fn case(source: &str, file: &str) {
       let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
       fs::create_dir(directory.path().join("foo")).unwrap();
@@ -127,47 +126,84 @@ mod tests {
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
       assert_eq!(
-        module("foo", Some("'foo'")).resolve(&base).unwrap(),
+        module("foo", Some(source)).resolve(&base).unwrap(),
         directory.path().join("foo").join(file),
       );
     }
 
-    case("mod.just");
-    case("JUSTFILE");
-    case(".JUSTFILE");
+    case("'foo'", "mod.just");
+    case("'foo'", "JUSTFILE");
+    case("'foo'", ".JUSTFILE");
+    case("x'foo'", "mod.just");
+    case(r#""\u{66}oo""#, "mod.just");
   }
 
   #[test]
   fn explicit_path() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str, expected: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    let expected = directory.path().join("bar.just");
+      assert_eq!(
+        module("foo", Some(source)).resolve(&base),
+        Some(directory.path().join(expected)),
+      );
+    }
 
-    assert_eq!(
-      module("foo", Some("'bar.just'")).resolve(&base).unwrap(),
-      expected,
-    );
-
-    assert_eq!(
-      module("foo", Some("\"bar.just\"")).resolve(&base).unwrap(),
-      expected,
-    );
+    case("'foo.just'", "foo.just");
+    case("\"foo.just\"", "foo.just");
+    case("x'foo.just'", "foo.just");
+    case("x\"foo.just\"", "foo.just");
+    case("x'''foo.just'''", "foo.just");
+    case("x\"\"\"foo.just\"\"\"", "foo.just");
+    case("'''  foo.just'''", "foo.just");
+    case(r#""\u{66}oo.just""#, "foo.just");
+    case(r"'foo\nbar.just'", r"foo\nbar.just");
+    case(r#""foo\nbar.just""#, "foo\nbar.just");
+    case(r#""'foo.just'""#, "'foo.just'");
+    case(r#"'"foo.just"'"#, "\"foo.just\"");
+    case(r#""foo\".just""#, "foo\".just");
+    case("x'$$foo.just'", "$foo.just");
   }
 
   #[test]
   fn explicit_path_home_directory() {
-    let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+    #[track_caller]
+    fn case(source: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
 
-    let base =
-      lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(
-      module("foo", Some("'~/bar.just'")).resolve(&base).unwrap(),
-      env::home_dir().unwrap().join("bar.just"),
-    );
+      assert_eq!(
+        module("foo", Some(source)).resolve(&base).unwrap(),
+        env::home_dir().unwrap().join("bar.just"),
+      );
+    }
+
+    case("'~/bar.just'");
+    case("x'~/bar.just'");
+  }
+
+  #[test]
+  fn explicit_path_invalid_literal_returns_none() {
+    #[track_caller]
+    fn case(source: &str) {
+      let directory = Builder::new().prefix("just-lsp").tempdir().unwrap();
+
+      let base =
+        lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
+
+      assert_eq!(module("foo", Some(source)).resolve(&base), None);
+    }
+
+    case("");
+    case("'foo");
+    case("f'foo'");
+    case(r#""\q""#);
   }
 
   #[test]

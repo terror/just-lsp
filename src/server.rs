@@ -1824,7 +1824,7 @@ mod tests {
 
     Test::new()
       .initialize()
-      .open(justfile_uri, "mod bar 'baz.just'\n")
+      .open(justfile_uri, "mod bar x'baz.just'\n")
       .request::<request::DocumentLinkRequest>(
         lsp::DocumentLinkParams {
           text_document: lsp::TextDocumentIdentifier::new(
@@ -1834,7 +1834,7 @@ mod tests {
           partial_result_params: lsp::PartialResultParams::default(),
         },
         Ok(Some(vec![lsp::DocumentLink {
-          range: lsp::Range::at(0, 8, 0, 18),
+          range: lsp::Range::at(0, 8, 0, 19),
           target: Some(target_uri.parse().unwrap()),
           tooltip: Some(tooltip.into()),
           data: None,
