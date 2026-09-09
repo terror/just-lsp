@@ -273,7 +273,7 @@ impl Document {
         let name_node = module_node.child_by_field_name("name")?;
 
         let path = module_node
-          .find("string")
+          .find("^string")
           .map(|path_node| TextNode::from_node(&path_node, self));
 
         Some(Module {
@@ -1754,6 +1754,24 @@ mod tests {
         },
       ],
     );
+  }
+
+  #[test]
+  fn module_path_ignores_attribute_strings() {
+    #[track_caller]
+    fn case(source: &str, expected: Option<&TextNode>) {
+      assert_eq!(Document::from(source).modules()[0].path.as_ref(), expected);
+    }
+
+    case(
+      "[doc: 'foo']\nmod bar 'baz.just'",
+      Some(&TextNode {
+        value: "'baz.just'".into(),
+        range: lsp::Range::at(1, 8, 1, 18),
+      }),
+    );
+
+    case("[doc: 'foo']\nmod bar", None);
   }
 
   #[test]
