@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recipe {
   pub attributes: Vec<Attribute>,
+  pub body: Vec<TextNode>,
   pub content: String,
   pub dependencies: Vec<Dependency>,
   pub name: TextNode,
@@ -12,6 +13,10 @@ pub struct Recipe {
 }
 
 impl Recipe {
+  pub(crate) fn body_lines(&self) -> impl Iterator<Item = RecipeLine<'_>> {
+    self.body.iter().filter_map(RecipeLine::parse)
+  }
+
   #[must_use]
   pub fn find_attribute(&self, name: &str) -> Option<&Attribute> {
     self
@@ -46,6 +51,234 @@ impl Recipe {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn body_lines_comments() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        # bar
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  "), (2, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_continuation() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        {{'bar'}}\\
+      \t{{'baz'}}
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent, line.continues))
+        .collect::<Vec<_>>(),
+      [(1, "  ", true), (2, "\t", false)],
+    );
+  }
+
+  #[test]
+  fn body_lines_crlf() {
+    let document = Document::from("[private]\r\nfoo:\r\n\tbar");
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(2, "\t")],
+    );
+  }
+
+  #[test]
+  fn body_lines_empty() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+      bar:
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert!(document.recipes()[0].body_lines().next().is_none());
+  }
+
+  #[test]
+  fn body_lines_multiline_header() {
+    let document = Document::from(indoc! {
+      "
+      foo: \\
+      \tbar
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(2, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_multiline_interpolation() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}}
+        qux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  "), (5, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_multiline_parameter() {
+    let document = Document::from(indoc! {
+      "
+      foo bar='''
+      \tbaz
+          qux
+      ''':
+        bar
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(4, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_recipe_boundary() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+      baz:
+      \tqux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_shebang() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        #!/bin/sh
+        bar
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  "), (2, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_shebang_comment() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+          #!/bin/sh
+        qux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  "), (2, "    "), (3, "  ")],
+    );
+  }
+
+  #[test]
+  fn body_lines_whitespace() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+
+       \t
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0]
+        .body_lines()
+        .map(|line| (line.number, line.indent))
+        .collect::<Vec<_>>(),
+      [(1, "  "), (4, "  ")],
+    );
+  }
 
   #[test]
   fn recipe_groups_all_attributes() {
@@ -134,6 +367,10 @@ mod tests {
       content:
         "[linux]\n[windows]\n[macos]\n[unix]\n[dragonfly]\n[freebsd]\n[netbsd]\n[openbsd]\ntest:\n  echo test"
           .to_string(),
+      body: vec![TextNode {
+        value: "  echo test".into(),
+        range: lsp::Range::at(9, 0, 9, 11),
+      }],
       range: lsp::Range::at(0, 0, 10, 0),
     };
 
@@ -183,6 +420,10 @@ mod tests {
       shebang: None,
       parameters: vec![],
       content: "[linux]\n[windows]\ntest:\n  echo test".to_string(),
+      body: vec![TextNode {
+        value: "  echo test".into(),
+        range: lsp::Range::at(3, 0, 3, 11),
+      }],
       range: lsp::Range::at(0, 0, 4, 0),
     };
 
@@ -204,6 +445,10 @@ mod tests {
       shebang: None,
       parameters: vec![],
       content: "test:\n  echo test".to_string(),
+      body: vec![TextNode {
+        value: "  echo test".into(),
+        range: lsp::Range::at(1, 0, 1, 11),
+      }],
       range: lsp::Range::at(0, 0, 2, 0),
     };
 
@@ -230,6 +475,10 @@ mod tests {
       shebang: None,
       parameters: vec![],
       content: "[private]\ntest:\n  echo test".to_string(),
+      body: vec![TextNode {
+        value: "  echo test".into(),
+        range: lsp::Range::at(2, 0, 2, 11),
+      }],
       range: lsp::Range::at(0, 0, 3, 0),
     };
 
@@ -256,6 +505,10 @@ mod tests {
       shebang: None,
       parameters: vec![],
       content: "[linux]\ntest:\n  echo test".to_string(),
+      body: vec![TextNode {
+        value: "  echo test".into(),
+        range: lsp::Range::at(2, 0, 2, 11),
+      }],
       range: lsp::Range::at(0, 0, 3, 0),
     };
 

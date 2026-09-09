@@ -5,6 +5,7 @@ use {
   indoc::indoc,
   path_ext::PathExt,
   project_view_document::ProjectViewDocument,
+  recipe_line::{IndentKind, RecipeLine},
   ropey::Rope,
   serde::{Deserialize, Serialize},
   std::{
@@ -128,6 +129,7 @@ mod quickfix;
 mod quickfixer;
 mod range_ext;
 mod recipe;
+mod recipe_line;
 mod rope_ext;
 mod rule;
 mod rule_context;

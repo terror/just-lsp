@@ -4155,10 +4155,204 @@ mod tests {
   }
 
   #[test]
-  fn recipe_inconsistent_indentation_between_lines() {
-    Test::new("foo:\n        echo \"foo\"\n  echo \"bar\"\n")
+  fn recipe_inconsistent_indentation_after_multiline_interpolation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}}
+          qux
+      "
+    })
     .error(
-      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`", lsp::Range::at(2, 0, 2, 2))
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠` but found line with `␠␠␠␠`",
+      lsp::Range::at(5, 0, 5, 4),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_between_lines() {
+    Test::new(indoc! {
+      "
+      foo:
+              echo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(2, 0, 2, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_shebang_comment() {
+    Test::new(indoc! {
+      "
+      foo:
+        bar
+          #!/bin/sh
+        qux
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠` but found line with `␠␠␠␠`",
+      lsp::Range::at(2, 0, 2, 4),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_with_attribute() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo:
+              echo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(3, 0, 3, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_with_multiline_header() {
+    Test::new(indoc! {
+      "
+      foo bar='''
+      \tbaz
+          qux
+      ''':
+              echo {{bar}}
+        echo foo
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(5, 0, 5, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_with_multiple_attributes() {
+    Test::new(indoc! {
+      "
+      bar:
+
+      [private]
+      [no-cd]
+      foo:
+              echo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(6, 0, 6, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_with_shell_attribute() {
+    Test::new(indoc! {
+      "
+      set default-script
+      [shell]
+      foo:
+              echo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(4, 0, 4, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_inconsistent_indentation_with_shell_shebang() {
+    Test::new(indoc! {
+      "
+      [shell]
+      foo:
+              #!/bin/sh
+        echo foo
+      "
+    })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠␠␠␠␠␠␠` but found line with `␠␠`",
+      lsp::Range::at(3, 0, 3, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_multiline_interpolation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_multiline_interpolation_continuation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}} \\
+          qux
+        quux
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_multiline_interpolation_tabs() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo:
+        {{'
+      bar
+      \tbaz
+      '}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_script_attribute() {
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+        bar
+          baz
+      \tqux
+      "
+    })
     .run();
   }
 
@@ -4342,12 +4536,31 @@ mod tests {
   }
 
   #[test]
+  fn recipe_mixed_indentation_after_multiline_interpolation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'
+      bar
+      \tbaz
+      '}}
+      \tqux
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_mixed_indentation_between_lines() {
     Test::new(indoc! {
       "
       foo:
-      \techo \"foo\"
-        echo \"bar\"
+      \techo foo
+        echo bar
       "
     })
     .error(
@@ -4358,16 +4571,175 @@ mod tests {
   }
 
   #[test]
+  fn recipe_mixed_indentation_continuation_after_interpolation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'bar'}}\\
+      \t{{'baz'}}
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_continuation_after_multiline_interpolation() {
+    Test::new(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}}\\
+      \t{{'qux'}}
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_shebang_comment() {
+    Test::new(indoc! {
+      "
+      foo:
+        bar
+      \t#!/bin/sh
+        qux
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 1),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_mixed_indentation_single_line_mix() {
     Test::new(indoc! {
       "
       foo:
-   \t  echo \"foo\"
+      \t  echo foo
       "
     })
     .error(
       "Recipe `foo` mixes tabs and spaces for indentation",
       lsp::Range::at(1, 0, 1, 3),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_single_line_mix_with_attribute() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo:
+      \t  echo foo
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 3),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_with_attribute() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo:
+      \techo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(3, 0, 3, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_with_multiline_header() {
+    Test::new(indoc! {
+      "
+      foo bar='''
+        baz
+          qux
+      ''':
+      \techo {{bar}}
+        echo foo
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(5, 0, 5, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_with_multiple_attributes() {
+    Test::new(indoc! {
+      "
+      bar:
+
+      [private]
+      [no-cd]
+      foo:
+      \techo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(6, 0, 6, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_with_shell_attribute() {
+    Test::new(indoc! {
+      "
+      set default-script
+      [shell]
+      foo:
+      \techo foo
+        echo bar
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(4, 0, 4, 2),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_mixed_indentation_with_shell_shebang() {
+    Test::new(indoc! {
+      "
+      [shell]
+      foo:
+      \t#!/bin/sh
+        echo foo
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(3, 0, 3, 2),
     )
     .run();
   }
