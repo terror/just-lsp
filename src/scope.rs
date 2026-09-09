@@ -1,10 +1,14 @@
 use super::*;
 
+#[derive(Default)]
+struct LocalScope {
+  parameters: HashSet<String>,
+  recipe: Option<String>,
+}
+
 pub struct Scope<'a> {
-  current_recipe: Option<String>,
   document: &'a Document,
   globals: HashSet<String>,
-  locals: HashSet<String>,
   pub recipe_identifier_usage: HashMap<String, HashSet<String>>,
   root: bool,
   pub unresolved_identifiers: Vec<(TextNode, Option<String>)>,
@@ -26,7 +30,6 @@ impl<'a> Scope<'a> {
 
   fn new(context: &RuleContext<'a>) -> Self {
     Self {
-      current_recipe: None,
       document: context.document(),
       globals: context
         .variable_and_builtin_names()
@@ -34,7 +37,6 @@ impl<'a> Scope<'a> {
         .cloned()
         .chain(context.user_function_names().iter().cloned())
         .collect(),
-      locals: HashSet::new(),
       recipe_identifier_usage: context
         .recipes()
         .iter()
@@ -58,14 +60,14 @@ impl<'a> Scope<'a> {
   /// the analyzed document: usage in imported documents still counts, since
   /// `just` imports are textual inclusions, but a range from an imported
   /// document would not be valid in the analyzed document.
-  fn record(&mut self, identifier: Node<'_>) {
+  fn record(&mut self, identifier: Node<'_>, local: &LocalScope) {
     if identifier.is_missing() {
       return;
     }
 
     let name = self.document.get_node_text(&identifier);
 
-    if let Some(recipe_name) = &self.current_recipe {
+    if let Some(recipe_name) = &local.recipe {
       self
         .recipe_identifier_usage
         .entry(recipe_name.clone())
@@ -73,7 +75,7 @@ impl<'a> Scope<'a> {
         .insert(name.clone());
     }
 
-    if self.locals.contains(&name) {
+    if local.parameters.contains(&name) {
       return;
     }
 
@@ -88,7 +90,11 @@ impl<'a> Scope<'a> {
 
     if self.root {
       let suggestion = name.find_suggestion(
-        self.locals.iter().chain(&self.globals).map(String::as_str),
+        local
+          .parameters
+          .iter()
+          .chain(&self.globals)
+          .map(String::as_str),
       );
 
       self.unresolved_identifiers.push((
@@ -107,10 +113,6 @@ impl<'a> Scope<'a> {
     self.document = document;
     self.root = root;
 
-    // Parameters of recipes and functions in one document are not in scope in
-    // any other, so each document starts with an empty local scope.
-    self.locals.clear();
-
     let root_node = document.tree.root_node();
 
     for node in root_node.find_all("recipe") {
@@ -121,12 +123,14 @@ impl<'a> Scope<'a> {
       self.walk_function(node);
     }
 
+    let local = LocalScope::default();
+
     for identifier in root_node.find_all("value > identifier") {
       if identifier.has_any_parent(&["function_definition", "recipe"]) {
         continue;
       }
 
-      self.record(identifier);
+      self.record(identifier, &local);
     }
   }
 
@@ -136,21 +140,19 @@ impl<'a> Scope<'a> {
   /// function parameters have no default values and cannot reference each
   /// other.
   fn walk_function(&mut self, function_node: Node<'_>) {
-    self.locals.clear();
-
-    if let Some(parameters_node) =
-      function_node.child_by_field_name("parameters")
-    {
-      for parameter_node in parameters_node.find_all("^identifier") {
-        self
-          .locals
-          .insert(self.document.get_node_text(&parameter_node));
-      }
-    }
+    let local = LocalScope {
+      parameters: function_node
+        .child_by_field_name("parameters")
+        .iter()
+        .flat_map(|parameters| parameters.find_all("^identifier"))
+        .map(|parameter| self.document.get_node_text(&parameter))
+        .collect(),
+      recipe: None,
+    };
 
     if let Some(body_node) = function_node.child_by_field_name("body") {
       for identifier in body_node.find_all("value > identifier") {
-        self.record(identifier);
+        self.record(identifier, &local);
       }
     }
   }
@@ -167,8 +169,10 @@ impl<'a> Scope<'a> {
       return;
     };
 
-    self.current_recipe = Some(self.document.get_node_text(&name_node));
-    self.locals.clear();
+    let mut local = LocalScope {
+      parameters: HashSet::new(),
+      recipe: Some(self.document.get_node_text(&name_node)),
+    };
 
     if let Some(parameters_node) =
       recipe_node.find("recipe_header > parameters")
@@ -190,12 +194,14 @@ impl<'a> Scope<'a> {
           parameter_node.child_by_field_name("default")
         {
           for identifier in default_node.find_all("value > identifier") {
-            self.record(identifier);
+            self.record(identifier, &local);
           }
         }
 
         if let Some(name_node) = parameter_node.child_by_field_name("name") {
-          self.locals.insert(self.document.get_node_text(&name_node));
+          local
+            .parameters
+            .insert(self.document.get_node_text(&name_node));
         }
       }
     }
@@ -205,10 +211,8 @@ impl<'a> Scope<'a> {
         continue;
       }
 
-      self.record(identifier);
+      self.record(identifier, &local);
     }
-
-    self.current_recipe = None;
   }
 }
 
@@ -672,6 +676,30 @@ mod tests {
     })
     .unused(&["x"])
     .run();
+  }
+
+  #[test]
+  fn parameters_do_not_shadow_globals_in_assignments() {
+    #[track_caller]
+    fn case(definition: &str) {
+      let content = format!("{definition}\nbaz := bar\n");
+
+      Test::new(&format!("bar := 'foo'\n{content}"))
+        .recipe_usage("foo", &[])
+        .used(&["bar"])
+        .unused(&["baz"])
+        .run();
+
+      Test::new("bar := 'foo'\n")
+        .imported_document(&content)
+        .recipe_usage("foo", &[])
+        .used(&["bar"])
+        .unused(&["baz"])
+        .run();
+    }
+
+    case("foo bar:");
+    case("foo(bar) := bar");
   }
 
   #[test]
