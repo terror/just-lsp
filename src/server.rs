@@ -82,38 +82,37 @@ impl Server {
   }
 
   async fn publish_diagnostics(&self, uri: &lsp::Url) {
-    if !self.initialized.load(std::sync::atomic::Ordering::Relaxed) {
+    if !self.initialized.load(Ordering::Relaxed) {
       return;
     }
 
-    let (diagnostics, version) = {
-      let workspace = self.workspace.read().await;
-      let config = self.config.read().await;
+    let config = self.config.read().await;
 
-      let Some(view) = workspace.project_view(uri) else {
-        return;
-      };
+    let workspace = self.workspace.read().await;
 
-      let version = view.document().version;
-
-      let analyzer = Analyzer {
-        config: Some(&config),
-        view,
-      };
-
-      (
-        analyzer
-          .analyze()
-          .into_iter()
-          .map(lsp::Diagnostic::from)
-          .collect(),
-        version,
-      )
+    let Some(view) = workspace.project_view(uri) else {
+      return;
     };
+
+    let version = view.document().version;
+
+    let analyzer = Analyzer {
+      config: Some(&config),
+      view,
+    };
+
+    let diagnostics = analyzer.analyze();
+
+    drop(config);
+    drop(workspace);
 
     self
       .client
-      .publish_diagnostics(uri.clone(), diagnostics, Some(version))
+      .publish_diagnostics(
+        uri.clone(),
+        diagnostics.into_iter().map(lsp::Diagnostic::from).collect(),
+        Some(version),
+      )
       .await;
   }
 
