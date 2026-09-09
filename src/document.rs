@@ -350,6 +350,50 @@ impl Document {
 
         let recipe_name = TextNode::from_node(&name_node, self);
 
+        let body =
+          recipe_node
+            .find("^recipe_body")
+            .map_or_else(Vec::new, |body_node| {
+              let interpolations = body_node.find_all("interpolation");
+
+              let offset =
+                body_node.start_byte() - body_node.start_position().column;
+
+              self
+                .content
+                .byte_slice(offset..body_node.end_byte())
+                .bytes()
+                .enumerate()
+                .filter_map(|(index, byte)| {
+                  (byte == b'\n').then_some(offset + index)
+                })
+                .chain(once(body_node.end_byte()))
+                .filter(|end| {
+                  !interpolations.iter().any(|interpolation| {
+                    interpolation.start_byte() <= *end
+                      && *end < interpolation.end_byte()
+                  })
+                })
+                .scan(offset, |start, end| {
+                  let range = *start..end;
+                  *start = end + 1;
+                  Some(range)
+                })
+                .filter_map(|range| {
+                  let value =
+                    self.content.byte_slice(range.clone()).to_string();
+
+                  (!value.trim().is_empty()).then(|| TextNode {
+                    value,
+                    range: lsp::Range {
+                      start: self.content.byte_to_lsp_position(range.start),
+                      end: self.content.byte_to_lsp_position(range.end),
+                    },
+                  })
+                })
+                .collect()
+            });
+
         let dependencies = recipe_node
           .find("recipe_header > dependencies")
           .map(|dependencies_node| {
@@ -454,6 +498,7 @@ impl Document {
         Some(Recipe {
           name: recipe_name,
           attributes: self.attributes_for_node(recipe_node),
+          body,
           dependencies,
           content: self.get_node_text(recipe_node).trim().to_string(),
           parameters,
@@ -1866,6 +1911,10 @@ mod tests {
           dependencies: vec![],
           parameters: vec![],
           content: "foo:\n  echo \"foo\"".into(),
+          body: vec![TextNode {
+            value: "  echo \"foo\"".into(),
+            range: lsp::Range::at(1, 0, 1, 12),
+          }],
           range: lsp::Range::at(0, 0, 3, 0),
           shebang: None,
         },
@@ -1878,6 +1927,10 @@ mod tests {
           dependencies: vec![],
           parameters: vec![],
           content: "bar:\n  echo \"bar\"".into(),
+          body: vec![TextNode {
+            value: "  echo \"bar\"".into(),
+            range: lsp::Range::at(4, 0, 4, 12),
+          }],
           range: lsp::Range::at(3, 0, 5, 0),
           shebang: None,
         }
@@ -2120,6 +2173,10 @@ mod tests {
         content:
           "baz first second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
+        body: vec![TextNode {
+          value: "  echo \"{{first}} {{second}}\"".into(),
+          range: lsp::Range::at(1, 0, 1, 29),
+        }],
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       }
@@ -2158,6 +2215,10 @@ mod tests {
         }],
         parameters: vec![],
         content: "bar: foo\n  echo \"bar\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"bar\"".into(),
+          range: lsp::Range::at(4, 0, 4, 12),
+        }],
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       }
@@ -2207,6 +2268,10 @@ mod tests {
         }],
         parameters: vec![],
         content: "bar: (foo 'value1' 'value2')\n  echo \"bar\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"bar\"".into(),
+          range: lsp::Range::at(4, 0, 4, 12),
+        }],
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       }
@@ -2289,6 +2354,10 @@ mod tests {
           range: lsp::Range::at(3, 4, 3, 8),
         }],
         content: "foo args: *(bar args *args)\n  echo \"foo\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"foo\"".into(),
+          range: lsp::Range::at(4, 0, 4, 12),
+        }],
         range: lsp::Range::at(3, 0, 5, 0),
         shebang: None,
       }
@@ -2330,6 +2399,10 @@ mod tests {
         }],
         parameters: vec![],
         content: "baz: tools::foo\n  echo \"baz\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"baz\"".into(),
+          range: lsp::Range::at(7, 0, 7, 12),
+        }],
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       }
@@ -2383,6 +2456,10 @@ mod tests {
         ],
         parameters: vec![],
         content: "baz: foo bar\n  echo \"baz\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"baz\"".into(),
+          range: lsp::Range::at(7, 0, 7, 12),
+        }],
         range: lsp::Range::at(6, 0, 8, 0),
         shebang: None,
       }
@@ -2426,6 +2503,10 @@ mod tests {
           }
         ],
         content: "bar target $lol:\n  echo \"Building {{target}}\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"Building {{target}}\"".into(),
+          range: lsp::Range::at(1, 0, 1, 28),
+        }],
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       }
@@ -2517,6 +2598,10 @@ mod tests {
         content:
           "baz first +second=\"default\":\n  echo \"{{first}} {{second}}\""
             .into(),
+        body: vec![TextNode {
+          value: "  echo \"{{first}} {{second}}\"".into(),
+          range: lsp::Range::at(1, 0, 1, 29),
+        }],
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       }
@@ -2564,6 +2649,10 @@ mod tests {
         dependencies: vec![],
         parameters: vec![],
         content: "foo:\n  echo \"foo\"".into(),
+        body: vec![TextNode {
+          value: "  echo \"foo\"".into(),
+          range: lsp::Range::at(1, 0, 1, 12),
+        }],
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       }

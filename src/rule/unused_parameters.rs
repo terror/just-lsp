@@ -125,6 +125,7 @@ mod tests {
   fn recipe(content: &str) -> Recipe {
     Recipe {
       attributes: vec![],
+      body: vec![],
       content: content.into(),
       dependencies: vec![],
       name: TextNode {
