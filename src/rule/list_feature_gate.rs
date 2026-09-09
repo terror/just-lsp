@@ -4,8 +4,8 @@ const COMPARISON_OPERATORS: &[&str] = &["!=", "!~", "==", "=~"];
 const LOGICAL_OPERATORS: &[&str] = &["&&", "||"];
 
 define_rule! {
-  ListFeaturesRule {
-    id: "list-features",
+  ListFeatureGateRule {
+    id: "list-feature-gate",
     message: "list feature requires set lists",
     run(context) {
       let mut diagnostics = Vec::new();
@@ -26,7 +26,7 @@ define_rule! {
   }
 }
 
-impl ListFeaturesRule {
+impl ListFeatureGateRule {
   fn arg_flag_range(document: &Document, node: Node<'_>) -> Option<lsp::Range> {
     let name = node.child_by_field_name("name")?;
 
