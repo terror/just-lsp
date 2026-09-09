@@ -11,14 +11,10 @@ export const EditorSettingsProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const [settings, setSettings] = usePersistedState<EditorSettings>(
+  const [settings, updateSettings] = usePersistedState<EditorSettings>(
     'editor-settings',
     defaultSettings
   );
-
-  const updateSettings = (newSettings: Partial<EditorSettings>) => {
-    setSettings((prevSettings) => ({ ...prevSettings, ...newSettings }));
-  };
 
   useEffect(() => {
     document.documentElement.style.setProperty(
