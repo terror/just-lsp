@@ -1,7 +1,6 @@
 ---
-title: Function arguments
 severity: error
-order: 320
+order: 10
 ---
 
 Reports a builtin or user-defined function call with an invalid argument count.

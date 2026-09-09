@@ -1,7 +1,6 @@
 ---
-title: Unknown function
 severity: error
-order: 310
+order: 10
 ---
 
 Reports a function call whose name is neither a known builtin nor a user-defined function.

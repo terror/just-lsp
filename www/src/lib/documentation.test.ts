@@ -7,14 +7,17 @@ const source = (metadata: Record<string, unknown> = {}, content = 'bar') =>
   `---\n${stringify({ title: 'foo', order: 1, ...metadata })}---\n${content}`;
 
 describe('loadDocumentation', () => {
-  it('parses frontmatter and trims Markdown with either line ending', () => {
-    for (const newline of ['\n', '\r\n']) {
+  it('parses frontmatter and defaults missing titles to document IDs', () => {
+    for (const [newline, title, expected] of [
+      ['\n', ' baz ', 'baz'],
+      ['\r\n', undefined, 'foo'],
+    ] as const) {
       expect(
         loadDocumentation({
-          './foo.md': source(
-            { severity: 'warning', title: ' foo ' },
-            '\nbar\n'
-          ).replace(/\n/g, newline),
+          './foo.md': source({ severity: 'warning', title }, '\nbar\n').replace(
+            /\n/g,
+            newline
+          ),
         })
       ).toEqual([
         {
@@ -23,7 +26,7 @@ describe('loadDocumentation', () => {
           id: 'foo',
           order: 1,
           severity: 'warning',
-          title: 'foo',
+          title: expected,
         },
       ]);
     }
@@ -53,7 +56,6 @@ describe('loadDocumentation', () => {
       ['foo_bar/baz.md', source()],
       ['foo.md', 'bar'],
       ['foo.md', '---\ntitle: [\n---\nbar'],
-      ['foo.md', source({ title: undefined })],
       ['foo.md', source({ title: ' ' })],
       ['foo.md', source({ severity: 'foo' })],
       ['foo.md', source({ order: 0 })],

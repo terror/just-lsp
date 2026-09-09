@@ -1,7 +1,6 @@
 ---
-title: Missing recipe for alias
 severity: error
-order: 80
+order: 10
 ---
 
 Reports an alias whose target cannot be resolved to a recipe.

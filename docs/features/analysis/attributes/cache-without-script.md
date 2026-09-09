@@ -1,7 +1,6 @@
 ---
-title: Cache without script mode
 severity: error
-order: 180
+order: 10
 ---
 
 Reports a recipe that uses `[cache]` without script mode.

@@ -1,7 +1,6 @@
 ---
-title: Script and shell conflict
 severity: error
-order: 200
+order: 10
 ---
 
 Reports a recipe that combines `[script]` with `[shell]`.

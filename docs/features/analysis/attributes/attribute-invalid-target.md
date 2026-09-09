@@ -1,7 +1,6 @@
 ---
-title: Invalid attribute target
 severity: error
-order: 120
+order: 10
 ---
 
 Reports a known attribute that is not attached to a declaration that can take attributes.

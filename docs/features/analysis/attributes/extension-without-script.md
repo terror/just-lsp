@@ -1,7 +1,6 @@
 ---
-title: Extension without script
 severity: error
-order: 190
+order: 10
 ---
 
 Reports `[extension]` on a recipe that does not run in script mode.

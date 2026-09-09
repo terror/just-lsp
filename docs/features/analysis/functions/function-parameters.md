@@ -1,7 +1,6 @@
 ---
-title: Function parameters
 severity: error
-order: 350
+order: 10
 ---
 
 Reports repeated parameter names within a user-defined function.

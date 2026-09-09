@@ -1,7 +1,6 @@
 ---
-title: Deprecated function
 severity: warning
-order: 330
+order: 10
 ---
 
 Reports a call to a builtin function with a documented replacement.

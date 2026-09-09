@@ -4,13 +4,14 @@ import { z } from 'zod';
 const metadataSchema = z.object({
   order: z.int().positive(),
   severity: z.enum(['error', 'warning']).optional(),
-  title: z.string().trim().min(1),
+  title: z.string().trim().min(1).optional(),
 });
 
 export type DocumentationSection = z.infer<typeof metadataSchema> & {
   children: DocumentationSection[];
   content: string;
   id: string;
+  title: string;
 };
 
 const parseDocument = ([path, source]: [string, string]): [
@@ -36,7 +37,13 @@ const parseDocument = ([path, source]: [string, string]): [
 
     return [
       `${filename[1]}${filename[2]}`,
-      { ...metadata, children: [], content, id: filename[2] },
+      {
+        ...metadata,
+        children: [],
+        content,
+        id: filename[2],
+        title: metadata.title ?? filename[2],
+      },
     ];
   } catch (error) {
     throw new Error(

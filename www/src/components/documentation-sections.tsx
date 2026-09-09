@@ -111,11 +111,6 @@ const DocumentationContent = ({
           </span>
         )}
       </div>
-      {section.severity && (
-        <p className='text-muted-foreground mt-1 font-mono text-sm break-all'>
-          {section.id}
-        </p>
-      )}
       {section.content && (
         <DocumentationMarkdown>{section.content}</DocumentationMarkdown>
       )}

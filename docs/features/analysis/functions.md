@@ -1,4 +1,4 @@
 ---
 title: Functions
-order: 50
+order: 10
 ---

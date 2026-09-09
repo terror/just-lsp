@@ -1,7 +1,6 @@
 ---
-title: Unknown attribute
 severity: error
-order: 90
+order: 10
 ---
 
 Reports an attribute name that is absent from the builtin attribute catalog.
