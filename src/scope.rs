@@ -31,12 +31,7 @@ impl<'a> Scope<'a> {
   fn new(context: &RuleContext<'a>) -> Self {
     Self {
       document: context.document(),
-      globals: context
-        .variable_and_builtin_names()
-        .iter()
-        .cloned()
-        .chain(context.user_function_names().iter().cloned())
-        .collect(),
+      globals: context.variable_and_builtin_names().clone(),
       recipe_identifier_usage: context
         .recipes()
         .iter()

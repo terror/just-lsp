@@ -6145,6 +6145,23 @@ mod tests {
   }
 
   #[test]
+  fn user_defined_function_name_is_not_variable() {
+    Test::new(indoc! {
+      "
+      set unstable
+
+      foo() := 'bar'
+      baz := foo
+
+      qux:
+        echo {{foo()}} {{baz}}
+      "
+    })
+    .error("Variable `foo` not found", lsp::Range::at(3, 7, 3, 10))
+    .run();
+  }
+
+  #[test]
   fn user_defined_function_no_params() {
     Test::new(indoc! {
       "
