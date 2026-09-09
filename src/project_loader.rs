@@ -183,22 +183,18 @@ mod tests {
       [
         ImportScopeDocument {
           load_depth: 0,
-          traversal_order: 0,
           uri: root,
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 1,
           uri: right,
         },
         ImportScopeDocument {
           load_depth: 2,
-          traversal_order: 2,
           uri: shared,
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 3,
           uri: left,
         },
       ]
@@ -218,12 +214,10 @@ mod tests {
       [
         ImportScopeDocument {
           load_depth: 0,
-          traversal_order: 0,
           uri: root,
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 1,
           uri: foo,
         },
       ]
@@ -248,22 +242,18 @@ mod tests {
       [
         ImportScopeDocument {
           load_depth: 0,
-          traversal_order: 0,
           uri: root,
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 1,
           uri: bar,
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 2,
           uri: foo,
         },
         ImportScopeDocument {
           load_depth: 2,
-          traversal_order: 3,
           uri: baz,
         },
       ]
@@ -361,17 +351,14 @@ mod tests {
       [
         ImportScopeDocument {
           load_depth: 0,
-          traversal_order: 0,
           uri: test.root.clone(),
         },
         ImportScopeDocument {
           load_depth: 1,
-          traversal_order: 1,
           uri: bar.clone(),
         },
         ImportScopeDocument {
           load_depth: 2,
-          traversal_order: 2,
           uri: baz.clone(),
         },
       ]

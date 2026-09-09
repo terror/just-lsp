@@ -13,11 +13,7 @@ impl ImportScope {
 
   pub(super) fn new(uri: lsp::Url) -> Self {
     Self {
-      documents: vec![ImportScopeDocument {
-        load_depth: 0,
-        traversal_order: 0,
-        uri,
-      }],
+      documents: vec![ImportScopeDocument { load_depth: 0, uri }],
     }
   }
 }
@@ -50,7 +46,6 @@ impl From<&Project> for ImportScope {
     while let Some(source) = stack.pop() {
       documents.push(ImportScopeDocument {
         load_depth: depths[&source],
-        traversal_order: documents.len(),
         uri: source.clone(),
       });
 
