@@ -7,18 +7,18 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut conflicts = ConflictTracker::default();
-
-      for unexport in context.unexports() {
-        if conflicts.record(&unexport.name, &unexport.attributes) {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Variable `{}` is unexported multiple times",
-              unexport.name.value
-            ),
-            unexport.name.range,
-          ));
-        }
+      for unexport in context.duplicate_declarations(
+        context.unexports(),
+        |unexport| &unexport.name,
+        |unexport| &unexport.attributes,
+      ) {
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Variable `{}` is unexported multiple times",
+            unexport.name.value
+          ),
+          unexport.name.range,
+        ));
       }
 
       diagnostics

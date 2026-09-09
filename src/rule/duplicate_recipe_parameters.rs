@@ -9,7 +9,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         let mut seen = HashSet::new();
 
         let mut passed_default = false;

@@ -394,9 +394,299 @@ mod tests {
   }
 
   #[test]
+  fn analyzer_ignores_imported_alias_recipe_conflicts() {
+    Test::new("")
+      .imported_document("foo:\nalias foo := bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_cache_without_script() {
+    Test::new("").imported_document("[cache]\nfoo:\n").run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_dotenv_path_filename_conflicts() {
+    Test::new("")
+      .imported_document(
+        "set dotenv-path := 'foo'\nset dotenv-filename := 'bar'\n",
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_aliases() {
+    Test::new("")
+      .imported_document("alias foo := bar\nalias foo := bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_dependencies() {
+    Test::new("").imported_document("foo: bar bar\n").run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_functions() {
+    Test::new("")
+      .imported_document("foo() := 'bar'\nfoo() := 'baz'\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_recipe_parameters() {
+    Test::new("").imported_document("foo bar bar:\n").run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_recipes() {
+    Test::new("").imported_document("foo:\nfoo:\n").run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_settings() {
+    Test::new("")
+      .imported_document("set export\nset export\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_unexports() {
+    Test::new("")
+      .imported_document("unexport foo\nunexport foo\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_variables() {
+    Test::new("")
+      .imported_document("foo := 'bar'\nfoo := 'baz'\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_exit_message_conflicts() {
+    Test::new("")
+      .imported_document("[exit-message]\n[no-exit-message]\nfoo:\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_export_unexport_conflicts() {
+    Test::new("")
+      .imported_document("export foo := 'bar'\nunexport foo\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_extension_without_script() {
+    Test::new("")
+      .imported_document("[extension: 'foo']\nfoo:\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_function_parameters() {
+    Test::new("")
+      .imported_document("foo(bar, bar) := bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_inconsistent_indentation() {
+    Test::new("")
+      .imported_document("foo:\n  echo foo\n    echo bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_invalid_setting_kinds() {
+    Test::new("")
+      .imported_document("set export := 'bar'\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_invalid_setting_values() {
+    Test::new("")
+      .imported_document("set indentation := 'foo'\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_mapped_dependencies() {
+    Test::new("").imported_document("foo: *(bar 'baz')\n").run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_mixed_indentation() {
+    Test::new("").imported_document("foo:\n \techo foo\n").run();
+  }
+
+  #[test]
   fn analyzer_ignores_imported_recipe_diagnostics() {
     Test::new("foo: (bar 'baz')\n")
       .imported_document("bar baz: bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_script_shell_conflicts() {
+    Test::new("")
+      .imported_document("[script]\n[shell]\nfoo:\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_working_directory_attribute_conflicts() {
+    Test::new("")
+      .imported_document("[working-directory: 'foo']\n[no-cd]\nfoo:\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_working_directory_setting_conflicts() {
+    Test::new("")
+      .imported_document("set working-directory := 'foo'\nset no-cd\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_alias_conflict_reports_local_recipe() {
+    Test::new("foo:\n")
+      .imported_document("\n\nalias foo := bar\nbar:\n")
+      .error(
+        "Alias `foo` is redefined as a recipe",
+        lsp::Range::at(0, 0, 0, 3),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_dotenv_filename_conflict_reports_local_path() {
+    Test::new("set dotenv-path := 'foo'\n")
+      .imported_document("\n\nset dotenv-filename := 'bar'\n")
+      .warning(
+        "`dotenv-path` overrides `dotenv-filename`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_dotenv_path_conflict_reports_local_filename() {
+    Test::new("set dotenv-filename := 'foo'\n")
+      .imported_document("\n\nset dotenv-path := 'bar'\n")
+      .warning(
+        "`dotenv-path` overrides `dotenv-filename`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_alias_reports_local_declaration() {
+    Test::new("alias foo := bar\nbar:\n")
+      .imported_document("\n\nalias foo := bar\n")
+      .error("Duplicate alias `foo`", lsp::Range::at(0, 0, 0, 16))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_function_reports_local_declaration() {
+    Test::new("set unstable\n_foo() := 'bar'\n")
+      .imported_document("\n\n_foo() := 'baz'\n")
+      .error("Duplicate function `_foo`", lsp::Range::at(1, 0, 2, 0))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_recipe_reports_local_declaration() {
+    Test::new("foo:\n")
+      .imported_document("\n\nfoo:\n")
+      .error("Duplicate recipe name `foo`", lsp::Range::at(0, 0, 1, 0))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_setting_reports_local_declaration() {
+    Test::new("set export\n")
+      .imported_document("\n\nset export\n")
+      .error("Duplicate setting `export`", lsp::Range::at(0, 0, 1, 0))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_unexport_reports_local_declaration() {
+    Test::new("unexport foo\n")
+      .imported_document("\n\nunexport foo\n")
+      .error(
+        "Variable `foo` is unexported multiple times",
+        lsp::Range::at(0, 9, 0, 12),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_variable_reports_local_declaration() {
+    Test::new("export foo := 'bar'\n")
+      .imported_document("\n\nexport foo := 'baz'\n")
+      .error("Duplicate variable `foo`", lsp::Range::at(0, 7, 1, 0))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_no_cd_conflict_reports_local_working_directory() {
+    Test::new("set working-directory := 'foo'\n")
+      .imported_document("\n\nset no-cd\n")
+      .error(
+        "`no-cd` is incompatible with `working-directory`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_recipe_conflict_reports_local_alias() {
+    Test::new("alias foo := bar\n")
+      .imported_document("\n\nfoo:\nbar:\n")
+      .error(
+        "Recipe `foo` is redefined as an alias",
+        lsp::Range::at(0, 6, 0, 9),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_unexport_conflict_reports_local_variable() {
+    Test::new("export foo := 'bar'\n")
+      .imported_document("\n\nunexport foo\n")
+      .error(
+        "Variable foo is both exported and unexported",
+        lsp::Range::at(0, 7, 0, 10),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_variable_conflict_reports_local_unexport() {
+    Test::new("unexport foo\n")
+      .imported_document("\n\nexport foo := 'bar'\n")
+      .error(
+        "Variable foo is both exported and unexported",
+        lsp::Range::at(0, 9, 0, 12),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_working_directory_conflict_reports_local_no_cd() {
+    Test::new("set no-cd\n")
+      .imported_document("\n\nset working-directory := 'foo'\n")
+      .error(
+        "`working-directory` is incompatible with `no-cd`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
       .run();
   }
 

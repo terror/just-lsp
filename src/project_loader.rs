@@ -99,7 +99,7 @@ impl<'a> ProjectLoader<'a> {
 
     self.project.dependencies.entry(uri.clone()).or_default();
 
-    for import in imports {
+    for import in imports.into_iter().filter(Import::is_enabled) {
       self.add_dependency(uri, import)?;
     }
 
@@ -164,6 +164,89 @@ mod tests {
     fn uri(&self, path: &str) -> lsp::Url {
       lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
     }
+  }
+
+  #[test]
+  fn conditional_import_is_disabled() {
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    let mut test = Test::new(&format!("[{disabled}]\nimport 'foo.just'"))
+      .file("foo.just", "import 'bar.just'")
+      .file("bar.just", "bar:");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.import_scope.documents(),
+      [ImportScopeDocument {
+        load_depth: 0,
+        uri: test.root.clone(),
+      }],
+    );
+
+    assert_eq!(
+      project.dependencies,
+      HashMap::from([(test.root.clone(), Vec::new())]),
+    );
+
+    assert_eq!(project.dependents, HashMap::new());
+    assert!(test.documents.get(&test.uri("foo.just")).is_none());
+    assert!(test.documents.get(&test.uri("bar.just")).is_none());
+  }
+
+  #[test]
+  fn conditional_import_is_enabled() {
+    let mut test =
+      Test::new(&format!("[{}]\nimport 'foo.just'", env::consts::OS))
+        .file("foo.just", "import 'bar.just'")
+        .file("bar.just", "bar:");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          uri: test.root.clone(),
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          uri: test.uri("foo.just"),
+        },
+        ImportScopeDocument {
+          load_depth: 2,
+          uri: test.uri("bar.just"),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn conditional_import_with_matching_attribute_is_enabled() {
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    let mut test = Test::new(&format!(
+      "[{disabled}, {}]\nimport 'foo.just'",
+      env::consts::OS,
+    ))
+    .file("foo.just", "foo:");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.import_scope.documents(),
+      [
+        ImportScopeDocument {
+          load_depth: 0,
+          uri: test.root.clone(),
+        },
+        ImportScopeDocument {
+          load_depth: 1,
+          uri: test.uri("foo.just"),
+        },
+      ],
+    );
   }
 
   #[test]

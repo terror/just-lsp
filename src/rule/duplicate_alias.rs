@@ -8,15 +8,15 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut conflicts = ConflictTracker::default();
-
-      for alias in context.aliases() {
-        if conflicts.record(&alias.name, &alias.attributes) {
-          diagnostics.push(Diagnostic::error(
-            format!("Duplicate alias `{}`", alias.name.value),
-            alias.range,
-          ));
-        }
+      for alias in context.duplicate_declarations(
+        context.aliases(),
+        |alias| &alias.name,
+        |alias| &alias.attributes,
+      ) {
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate alias `{}`", alias.name.value),
+          alias.range,
+        ));
       }
 
       diagnostics

@@ -6,7 +6,7 @@ define_rule! {
     id: "working-directory-conflict",
     message: "conflicting working directory configuration",
     run(context) {
-      let settings = context
+      let mut settings = context
         .settings()
         .iter()
         .map(|setting| {
@@ -15,6 +15,8 @@ define_rule! {
           (setting, groups)
         })
         .collect::<Vec<_>>();
+
+      settings.sort_by_key(|(setting, _)| setting.uri == context.document().uri);
 
       let mut seen = HashSet::new();
 
@@ -39,7 +41,8 @@ define_rule! {
             .map(move |previous| (index, previous, current))
         })
         .filter(|(_, (previous, previous_groups), (current, current_groups))| {
-          previous_groups.conflicts_with(current_groups)
+          current.uri == context.document().uri
+            && previous_groups.conflicts_with(current_groups)
             && incompatible(previous, current)
         })
         .filter_map(|(index, (previous, _), (current, _))| {
@@ -54,7 +57,7 @@ define_rule! {
         })
         .collect::<Vec<_>>();
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         let working_directory_attribute =
           recipe.find_attribute("working-directory");
 

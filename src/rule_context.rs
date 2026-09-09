@@ -3,30 +3,30 @@ use super::*;
 type BuiltinRef = &'static Builtin<'static>;
 
 pub struct RuleContext<'a> {
-  aliases: OnceLock<Vec<Alias>>,
+  aliases: OnceLock<Vec<Located<Alias>>>,
   attributes: OnceLock<Vec<Attribute>>,
   builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  functions: OnceLock<Vec<Function>>,
+  functions: OnceLock<Vec<Located<Function>>>,
   recipe_names: OnceLock<HashSet<String>>,
-  recipes: OnceLock<Vec<Recipe>>,
+  recipes: OnceLock<Vec<Located<Recipe>>>,
   scope: OnceLock<Scope<'a>>,
-  settings: OnceLock<Vec<Setting>>,
-  unexports: OnceLock<Vec<Unexport>>,
+  settings: OnceLock<Vec<Located<Setting>>>,
+  unexports: OnceLock<Vec<Located<Unexport>>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
-  variables: OnceLock<Vec<Variable>>,
+  variables: OnceLock<Vec<Located<Variable>>>,
   view: &'a ProjectView<'a>,
 }
 
 impl<'a> RuleContext<'a> {
-  pub fn aliases(&self) -> &[Alias] {
+  pub fn aliases(&self) -> &[Located<Alias>] {
     self
       .aliases
-      .get_or_init(|| self.documents().flat_map(Document::aliases).collect())
+      .get_or_init(|| self.declarations(Document::aliases))
       .as_slice()
   }
 
@@ -110,6 +110,21 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  fn declarations<T>(
+    &self,
+    declarations: impl Fn(&Document) -> Vec<T>,
+  ) -> Vec<Located<T>> {
+    self
+      .view
+      .documents()
+      .flat_map(|document| {
+        declarations(document)
+          .into_iter()
+          .map(|declaration| Located::new(document.uri.clone(), declaration))
+      })
+      .collect()
+  }
+
   pub fn document(&self) -> &'a Document {
     self.view.document()
   }
@@ -124,8 +139,26 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  fn documents(&self) -> impl Iterator<Item = &Document> {
-    self.view.documents()
+  pub(super) fn duplicate_declarations<'b, T>(
+    &self,
+    declarations: &'b [Located<T>],
+    name: impl Fn(&T) -> &TextNode,
+    attributes: impl Fn(&T) -> &[Attribute],
+  ) -> Vec<&'b T> {
+    let mut conflicts = ConflictTracker::default();
+
+    for declaration in declarations {
+      if declaration.uri != self.document().uri {
+        conflicts.record(name(declaration), attributes(declaration));
+      }
+    }
+
+    self
+      .local_declarations(declarations)
+      .filter(|declaration| {
+        conflicts.record(name(declaration), attributes(declaration))
+      })
+      .collect()
   }
 
   pub fn function_calls(&self) -> &[FunctionCall] {
@@ -135,15 +168,28 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub fn functions(&self) -> &[Function] {
+  pub fn functions(&self) -> &[Located<Function>] {
     self
       .functions
-      .get_or_init(|| self.documents().flat_map(Document::functions).collect())
+      .get_or_init(|| self.declarations(Document::functions))
       .as_slice()
   }
 
   pub fn imported_documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
-    self.view.documents().skip(1)
+    self
+      .view
+      .documents()
+      .filter(|document| document.uri != self.document().uri)
+  }
+
+  pub(super) fn local_declarations<'b, T>(
+    &self,
+    declarations: &'b [Located<T>],
+  ) -> impl Iterator<Item = &'b T> {
+    declarations
+      .iter()
+      .filter(|declaration| declaration.uri == self.document().uri)
+      .map(Deref::deref)
   }
 
   #[must_use]
@@ -179,10 +225,10 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub fn recipes(&self) -> &[Recipe] {
+  pub fn recipes(&self) -> &[Located<Recipe>] {
     self
       .recipes
-      .get_or_init(|| self.documents().flat_map(Document::recipes).collect())
+      .get_or_init(|| self.declarations(Document::recipes))
       .as_slice()
   }
 
@@ -197,10 +243,10 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub fn settings(&self) -> &[Setting] {
+  pub fn settings(&self) -> &[Located<Setting>] {
     self
       .settings
-      .get_or_init(|| self.documents().flat_map(Document::settings).collect())
+      .get_or_init(|| self.declarations(Document::settings))
       .as_slice()
   }
 
@@ -208,10 +254,10 @@ impl<'a> RuleContext<'a> {
     &self.document().tree
   }
 
-  pub fn unexports(&self) -> &[Unexport] {
+  pub fn unexports(&self) -> &[Located<Unexport>] {
     self
       .unexports
-      .get_or_init(|| self.documents().flat_map(Document::unexports).collect())
+      .get_or_init(|| self.declarations(Document::unexports))
       .as_slice()
   }
 
@@ -238,10 +284,10 @@ impl<'a> RuleContext<'a> {
     })
   }
 
-  pub fn variables(&self) -> &[Variable] {
+  pub fn variables(&self) -> &[Located<Variable>] {
     self
       .variables
-      .get_or_init(|| self.documents().flat_map(Document::variables).collect())
+      .get_or_init(|| self.declarations(Document::variables))
       .as_slice()
   }
 
@@ -268,6 +314,60 @@ mod tests {
       &project.import_scope,
       &documents,
     )));
+  }
+
+  #[test]
+  fn analyzed_document_is_selected_by_uri() {
+    let root =
+      Document::new("foo:\n", lsp::Url::parse("file:///foo.just").unwrap())
+        .unwrap();
+
+    let document =
+      Document::new("foo:\n", lsp::Url::parse("file:///bar.just").unwrap())
+        .unwrap();
+
+    let view = ProjectView {
+      document: &document,
+      documents: vec![
+        ProjectViewDocument {
+          document: &root,
+          load_depth: 0,
+        },
+        ProjectViewDocument {
+          document: &document,
+          load_depth: 1,
+        },
+      ],
+    };
+
+    let context = RuleContext::new(&view);
+
+    assert_eq!(
+      context
+        .recipes()
+        .iter()
+        .map(|recipe| recipe.location(recipe.name.range))
+        .collect::<Vec<_>>(),
+      [
+        lsp::Location::new(root.uri.clone(), lsp::Range::at(0, 0, 0, 3)),
+        lsp::Location::new(document.uri.clone(), lsp::Range::at(0, 0, 0, 3)),
+      ],
+    );
+
+    assert_eq!(
+      context
+        .local_declarations(context.recipes())
+        .collect::<Vec<_>>(),
+      [&document.recipes()[0]],
+    );
+
+    assert_eq!(
+      context
+        .imported_documents()
+        .map(|document| &document.uri)
+        .collect::<Vec<_>>(),
+      [&root.uri],
+    );
   }
 
   #[test]

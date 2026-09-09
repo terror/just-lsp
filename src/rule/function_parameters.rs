@@ -7,8 +7,7 @@ define_rule! {
     message: "invalid function parameters",
     run(context) {
       context
-        .functions()
-        .iter()
+        .local_declarations(context.functions())
         .flat_map(|function| {
           let mut seen = HashSet::new();
 

@@ -13,16 +13,24 @@ define_rule! {
       let dotenv_filename = context
         .settings()
         .iter()
-        .find(|setting| setting.name.value == "dotenv-filename");
+        .any(|setting| setting.name.value == "dotenv-filename");
 
-      if dotenv_path && let Some(filename) = dotenv_filename {
-        return vec![Diagnostic::warning(
-          "`dotenv-path` overrides `dotenv-filename`".to_string(),
-          filename.range,
-        )];
-      }
-
-      vec![]
+      context
+        .local_declarations(context.settings())
+        .find(|setting| setting.name.value == "dotenv-filename" && dotenv_path)
+        .or_else(|| {
+          context
+            .local_declarations(context.settings())
+            .find(|setting| setting.name.value == "dotenv-path" && dotenv_filename)
+        })
+        .into_iter()
+        .map(|setting| {
+          Diagnostic::warning(
+            "`dotenv-path` overrides `dotenv-filename`".to_string(),
+            setting.range,
+          )
+        })
+        .collect()
     }
   }
 }

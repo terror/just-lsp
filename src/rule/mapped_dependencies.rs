@@ -9,7 +9,7 @@ define_rule! {
 
       let lists = context.setting_enabled("lists");
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         for dependency in &recipe.dependencies {
           let starred = dependency
             .arguments

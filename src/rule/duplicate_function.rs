@@ -6,14 +6,13 @@ define_rule! {
     id: "duplicate-function",
     message: "duplicate function",
     run(context) {
-      let mut conflicts = ConflictTracker::default();
-
       context
-        .functions()
-        .iter()
-        .filter(|function| {
-          conflicts.record(&function.name, &function.attributes)
-        })
+        .duplicate_declarations(
+          context.functions(),
+          |function| &function.name,
+          |function| &function.attributes,
+        )
+        .into_iter()
         .map(|function| {
           Diagnostic::error(
             format!("Duplicate function `{}`", function.name.value),
