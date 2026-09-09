@@ -110,6 +110,50 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  pub(super) fn conflicting_settings(
+    &self,
+    incompatible: impl Fn(&Setting, &Setting) -> bool,
+  ) -> Vec<Diagnostic> {
+    let mut settings = self
+      .settings()
+      .iter()
+      .map(|setting| {
+        let groups = GroupSet::from_attributes(&setting.attributes);
+
+        (setting, groups)
+      })
+      .collect::<Vec<_>>();
+
+    settings.sort_by_key(|(setting, _)| setting.uri == self.document().uri);
+
+    let mut diagnostics = Vec::new();
+
+    for (index, (current, current_groups)) in settings.iter().enumerate() {
+      if current.uri != self.document().uri {
+        continue;
+      }
+
+      let mut seen = HashSet::new();
+
+      for (previous, previous_groups) in &settings[..index] {
+        if previous_groups.conflicts_with(current_groups)
+          && incompatible(previous, current)
+          && seen.insert(previous.name.value.as_str())
+        {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "`{}` is incompatible with `{}`",
+              previous.name.value, current.name.value,
+            ),
+            current.range,
+          ));
+        }
+      }
+    }
+
+    diagnostics
+  }
+
   fn declarations<T>(
     &self,
     declarations: impl Fn(&Document) -> Vec<T>,
