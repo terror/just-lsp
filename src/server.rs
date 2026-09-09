@@ -928,820 +928,107 @@ mod tests {
   use {
     super::*,
     indoc::indoc,
+    lsp::{notification, request},
     pretty_assertions::assert_eq,
-    serde_json::{Value, json},
-    std::env,
+    serde_json::json,
     tokio_stream::StreamExt,
-    tower_lsp::LspService,
     tower_test::mock::Spawn,
   };
 
   #[derive(Debug)]
   struct Test {
-    requests: Vec<Value>,
-    responses: Vec<Option<Value>>,
+    messages: Vec<(jsonrpc::Request, Option<jsonrpc::Response>)>,
     service: Spawn<LspService<Server>>,
   }
 
   impl Test {
+    fn initialize(self) -> Self {
+      self.request::<request::Initialize>(
+        lsp::InitializeParams::default(),
+        Ok(lsp::InitializeResult {
+          server_info: Some(lsp::ServerInfo {
+            name: env!("CARGO_PKG_NAME").into(),
+            version: Some(env!("CARGO_PKG_VERSION").into()),
+          }),
+          capabilities: Server::capabilities(),
+        }),
+      )
+    }
+
+    fn message(
+      method: &'static str,
+      params: impl Serialize,
+    ) -> jsonrpc::RequestBuilder {
+      let params = serde_json::to_value(params).unwrap();
+
+      let request = jsonrpc::Request::build(method);
+
+      if params.is_null() {
+        request
+      } else {
+        request.params(params)
+      }
+    }
+
     fn new() -> Self {
       let (service, _) = LspService::new(Server::new);
 
       Self {
-        requests: Vec::new(),
-        responses: Vec::new(),
+        messages: Vec::new(),
         service: Spawn::new(service),
       }
     }
 
-    fn notification<T: IntoValue>(mut self, notification: T) -> Self {
-      self.requests.push(notification.into_value());
-      self.responses.push(None);
+    fn notification<N: notification::Notification>(
+      mut self,
+      params: N::Params,
+    ) -> Self {
+      self
+        .messages
+        .push((Self::message(N::METHOD, params).finish(), None));
+
       self
     }
 
-    fn request<T: IntoValue>(mut self, request: T) -> Self {
-      self.requests.push(request.into_value());
-      self
+    fn open(self, uri: &str, text: &str) -> Self {
+      self.notification::<notification::DidOpenTextDocument>(
+        lsp::DidOpenTextDocumentParams {
+          text_document: lsp::TextDocumentItem::new(
+            uri.parse().unwrap(),
+            "just".into(),
+            1,
+            text.into(),
+          ),
+        },
+      )
     }
 
-    fn response<T: IntoValue>(mut self, response: T) -> Self {
-      self.responses.push(Some(response.into_value()));
+    fn request<R: request::Request>(
+      mut self,
+      params: R::Params,
+      expected: jsonrpc::Result<R::Result>,
+    ) -> Self {
+      let id = i64::try_from(self.messages.len()).unwrap();
+
+      self.messages.push((
+        Self::message(R::METHOD, params).id(id).finish(),
+        Some(jsonrpc::Response::from_parts(
+          id.into(),
+          expected.map(|result| serde_json::to_value(result).unwrap()),
+        )),
+      ));
+
       self
     }
 
     async fn run(mut self) -> Result {
-      for (request, expected_response) in
-        self.requests.iter().zip(self.responses.iter())
-      {
-        let response = self
-          .service
-          .call(serde_json::from_value(request.clone())?)
-          .await?;
+      for (request, expected) in self.messages {
+        let method = request.method().to_owned();
 
-        if let Some(expected) = expected_response {
-          assert_eq!(
-            *expected,
-            response.map(|v| serde_json::to_value(v).unwrap()).unwrap()
-          );
-        } else {
-          assert!(response.is_none(), "Expected no response for notification");
-        }
+        assert_eq!(self.service.call(request).await?, expected, "{method}");
       }
 
       Ok(())
-    }
-  }
-
-  trait IntoValue {
-    fn into_value(self) -> Value;
-  }
-
-  impl IntoValue for Value {
-    fn into_value(self) -> Value {
-      self
-    }
-  }
-
-  #[derive(Debug)]
-  struct InitializeRequest {
-    id: i64,
-  }
-
-  impl IntoValue for InitializeRequest {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "initialize",
-        "params": {
-          "capabilities": {}
-        },
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct InitializeResponse {
-    id: i64,
-  }
-
-  impl IntoValue for InitializeResponse {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "serverInfo": {
-            "name": env!("CARGO_PKG_NAME"),
-            "version": env!("CARGO_PKG_VERSION")
-          },
-          "capabilities": Server::capabilities()
-        },
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct DidOpenNotification<'a> {
-    text: &'a str,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DidOpenNotification<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didOpen",
-        "params": {
-          "textDocument": {
-            "uri": self.uri,
-            "languageId": "just",
-            "version": 1,
-            "text": self.text
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct DidChangeNotification<'a> {
-    changes: Vec<lsp::TextDocumentContentChangeEvent>,
-    uri: &'a str,
-    version: i32,
-  }
-
-  impl IntoValue for DidChangeNotification<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didChange",
-        "params": {
-          "textDocument": {
-            "uri": self.uri,
-            "version": self.version
-          },
-          "contentChanges": self.changes
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct DidCloseNotification<'a> {
-    uri: &'a str,
-  }
-
-  impl IntoValue for DidCloseNotification<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "method": "textDocument/didClose",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct GotoDefinitionRequest<'a> {
-    character: u32,
-    id: i64,
-    line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for GotoDefinitionRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/definition",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct GotoDefinitionResponse<'a> {
-    end_char: u32,
-    end_line: u32,
-    id: i64,
-    start_char: u32,
-    start_line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for GotoDefinitionResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "uri": self.uri,
-          "range": {
-            "start": {
-              "line": self.start_line,
-              "character": self.start_char
-            },
-            "end": {
-              "line": self.end_line,
-              "character": self.end_char
-            }
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct Location<'a> {
-    end_char: u32,
-    end_line: u32,
-    start_char: u32,
-    start_line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for Location<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "uri": self.uri,
-        "range": {
-          "start": {
-            "line": self.start_line,
-            "character": self.start_char
-          },
-          "end": {
-            "line": self.end_line,
-            "character": self.end_char
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct ReferencesRequest<'a> {
-    character: u32,
-    id: i64,
-    include_declaration: bool,
-    line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for ReferencesRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/references",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          },
-          "context": {
-            "includeDeclaration": self.include_declaration
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct ReferencesResponse<'a> {
-    id: i64,
-    locations: Vec<Location<'a>>,
-  }
-
-  impl IntoValue for Vec<Location<'_>> {
-    fn into_value(self) -> Value {
-      self.into_iter().map(Location::into_value).collect()
-    }
-  }
-
-  impl IntoValue for ReferencesResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.locations.into_value()
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct Rename<'a> {
-    end_char: u32,
-    end_line: u32,
-    new_text: &'a str,
-    start_char: u32,
-    start_line: u32,
-  }
-
-  impl IntoValue for Rename<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "range": {
-          "start": {
-            "line": self.start_line,
-            "character": self.start_char
-          },
-          "end": {
-            "line": self.end_line,
-            "character": self.end_char
-          }
-        },
-        "newText": self.new_text
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct RenameRequest<'a> {
-    character: u32,
-    id: i64,
-    line: u32,
-    new_name: &'a str,
-    uri: &'a str,
-  }
-
-  impl IntoValue for RenameRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/rename",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          },
-          "newName": self.new_name
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct RenameResponse<'a> {
-    edits: Vec<Rename<'a>>,
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for Vec<Rename<'_>> {
-    fn into_value(self) -> Value {
-      self.into_iter().map(Rename::into_value).collect()
-    }
-  }
-
-  impl IntoValue for RenameResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "changes": {
-            self.uri: self.edits.into_value()
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct PrepareRenameRequest<'a> {
-    character: u32,
-    id: i64,
-    line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for PrepareRenameRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/prepareRename",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct PrepareRenameResponse<'a> {
-    end_char: u32,
-    end_line: u32,
-    id: i64,
-    placeholder: &'a str,
-    start_char: u32,
-    start_line: u32,
-  }
-
-  impl IntoValue for PrepareRenameResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "range": {
-            "start": {
-              "line": self.start_line,
-              "character": self.start_char
-            },
-            "end": {
-              "line": self.end_line,
-              "character": self.end_char
-            }
-          },
-          "placeholder": self.placeholder
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct HoverRequest<'a> {
-    character: u32,
-    id: i64,
-    line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for HoverRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/hover",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct HoverResponse<'a> {
-    content: &'a str,
-    end_char: u32,
-    end_line: u32,
-    id: i64,
-    kind: &'a str,
-    start_char: u32,
-    start_line: u32,
-  }
-
-  impl IntoValue for HoverResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "contents": {
-            "kind": self.kind,
-            "value": self.content
-          },
-          "range": {
-            "start": {
-              "line": self.start_line,
-              "character": self.start_char
-            },
-            "end": {
-              "line": self.end_line,
-              "character": self.end_char
-            }
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct DocumentHighlightRequest<'a> {
-    character: u32,
-    id: i64,
-    line: u32,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DocumentHighlightRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/documentHighlight",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "position": {
-            "line": self.line,
-            "character": self.character
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct DocumentHighlightResponse<'a> {
-    highlights: Vec<Highlight<'a>>,
-    id: i64,
-  }
-
-  impl IntoValue for DocumentHighlightResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.highlights.into_value()
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct Highlight<'a> {
-    end_char: u32,
-    end_line: u32,
-    kind: &'a str,
-    start_char: u32,
-    start_line: u32,
-  }
-
-  impl IntoValue for Highlight<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "range": {
-          "start": {
-            "line": self.start_line,
-            "character": self.start_char
-          },
-          "end": {
-            "line": self.end_line,
-            "character": self.end_char
-          }
-        },
-        "kind": match self.kind {
-          "read" => 2,
-          "write" => 3,
-          _ => 1
-        }
-      })
-    }
-  }
-
-  impl IntoValue for Vec<Highlight<'_>> {
-    fn into_value(self) -> Value {
-      self.into_iter().map(Highlight::into_value).collect()
-    }
-  }
-
-  #[derive(Debug)]
-  struct SemanticTokensRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for SemanticTokensRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/semanticTokens/full",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct SemanticTokensResponse {
-    data: Vec<u32>,
-    id: i64,
-  }
-
-  impl IntoValue for SemanticTokensResponse {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": {
-          "data": self.data,
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct FoldingRange<'a> {
-    end_line: u32,
-    kind: &'a str,
-    start_line: u32,
-  }
-
-  impl IntoValue for FoldingRange<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "startLine": self.start_line,
-        "endLine": self.end_line,
-        "kind": self.kind
-      })
-    }
-  }
-
-  impl IntoValue for Vec<FoldingRange<'_>> {
-    fn into_value(self) -> Value {
-      self.into_iter().map(FoldingRange::into_value).collect()
-    }
-  }
-
-  #[derive(Debug)]
-  struct FoldingRangeRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for FoldingRangeRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/foldingRange",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct FoldingRangeResponse<'a> {
-    id: i64,
-    ranges: Vec<FoldingRange<'a>>,
-  }
-
-  impl IntoValue for FoldingRangeResponse<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.ranges.into_value()
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct CodeActionRequest {
-    id: i64,
-    range: lsp::Range,
-    uri: &'static str,
-  }
-
-  impl IntoValue for CodeActionRequest {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/codeAction",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          },
-          "range": {
-            "start": {
-              "line": self.range.start.line,
-              "character": self.range.start.character
-            },
-            "end": {
-              "line": self.range.end.line,
-              "character": self.range.end.character
-            }
-          },
-          "context": {
-            "diagnostics": []
-          }
-        }
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct CodeActionResponse {
-    actions: Vec<CodeAction>,
-    id: i64,
-  }
-
-  impl IntoValue for CodeActionResponse {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "result": self.actions.into_value()
-      })
-    }
-  }
-
-  #[derive(Debug)]
-  struct CodeAction {
-    arguments: Vec<ParameterJson>,
-    command: Command,
-    kind: &'static str,
-    title: &'static str,
-  }
-
-  impl IntoValue for Vec<ParameterJson> {
-    fn into_value(self) -> Value {
-      self
-        .into_iter()
-        .map(|p| serde_json::to_value(p).unwrap())
-        .collect()
-    }
-  }
-
-  impl IntoValue for CodeAction {
-    fn into_value(self) -> Value {
-      let recipe_name = json!(self.title);
-
-      let uri = json!("file:///test.just");
-
-      let parameters = json!(self.arguments.into_value());
-
-      json!({
-        "title": self.title,
-        "kind": self.kind,
-        "command": {
-          "title": self.title,
-          "command": self.command.to_string(),
-          "arguments": [recipe_name, uri, parameters]
-        }
-      })
-    }
-  }
-
-  impl IntoValue for Vec<CodeAction> {
-    fn into_value(self) -> Value {
-      self.into_iter().map(CodeAction::into_value).collect()
-    }
-  }
-
-  #[derive(Debug)]
-  struct CodeLensRequest {
-    id: i64,
-    uri: &'static str,
-  }
-
-  impl IntoValue for CodeLensRequest {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/codeLens",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
     }
   }
 
@@ -1762,45 +1049,40 @@ mod tests {
     std::fs::write(target.to_file_path().unwrap(), "bar:")?;
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import 'foo.just'\n\nfoo: bar",
-      })
-      .notification(DidOpenNotification {
-        uri: imported.as_str(),
-        text: "",
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
-      .notification(DidCloseNotification {
-        uri: imported.as_str(),
-      })
-      .request(HoverRequest {
-        id: 3,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 3,
-        content: "bar:",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 5,
-        end_line: 2,
-        end_char: 8,
-      })
+      .initialize()
+      .open(root.as_str(), "import 'foo.just'\n\nfoo: bar")
+      .open(imported.as_str(), "")
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(None),
+      )
+      .notification::<notification::DidCloseTextDocument>(
+        lsp::DidCloseTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier::new(imported.clone()),
+        },
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "bar:".into(),
+          }),
+          range: Some(lsp::Range::at(2, 5, 2, 8)),
+        })),
+      )
       .run()
       .await
   }
@@ -1808,40 +1090,39 @@ mod tests {
   #[tokio::test]
   async fn code_action_deprecated_function_or_default_quickfix() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env_var_or_default(\"BAR\", \"baz\")\n",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 10, 0, 10),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "title": "Replace `env_var_or_default` with `env`",
-            "kind": "quickfix",
-            "edit": {
-              "changes": {
-                "file:///test.just": [
-                  {
-                    "range": {
-                      "start": { "line": 0, "character": 7 },
-                      "end": { "line": 0, "character": 25 }
-                    },
-                    "newText": "env"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }))
+      .initialize()
+      .open(
+        "file:///test.just",
+        "foo := env_var_or_default(\"BAR\", \"baz\")\n",
+      )
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 10, 0, 10),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
+          lsp::CodeAction {
+            title: "Replace `env_var_or_default` with `env`".into(),
+            kind: Some(lsp::CodeActionKind::QUICKFIX),
+            edit: Some(lsp::WorkspaceEdit {
+              changes: Some(HashMap::from([(
+                "file:///test.just".parse().unwrap(),
+                vec![lsp::TextEdit {
+                  range: lsp::Range::at(0, 7, 0, 25),
+                  new_text: "env".into(),
+                }],
+              )])),
+              ..Default::default()
+            }),
+            ..Default::default()
+          },
+        )])),
+      )
       .run()
       .await
   }
@@ -1849,22 +1130,20 @@ mod tests {
   #[tokio::test]
   async fn code_action_deprecated_function_outside_range() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env_var(\"BAR\")\n",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 0, 0, 3),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///test.just", "foo := env_var(\"BAR\")\n")
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 0, 0, 3),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -1872,68 +1151,74 @@ mod tests {
   #[tokio::test]
   async fn code_action_deprecated_function_quickfix() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "foo := env(\"BAR\")\n",
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///test.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(0, 7, 0, 10)),
-          range_length: None,
-          text: "env_var".into(),
-        }],
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 10, 0, 10),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "title": "Replace `env_var` with `env`",
-            "kind": "quickfix",
-            "edit": {
-              "changes": {
-                "file:///test.just": [
-                  {
-                    "range": {
-                      "start": { "line": 0, "character": 7 },
-                      "end": { "line": 0, "character": 14 }
-                    },
-                    "newText": "env"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }))
-      .notification(DidChangeNotification {
-        uri: "file:///test.just",
-        version: 3,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(0, 7, 0, 14)),
-          range_length: None,
-          text: "env".into(),
-        }],
-      })
-      .request(CodeActionRequest {
-        id: 3,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 8, 0, 8),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 3,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///test.just", "foo := env(\"BAR\")\n")
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+            2,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(0, 7, 0, 10)),
+            range_length: None,
+            text: "env_var".into(),
+          }],
+        },
+      )
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 10, 0, 10),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::CodeActionOrCommand::CodeAction(
+          lsp::CodeAction {
+            title: "Replace `env_var` with `env`".into(),
+            kind: Some(lsp::CodeActionKind::QUICKFIX),
+            edit: Some(lsp::WorkspaceEdit {
+              changes: Some(HashMap::from([(
+                "file:///test.just".parse().unwrap(),
+                vec![lsp::TextEdit {
+                  range: lsp::Range::at(0, 7, 0, 14),
+                  new_text: "env".into(),
+                }],
+              )])),
+              ..Default::default()
+            }),
+            ..Default::default()
+          },
+        )])),
+      )
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+            3,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(0, 7, 0, 14)),
+            range_length: None,
+            text: "env".into(),
+          }],
+        },
+      )
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 8, 0, 8),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -1941,22 +1226,20 @@ mod tests {
   #[tokio::test]
   async fn code_action_empty_document() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///empty.just",
-        range: lsp::Range::at(0, 0, 0, 0),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///empty.just", "")
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///empty.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 0, 0, 0),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -1964,11 +1247,10 @@ mod tests {
   #[tokio::test]
   async fn code_action_with_recipes() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo foo
@@ -1977,38 +1259,57 @@ mod tests {
             echo bar
           "
         },
-      })
-      .request(CodeActionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        range: lsp::Range::at(0, 0, 0, 0),
-      })
-      .response(CodeActionResponse {
-        id: 2,
-        actions: vec![
-          CodeAction {
-            title: "foo",
-            kind: "source",
-            command: Command::RunRecipe,
-            arguments: vec![],
-          },
-          CodeAction {
-            title: "bar",
-            kind: "source",
-            command: Command::RunRecipe,
-            arguments: vec![
-              ParameterJson {
-                name: "arg1".into(),
-                default_value: None,
-              },
-              ParameterJson {
-                name: "arg2".into(),
-                default_value: Some("'default'".to_string()),
-              },
-            ],
-          },
-        ],
-      })
+      )
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          range: lsp::Range::at(0, 0, 0, 0),
+          context: lsp::CodeActionContext::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+            title: "foo".into(),
+            kind: Some(lsp::CodeActionKind::SOURCE),
+            command: Some(lsp::Command {
+              title: "foo".into(),
+              command: Command::RunRecipe.to_string(),
+              arguments: Some(vec![
+                json!("foo"),
+                json!("file:///test.just"),
+                json!([]),
+              ]),
+            }),
+            ..Default::default()
+          }),
+          lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+            title: "bar".into(),
+            kind: Some(lsp::CodeActionKind::SOURCE),
+            command: Some(lsp::Command {
+              title: "bar".into(),
+              command: Command::RunRecipe.to_string(),
+              arguments: Some(vec![
+                json!("bar"),
+                json!("file:///test.just"),
+                json!(vec![
+                  ParameterJson {
+                    name: "arg1".into(),
+                    default_value: None,
+                  },
+                  ParameterJson {
+                    name: "arg2".into(),
+                    default_value: Some("'default'".to_string()),
+                  },
+                ]),
+              ]),
+            }),
+            ..Default::default()
+          }),
+        ])),
+      )
       .run()
       .await
   }
@@ -2016,21 +1317,18 @@ mod tests {
   #[tokio::test]
   async fn code_lens_empty_document() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(CodeLensRequest {
-        id: 2,
-        uri: "file:///empty.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///empty.just", "")
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///empty.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -2038,11 +1336,10 @@ mod tests {
   #[tokio::test]
   async fn code_lens_with_recipes() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo foo
@@ -2051,69 +1348,49 @@ mod tests {
             echo bar
           "
         },
-      })
-      .request(CodeLensRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            },
-            "command": {
-              "title": "Run",
-              "command": "just-lsp.run_recipe",
-              "arguments": ["foo", "file:///test.just", []]
-            }
+      )
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::CodeLens {
+            range: lsp::Range::at(0, 0, 0, 3),
+            command: Some(lsp::Command {
+              title: "Run".into(),
+              command: "just-lsp.run_recipe".into(),
+              arguments: Some(vec![
+                json!("foo"),
+                json!("file:///test.just"),
+                json!([]),
+              ]),
+            }),
+            data: None,
           },
-          {
-            "range": {
-              "start": { "line": 3, "character": 0 },
-              "end": { "line": 3, "character": 3 }
-            },
-            "command": {
-              "title": "Run",
-              "command": "just-lsp.run_recipe",
-              "arguments": [
-                "bar",
-                "file:///test.just",
-                [
+          lsp::CodeLens {
+            range: lsp::Range::at(3, 0, 3, 3),
+            command: Some(lsp::Command {
+              title: "Run".into(),
+              command: "just-lsp.run_recipe".into(),
+              arguments: Some(vec![
+                json!("bar"),
+                json!("file:///test.just"),
+                json!([
                   { "name": "arg1", "default_value": null },
                   { "name": "arg2", "default_value": "'default'" }
-                ]
-              ]
-            }
-          }
-        ]
-      }))
+                ]),
+              ]),
+            }),
+            data: None,
+          },
+        ])),
+      )
       .run()
       .await
-  }
-
-  #[derive(Debug)]
-  struct DocumentLinkRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DocumentLinkRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/documentLink",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
   }
 
   #[tokio::test]
@@ -2133,52 +1410,64 @@ mod tests {
     let mut service = Spawn::new(service);
 
     service
-      .call(serde_json::from_value(
-        InitializeRequest { id: 1 }.into_value(),
-      )?)
+      .call(
+        Test::message("initialize", lsp::InitializeParams::default())
+          .id(1)
+          .finish(),
+      )
       .await?;
 
-    let initialized = service.call(serde_json::from_value(json!({
-      "jsonrpc": "2.0",
-      "method": "initialized",
-      "params": {}
-    }))?);
+    let initialized = service
+      .call(Test::message("initialized", lsp::InitializedParams {}).finish());
 
     let (response, _) = tokio::join!(initialized, socket.next());
 
     response?;
 
-    let open = service.call(serde_json::from_value(
-      DidOpenNotification {
-        uri: root.as_str(),
-        text: "import 'foo.just'\n\nbar: foo",
-      }
-      .into_value(),
-    )?);
+    let open = service.call(
+      Test::message(
+        "textDocument/didOpen",
+        lsp::DidOpenTextDocumentParams {
+          text_document: lsp::TextDocumentItem::new(
+            root.clone(),
+            "just".into(),
+            1,
+            "import 'foo.just'\n\nbar: foo".into(),
+          ),
+        },
+      )
+      .finish(),
+    );
 
     let (response, diagnostics) = tokio::join!(open, socket.next());
 
     response?;
 
-    let diagnostics = serde_json::to_value(diagnostics.unwrap())?;
+    let diagnostics = diagnostics.unwrap();
 
-    assert_eq!(diagnostics["method"], "textDocument/publishDiagnostics");
-    assert_eq!(diagnostics["params"]["uri"], root.as_str());
+    assert_eq!(diagnostics.method(), "textDocument/publishDiagnostics");
 
-    assert!(
-      !diagnostics["params"]["diagnostics"]
-        .as_array()
-        .unwrap()
-        .is_empty()
+    let diagnostics = serde_json::from_value::<lsp::PublishDiagnosticsParams>(
+      diagnostics.params().unwrap().clone(),
+    )?;
+
+    assert_eq!(diagnostics.uri, root);
+    assert!(!diagnostics.diagnostics.is_empty());
+
+    let open = service.call(
+      Test::message(
+        "textDocument/didOpen",
+        lsp::DidOpenTextDocumentParams {
+          text_document: lsp::TextDocumentItem::new(
+            imported.clone(),
+            "just".into(),
+            1,
+            "foo:".into(),
+          ),
+        },
+      )
+      .finish(),
     );
-
-    let open = service.call(serde_json::from_value(
-      DidOpenNotification {
-        uri: imported.as_str(),
-        text: "foo:",
-      }
-      .into_value(),
-    )?);
 
     let diagnostics =
       async { [socket.next().await.unwrap(), socket.next().await.unwrap()] };
@@ -2189,15 +1478,19 @@ mod tests {
 
     let diagnostics = diagnostics
       .into_iter()
-      .map(serde_json::to_value)
+      .map(|diagnostics| {
+        serde_json::from_value::<lsp::PublishDiagnosticsParams>(
+          diagnostics.params().unwrap().clone(),
+        )
+      })
       .collect::<serde_json::Result<Vec<_>>>()?;
 
     let diagnostics = diagnostics
       .iter()
-      .find(|diagnostics| diagnostics["params"]["uri"] == root.as_str())
+      .find(|diagnostics| diagnostics.uri == root)
       .unwrap();
 
-    assert_eq!(diagnostics["params"]["diagnostics"], json!([]));
+    assert!(diagnostics.diagnostics.is_empty());
 
     Ok(())
   }
@@ -2205,43 +1498,46 @@ mod tests {
   #[tokio::test]
   async fn did_change_handles_multibyte_characters() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///foo.just",
-        text: "# ─🧪\nfoo:\n  echo '─🧪'",
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///foo.just",
-        version: 2,
-        changes: vec![
-          lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(0, 2, 0, u32::MAX)),
-            range_length: None,
-            text: "bar".into(),
-          },
-          lsp::TextDocumentContentChangeEvent {
-            range: Some(lsp::Range::at(2, 8, 2, u32::MAX)),
-            range_length: None,
-            text: "🧪bar'".into(),
-          },
-        ],
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///foo.just",
-        line: 1,
-        character: 1,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo '🧪bar'",
-        kind: "plaintext",
-        start_line: 1,
-        start_char: 0,
-        end_line: 1,
-        end_char: 3,
-      })
+      .initialize()
+      .open("file:///foo.just", "# ─🧪\nfoo:\n  echo '─🧪'")
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///foo.just".parse().unwrap(),
+            2,
+          ),
+          content_changes: vec![
+            lsp::TextDocumentContentChangeEvent {
+              range: Some(lsp::Range::at(0, 2, 0, u32::MAX)),
+              range_length: None,
+              text: "bar".into(),
+            },
+            lsp::TextDocumentContentChangeEvent {
+              range: Some(lsp::Range::at(2, 8, 2, u32::MAX)),
+              range_length: None,
+              text: "🧪bar'".into(),
+            },
+          ],
+        },
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///foo.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 1),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo '🧪bar'".into(),
+          }),
+          range: Some(lsp::Range::at(1, 0, 1, 3)),
+        })),
+      )
       .run()
       .await
   }
@@ -2249,36 +1545,42 @@ mod tests {
   #[tokio::test]
   async fn did_change_preserves_unicode_line_separators() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///foo.just",
-        text: "foo:\n  echo 'foo\u{2028}bar'\n\nbaz: foo",
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///foo.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(1, 12, 1, 15)),
-          range_length: None,
-          text: "baz\u{2029}qux".into(),
-        }],
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///foo.just",
-        line: 3,
-        character: 6,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo 'foo\u{2028}baz\u{2029}qux'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 8,
-      })
+      .initialize()
+      .open(
+        "file:///foo.just",
+        "foo:\n  echo 'foo\u{2028}bar'\n\nbaz: foo",
+      )
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///foo.just".parse().unwrap(),
+            2,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(1, 12, 1, 15)),
+            range_length: None,
+            text: "baz\u{2029}qux".into(),
+          }],
+        },
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///foo.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 6),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo 'foo\u{2028}baz\u{2029}qux'".into(),
+          }),
+          range: Some(lsp::Range::at(3, 5, 3, 8)),
+        })),
+      )
       .run()
       .await
   }
@@ -2286,41 +1588,47 @@ mod tests {
   #[tokio::test]
   async fn did_change_updates_document() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
           "
         },
-      })
-      .notification(DidChangeNotification {
-        uri: "file:///test.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(1, 7, 2, 0)),
-          range_length: None,
-          text: "\"updated\"".into(),
-        }],
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo \"updated\"",
-        kind: "plaintext",
-        start_line: 0,
-        start_char: 0,
-        end_line: 0,
-        end_char: 3,
-      })
+      )
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+            2,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(1, 7, 2, 0)),
+            range_length: None,
+            text: "\"updated\"".into(),
+          }],
+        },
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 1),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo \"updated\"".into(),
+          }),
+          range: Some(lsp::Range::at(0, 0, 0, 3)),
+        })),
+      )
       .run()
       .await
   }
@@ -2328,20 +1636,23 @@ mod tests {
   #[tokio::test]
   async fn did_change_without_open_document_is_ignored() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidChangeNotification {
-        uri: "file:///missing.just",
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: Some(lsp::Range::at(0, 0, 0, 0)),
-          range_length: None,
-          text: "\"updated\"".into(),
-        }],
-      })
-      .notification(DidOpenNotification {
-        uri: "file:///missing.just",
-        text: indoc! {
+      .initialize()
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            "file:///missing.just".parse().unwrap(),
+            2,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range::at(0, 0, 0, 0)),
+            range_length: None,
+            text: "\"updated\"".into(),
+          }],
+        },
+      )
+      .open(
+        "file:///missing.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -2350,22 +1661,25 @@ mod tests {
             echo \"bar\"
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///missing.just",
-        line: 3,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo \"foo\"",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 8,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///missing.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo \"foo\"".into(),
+          }),
+          range: Some(lsp::Range::at(3, 5, 3, 8)),
+        })),
+      )
       .run()
       .await
   }
@@ -2373,11 +1687,10 @@ mod tests {
   #[tokio::test]
   async fn document_highlight() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -2388,39 +1701,33 @@ mod tests {
           alias baz := foo
           "
         },
-      })
-      .request(DocumentHighlightRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-      })
-      .response(DocumentHighlightResponse {
-        id: 2,
-        highlights: vec![
-          Highlight {
-            start_line: 0,
-            start_char: 0,
-            end_line: 0,
-            end_char: 3,
-            kind: "text",
+      )
+      .request::<request::DocumentHighlightRequest>(
+        lsp::DocumentHighlightParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 1),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::DocumentHighlight {
+            range: lsp::Range::at(0, 0, 0, 3),
+            kind: Some(lsp::DocumentHighlightKind::TEXT),
           },
-          Highlight {
-            start_line: 3,
-            start_char: 5,
-            end_line: 3,
-            end_char: 8,
-            kind: "text",
+          lsp::DocumentHighlight {
+            range: lsp::Range::at(3, 5, 3, 8),
+            kind: Some(lsp::DocumentHighlightKind::TEXT),
           },
-          Highlight {
-            start_line: 6,
-            start_char: 13,
-            end_line: 6,
-            end_char: 16,
-            kind: "text",
+          lsp::DocumentHighlight {
+            range: lsp::Range::at(6, 13, 6, 16),
+            kind: Some(lsp::DocumentHighlightKind::TEXT),
           },
-        ],
-      })
+        ])),
+      )
       .run()
       .await
   }
@@ -2428,21 +1735,18 @@ mod tests {
   #[tokio::test]
   async fn document_link_empty_document() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: "",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///test.just", "")
+      .request::<request::DocumentLinkRequest>(
+        lsp::DocumentLinkParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -2455,21 +1759,19 @@ mod tests {
       lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import? 'missing.just'\nimport x'dynamic.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: root.as_str(),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open(
+        root.as_str(),
+        "import? 'missing.just'\nimport x'dynamic.just'\n",
+      )
+      .request::<request::DocumentLinkRequest>(
+        lsp::DocumentLinkParams {
+          text_document: lsp::TextDocumentIdentifier::new(root.clone()),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![])),
+      )
       .run()
       .await
   }
@@ -2486,30 +1788,21 @@ mod tests {
     let root_uri = lsp::Url::from_file_path(root).unwrap();
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root_uri.as_str(),
-        text: "import 'bar.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: root_uri.as_str(),
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 7 },
-              "end": { "line": 0, "character": 17 }
-            },
-            "target": lsp::Url::from_file_path(&target).unwrap(),
-            "tooltip": target.display().to_string()
-          }
-        ]
-      }))
+      .initialize()
+      .open(root_uri.as_str(), "import 'bar.just'\n")
+      .request::<request::DocumentLinkRequest>(
+        lsp::DocumentLinkParams {
+          text_document: lsp::TextDocumentIdentifier::new(root_uri.clone()),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::DocumentLink {
+          range: lsp::Range::at(0, 7, 0, 17),
+          target: Some(lsp::Url::from_file_path(&target).unwrap()),
+          tooltip: Some(target.display().to_string()),
+          data: None,
+        }])),
+      )
       .run()
       .await
   }
@@ -2531,30 +1824,23 @@ mod tests {
     };
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: justfile_uri,
-        text: "mod bar 'baz.just'\n",
-      })
-      .request(DocumentLinkRequest {
-        id: 2,
-        uri: justfile_uri,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "range": {
-              "start": { "line": 0, "character": 8 },
-              "end": { "line": 0, "character": 18 }
-            },
-            "target": target_uri,
-            "tooltip": tooltip
-          }
-        ]
-      }))
+      .initialize()
+      .open(justfile_uri, "mod bar 'baz.just'\n")
+      .request::<request::DocumentLinkRequest>(
+        lsp::DocumentLinkParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            justfile_uri.parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::DocumentLink {
+          range: lsp::Range::at(0, 8, 0, 18),
+          target: Some(target_uri.parse().unwrap()),
+          tooltip: Some(tooltip.into()),
+          data: None,
+        }])),
+      )
       .run()
       .await
   }
@@ -2562,33 +1848,30 @@ mod tests {
   #[tokio::test]
   async fn document_symbol_empty_document() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///empty.just",
-        text: "",
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///empty.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": []
-      }))
+      .initialize()
+      .open("file:///empty.just", "")
+      .request::<request::DocumentSymbolRequest>(
+        lsp::DocumentSymbolParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///empty.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(vec![]))),
+      )
       .run()
       .await
   }
 
   #[tokio::test]
+  #[allow(deprecated)]
   async fn document_symbol_with_alias() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo foo
@@ -2596,54 +1879,50 @@ mod tests {
           alias bar := foo
           "
         },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 3, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            }
+      )
+      .request::<request::DocumentSymbolRequest>(
+        lsp::DocumentSymbolParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(vec![
+          lsp::DocumentSymbol {
+            name: "foo".into(),
+            detail: None,
+            kind: lsp::SymbolKind::FUNCTION,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(0, 0, 3, 0),
+            selection_range: lsp::Range::at(0, 0, 0, 3),
+            children: None,
           },
-          {
-            "name": "bar",
-            "detail": "alias for foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 3, "character": 0 },
-              "end": { "line": 3, "character": 16 }
-            },
-            "selectionRange": {
-              "start": { "line": 3, "character": 6 },
-              "end": { "line": 3, "character": 9 }
-            }
-          }
-        ]
-      }))
+          lsp::DocumentSymbol {
+            name: "bar".into(),
+            detail: Some("alias for foo".into()),
+            kind: lsp::SymbolKind::FUNCTION,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(3, 0, 3, 16),
+            selection_range: lsp::Range::at(3, 6, 3, 9),
+            children: None,
+          },
+        ]))),
+      )
       .run()
       .await
   }
 
   #[tokio::test]
+  #[allow(deprecated)]
   async fn document_symbol_with_recipes_and_variables() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           bar := 'baz'
 
@@ -2651,53 +1930,50 @@ mod tests {
             echo foo
           "
         },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "bar",
-            "kind": 13,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 0, "character": 3 }
-            }
+      )
+      .request::<request::DocumentSymbolRequest>(
+        lsp::DocumentSymbolParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(vec![
+          lsp::DocumentSymbol {
+            name: "bar".into(),
+            detail: None,
+            kind: lsp::SymbolKind::VARIABLE,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(0, 0, 1, 0),
+            selection_range: lsp::Range::at(0, 0, 0, 3),
+            children: None,
           },
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 4, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 2, "character": 3 }
-            }
-          }
-        ]
-      }))
+          lsp::DocumentSymbol {
+            name: "foo".into(),
+            detail: None,
+            kind: lsp::SymbolKind::FUNCTION,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(2, 0, 4, 0),
+            selection_range: lsp::Range::at(2, 0, 2, 3),
+            children: None,
+          },
+        ]))),
+      )
       .run()
       .await
   }
 
   #[tokio::test]
+  #[allow(deprecated)]
   async fn document_symbol_with_setting() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           set export := true
 
@@ -2705,42 +1981,38 @@ mod tests {
             echo foo
           "
         },
-      })
-      .request(DocumentSymbolRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": [
-          {
-            "name": "export",
-            "detail": "boolean",
-            "kind": 7,
-            "range": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 0, "character": 0 },
-              "end": { "line": 1, "character": 0 }
-            }
+      )
+      .request::<request::DocumentSymbolRequest>(
+        lsp::DocumentSymbolParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(vec![
+          lsp::DocumentSymbol {
+            name: "export".into(),
+            detail: Some("boolean".into()),
+            kind: lsp::SymbolKind::PROPERTY,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(0, 0, 1, 0),
+            selection_range: lsp::Range::at(0, 0, 1, 0),
+            children: None,
           },
-          {
-            "name": "foo",
-            "kind": 12,
-            "range": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 4, "character": 0 }
-            },
-            "selectionRange": {
-              "start": { "line": 2, "character": 0 },
-              "end": { "line": 2, "character": 3 }
-            }
-          }
-        ]
-      }))
+          lsp::DocumentSymbol {
+            name: "foo".into(),
+            detail: None,
+            kind: lsp::SymbolKind::FUNCTION,
+            tags: None,
+            deprecated: None,
+            range: lsp::Range::at(2, 0, 4, 0),
+            selection_range: lsp::Range::at(2, 0, 2, 3),
+            children: None,
+          },
+        ]))),
+      )
       .run()
       .await
   }
@@ -2748,11 +2020,10 @@ mod tests {
   #[tokio::test]
   async fn folding_range() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -2762,49 +2033,32 @@ mod tests {
             echo \"bar\"
           "
         },
-      })
-      .request(FoldingRangeRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(FoldingRangeResponse {
-        id: 2,
-        ranges: vec![
-          FoldingRange {
+      )
+      .request::<request::FoldingRangeRequest>(
+        lsp::FoldingRangeParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::FoldingRange {
             start_line: 0,
             end_line: 3,
-            kind: "region",
+            kind: Some(lsp::FoldingRangeKind::Region),
+            ..Default::default()
           },
-          FoldingRange {
+          lsp::FoldingRange {
             start_line: 4,
             end_line: 5,
-            kind: "region",
+            kind: Some(lsp::FoldingRangeKind::Region),
+            ..Default::default()
           },
-        ],
-      })
+        ])),
+      )
       .run()
       .await
-  }
-
-  #[derive(Debug)]
-  struct DocumentSymbolRequest<'a> {
-    id: i64,
-    uri: &'a str,
-  }
-
-  impl IntoValue for DocumentSymbolRequest<'_> {
-    fn into_value(self) -> Value {
-      json!({
-        "jsonrpc": "2.0",
-        "id": self.id,
-        "method": "textDocument/documentSymbol",
-        "params": {
-          "textDocument": {
-            "uri": self.uri
-          }
-        }
-      })
-    }
   }
 
   #[tokio::test]
@@ -2819,26 +2073,22 @@ mod tests {
     let root = lsp::Url::from_file_path(root).unwrap();
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import 'foo.just'",
-      })
-      .request(GotoDefinitionRequest {
-        id: 2,
-        uri: root.as_str(),
-        line: 0,
-        character: 9,
-      })
-      .response(GotoDefinitionResponse {
-        id: 2,
-        uri: lsp::Url::from_file_path(target).unwrap().as_str(),
-        start_line: 0,
-        start_char: 0,
-        end_line: 0,
-        end_char: 0,
-      })
+      .initialize()
+      .open(root.as_str(), "import 'foo.just'")
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(0, 9),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: lsp::Url::from_file_path(target).unwrap(),
+          range: lsp::Range::at(0, 0, 0, 0),
+        }))),
+      )
       .run()
       .await
   }
@@ -2846,11 +2096,10 @@ mod tests {
   #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -2859,21 +2108,23 @@ mod tests {
             echo \"bar\"
           "
         },
-      })
-      .request(GotoDefinitionRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 5,
-      })
-      .response(GotoDefinitionResponse {
-        id: 2,
-        uri: "file:///test.just",
-        start_line: 0,
-        start_char: 0,
-        end_line: 3,
-        end_char: 0,
-      })
+      )
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: "file:///test.just".parse().unwrap(),
+          range: lsp::Range::at(0, 0, 3, 0),
+        }))),
+      )
       .run()
       .await
   }
@@ -2881,28 +2132,32 @@ mod tests {
   #[tokio::test]
   async fn hover_attribute() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           [no-cd]
           foo:
             echo \"foo\"
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 3,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 3),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: indoc! {
+              "
           Don't change directory before executing the recipe.
 
           Normally `just` runs recipes with the current directory set to
@@ -2918,13 +2173,12 @@ mod tests {
             git commit
           ```
           "
-        },
-        kind: "markdown",
-        start_line: 0,
-        start_char: 1,
-        end_line: 0,
-        end_char: 6,
-      })
+            }
+            .into(),
+          }),
+          range: Some(lsp::Range::at(0, 1, 0, 6)),
+        })),
+      )
       .run()
       .await
   }
@@ -2932,27 +2186,31 @@ mod tests {
   #[tokio::test]
   async fn hover_builtin_function() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{arch()}}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: indoc! {
+              "
           Instruction set architecture of the host machine.
 
           Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
@@ -2964,13 +2222,12 @@ mod tests {
             @echo This is an {{arch()}} machine.
           ```
           "
-        },
-        kind: "markdown",
-        start_line: 1,
-        start_char: 9,
-        end_line: 1,
-        end_char: 13,
-      })
+            }
+            .into(),
+          }),
+          range: Some(lsp::Range::at(1, 9, 1, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -2978,11 +2235,10 @@ mod tests {
   #[tokio::test]
   async fn hover_constant() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{ HEX }}
@@ -2991,17 +2247,22 @@ mod tests {
             echo \"bar\"
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 12,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 12),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: indoc! {
+              "
           Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
 
           Useful as the alphabet argument to `choose()` for generating
@@ -3011,13 +2272,12 @@ mod tests {
           token := choose('32', HEX)
           ```
           "
-        },
-        kind: "markdown",
-        start_line: 1,
-        start_char: 10,
-        end_line: 1,
-        end_char: 13,
-      })
+            }
+            .into(),
+          }),
+          range: Some(lsp::Range::at(1, 10, 1, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3025,11 +2285,10 @@ mod tests {
   #[tokio::test]
   async fn hover_local_parameter() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           bar arg='cooler':
             echo {{ arg }}
@@ -3038,22 +2297,25 @@ mod tests {
             echo {{ arg }}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 4,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 4,
-        start_char: 10,
-        end_line: 4,
-        end_char: 13,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(4, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "arg='cool'".into(),
+          }),
+          range: Some(lsp::Range::at(4, 10, 4, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3062,11 +2324,10 @@ mod tests {
   async fn hover_prioritize_recipe_parameter_over_variable_in_interpolation()
   -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           arg := 'wow'
 
@@ -3074,22 +2335,25 @@ mod tests {
             echo {{ arg }}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 10,
-        end_line: 3,
-        end_char: 13,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "arg='cool'".into(),
+          }),
+          range: Some(lsp::Range::at(3, 10, 3, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3097,11 +2361,10 @@ mod tests {
   #[tokio::test]
   async fn hover_recipe() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -3110,22 +2373,25 @@ mod tests {
             echo \"bar\"
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo:\n  echo \"foo\"",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 8,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo \"foo\"".into(),
+          }),
+          range: Some(lsp::Range::at(3, 5, 3, 8)),
+        })),
+      )
       .run()
       .await
   }
@@ -3133,32 +2399,34 @@ mod tests {
   #[tokio::test]
   async fn hover_recipe_parameter_in_interpolation() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo arg='cool':
             echo {{ arg }}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arg='cool'",
-        kind: "plaintext",
-        start_line: 1,
-        start_char: 10,
-        end_line: 1,
-        end_char: 13,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "arg='cool'".into(),
+          }),
+          range: Some(lsp::Range::at(1, 10, 1, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3166,11 +2434,10 @@ mod tests {
   #[tokio::test]
   async fn hover_same_named_recipes_and_functions() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           arch:
             echo \"foo\"
@@ -3179,32 +2446,40 @@ mod tests {
             echo {{ arch() }}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "arch:\n  echo \"foo\"",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 5,
-        end_line: 3,
-        end_char: 9,
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 4,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "arch:\n  echo \"foo\"".into(),
+          }),
+          range: Some(lsp::Range::at(3, 5, 3, 9)),
+        })),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(4, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: indoc! {
+              "
           Instruction set architecture of the host machine.
 
           Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
@@ -3216,13 +2491,12 @@ mod tests {
             @echo This is an {{arch()}} machine.
           ```
           "
-        },
-        kind: "markdown",
-        start_line: 4,
-        start_char: 10,
-        end_line: 4,
-        end_char: 14,
-      })
+            }
+            .into(),
+          }),
+          range: Some(lsp::Range::at(4, 10, 4, 14)),
+        })),
+      )
       .run()
       .await
   }
@@ -3230,11 +2504,10 @@ mod tests {
   #[tokio::test]
   async fn hover_setting() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           set export := true
 
@@ -3242,17 +2515,22 @@ mod tests {
             echo \"foo\"
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 4,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: indoc! {
-          "
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 4),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: indoc! {
+              "
           Export every top-level `just` variable as an environment
           variable.
 
@@ -3270,13 +2548,12 @@ mod tests {
             echo $b
           ```
           "
-        },
-        kind: "markdown",
-        start_line: 0,
-        start_char: 4,
-        end_line: 0,
-        end_char: 10,
-      })
+            }
+            .into(),
+          }),
+          range: Some(lsp::Range::at(0, 4, 0, 10)),
+        })),
+      )
       .run()
       .await
   }
@@ -3284,11 +2561,10 @@ mod tests {
   #[tokio::test]
   async fn hover_variable_in_interpolation() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo := 'foo'
 
@@ -3296,22 +2572,25 @@ mod tests {
             echo {{ foo }}
           "
         },
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 3,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 2,
-        content: "foo := 'foo'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 10,
-        end_line: 3,
-        end_char: 13,
-      })
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(3, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo := 'foo'".into(),
+          }),
+          range: Some(lsp::Range::at(3, 10, 3, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3341,11 +2620,10 @@ mod tests {
     let target = lsp::Url::from_file_path(target).unwrap();
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: indoc! {
+      .initialize()
+      .open(
+        root.as_str(),
+        indoc! {
           "
           import 'foo.just'
 
@@ -3357,109 +2635,113 @@ mod tests {
             echo {{ bar }}
           "
         },
-      })
-      .request(GotoDefinitionRequest {
-        id: 2,
-        uri: root.as_str(),
-        line: 2,
-        character: 18,
-      })
-      .response(GotoDefinitionResponse {
-        id: 2,
-        uri: target.as_str(),
-        start_line: 0,
-        start_char: 0,
-        end_line: 3,
-        end_char: 0,
-      })
-      .request(GotoDefinitionRequest {
-        id: 3,
-        uri: root.as_str(),
-        line: 4,
-        character: 11,
-      })
-      .response(GotoDefinitionResponse {
-        id: 3,
-        uri: target.as_str(),
-        start_line: 5,
-        start_char: 0,
-        end_line: 5,
-        end_char: 3,
-      })
-      .request(GotoDefinitionRequest {
-        id: 4,
-        uri: root.as_str(),
-        line: 7,
-        character: 11,
-      })
-      .response(GotoDefinitionResponse {
-        id: 4,
-        uri: target.as_str(),
-        start_line: 3,
-        start_char: 0,
-        end_line: 4,
-        end_char: 0,
-      })
-      .request(HoverRequest {
-        id: 5,
-        uri: root.as_str(),
-        line: 2,
-        character: 18,
-      })
-      .response(HoverResponse {
-        id: 5,
-        content: "qux:\n  echo foo",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 17,
-        end_line: 2,
-        end_char: 20,
-      })
-      .request(HoverRequest {
-        id: 6,
-        uri: root.as_str(),
-        line: 4,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 6,
-        content: "qux() := 'quux'",
-        kind: "plaintext",
-        start_line: 4,
-        start_char: 10,
-        end_line: 4,
-        end_char: 13,
-      })
-      .request(HoverRequest {
-        id: 7,
-        uri: root.as_str(),
-        line: 7,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 7,
-        content: "bar := 'baz'",
-        kind: "plaintext",
-        start_line: 7,
-        start_char: 10,
-        end_line: 7,
-        end_char: 13,
-      })
-      .request(HoverRequest {
-        id: 8,
-        uri: root.as_str(),
-        line: 3,
-        character: 11,
-      })
-      .response(HoverResponse {
-        id: 8,
-        content: "bar='local'",
-        kind: "plaintext",
-        start_line: 3,
-        start_char: 10,
-        end_line: 3,
-        end_char: 13,
-      })
+      )
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 18),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target.clone(),
+          range: lsp::Range::at(0, 0, 3, 0),
+        }))),
+      )
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(4, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target.clone(),
+          range: lsp::Range::at(5, 0, 5, 3),
+        }))),
+      )
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(7, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target.clone(),
+          range: lsp::Range::at(3, 0, 4, 0),
+        }))),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 18),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "qux:\n  echo foo".into(),
+          }),
+          range: Some(lsp::Range::at(2, 17, 2, 20)),
+        })),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(4, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "qux() := 'quux'".into(),
+          }),
+          range: Some(lsp::Range::at(4, 10, 4, 13)),
+        })),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(7, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "bar := 'baz'".into(),
+          }),
+          range: Some(lsp::Range::at(7, 10, 7, 13)),
+        })),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(3, 11),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "bar='local'".into(),
+          }),
+          range: Some(lsp::Range::at(3, 10, 3, 13)),
+        })),
+      )
       .run()
       .await
   }
@@ -3483,70 +2765,65 @@ mod tests {
     std::fs::write(target.to_file_path().unwrap(), "qux:")?;
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: first.as_str(),
-        text: "import 'baz.just'\n\nfoo: qux",
-      })
-      .notification(DidOpenNotification {
-        uri: second.as_str(),
-        text: "import 'baz.just'\n\nbar: qux",
-      })
-      .notification(DidOpenNotification {
-        uri: imported.as_str(),
-        text: "",
-      })
-      .request(HoverRequest {
-        id: 2,
-        uri: first.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
-      .notification(DidChangeNotification {
-        uri: imported.as_str(),
-        version: 2,
-        changes: vec![lsp::TextDocumentContentChangeEvent {
-          range: None,
-          range_length: None,
-          text: "import 'qux.just'".into(),
-        }],
-      })
-      .request(HoverRequest {
-        id: 3,
-        uri: first.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 3,
-        content: "qux:",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 5,
-        end_line: 2,
-        end_char: 8,
-      })
-      .request(HoverRequest {
-        id: 4,
-        uri: second.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 4,
-        content: "qux:",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 5,
-        end_line: 2,
-        end_char: 8,
-      })
+      .initialize()
+      .open(first.as_str(), "import 'baz.just'\n\nfoo: qux")
+      .open(second.as_str(), "import 'baz.just'\n\nbar: qux")
+      .open(imported.as_str(), "")
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(first.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(None),
+      )
+      .notification::<notification::DidChangeTextDocument>(
+        lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier::new(
+            imported.clone(),
+            2,
+          ),
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: "import 'qux.just'".into(),
+          }],
+        },
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(first.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "qux:".into(),
+          }),
+          range: Some(lsp::Range::at(2, 5, 2, 8)),
+        })),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(second.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "qux:".into(),
+          }),
+          range: Some(lsp::Range::at(2, 5, 2, 8)),
+        })),
+      )
       .run()
       .await
   }
@@ -3564,72 +2841,56 @@ mod tests {
     let target = lsp::Url::from_file_path(target).unwrap();
 
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: root.as_str(),
-        text: "import 'foo.just'\n\nbar: foo",
-      })
-      .notification(DidOpenNotification {
-        uri: target.as_str(),
-        text: "\nfoo:\n  echo buffer",
-      })
-      .request(GotoDefinitionRequest {
-        id: 2,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(GotoDefinitionResponse {
-        id: 2,
-        uri: target.as_str(),
-        start_line: 1,
-        start_char: 0,
-        end_line: 2,
-        end_char: 13,
-      })
-      .request(HoverRequest {
-        id: 3,
-        uri: root.as_str(),
-        line: 2,
-        character: 5,
-      })
-      .response(HoverResponse {
-        id: 3,
-        content: "foo:\n  echo buffer",
-        kind: "plaintext",
-        start_line: 2,
-        start_char: 5,
-        end_line: 2,
-        end_char: 8,
-      })
+      .initialize()
+      .open(root.as_str(), "import 'foo.just'\n\nbar: foo")
+      .open(target.as_str(), "\nfoo:\n  echo buffer")
+      .request::<request::GotoDefinition>(
+        lsp::GotoDefinitionParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target.clone(),
+          range: lsp::Range::at(1, 0, 2, 13),
+        }))),
+      )
+      .request::<request::HoverRequest>(
+        lsp::HoverParams {
+          text_document_position_params: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(root.clone()),
+            lsp::Position::new(2, 5),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo:\n  echo buffer".into(),
+          }),
+          range: Some(lsp::Range::at(2, 5, 2, 8)),
+        })),
+      )
       .run()
       .await
   }
 
   #[tokio::test]
   async fn initialize() -> Result {
-    Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .run()
-      .await
+    Test::new().initialize().run().await
   }
 
   #[tokio::test]
   async fn initialize_once() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .request(InitializeRequest { id: 1 })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "error": {
-          "code": -32600,
-          "message": "Invalid request"
-        }
-      }))
+      .initialize()
+      .request::<request::Initialize>(
+        lsp::InitializeParams::default(),
+        Err(jsonrpc::Error::invalid_request()),
+      )
       .run()
       .await
   }
@@ -3637,28 +2898,25 @@ mod tests {
   #[tokio::test]
   async fn prepare_rename_builtin_function() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{arch()}}
           "
         },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      )
+      .request::<request::PrepareRenameRequest>(
+        lsp::TextDocumentPositionParams::new(
+          lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          lsp::Position::new(1, 11),
+        ),
+        Ok(None),
+      )
       .run()
       .await
   }
@@ -3666,31 +2924,28 @@ mod tests {
   #[tokio::test]
   async fn prepare_rename_identifier() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
           "
         },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-      })
-      .response(PrepareRenameResponse {
-        id: 2,
-        start_line: 0,
-        start_char: 0,
-        end_line: 0,
-        end_char: 3,
-        placeholder: "foo",
-      })
+      )
+      .request::<request::PrepareRenameRequest>(
+        lsp::TextDocumentPositionParams::new(
+          lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          lsp::Position::new(0, 1),
+        ),
+        Ok(Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
+          range: lsp::Range::at(0, 0, 0, 3),
+          placeholder: "foo".into(),
+        })),
+      )
       .run()
       .await
   }
@@ -3698,28 +2953,25 @@ mod tests {
   #[tokio::test]
   async fn prepare_rename_non_identifier() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
           "
         },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 3,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      )
+      .request::<request::PrepareRenameRequest>(
+        lsp::TextDocumentPositionParams::new(
+          lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          lsp::Position::new(1, 3),
+        ),
+        Ok(None),
+      )
       .run()
       .await
   }
@@ -3727,28 +2979,25 @@ mod tests {
   #[tokio::test]
   async fn prepare_rename_undefined() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{ missing }}
           "
         },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 13,
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      )
+      .request::<request::PrepareRenameRequest>(
+        lsp::TextDocumentPositionParams::new(
+          lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          lsp::Position::new(1, 13),
+        ),
+        Ok(None),
+      )
       .run()
       .await
   }
@@ -3756,11 +3005,10 @@ mod tests {
   #[tokio::test]
   async fn prepare_rename_variable() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           x := '1'
 
@@ -3768,21 +3016,19 @@ mod tests {
             echo {{ x }}
           "
         },
-      })
-      .request(PrepareRenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 0,
-      })
-      .response(PrepareRenameResponse {
-        id: 2,
-        start_line: 0,
-        start_char: 0,
-        end_line: 0,
-        end_char: 1,
-        placeholder: "x",
-      })
+      )
+      .request::<request::PrepareRenameRequest>(
+        lsp::TextDocumentPositionParams::new(
+          lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          lsp::Position::new(0, 0),
+        ),
+        Ok(Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
+          range: lsp::Range::at(0, 0, 0, 1),
+          placeholder: "x".into(),
+        })),
+      )
       .run()
       .await
   }
@@ -3790,11 +3036,10 @@ mod tests {
   #[tokio::test]
   async fn recipe_references() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -3805,40 +3050,36 @@ mod tests {
           alias baz := foo
           "
         },
-      })
-      .request(ReferencesRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-        include_declaration: true,
-      })
-      .response(ReferencesResponse {
-        id: 2,
-        locations: vec![
-          Location {
-            uri: "file:///test.just",
-            start_line: 0,
-            start_char: 0,
-            end_line: 0,
-            end_char: 3,
+      )
+      .request::<request::References>(
+        lsp::ReferenceParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 1),
+          ),
+          context: lsp::ReferenceContext {
+            include_declaration: true,
           },
-          Location {
-            uri: "file:///test.just",
-            start_line: 3,
-            start_char: 5,
-            end_line: 3,
-            end_char: 8,
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::Location {
+            uri: "file:///test.just".parse().unwrap(),
+            range: lsp::Range::at(0, 0, 0, 3),
           },
-          Location {
-            uri: "file:///test.just",
-            start_line: 6,
-            start_char: 13,
-            end_line: 6,
-            end_char: 16,
+          lsp::Location {
+            uri: "file:///test.just".parse().unwrap(),
+            range: lsp::Range::at(3, 5, 3, 8),
           },
-        ],
-      })
+          lsp::Location {
+            uri: "file:///test.just".parse().unwrap(),
+            range: lsp::Range::at(6, 13, 6, 16),
+          },
+        ])),
+      )
       .run()
       .await
   }
@@ -3846,29 +3087,29 @@ mod tests {
   #[tokio::test]
   async fn rename_builtin() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{arch()}}
           "
         },
-      })
-      .request(RenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 11,
-        new_name: "cpu",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 11),
+          ),
+          new_name: "cpu".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(None),
+      )
       .run()
       .await
   }
@@ -3878,37 +3119,40 @@ mod tests {
     async fn case(ranges: &[lsp::Range]) -> Result {
       for range in ranges {
         Test::new()
-          .request(InitializeRequest { id: 1 })
-          .response(InitializeResponse { id: 1 })
-          .notification(DidOpenNotification {
-            uri: "file:///foo.just",
-            text: indoc! {"
+          .initialize()
+          .open(
+            "file:///foo.just",
+            indoc! {"
               foo := 'bar'
               baz foo=foo bar=foo:
                 echo {{ foo }}
             "},
-          })
-          .request(RenameRequest {
-            id: 2,
-            uri: "file:///foo.just",
-            line: range.start.line,
-            character: range.start.character,
-            new_name: "qux",
-          })
-          .response(RenameResponse {
-            id: 2,
-            uri: "file:///foo.just",
-            edits: ranges
-              .iter()
-              .map(|range| Rename {
-                start_line: range.start.line,
-                start_char: range.start.character,
-                end_line: range.end.line,
-                end_char: range.end.character,
-                new_text: "qux",
-              })
-              .collect(),
-          })
+          )
+          .request::<request::Rename>(
+            lsp::RenameParams {
+              text_document_position: lsp::TextDocumentPositionParams::new(
+                lsp::TextDocumentIdentifier::new(
+                  "file:///foo.just".parse().unwrap(),
+                ),
+                range.start,
+              ),
+              new_name: "qux".into(),
+              work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+            },
+            Ok(Some(lsp::WorkspaceEdit {
+              changes: Some(HashMap::from([(
+                "file:///foo.just".parse().unwrap(),
+                ranges
+                  .iter()
+                  .map(|range| lsp::TextEdit {
+                    range: *range,
+                    new_text: "qux".into(),
+                  })
+                  .collect(),
+              )])),
+              ..Default::default()
+            })),
+          )
           .run()
           .await?;
       }
@@ -3929,11 +3173,10 @@ mod tests {
   #[tokio::test]
   async fn rename_recipe() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"foo\"
@@ -3944,41 +3187,39 @@ mod tests {
           alias baz := foo
           "
         },
-      })
-      .request(RenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 0,
-        character: 1,
-        new_name: "renamed",
-      })
-      .response(RenameResponse {
-        id: 2,
-        uri: "file:///test.just",
-        edits: vec![
-          Rename {
-            start_line: 0,
-            start_char: 0,
-            end_line: 0,
-            end_char: 3,
-            new_text: "renamed",
-          },
-          Rename {
-            start_line: 3,
-            start_char: 5,
-            end_line: 3,
-            end_char: 8,
-            new_text: "renamed",
-          },
-          Rename {
-            start_line: 6,
-            start_char: 13,
-            end_line: 6,
-            end_char: 16,
-            new_text: "renamed",
-          },
-        ],
-      })
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(0, 1),
+          ),
+          new_name: "renamed".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([(
+            "file:///test.just".parse().unwrap(),
+            vec![
+              lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "renamed".into(),
+              },
+              lsp::TextEdit {
+                range: lsp::Range::at(3, 5, 3, 8),
+                new_text: "renamed".into(),
+              },
+              lsp::TextEdit {
+                range: lsp::Range::at(6, 13, 6, 16),
+                new_text: "renamed".into(),
+              },
+            ],
+          )])),
+          ..Default::default()
+        })),
+      )
       .run()
       .await
   }
@@ -3986,29 +3227,29 @@ mod tests {
   #[tokio::test]
   async fn rename_undefined() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo {{ missing }}
           "
         },
-      })
-      .request(RenameRequest {
-        id: 2,
-        uri: "file:///test.just",
-        line: 1,
-        character: 13,
-        new_name: "defined",
-      })
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 13),
+          ),
+          new_name: "defined".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(None),
+      )
       .run()
       .await
   }
@@ -4016,28 +3257,46 @@ mod tests {
   #[tokio::test]
   async fn semantic_tokens_basic() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .notification(DidOpenNotification {
-        uri: "file:///test.just",
-        text: indoc! {
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
           "
           foo:
             echo \"bar\"
           "
         },
-      })
-      .request(SemanticTokensRequest {
-        id: 2,
-        uri: "file:///test.just",
-      })
-      .response(SemanticTokensResponse {
-        id: 2,
-        data: vec![
-          0, 0, 3, 6, 1, //
-          0, 3, 1, 3, 0,
-        ],
-      })
+      )
+      .request::<request::SemanticTokensFullRequest>(
+        lsp::SemanticTokensParams {
+          text_document: lsp::TextDocumentIdentifier::new(
+            "file:///test.just".parse().unwrap(),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lsp::SemanticTokensResult::Tokens(
+          lsp::SemanticTokens {
+            result_id: None,
+            data: vec![
+              lsp::SemanticToken {
+                delta_line: 0,
+                delta_start: 0,
+                length: 3,
+                token_type: 6,
+                token_modifiers_bitset: 1,
+              },
+              lsp::SemanticToken {
+                delta_line: 0,
+                delta_start: 3,
+                length: 1,
+                token_type: 3,
+                token_modifiers_bitset: 0,
+              },
+            ],
+          },
+        ))),
+      )
       .run()
       .await
   }
@@ -4045,18 +3304,8 @@ mod tests {
   #[tokio::test]
   async fn shutdown() -> Result {
     Test::new()
-      .request(InitializeRequest { id: 1 })
-      .response(InitializeResponse { id: 1 })
-      .request(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "shutdown",
-      }))
-      .response(json!({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": null
-      }))
+      .initialize()
+      .request::<request::Shutdown>((), Ok(()))
       .run()
       .await
   }
