@@ -11,9 +11,9 @@
 [language server protocol](https://microsoft.github.io/language-server-protocol/)
 for [just](https://github.com/casey/just), the command runner.
 
-[Website](https://just-lsp.vercel.app/) ·
-[Documentation](https://just-lsp.vercel.app/documentation) ·
-[Playground](https://just-lsp.vercel.app/playground)
+[Website](https://www.just-lsp.systems/) ·
+[Documentation](https://www.just-lsp.systems/documentation) ·
+[Playground](https://www.just-lsp.systems/playground)
 
 <img width="1667" alt="demo" src="screenshot.png" />
 
@@ -30,16 +30,16 @@ cargo install just-lsp
 ```
 
 See the
-[installation guide](https://just-lsp.vercel.app/documentation#installation) for
+[installation guide](https://www.just-lsp.systems/documentation#installation) for
 other package managers and pre-built binaries.
 
 ## Usage
 
 See the documentation for
-[editor setup](https://just-lsp.vercel.app/documentation#usage),
-[command-line usage](https://just-lsp.vercel.app/documentation#cli),
-[configuration](https://just-lsp.vercel.app/documentation#configuration), and
-[features](https://just-lsp.vercel.app/documentation#features).
+[editor setup](https://www.just-lsp.systems/documentation#usage),
+[command-line usage](https://www.just-lsp.systems/documentation#cli),
+[configuration](https://www.just-lsp.systems/documentation#configuration), and
+[features](https://www.just-lsp.systems/documentation#features).
 
 ## Development
 
