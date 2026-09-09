@@ -31,8 +31,8 @@ for [just](https://github.com/casey/just), the command runner.
 - Rename and find references for recipes, aliases, variables, and parameters,
   scope-aware so refactors don't accidentally rewrite unrelated identifiers.
 
-- Run any recipe directly from your editor via a code action, with optional
-  argument prompting before `just` is invoked.
+- Run recipes with no required arguments directly from your editor via a code
+  action or a `Run` code lens.
 
 - Semantic highlighting, folding, and formatting via `just --fmt --unstable`.
 
