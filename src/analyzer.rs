@@ -406,6 +406,13 @@ mod tests {
   }
 
   #[test]
+  fn analyzer_ignores_imported_dotenv_command_conflicts() {
+    Test::new("")
+      .imported_document("set dotenv-command := 'foo'\nset dotenv-load\n")
+      .run();
+  }
+
+  #[test]
   fn analyzer_ignores_imported_dotenv_path_filename_conflicts() {
     Test::new("")
       .imported_document(
@@ -563,11 +570,33 @@ mod tests {
   }
 
   #[test]
+  fn analyzer_imported_dotenv_command_conflict_reports_local_load() {
+    Test::new("set dotenv-load\n")
+      .imported_document("\n\nset dotenv-command := 'foo'\n")
+      .error(
+        "`dotenv-command` is incompatible with `dotenv-load`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
   fn analyzer_imported_dotenv_filename_conflict_reports_local_path() {
     Test::new("set dotenv-path := 'foo'\n")
       .imported_document("\n\nset dotenv-filename := 'bar'\n")
       .warning(
         "`dotenv-path` overrides `dotenv-filename`",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_dotenv_load_conflict_reports_local_command() {
+    Test::new("set dotenv-command := 'foo'\n")
+      .imported_document("\n\nset dotenv-load\n")
+      .error(
+        "`dotenv-load` is incompatible with `dotenv-command`",
         lsp::Range::at(0, 0, 1, 0),
       )
       .run();
@@ -654,6 +683,14 @@ mod tests {
         "Recipe `foo` is redefined as an alias",
         lsp::Range::at(0, 6, 0, 9),
       )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_recipe_usage_does_not_hide_unused_parameters() {
+    Test::new("set allow-duplicate-recipes\nfoo bar:\n")
+      .imported_document("foo bar:\n  echo {{bar}}\n")
+      .warning("Parameter `bar` appears unused", lsp::Range::at(1, 4, 1, 7))
       .run();
   }
 
