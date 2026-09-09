@@ -29,11 +29,9 @@ define_rule! {
             positional_arguments_enabled || recipe.has_attribute("positional-arguments");
 
           let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
-            (
-              UnusedRecipeParameterRule::positional_argument_indices(recipe),
-              recipe.runs_as_script(default_script)
-                || UnusedRecipeParameterRule::uses_all_positional_arguments(recipe),
-            )
+            let (indices, uses_all) = UnusedRecipeParameterRule::positional_argument_usage(recipe);
+
+            (indices, recipe.runs_as_script(default_script) || uses_all)
           } else {
             (HashSet::new(), false)
           };
@@ -60,10 +58,6 @@ define_rule! {
 }
 
 impl UnusedRecipeParameterRule {
-  fn is_unescaped_dollar(bytes: &[u8], i: usize) -> bool {
-    bytes[i] == b'$' && (i == 0 || bytes[i - 1] != b'\\')
-  }
-
   fn parse_positional(bytes: &[u8], braced: bool) -> Option<usize> {
     let inner = if braced {
       bytes.strip_prefix(b"{").and_then(|b| b.strip_suffix(b"}"))
@@ -78,65 +72,52 @@ impl UnusedRecipeParameterRule {
     str::from_utf8(inner).ok()?.parse().ok().filter(|&n| n > 0)
   }
 
-  fn positional_argument_indices(recipe: &Recipe) -> HashSet<usize> {
-    let bytes = recipe.content.as_bytes();
-
-    bytes
+  fn positional_argument_usage(recipe: &Recipe) -> (HashSet<usize>, bool) {
+    recipe
+      .body
       .iter()
-      .enumerate()
-      .filter(|&(i, _)| Self::is_unescaped_dollar(bytes, i))
-      .filter_map(|(i, _)| {
-        let rest = &bytes[i + 1..];
+      .flat_map(|line| {
+        let bytes = line.value.as_bytes();
+
+        bytes
+          .iter()
+          .enumerate()
+          .filter(move |&(i, _)| {
+            bytes[i] == b'$' && (i == 0 || bytes[i - 1] != b'\\')
+          })
+          .map(move |(i, _)| &bytes[i + 1..])
+      })
+      .fold((HashSet::new(), false), |(mut indices, uses_all), rest| {
+        if matches!(rest.first(), Some(b'@' | b'*'))
+          || matches!(rest, [b'{', b'@' | b'*', b'}', ..])
+        {
+          return (indices, true);
+        }
 
         let unbraced_end =
           rest.iter().take_while(|b| b.is_ascii_digit()).count();
 
-        if unbraced_end > 0 {
-          return Self::parse_positional(&rest[..unbraced_end], false);
+        let index = if unbraced_end > 0 {
+          Self::parse_positional(&rest[..unbraced_end], false)
+        } else {
+          rest
+            .iter()
+            .position(|&b| b == b'}')
+            .and_then(|end| Self::parse_positional(&rest[..=end], true))
+        };
+
+        if let Some(index) = index {
+          indices.insert(index);
         }
 
-        let brace_end = rest.iter().position(|&b| b == b'}')?;
-
-        Self::parse_positional(&rest[..=brace_end], true)
+        (indices, uses_all)
       })
-      .collect()
-  }
-
-  fn uses_all_positional_arguments(recipe: &Recipe) -> bool {
-    let bytes = recipe.content.as_bytes();
-
-    bytes.iter().enumerate().any(|(i, _)| {
-      if !Self::is_unescaped_dollar(bytes, i) {
-        return false;
-      }
-
-      let rest = &bytes[i + 1..];
-
-      matches!(rest.first(), Some(b'@' | b'*'))
-        || matches!(rest, [b'{', b'@' | b'*', b'}', ..])
-    })
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq, std::collections::HashSet};
-
-  fn recipe(content: &str) -> Recipe {
-    Recipe {
-      attributes: vec![],
-      body: vec![],
-      content: content.into(),
-      dependencies: vec![],
-      name: TextNode {
-        value: "graph".into(),
-        range: lsp::Range::default(),
-      },
-      parameters: vec![],
-      range: lsp::Range::default(),
-      shebang: None,
-    }
-  }
+  use {super::*, pretty_assertions::assert_eq};
 
   #[test]
   fn parse_positional_rejects_incomplete_braced() {
@@ -179,74 +160,30 @@ mod tests {
   }
 
   #[test]
-  fn positional_argument_indices_detects_braced_arguments() {
-    assert_eq!(
-      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
-        "graph log:\n  ./bin/graph ${3} ${4}"
-      )),
-      HashSet::from([3, 4])
-    );
-  }
+  fn positional_argument_usage() {
+    #[track_caller]
+    fn case(body: &str, indices: &[usize], uses_all: bool) {
+      let document = Document::from(format!("foo:\n{body}").as_str());
 
-  #[test]
-  fn positional_argument_indices_detects_unbraced_arguments() {
-    assert_eq!(
-      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
-        "graph log:\n  ./bin/graph $1 $2 text"
-      )),
-      HashSet::from([1, 2])
-    );
-  }
+      assert!(!document.tree.root_node().has_error());
 
-  #[test]
-  fn positional_argument_indices_ignores_invalid_variants() {
-    assert_eq!(
-      UnusedRecipeParameterRule::positional_argument_indices(&recipe(
-        "graph log:\n  echo $0 $foo ${bar} ${5} \\$6 ${7"
-      )),
-      HashSet::from([5])
-    );
-  }
+      assert_eq!(
+        UnusedRecipeParameterRule::positional_argument_usage(
+          &document.recipes()[0]
+        ),
+        (indices.iter().copied().collect::<HashSet<_>>(), uses_all),
+      );
+    }
 
-  #[test]
-  fn uses_all_positional_arguments_detects_braced_at() {
-    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo \"${@}\"")
-    ));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_detects_braced_star() {
-    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo ${*}")
-    ));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_detects_dollar_at() {
-    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo \"$@\"")
-    ));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_detects_dollar_star() {
-    assert!(UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo $*")
-    ));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_ignores_escaped() {
-    assert!(!UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo \\$@")
-    ));
-  }
-
-  #[test]
-  fn uses_all_positional_arguments_returns_false_when_absent() {
-    assert!(!UnusedRecipeParameterRule::uses_all_positional_arguments(
-      &recipe("run *args:\n  echo $1 $2")
-    ));
+    case("", &[], false);
+    case("  bar ${3} ${4}", &[3, 4], false);
+    case("  bar $1 $2", &[1, 2], false);
+    case("  bar $0 $foo ${bar} ${5} \\$6 ${7", &[5], false);
+    case("  bar \"${@}\"", &[], true);
+    case("  bar ${*}", &[], true);
+    case("  bar \"$@\"", &[], true);
+    case("  bar $*", &[], true);
+    case("  bar \\$@", &[], false);
+    case("  bar $1\n  baz $@\n  qux ${3}", &[1, 3], true);
   }
 }

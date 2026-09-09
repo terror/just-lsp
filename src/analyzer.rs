@@ -3823,6 +3823,36 @@ mod tests {
   }
 
   #[test]
+  fn positional_arguments_ignore_attributes() {
+    Test::new(indoc! {
+      "
+      [positional-arguments]
+      [doc: '$@']
+      foo bar baz:
+        echo $2
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_ignore_parameter_defaults() {
+    Test::new(indoc! {
+      "
+      set positional-arguments
+      foo bar='$1' baz='qux':
+        echo $2
+      "
+    })
+    .warning(
+      "Parameter `bar` appears unused",
+      lsp::Range::at(1, 4, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
   fn positional_arguments_only_mark_used_indices() {
     Test::new(indoc! {
       "
