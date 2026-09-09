@@ -20,7 +20,10 @@ use {
     io::{self, stderr},
     path::{Path, PathBuf},
     process::{self, Stdio},
-    sync::{LazyLock, atomic::AtomicBool},
+    sync::{
+      LazyLock,
+      atomic::{AtomicBool, Ordering},
+    },
     time::Instant,
   },
   subcommand::Subcommand,
