@@ -5247,6 +5247,10 @@ mod tests {
     case("invalid-arg-attribute", "[arg('bar')]\nfoo:\n");
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
     case(
+      "invalid-cache-attribute",
+      "set unstable\n[script, cache('foo')]\nfoo:\n",
+    );
+    case(
       "invalid-dependency-argument-count",
       "foo bar:\n  echo {{bar}}\nbaz: foo\n",
     );
