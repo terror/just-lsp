@@ -1958,13 +1958,15 @@ mod tests {
 
   #[test]
   fn node_at_position() {
-    let document = Document::from(indoc! {"
+    let document = Document::from(indoc! {
+      "
       foo:
         echo \"foo\"
 
       bar: foo
         echo \"bar\"
-    "});
+      "
+    });
 
     let node = document
       .node_at_position(lsp::Position {
