@@ -152,6 +152,13 @@ impl Workspace {
         .any(|document| self.documents.is_open(&document.uri))
     });
 
+    self.documents.retain_closed(|uri| {
+      self
+        .projects
+        .values()
+        .any(|project| project.import_scope.contains(uri))
+    });
+
     Ok(())
   }
 
@@ -189,5 +196,56 @@ impl Workspace {
     projects.sort_by_key(|project| &project.root);
 
     projects
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use {super::*, pretty_assertions::assert_eq};
+
+  #[test]
+  fn reopening_project_reloads_imports() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let root = tempdir.path().join("justfile");
+    let imported = tempdir.path().join("foo.just");
+
+    fs::write(&root, "import 'foo.just'\n").unwrap();
+    fs::write(&imported, "foo:\n").unwrap();
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+    let imported = lsp::Url::from_file_path(imported).unwrap();
+    let open = lsp::DidOpenTextDocumentParams {
+      text_document: lsp::TextDocumentItem::new(
+        root.clone(),
+        "just".into(),
+        1,
+        "import 'foo.just'\n".into(),
+      ),
+    };
+    let mut workspace = Workspace::default();
+
+    workspace.documents.open(open.clone()).unwrap();
+    workspace.load_projects([root.clone()]).unwrap();
+
+    assert!(workspace.documents.close(&lsp::DidCloseTextDocumentParams {
+      text_document: lsp::TextDocumentIdentifier::new(root.clone()),
+    }));
+
+    workspace.load_projects([root.clone()]).unwrap();
+
+    fs::write(imported.to_file_path().unwrap(), "bar:\n").unwrap();
+
+    workspace.documents.open(open).unwrap();
+    workspace.load_projects([root]).unwrap();
+
+    assert_eq!(
+      workspace
+        .documents
+        .get(&imported)
+        .unwrap()
+        .content
+        .to_string(),
+      "bar:\n",
+    );
   }
 }

@@ -107,6 +107,15 @@ impl DocumentStore {
 
     Document::new(&fs::read_to_string(path)?, uri.clone())
   }
+
+  pub(super) fn retain_closed(
+    &mut self,
+    mut retain: impl FnMut(&lsp::Url) -> bool,
+  ) {
+    self
+      .documents
+      .retain(|uri, entry| entry.open || retain(uri));
+  }
 }
 
 #[cfg(test)]
@@ -224,5 +233,27 @@ mod tests {
     assert_eq!(store.load(&uri).unwrap().content.to_string(), "bar:");
 
     assert!(store.is_open(&uri));
+  }
+
+  #[test]
+  fn retain_closed_documents() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let foo = uri(&tempdir.path().join("foo.just"));
+    let bar = uri(&tempdir.path().join("bar.just"));
+    let baz = uri(&tempdir.path().join("baz.just"));
+
+    fs::write(foo.to_file_path().unwrap(), "foo:\n").unwrap();
+    fs::write(bar.to_file_path().unwrap(), "bar:\n").unwrap();
+
+    let mut store = DocumentStore::default();
+
+    store.load(&foo).unwrap();
+    store.load(&bar).unwrap();
+    store.open(open(baz.clone(), 1, "baz:\n")).unwrap();
+    store.retain_closed(|uri| uri == &foo);
+
+    assert_eq!(store.get(&foo).unwrap().content.to_string(), "foo:\n");
+    assert!(store.get(&bar).is_none());
+    assert_eq!(store.get_open(&baz).unwrap().content.to_string(), "baz:\n");
   }
 }
