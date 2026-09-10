@@ -6,6 +6,10 @@ pub struct ImportScope {
 }
 
 impl ImportScope {
+  pub(super) fn contains(&self, uri: &lsp::Url) -> bool {
+    self.documents.iter().any(|document| document.uri == *uri)
+  }
+
   #[must_use]
   pub fn documents(&self) -> &[ImportScopeDocument] {
     &self.documents
