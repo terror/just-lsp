@@ -5248,6 +5248,10 @@ mod tests {
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
     case("invalid-continue-signal", "[continue('foo')]\nbar:\n");
     case(
+      "invalid-attribute-argument-expression",
+      "[group('foo' + 'bar')]\nfoo:\n",
+    );
+    case(
       "invalid-cache-attribute",
       "set unstable\n[script, cache('foo')]\nfoo:\n",
     );

@@ -5,8 +5,8 @@ const EXPRESSION_ATTRIBUTES: &[&str] =
 const CONST_EXPRESSION_ATTRIBUTES: &[&str] = &["doc"];
 
 define_rule! {
-  AttributeArgumentExpressionsRule {
-    id: "attribute-argument-expressions",
+  InvalidAttributeArgumentExpressionRule {
+    id: "invalid-attribute-argument-expression",
     message: "invalid attribute argument expression",
     run(context) {
       context
@@ -26,7 +26,7 @@ define_rule! {
   }
 }
 
-impl AttributeArgumentExpressionsRule {
+impl InvalidAttributeArgumentExpressionRule {
   fn const_expression(node: Node) -> bool {
     node.find("function_call").is_none()
       && node.find("external_command").is_none()
