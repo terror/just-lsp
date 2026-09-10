@@ -4,7 +4,7 @@ define_rule! {
   /// Detects recipes that have the same name and overlapping OS constraints,
   /// which would shadow each other at runtime unless overrides are enabled.
   DuplicateRecipeRule {
-    id: "duplicate-recipes",
+    id: "duplicate-recipe",
     message: "duplicate recipes",
     run(context) {
       let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
