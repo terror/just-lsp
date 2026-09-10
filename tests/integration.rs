@@ -517,7 +517,7 @@ fn analyze_reports_imported_recipe_parameters() -> Result {
     .argument("justfile")
     .expected_stdout(indoc! {
       "
-      warning[unused-recipe-parameters]: unused parameter
+      warning[unused-recipe-parameter]: unused parameter
          ╭─[ [ROOT]/foo.just:1:5 ]
          │
        1 │ foo bar:
@@ -586,7 +586,7 @@ fn analyze_reports_nested_import_errors_and_fails() -> Result {
          │          ─┬─
          │           ╰─── Unknown function `qux`
       ───╯
-      warning[unused-recipe-parameters]: unused parameter
+      warning[unused-recipe-parameter]: unused parameter
          ╭─[ foo/justfile:3:5 ]
          │
        3 │ foo bar:
@@ -648,7 +648,7 @@ fn analyze_reports_syntax_errors_and_fails() -> Result {
     .expected_status(1)
     .expected_stdout(indoc! {
       r#"
-      error[syntax-errors]: syntax errors
+      error[syntax-error]: syntax errors
          ╭─[ justfile:1:1 ]
          │
        1 │ ╭─▶ foo
