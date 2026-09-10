@@ -5233,6 +5233,7 @@ mod tests {
       "assignment-unexport-conflict",
       "export foo := 'bar'\nunexport foo\n",
     );
+    case("duplicate-dependency", "foo:\nbar: foo foo\n");
     case(
       "duplicate-function-parameter",
       "set unstable\n_foo(bar, bar) := bar\n",
@@ -5260,13 +5261,30 @@ mod tests {
     );
     case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("recipe-dependency-cycle", "foo: foo\n");
     case("syntax-error", "foo\n");
+    case("undefined-identifier", "foo:\n  echo {{bar}}\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
     );
     case("unused-recipe-parameter", "foo bar:\n");
     case("unused-variable", "foo := 'bar'\n");
+  }
+
+  #[test]
+  fn rule_config_off_suppresses_invalid_attribute_placement() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "invalid-attribute-placement": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new("[private]\n")
+      .config(config)
+      .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
+      .run();
   }
 
   #[test]

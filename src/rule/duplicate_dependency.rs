@@ -17,8 +17,8 @@ struct DependencyKey {
 define_rule! {
   /// Warns when a recipe lists the same dependency with identical arguments
   /// more than once since `just` only runs it once.
-  DuplicateDependenciesRule {
-    id: "duplicate-dependencies",
+  DuplicateDependencyRule {
+    id: "duplicate-dependency",
     message: "duplicate dependencies",
     run(context) {
       let mut diagnostics = Vec::new();
