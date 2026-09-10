@@ -14,7 +14,7 @@ these options.
     "indentation": "\t"
   },
   "rules": {
-    "unused-variables": "off",
+    "unused-variable": "off",
     "unused-recipe-parameters": { "level": "warning" }
   }
 }

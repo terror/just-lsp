@@ -2,8 +2,8 @@ use super::*;
 
 define_rule! {
   /// Reports invalid user-defined function parameter lists.
-  FunctionParametersRule {
-    id: "function-parameters",
+  DuplicateFunctionParameterRule {
+    id: "duplicate-function-parameter",
     message: "invalid function parameters",
     run(context) {
       context
