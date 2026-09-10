@@ -4481,6 +4481,16 @@ mod tests {
   }
 
   #[test]
+  fn recipe_inconsistent_indentation_after_continuation() {
+    Test::new("foo:\n  bar \\\n    baz\n    qux\n      quux\n")
+      .error(
+        "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠` but found line with `␠␠␠␠`",
+        lsp::Range::at(3, 0, 3, 4),
+      )
+      .run();
+  }
+
+  #[test]
   fn recipe_inconsistent_indentation_after_multiline_interpolation() {
     Test::new(indoc! {
       "
