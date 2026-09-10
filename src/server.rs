@@ -1797,7 +1797,7 @@ mod tests {
         "bar.just",
         None,
         [Diagnostic {
-          id: "duplicate-recipe-parameters".into(),
+          id: "duplicate-recipe-parameter".into(),
           ..Diagnostic::error(
             "Duplicate parameter `bar`",
             lsp::Range::at(0, 8, 0, 11),
