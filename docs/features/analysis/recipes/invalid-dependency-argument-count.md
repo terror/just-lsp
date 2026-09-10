@@ -7,7 +7,7 @@ Reports a dependency invocation with an argument count that does not match the t
 
 - Required parameters and `+` variadic parameters without defaults each need an argument. Defaulted parameters and `*` variadic parameters can be omitted.
 - Without list mode, a variadic parameter permits additional arguments. With `set lists`, extra arguments beyond the number of parameters are rejected.
-- The check uses the resolved recipe signature, including imported recipes. A missing target is handled by `missing-dependencies`.
+- The check uses the resolved recipe signature, including imported recipes. A missing target is handled by `unresolved-dependency`.
 
 ## How to fix it
 

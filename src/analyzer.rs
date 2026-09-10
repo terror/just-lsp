@@ -5269,6 +5269,7 @@ mod tests {
     case("syntax-error", "foo\n");
     case("undefined-identifier", "foo:\n  echo {{bar}}\n");
     case("unresolved-alias-target", "alias foo := bar\n");
+    case("unresolved-dependency", "foo: bar\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
@@ -5318,7 +5319,7 @@ mod tests {
   fn rule_config_overrides_severity_to_warning() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
-        "missing-dependencies": "warning"
+        "unresolved-dependency": "warning"
       }
     }))
     .unwrap();
