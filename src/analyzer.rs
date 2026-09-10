@@ -5229,10 +5229,14 @@ mod tests {
       Test::new(source).config(config).run();
     }
 
-    case("duplicate-recipe", "foo:\nfoo:\n");
     case(
       "duplicate-function-parameter",
       "set unstable\n_foo(bar, bar) := bar\n",
+    );
+    case("duplicate-recipe", "foo:\nfoo:\n");
+    case(
+      "assignment-unexport-conflict",
+      "export foo := 'bar'\nunexport foo\n",
     );
     case(
       "duplicate-recipe-parameter",
@@ -5240,6 +5244,10 @@ mod tests {
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
+    case(
+      "invalid-function-argument-count",
+      "foo:\n  echo {{arch('bar')}}\n",
+    );
     case(
       "invalid-mapped-dependency",
       "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
