@@ -33,6 +33,7 @@ impl<'a> Scope<'a> {
       document: context.document(),
       globals: context.variable_and_builtin_names().clone(),
       recipe_identifier_usage: context
+        .document()
         .recipes()
         .iter()
         .map(|recipe| (recipe.name.value.clone(), HashSet::new()))
@@ -62,7 +63,9 @@ impl<'a> Scope<'a> {
 
     let name = self.document.get_node_text(&identifier);
 
-    if let Some(recipe_name) = &local.recipe {
+    if self.root
+      && let Some(recipe_name) = &local.recipe
+    {
       self
         .recipe_identifier_usage
         .entry(recipe_name.clone())
@@ -508,7 +511,7 @@ mod tests {
         echo {{lib_var}}
       "
     })
-    .recipe_usage("use", &["lib_var"])
+    .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
   }
@@ -526,7 +529,7 @@ mod tests {
         echo {{arg}}
       "
     })
-    .recipe_usage("use", &["arg", "lib_var"])
+    .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
   }
@@ -546,7 +549,7 @@ mod tests {
         echo {{arg}}
       "
     })
-    .recipe_usage("use", &["arg"])
+    .recipe_usage("use", &[])
     .run();
   }
 

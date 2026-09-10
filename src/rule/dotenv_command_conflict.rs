@@ -5,16 +5,17 @@ define_rule! {
     id: "dotenv-command-conflict",
     message: "conflicting dotenv command setting",
     run(context) {
-      let settings = context
-        .document()
+      let mut settings = context
         .settings()
-        .into_iter()
+        .iter()
         .map(|setting| {
           let groups = GroupSet::from_attributes(&setting.attributes);
 
           (setting, groups)
         })
         .collect::<Vec<_>>();
+
+      settings.sort_by_key(|(setting, _)| setting.uri == context.document().uri);
 
       let mut seen = HashSet::new();
 
@@ -27,7 +28,8 @@ define_rule! {
             .map(move |previous| (previous, current))
         })
         .filter(|((previous, previous_groups), (current, current_groups))| {
-          previous_groups.conflicts_with(current_groups)
+          current.uri == context.document().uri
+            && previous_groups.conflicts_with(current_groups)
             && (previous.name.value == "dotenv-command"
               && current.loads_dotenv()
               || current.name.value == "dotenv-command"
