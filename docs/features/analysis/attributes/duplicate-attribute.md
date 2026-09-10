@@ -8,7 +8,7 @@ Reports repeated attributes that must be unique, repeated group values, or more 
 - Most builtin attributes may appear once per target, including when written in separate attribute lists.
 - `[group]` may be repeated with different literal values; equivalent decoded values on the same target are duplicates. `[env]` and `[metadata]` may repeat.
 - `[default]` is limited to one recipe per module for overlapping platform constraints. Disjoint platform-specific defaults are allowed.
-- `[arg]` may configure multiple parameters, but duplicate configuration for one parameter is checked by `arg-attribute`.
+- `[arg]` may configure multiple parameters, but duplicate configuration for one parameter is checked by `invalid-arg-attribute`.
 
 ## How to fix it
 

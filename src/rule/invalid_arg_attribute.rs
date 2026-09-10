@@ -8,8 +8,8 @@ define_rule! {
   /// Validates `[arg(NAME, ...)]` attributes: that NAME refers to an existing
   /// recipe parameter, that only known keyword arguments are used, and that
   /// `value=` is paired with `long=` or `short=`.
-  ArgAttributeRule {
-    id: "arg-attribute",
+  InvalidArgAttributeRule {
+    id: "invalid-arg-attribute",
     message: "invalid arg attribute",
     run(context) {
       let document = context.document();
@@ -65,7 +65,7 @@ define_rule! {
   }
 }
 
-impl ArgAttributeRule {
+impl InvalidArgAttributeRule {
   fn const_expression(node: Node) -> bool {
     node.find("function_call").is_none()
       && node.find("external_command").is_none()
