@@ -2072,6 +2072,274 @@ mod tests {
   }
 
   #[test]
+  fn recipe_body_comments() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        # bar
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  # bar".into(),
+          range: lsp::Range::at(1, 0, 1, 7),
+        },
+        TextNode {
+          value: "  baz".into(),
+          range: lsp::Range::at(2, 0, 2, 5),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn recipe_body_continuation() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        {{'bar'}}\\
+      \t{{'baz'}}
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  {{'bar'}}\\".into(),
+          range: lsp::Range::at(1, 0, 1, 12),
+        },
+        TextNode {
+          value: "\t{{'baz'}}".into(),
+          range: lsp::Range::at(2, 0, 2, 10),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn recipe_body_crlf() {
+    let document = Document::from("[private]\r\nfoo:\r\n\tbar");
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![TextNode {
+        value: "\tbar".into(),
+        range: lsp::Range::at(2, 0, 2, 4),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_body_empty() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+      bar:
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(document.recipes()[0].body, vec![]);
+  }
+
+  #[test]
+  fn recipe_body_multiline_header() {
+    let document = Document::from(indoc! {
+      "
+      foo: \\
+      \tbar
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![TextNode {
+        value: "  baz".into(),
+        range: lsp::Range::at(2, 0, 2, 5),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_body_multiline_interpolation() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        {{'
+      bar
+          baz
+      '}}
+        qux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  {{'\nbar\n    baz\n'}}".into(),
+          range: lsp::Range::at(1, 0, 4, 3),
+        },
+        TextNode {
+          value: "  qux".into(),
+          range: lsp::Range::at(5, 0, 5, 5),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn recipe_body_multiline_parameter() {
+    let document = Document::from(indoc! {
+      "
+      foo bar='''
+      \tbaz
+          qux
+      ''':
+        bar
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![TextNode {
+        value: "  bar".into(),
+        range: lsp::Range::at(4, 0, 4, 5),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_body_recipe_boundary() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+      baz:
+      \tqux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![TextNode {
+        value: "  bar".into(),
+        range: lsp::Range::at(1, 0, 1, 5),
+      }],
+    );
+  }
+
+  #[test]
+  fn recipe_body_shebang() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        #!/bin/sh
+        bar
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  #!/bin/sh".into(),
+          range: lsp::Range::at(1, 0, 1, 11),
+        },
+        TextNode {
+          value: "  bar".into(),
+          range: lsp::Range::at(2, 0, 2, 5),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn recipe_body_shebang_comment() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+          #!/bin/sh
+        qux
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  bar".into(),
+          range: lsp::Range::at(1, 0, 1, 5),
+        },
+        TextNode {
+          value: "    #!/bin/sh".into(),
+          range: lsp::Range::at(2, 0, 2, 13),
+        },
+        TextNode {
+          value: "  qux".into(),
+          range: lsp::Range::at(3, 0, 3, 5),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn recipe_body_whitespace() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        bar
+
+       \t
+        baz
+      "
+    });
+
+    assert!(!document.tree.root_node().has_error());
+
+    assert_eq!(
+      document.recipes()[0].body,
+      vec![
+        TextNode {
+          value: "  bar".into(),
+          range: lsp::Range::at(1, 0, 1, 5),
+        },
+        TextNode {
+          value: "  baz".into(),
+          range: lsp::Range::at(4, 0, 4, 5),
+        },
+      ],
+    );
+  }
+
+  #[test]
   fn recipe_with_attributes() {
     let document = Document::from(indoc! {
       "
