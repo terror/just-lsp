@@ -73,7 +73,7 @@ mod missing_recipe_for_alias;
 mod mixed_indentation;
 mod recipe_dependency_cycles;
 mod script_shell_conflict;
-mod syntax;
+mod syntax_error;
 mod undefined_identifiers;
 mod unknown_attribute;
 mod unknown_function;

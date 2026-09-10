@@ -5244,6 +5244,7 @@ mod tests {
       "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
     );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("syntax-error", "foo\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
