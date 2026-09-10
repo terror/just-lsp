@@ -5230,20 +5230,25 @@ mod tests {
     }
 
     case(
+      "assignment-unexport-conflict",
+      "export foo := 'bar'\nunexport foo\n",
+    );
+    case(
       "duplicate-function-parameter",
       "set unstable\n_foo(bar, bar) := bar\n",
     );
     case("duplicate-recipe", "foo:\nfoo:\n");
     case(
-      "assignment-unexport-conflict",
-      "export foo := 'bar'\nunexport foo\n",
-    );
-    case(
       "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
+    case("invalid-arg-attribute", "[arg('bar')]\nfoo:\n");
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
+    case(
+      "invalid-dependency-argument-count",
+      "foo bar:\n  echo {{bar}}\nbaz: foo\n",
+    );
     case(
       "invalid-function-argument-count",
       "foo:\n  echo {{arch('bar')}}\n",
@@ -5252,6 +5257,7 @@ mod tests {
       "invalid-mapped-dependency",
       "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
     );
+    case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case("syntax-error", "foo\n");
     case(
