@@ -5230,20 +5230,25 @@ mod tests {
     }
 
     case(
-      "duplicate-recipe-parameters",
+      "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );
+    case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
     case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case(
+      "unsupported-attribute-target",
+      "[group('foo')]\nalias bar := baz\nbaz:\n",
+    );
     case("unused-recipe-parameters", "foo bar:\n");
-    case("unused-variables", "foo := 'bar'\n");
+    case("unused-variable", "foo := 'bar'\n");
   }
 
   #[test]
   fn rule_config_overrides_severity_to_error() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
-        "unused-variables": "error"
+        "unused-variable": "error"
       }
     }))
     .unwrap();
