@@ -219,7 +219,7 @@ fn analyze_accepts_absolute_justfile_path() -> Result {
     .argument(&path)
     .expected_stdout(indoc! {
       r#"
-      warning[unused-variables]: unused variable
+      warning[unused-variable]: unused variable
          ╭─[ [ROOT]/justfile:1:1 ]
          │
        1 │ foo := "bar"
@@ -419,7 +419,7 @@ fn analyze_reports_diagnostics_for_nested_relative_path() -> Result {
     .argument("subdir/justfile")
     .expected_stdout(indoc! {
       r#"
-      warning[unused-variables]: unused variable
+      warning[unused-variable]: unused variable
          ╭─[ subdir/justfile:1:1 ]
          │
        1 │ foo := "bar"
@@ -448,7 +448,7 @@ fn analyze_reports_diagnostics_for_parent_justfile() -> Result {
     .directory("foo/bar")
     .expected_stdout(indoc! {
       r#"
-      warning[unused-variables]: unused variable
+      warning[unused-variable]: unused variable
          ╭─[ [ROOT]/justfile:1:1 ]
          │
        1 │ foo := "bar"
@@ -547,7 +547,7 @@ fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
     .expected_status(1)
     .expected_stdout(indoc! {
       r#"
-      warning[unused-variables]: unused variable
+      warning[unused-variable]: unused variable
          ╭─[ justfile:1:1 ]
          │
        1 │ foo := "bar"
@@ -678,7 +678,7 @@ fn analyze_reports_warnings_without_failing() -> Result {
     .argument("justfile")
     .expected_stdout(indoc! {
       r#"
-      warning[unused-variables]: unused variable
+      warning[unused-variable]: unused variable
          ╭─[ justfile:1:1 ]
          │
        1 │ foo := "bar"

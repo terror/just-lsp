@@ -26,7 +26,7 @@ vim.lsp.config('just', {
       indentation = '\t',
     },
     rules = {
-      ['unused-variables'] = 'off',
+      ['unused-variable'] = 'off',
       ['unused-recipe-parameter'] = { level = 'warning' },
     },
   },

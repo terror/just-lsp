@@ -10,7 +10,7 @@ string or an object with a `level` field:
 ```json
 {
   "rules": {
-    "unused-variables": "off",
+    "unused-variable": "off",
     "unused-recipe-parameter": { "level": "error" }
   }
 }
