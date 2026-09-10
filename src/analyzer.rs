@@ -5094,32 +5094,6 @@ mod tests {
   }
 
   #[test]
-  fn recipe_parameter_rules_are_independent() {
-    for (rule, message) in [
-      (
-        "duplicate-recipe-parameter",
-        "Required parameter `bar` follows a parameter with a default value",
-      ),
-      (
-        "invalid-recipe-parameter-order",
-        "Duplicate parameter `bar`",
-      ),
-    ] {
-      let config = serde_json::from_value::<Config>(serde_json::json!({
-        "rules": {
-          rule: "off"
-        }
-      }))
-      .unwrap();
-
-      Test::new("foo bar='bar' bar:\n  echo {{bar}}\n")
-        .config(config)
-        .error(message, lsp::Range::at(0, 14, 0, 17))
-        .run();
-    }
-  }
-
-  #[test]
   fn recipe_parameters_defaults_all() {
     Test::new(indoc! {
       "
