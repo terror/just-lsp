@@ -20,7 +20,7 @@ under `lsp.just-lsp` in your Zed `settings.json`:
           "indentation": "\t"
         },
         "rules": {
-          "unused-variables": "off",
+          "unused-variable": "off",
           "unused-recipe-parameters": { "level": "warning" }
         }
       }
