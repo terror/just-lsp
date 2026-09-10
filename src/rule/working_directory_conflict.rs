@@ -18,24 +18,9 @@ define_rule! {
         }
       });
 
-      for recipe in context.local_declarations(context.recipes()) {
-        let working_directory_attribute =
-          recipe.find_attribute("working-directory");
-
-        let no_cd_attribute = recipe.find_attribute("no-cd");
-
-        if let (Some(attribute), Some(_)) =
-          (working_directory_attribute, no_cd_attribute)
-        {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
-              recipe.name.value
-            ),
-            attribute.range,
-          ));
-        }
-      }
+      diagnostics.extend(
+        context.conflicting_recipe_attributes("working-directory", "no-cd"),
+      );
 
       diagnostics
     }

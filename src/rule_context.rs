@@ -110,6 +110,29 @@ impl<'a> RuleContext<'a> {
     })
   }
 
+  pub(super) fn conflicting_recipe_attributes(
+    &self,
+    left: &str,
+    right: &str,
+  ) -> Vec<Diagnostic> {
+    self
+      .local_declarations(self.recipes())
+      .filter_map(|recipe| {
+        let attribute = recipe.find_attribute(left)?;
+
+        recipe.find_attribute(right)?;
+
+        Some(Diagnostic::error(
+          format!(
+            "Recipe `{}` can't combine `[{left}]` with `[{right}]`",
+            recipe.name.value
+          ),
+          attribute.range,
+        ))
+      })
+      .collect()
+  }
+
   pub(super) fn conflicting_settings(
     &self,
     incompatible: impl Fn(&Setting, &Setting) -> bool,
