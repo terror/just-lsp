@@ -5235,6 +5235,10 @@ mod tests {
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case(
+      "unsupported-attribute-target",
+      "[group('foo')]\nalias bar := baz\nbaz:\n",
+    );
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
   }

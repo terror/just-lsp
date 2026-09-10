@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Validates that each attribute is attached to a supported target kind
   /// (recipe, module, alias, etc.) according to the builtin metadata.
-  AttributeTargetSupportRule {
-    id: "attribute-target-support",
+  UnsupportedAttributeTargetRule {
+    id: "unsupported-attribute-target",
     message: "unsupported attribute target",
     run(context) {
       let mut diagnostics = Vec::new();
