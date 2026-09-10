@@ -94,8 +94,8 @@ impl NodeExt for Node<'_> {
 
   fn get_range(&self, document: &Document) -> lsp::Range {
     lsp::Range {
-      start: self.start_position().position(document),
-      end: self.end_position().position(document),
+      start: document.content.byte_to_lsp_position(self.start_byte()),
+      end: document.content.byte_to_lsp_position(self.end_byte()),
     }
   }
 

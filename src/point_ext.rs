@@ -24,15 +24,19 @@ impl PointExt for Point {
   /// into a char index, and then into a UTF-16 offset to produce an
   /// `lsp::Position`.
   fn position(&self, document: &Document) -> lsp::Position {
-    let line = document.content.line(self.row);
+    let byte = if self.row == 0 {
+      0
+    } else {
+      document
+        .content
+        .bytes()
+        .enumerate()
+        .filter_map(|(index, byte)| (byte == b'\n').then_some(index + 1))
+        .nth(self.row - 1)
+        .expect("line index out of bounds")
+    };
 
-    let utf16_cu = line.char_to_utf16_cu(line.byte_to_char(self.column));
-
-    lsp::Position {
-      line: u32::try_from(self.row).expect("line index exceeds u32::MAX"),
-      character: u32::try_from(utf16_cu)
-        .expect("column index exceeds u32::MAX"),
-    }
+    document.content.byte_to_lsp_position(byte + self.column)
   }
 }
 
@@ -48,6 +52,19 @@ mod tests {
   #[test]
   fn advance_moves_rows_and_resets_column_when_row_delta_positive() {
     assert_eq!(Point::new(1, 4).advance(Point::new(2, 3)), Point::new(3, 3));
+  }
+
+  #[test]
+  fn bare_carriage_returns_preserve_lsp_lines() {
+    let document = Document::from("foo\r🧪\r\nbar\rbaz\nqux\r");
+
+    for (point, position) in [
+      (Point::new(0, 8), lsp::Position::new(1, 2)),
+      (Point::new(1, 4), lsp::Position::new(3, 0)),
+      (Point::new(2, 4), lsp::Position::new(5, 0)),
+    ] {
+      assert_eq!(point.position(&document), position);
+    }
   }
 
   #[test]

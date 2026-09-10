@@ -47,31 +47,11 @@ impl StrExt for str {
   }
 
   fn point_delta(&self) -> Point {
-    let (mut rows, mut column) = (0usize, 0usize);
+    let mut lines = self.split('\n');
 
-    let mut chars = self.chars().peekable();
+    let column = lines.next_back().unwrap().len();
 
-    while let Some(ch) = chars.next() {
-      match ch {
-        '\r' => {
-          if matches!(chars.peek().copied(), Some('\n')) {
-            chars.next();
-          }
-
-          rows += 1;
-          column = 0;
-        }
-        '\n' => {
-          rows += 1;
-          column = 0;
-        }
-        _ => {
-          column += ch.len_utf8();
-        }
-      }
-    }
-
-    Point::new(rows, column)
+    Point::new(lines.count(), column)
   }
 }
 
@@ -85,8 +65,8 @@ mod tests {
   }
 
   #[test]
-  fn bare_carriage_return_counts_as_line_break() {
-    assert_eq!("foo\rbar".point_delta(), Point::new(1, "bar".len()));
+  fn bare_carriage_return_advances_column() {
+    assert_eq!("foo\rbar".point_delta(), Point::new(0, 7));
   }
 
   #[test]

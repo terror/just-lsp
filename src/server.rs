@@ -2003,6 +2003,31 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn did_change_handles_bare_carriage_returns() -> Result {
+    Test::new()
+      .initialize()
+      .open(
+        "file:///foo.just",
+        "foo := '🧪\rbar'\r\n\nbaz:\n  echo {{ foo }}\n",
+      )
+      .edit("file:///foo.just", 2, lsp::Range::at(1, 0, 1, 3), "bar\r🧪")
+      .edit("file:///foo.just", 3, lsp::Range::at(2, 0, 2, 2), "qux")
+      .hover(
+        "file:///foo.just",
+        lsp::Position::new(5, 11),
+        Some(lsp::Hover {
+          contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::PlainText,
+            value: "foo := '🧪\rbar\rqux'".into(),
+          }),
+          range: Some(lsp::Range::at(5, 10, 5, 13)),
+        }),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn did_change_handles_multibyte_characters() -> Result {
     Test::new()
       .initialize()

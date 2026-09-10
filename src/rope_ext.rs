@@ -48,11 +48,18 @@ pub struct Edit<'a> {
 
 pub trait RopeExt {
   fn apply_edit(&mut self, edit: &Edit);
+
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> Edit<'a>;
+
   fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position;
+
+  fn lsp_position_to_char(&self, position: lsp::Position) -> usize {
+    self.lsp_position_to_position(position).char
+  }
+
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
 }
 
@@ -122,10 +129,7 @@ impl RopeExt for Rope {
     )
   }
 
-  /// Converts an LSP position back into absolute byte/char offsets and a
-  /// tree-sitter point so downstream consumers can choose whichever coordinate
-  /// space they need.
-  fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
+  fn lsp_position_to_char(&self, position: lsp::Position) -> usize {
     let row = (position.line as usize).min(self.len_lines() - 1);
 
     let line = self.line(row);
@@ -144,13 +148,26 @@ impl RopeExt for Rope {
       )
     };
 
-    let char = self.line_to_char(row) + column;
+    self.line_to_char(row) + column
+  }
+
+  /// Converts an LSP position back into absolute byte/char offsets and a
+  /// tree-sitter point so downstream consumers can choose whichever coordinate
+  /// space they need.
+  fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
+    let char = self.lsp_position_to_char(position);
+
     let byte = self.char_to_byte(char);
 
     Position {
       byte,
       char,
-      point: Point::new(row, byte - self.line_to_byte(row)),
+      point: self
+        .slice(..char)
+        .chunks()
+        .fold(Point::new(0, 0), |point, chunk| {
+          point.advance(chunk.point_delta())
+        }),
     }
   }
 }
@@ -434,32 +451,32 @@ mod tests {
 
   #[test]
   fn multiline_edit_handles_utf16_offsets() {
-    let mut rope = Rope::from_str("foo😊\nbar");
+    let mut rope = Rope::from_str("foo\r🧪bar\r\nbaz\rqux");
 
-    let change = change("XX", lsp::Range::at(0, 2, 1, 1));
+    let change = change("foo\rbar\r\n🧪\rbaz", lsp::Range::at(1, 2, 3, 0));
 
     let edit = rope.build_edit(&change);
 
     assert_eq!(
       edit,
       Edit {
-        start_char: 2,
-        end_char: 6,
+        start_char: 5,
+        end_char: 14,
         input_edit: InputEdit {
-          start_byte: 2,
-          old_end_byte: 9,
-          new_end_byte: 4,
-          start_position: Point::new(0, 2),
-          old_end_position: Point::new(1, 1),
-          new_end_position: Point::new(0, 4),
+          start_byte: 8,
+          old_end_byte: 17,
+          new_end_byte: 25,
+          start_position: Point::new(0, 8),
+          old_end_position: Point::new(1, 4),
+          new_end_position: Point::new(1, 8),
         },
-        text: "XX",
+        text: "foo\rbar\r\n🧪\rbaz",
       }
     );
 
     rope.apply_edit(&edit);
 
-    assert_eq!(rope.to_string(), "foXXar");
+    assert_eq!(rope.to_string(), "foo\r🧪foo\rbar\r\n🧪\rbazqux");
   }
 
   #[test]
