@@ -4,7 +4,7 @@ define_rule! {
   /// Highlights recipe parameters that never get read anywhere in the recipe
   /// body (unless `set export` is on).
   UnusedRecipeParameterRule {
-    id: "unused-recipe-parameters",
+    id: "unused-recipe-parameter",
     message: "unused parameter",
     run(context) {
       let default_script = context.setting_enabled("default-script");

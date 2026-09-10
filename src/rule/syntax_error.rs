@@ -3,22 +3,22 @@ use super::*;
 define_rule! {
   /// Surfaces tree-sitter syntax errors and missing nodes so users get feedback
   /// on malformed `justfile` syntax before other rules run.
-  SyntaxRule {
-    id: "syntax-errors",
+  SyntaxErrorRule {
+    id: "syntax-error",
     message: "syntax errors",
     run(context) {
       let mut diagnostics = Vec::new();
 
       let mut cursor = context.tree().root_node().walk();
 
-      SyntaxRule::collect(context.document(), &mut cursor, &mut diagnostics);
+      SyntaxErrorRule::collect(context.document(), &mut cursor, &mut diagnostics);
 
       diagnostics
     }
   }
 }
 
-impl SyntaxRule {
+impl SyntaxErrorRule {
   fn collect(
     document: &Document,
     cursor: &mut TreeCursor<'_>,
@@ -28,21 +28,21 @@ impl SyntaxRule {
 
     if node.is_error() {
       diagnostics.push(Diagnostic::error(
-        SyntaxRule::error_message(document, &node),
+        SyntaxErrorRule::error_message(document, &node),
         node.get_range(document),
       ));
     }
 
     if node.is_missing() {
       diagnostics.push(Diagnostic::error(
-        SyntaxRule::missing_message(&node),
+        SyntaxErrorRule::missing_message(&node),
         node.get_range(document),
       ));
     }
 
     if cursor.goto_first_child() {
       loop {
-        SyntaxRule::collect(document, cursor, diagnostics);
+        SyntaxErrorRule::collect(document, cursor, diagnostics);
 
         if !cursor.goto_next_sibling() {
           break;
@@ -74,14 +74,15 @@ impl SyntaxRule {
   }
 
   fn error_message(document: &Document, node: &Node<'_>) -> String {
-    let preview = SyntaxRule::snippet_preview(&document.get_node_text(node));
+    let preview =
+      SyntaxErrorRule::snippet_preview(&document.get_node_text(node));
 
     if let Some(snippet) = preview {
       format!("Syntax error near `{snippet}`")
     } else if let Some(parent) = node.parent() {
       format!(
         "Syntax error in {}",
-        SyntaxRule::describe_kind(parent.kind())
+        SyntaxErrorRule::describe_kind(parent.kind())
       )
     } else {
       "Syntax error".to_string()
@@ -89,10 +90,10 @@ impl SyntaxRule {
   }
 
   fn missing_message(node: &Node<'_>) -> String {
-    let missing = SyntaxRule::describe_kind(node.kind());
+    let missing = SyntaxErrorRule::describe_kind(node.kind());
 
     if let Some(parent) = node.parent() {
-      let context = SyntaxRule::describe_kind(parent.kind());
+      let context = SyntaxErrorRule::describe_kind(parent.kind());
 
       if missing == context {
         format!("Missing {missing}")
@@ -111,7 +112,7 @@ impl SyntaxRule {
       return None;
     }
 
-    Some(SyntaxRule::truncate(&collapsed, 40))
+    Some(SyntaxErrorRule::truncate(&collapsed, 40))
   }
 
   fn truncate(text: &str, max_chars: usize) -> String {
@@ -137,33 +138,33 @@ mod tests {
   #[test]
   fn describe_kind_formats_identifier_like_kinds() {
     assert_eq!(
-      SyntaxRule::describe_kind("recipe_body_line"),
+      SyntaxErrorRule::describe_kind("recipe_body_line"),
       "recipe body line"
     );
   }
 
   #[test]
   fn describe_kind_handles_newline_kind() {
-    assert_eq!(SyntaxRule::describe_kind("\n"), "newline");
+    assert_eq!(SyntaxErrorRule::describe_kind("\n"), "newline");
   }
 
   #[test]
   fn snippet_preview_collapses_whitespace() {
     assert_eq!(
-      SyntaxRule::snippet_preview("  foo\t\tbar \n baz  "),
+      SyntaxErrorRule::snippet_preview("  foo\t\tbar \n baz  "),
       Some("foo bar baz".to_string())
     );
   }
 
   #[test]
   fn snippet_preview_returns_none_for_blank() {
-    assert_eq!(SyntaxRule::snippet_preview("   \n\t  "), None);
+    assert_eq!(SyntaxErrorRule::snippet_preview("   \n\t  "), None);
   }
 
   #[test]
   fn truncate_limits_length() {
     assert_eq!(
-      SyntaxRule::truncate("abcdefghijklmnopqrstuvwxyz", 5),
+      SyntaxErrorRule::truncate("abcdefghijklmnopqrstuvwxyz", 5),
       "abcde..."
     );
   }

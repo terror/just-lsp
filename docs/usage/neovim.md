@@ -27,7 +27,7 @@ vim.lsp.config('just', {
     },
     rules = {
       ['unused-variable'] = 'off',
-      ['unused-recipe-parameters'] = { level = 'warning' },
+      ['unused-recipe-parameter'] = { level = 'warning' },
     },
   },
 })
