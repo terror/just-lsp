@@ -5234,6 +5234,7 @@ mod tests {
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("unresolved-dependency", "foo: bar\n");
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
   }
@@ -5264,7 +5265,7 @@ mod tests {
   fn rule_config_overrides_severity_to_warning() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
-        "missing-dependencies": "warning"
+        "unresolved-dependency": "warning"
       }
     }))
     .unwrap();
