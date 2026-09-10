@@ -50,7 +50,7 @@ mod dotenv_command_conflict;
 mod dotenv_path_filename_conflict;
 mod duplicate_alias;
 mod duplicate_attribute;
-mod duplicate_dependencies;
+mod duplicate_dependency;
 mod duplicate_function;
 mod duplicate_recipe_parameters;
 mod duplicate_recipes;
