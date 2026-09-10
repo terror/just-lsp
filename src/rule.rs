@@ -71,7 +71,7 @@ mod list_feature_gate;
 mod missing_dependencies;
 mod missing_recipe_for_alias;
 mod mixed_indentation;
-mod recipe_dependency_cycles;
+mod recipe_dependency_cycle;
 mod script_shell_conflict;
 mod syntax_error;
 mod undefined_identifier;

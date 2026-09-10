@@ -5259,6 +5259,7 @@ mod tests {
     );
     case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("recipe-dependency-cycle", "foo: foo\n");
     case("syntax-error", "foo\n");
     case("undefined-identifier", "foo:\n  echo {{bar}}\n");
     case(
