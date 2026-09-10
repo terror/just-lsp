@@ -5230,7 +5230,7 @@ mod tests {
     }
 
     case(
-      "duplicate-recipe-parameters",
+      "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
