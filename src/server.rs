@@ -1172,6 +1172,7 @@ mod tests {
       quickfixes: impl IntoIterator<Item = Quickfix>,
     ) -> Self {
       let uri = self.uri(path);
+
       let actions = quickfixes.into_iter().map(|quickfix| {
         lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
           title: quickfix.title().into(),
@@ -2926,6 +2927,7 @@ mod tests {
         "
       },
     );
+
     let target = test.uri("foo.just");
 
     test
@@ -3056,6 +3058,7 @@ mod tests {
   #[tokio::test]
   async fn imported_symbol_navigation_uses_open_buffer() -> Result {
     let test = Test::new().file("foo.just", "foo:\n  echo disk");
+
     let target = test.uri("foo.just");
 
     test
