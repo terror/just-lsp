@@ -5248,6 +5248,10 @@ mod tests {
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
     case("invalid-continue-signal", "[continue('foo')]\nbar:\n");
     case(
+      "invalid-cache-attribute",
+      "set unstable\n[script, cache('foo')]\nfoo:\n",
+    );
+    case(
       "invalid-dependency-argument-count",
       "foo bar:\n  echo {{bar}}\nbaz: foo\n",
     );
@@ -5264,6 +5268,7 @@ mod tests {
     case("recipe-dependency-cycle", "foo: foo\n");
     case("syntax-error", "foo\n");
     case("undefined-identifier", "foo:\n  echo {{bar}}\n");
+    case("unresolved-alias-target", "alias foo := bar\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
