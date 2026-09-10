@@ -1069,14 +1069,6 @@ mod tests {
       )
     }
 
-    fn error(id: &str, message: &str, range: lsp::Range) -> lsp::Diagnostic {
-      Diagnostic {
-        id: id.into(),
-        ..Diagnostic::error(message, range)
-      }
-      .into()
-    }
-
     fn file(self, path: &str, content: &str) -> Self {
       let path = self.tempdir.path().join(path);
 
@@ -1135,11 +1127,11 @@ mod tests {
     }
 
     fn missing_recipe(name: &str, range: lsp::Range) -> lsp::Diagnostic {
-      Self::error(
-        "missing-dependencies",
-        &format!("Recipe `{name}` not found"),
-        range,
-      )
+      Diagnostic {
+        id: "missing-dependencies".into(),
+        ..Diagnostic::error(format!("Recipe `{name}` not found"), range)
+      }
+      .into()
     }
 
     fn new() -> Self {
@@ -1378,11 +1370,14 @@ mod tests {
   #[tokio::test]
   async fn code_action_shared_import_requires_matching_quickfixes() -> Result {
     let range = lsp::Range::at(0, 8, 0, 11);
-    let diagnostic = Test::error(
-      "undefined-identifiers",
-      "Variable `bar` not found. Did you mean `baz`?",
-      range,
-    );
+
+    let diagnostic = lsp::Diagnostic::from(Diagnostic {
+      id: "undefined-identifiers".into(),
+      ..Diagnostic::error(
+        "Variable `bar` not found. Did you mean `baz`?",
+        range,
+      )
+    });
 
     Test::new()
       .file("foo.just", "_foo := bar\n")
@@ -1668,14 +1663,14 @@ mod tests {
   #[tokio::test]
   async fn diagnostics_deduplicate_shared_import_quickfixes() -> Result {
     let range = lsp::Range::at(0, 4, 0, 17);
-    let diagnostic = lsp::Diagnostic {
-      severity: Some(lsp::DiagnosticSeverity::WARNING),
-      ..Test::error(
-        "deprecated-setting",
+
+    let diagnostic = lsp::Diagnostic::from(Diagnostic {
+      id: "deprecated-setting".into(),
+      ..Diagnostic::warning(
         "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
         range,
       )
-    };
+    });
 
     Test::new()
       .file("foo.just", "set windows-shell := ['foo']\n")
@@ -1759,11 +1754,14 @@ mod tests {
       .diagnostics(
         "bar.just",
         None,
-        [Test::error(
-          "duplicate-recipe-parameters",
-          "Duplicate parameter `bar`",
-          lsp::Range::at(0, 8, 0, 11),
-        )],
+        [Diagnostic {
+          id: "duplicate-recipe-parameters".into(),
+          ..Diagnostic::error(
+            "Duplicate parameter `bar`",
+            lsp::Range::at(0, 8, 0, 11),
+          )
+        }
+        .into()],
       )
       .diagnostics("foo.just", None, [])
       .diagnostics("justfile", Some(1), [])
