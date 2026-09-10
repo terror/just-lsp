@@ -6,21 +6,7 @@ define_rule! {
     id: "working-directory-conflict",
     message: "conflicting working directory configuration",
     run(context) {
-      let mut settings = context
-        .settings()
-        .iter()
-        .map(|setting| {
-          let groups = GroupSet::from_attributes(&setting.attributes);
-
-          (setting, groups)
-        })
-        .collect::<Vec<_>>();
-
-      settings.sort_by_key(|(setting, _)| setting.uri == context.document().uri);
-
-      let mut seen = HashSet::new();
-
-      let incompatible = |left: &Setting, right: &Setting| {
+      let mut diagnostics = context.conflicting_settings(|left, right| {
         match (left.name.value.as_str(), right.name.value.as_str()) {
           ("working-directory", "no-cd") => {
             matches!(right.kind, SettingKind::Boolean(true))
@@ -30,32 +16,7 @@ define_rule! {
           }
           _ => false,
         }
-      };
-
-      let mut diagnostics = settings
-        .iter()
-        .enumerate()
-        .flat_map(|(index, current)| {
-          settings[..index]
-            .iter()
-            .map(move |previous| (index, previous, current))
-        })
-        .filter(|(_, (previous, previous_groups), (current, current_groups))| {
-          current.uri == context.document().uri
-            && previous_groups.conflicts_with(current_groups)
-            && incompatible(previous, current)
-        })
-        .filter_map(|(index, (previous, _), (current, _))| {
-          let message = format!(
-            "`{}` is incompatible with `{}`",
-            previous.name.value, current.name.value,
-          );
-
-          seen
-            .insert((message.clone(), index))
-            .then(|| Diagnostic::error(message, current.range))
-        })
-        .collect::<Vec<_>>();
+      });
 
       for recipe in context.local_declarations(context.recipes()) {
         let working_directory_attribute =
