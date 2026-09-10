@@ -5235,6 +5235,10 @@ mod tests {
       "set unstable\n_foo(bar, bar) := bar\n",
     );
     case(
+      "assignment-unexport-conflict",
+      "export foo := 'bar'\nunexport foo\n",
+    );
+    case(
       "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );

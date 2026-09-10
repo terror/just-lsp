@@ -35,6 +35,7 @@ inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
 mod arg_attribute;
+mod assignment_unexport_conflict;
 mod attribute_argument_expressions;
 mod attribute_invalid_target;
 mod backtick_shebang;
@@ -57,7 +58,6 @@ mod duplicate_setting;
 mod duplicate_unexports;
 mod duplicate_variables;
 mod exit_message_conflict;
-mod export_unexport_conflict;
 mod extension_without_script;
 mod function_arguments;
 mod inconsistent_indentation;
