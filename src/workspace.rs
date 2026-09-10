@@ -204,39 +204,25 @@ mod tests {
   use {super::*, pretty_assertions::assert_eq};
 
   #[test]
-  fn reopening_project_reloads_imports() {
+  fn unloaded_projects_reload_imports() {
     let tempdir = tempfile::tempdir().unwrap();
     let root = tempdir.path().join("justfile");
     let imported = tempdir.path().join("foo.just");
 
-    fs::write(&root, "import 'foo.just'\n").unwrap();
-    fs::write(&imported, "foo:\n").unwrap();
+    fs::write(&root, "import 'foo.just'").unwrap();
+    fs::write(&imported, "foo:").unwrap();
 
     let root = lsp::Url::from_file_path(root).unwrap();
-    let imported = lsp::Url::from_file_path(imported).unwrap();
-    let open = lsp::DidOpenTextDocumentParams {
-      text_document: lsp::TextDocumentItem::new(
-        root.clone(),
-        "just".into(),
-        1,
-        "import 'foo.just'\n".into(),
-      ),
-    };
     let mut workspace = Workspace::default();
 
-    workspace.documents.open(open.clone()).unwrap();
-    workspace.load_projects([root.clone()]).unwrap();
+    workspace.load_project(root.clone()).unwrap();
+    workspace.load_projects([]).unwrap();
 
-    assert!(workspace.documents.close(&lsp::DidCloseTextDocumentParams {
-      text_document: lsp::TextDocumentIdentifier::new(root.clone()),
-    }));
+    fs::write(&imported, "bar:").unwrap();
 
-    workspace.load_projects([root.clone()]).unwrap();
+    workspace.load_project(root).unwrap();
 
-    fs::write(imported.to_file_path().unwrap(), "bar:\n").unwrap();
-
-    workspace.documents.open(open).unwrap();
-    workspace.load_projects([root]).unwrap();
+    let imported = lsp::Url::from_file_path(imported).unwrap();
 
     assert_eq!(
       workspace
@@ -245,7 +231,7 @@ mod tests {
         .unwrap()
         .content
         .to_string(),
-      "bar:\n",
+      "bar:",
     );
   }
 }

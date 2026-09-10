@@ -29,6 +29,9 @@ use {
   url_ext::UrlExt,
 };
 
+#[cfg(test)]
+use test_project::TestProject;
+
 pub use {
   alias::Alias,
   analyzer::Analyzer,
@@ -140,6 +143,8 @@ mod str_ext;
 mod string_delimiter;
 mod string_kind;
 mod string_literal;
+#[cfg(test)]
+mod test_project;
 mod text_node;
 mod unexport;
 mod url_ext;
