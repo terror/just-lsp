@@ -4,7 +4,7 @@ define_rule! {
   /// Validates recipe parameter lists for duplicate names, ordering mistakes,
   /// and illegal variadic/default combinations.
   DuplicateRecipeParameterRule {
-    id: "duplicate-recipe-parameters",
+    id: "duplicate-recipe-parameter",
     message: "invalid recipe parameters",
     run(context) {
       let mut diagnostics = Vec::new();
