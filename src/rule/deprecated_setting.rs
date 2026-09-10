@@ -30,27 +30,38 @@ define_rule! {
               attribute,
               setting: replacement,
             } => {
-              if context.settings().iter().any(|replacement_setting| {
-                replacement_setting.name.value == replacement
-                  && replacement_setting.has_attribute(attribute)
-              }) {
+              let has_other_platform = setting.attributes.iter().any(|candidate| {
+                candidate.name.value != attribute
+                  && candidate.condition().is_some()
+              });
+
+              let replacement_exists = context.settings().iter().any(|candidate| {
+                candidate.name.value == replacement
+                  && candidate.has_attribute(attribute)
+              });
+
+              if has_other_platform || replacement_exists {
                 diagnostic
               } else {
-                let line = context.document()
-                  .content
-                  .line(setting.range.start.line as usize)
-                  .to_string();
+                let mut edits = vec![lsp::TextEdit {
+                  range: setting.name.range,
+                  new_text: replacement.into(),
+                }];
 
-                let line = line.replacen(&setting.name.value, replacement, 1);
+                if !setting.has_attribute(attribute) {
+                  edits.push(lsp::TextEdit {
+                    range: lsp::Range::new(setting.range.start, setting.range.start),
+                    new_text: format!("[{attribute}]\n"),
+                  });
+                }
 
                 diagnostic.quickfix(
-                  Quickfix::edit(
+                  Quickfix::new(
                     format!(
                       "Replace `{}` with `[{attribute}] set {replacement}`",
                       setting.name.value
                     ),
-                    setting.range,
-                    format!("[{attribute}]\n{line}"),
+                    edits,
                   )
                 )
               }
