@@ -15,6 +15,7 @@ use {
     fmt::{self, Debug, Display, Formatter},
     fs,
     iter::{once, successors},
+    mem,
     ops::{ControlFlow, Deref, RangeInclusive},
     path::{Component, Path, PathBuf},
     process,
