@@ -5229,6 +5229,7 @@ mod tests {
       Test::new(source).config(config).run();
     }
 
+    case("duplicate-recipe", "foo:\nfoo:\n");
     case(
       "duplicate-function-parameter",
       "set unstable\n_foo(bar, bar) := bar\n",
