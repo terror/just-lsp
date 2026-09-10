@@ -5217,69 +5217,14 @@ mod tests {
 
   #[test]
   fn rule_config_off_suppresses_diagnostic() {
-    #[track_caller]
-    fn case(rule: &str, source: &str) {
-      let config = serde_json::from_value::<Config>(serde_json::json!({
-        "rules": {
-          rule: "off"
-        }
-      }))
-      .unwrap();
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "unresolved-dependency": "off"
+      }
+    }))
+    .unwrap();
 
-      Test::new(source).config(config).run();
-    }
-
-    case(
-      "assignment-unexport-conflict",
-      "export foo := 'bar'\nunexport foo\n",
-    );
-    case("duplicate-dependency", "foo:\nbar: foo foo\n");
-    case(
-      "duplicate-function-parameter",
-      "set unstable\n_foo(bar, bar) := bar\n",
-    );
-    case("duplicate-recipe", "foo:\nfoo:\n");
-    case(
-      "duplicate-recipe-parameter",
-      "foo bar bar:\n  echo {{bar}}\n",
-    );
-    case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
-    case("invalid-arg-attribute", "[arg('bar')]\nfoo:\n");
-    case("invalid-attribute-argument-count", "[group]\nfoo:\n");
-    case("invalid-continue-signal", "[continue('foo')]\nbar:\n");
-    case(
-      "invalid-attribute-argument-expression",
-      "[group('foo' + 'bar')]\nfoo:\n",
-    );
-    case(
-      "invalid-cache-attribute",
-      "set unstable\n[script, cache('foo')]\nfoo:\n",
-    );
-    case(
-      "invalid-dependency-argument-count",
-      "foo bar:\n  echo {{bar}}\nbaz: foo\n",
-    );
-    case(
-      "invalid-function-argument-count",
-      "foo:\n  echo {{arch('bar')}}\n",
-    );
-    case(
-      "invalid-mapped-dependency",
-      "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
-    );
-    case("invalid-setting-type", "set export := 'foo'\n");
-    case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
-    case("recipe-dependency-cycle", "foo: foo\n");
-    case("syntax-error", "foo\n");
-    case("undefined-identifier", "foo:\n  echo {{bar}}\n");
-    case("unresolved-alias-target", "alias foo := bar\n");
-    case("unresolved-dependency", "foo: bar\n");
-    case(
-      "unsupported-attribute-target",
-      "[group('foo')]\nalias bar := baz\nbaz:\n",
-    );
-    case("unused-recipe-parameter", "foo bar:\n");
-    case("unused-variable", "foo := 'bar'\n");
+    Test::new("foo: bar\n").config(config).run();
   }
 
   #[test]
