@@ -1126,14 +1126,6 @@ mod tests {
       }
     }
 
-    fn missing_recipe(name: &str, range: lsp::Range) -> lsp::Diagnostic {
-      Diagnostic {
-        id: "missing-dependencies".into(),
-        ..Diagnostic::error(format!("Recipe `{name}` not found"), range)
-      }
-      .into()
-    }
-
     fn new() -> Self {
       let (service, socket) = LspService::new(Server::new);
 
@@ -1547,7 +1539,14 @@ mod tests {
       .diagnostics(
         "justfile",
         Some(1),
-        [Test::missing_recipe("foo", lsp::Range::at(2, 5, 2, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `foo` not found",
+            lsp::Range::at(2, 5, 2, 8),
+          )
+        }
+        .into()],
       )
       .open("foo.just", "foo:")
       .diagnostics("foo.just", Some(1), [])
@@ -1565,7 +1564,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(1), [])
       .close("justfile")
@@ -1584,7 +1590,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(1), [])
       .change("justfile", 2, "")
@@ -1632,7 +1645,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         Some(1),
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .run()
       .await
@@ -1653,7 +1673,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         Some(1),
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", None, [])
       .run()
@@ -1712,7 +1739,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(1), [])
       .change("justfile", 2, &format!("[{disabled}]\nimport 'foo.just'\n"))
@@ -1722,7 +1756,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(3), [])
       .run()
@@ -1778,7 +1819,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(1), [])
       .open("foo.just", "foo:\n")
@@ -1787,7 +1835,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .run()
       .await
@@ -1803,7 +1858,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .open("baz.just", "import 'foo.just'\n")
       .diagnostics("baz.just", Some(1), [])
@@ -1856,7 +1918,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         None,
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .diagnostics("justfile", Some(2), [])
       .run()
@@ -1872,7 +1941,14 @@ mod tests {
       .diagnostics(
         "foo.just",
         Some(1),
-        [Test::missing_recipe("bar", lsp::Range::at(0, 5, 0, 8))],
+        [Diagnostic {
+          id: "missing-dependencies".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
       )
       .open("justfile", "import 'foo.just'\nbar:\n")
       .diagnostics("foo.just", Some(1), [])
