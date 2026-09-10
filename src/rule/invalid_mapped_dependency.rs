@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  MappedDependenciesRule {
-    id: "mapped-dependencies",
+  InvalidMappedDependencyRule {
+    id: "invalid-mapped-dependency",
     message: "invalid mapped dependency",
     run(context) {
       let mut diagnostics = Vec::new();

@@ -15,7 +15,7 @@ these options.
   },
   "rules": {
     "unused-variable": "off",
-    "unused-recipe-parameters": { "level": "warning" }
+    "unused-recipe-parameter": { "level": "warning" }
   }
 }
 ```
