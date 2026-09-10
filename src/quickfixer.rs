@@ -385,15 +385,65 @@ mod tests {
       "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
     )
     .range(lsp::Range::at(0, 4, 0, 4))
+    .quickfix(Quickfix::new(
+      "Replace `windows-shell` with `[windows] set shell`",
+      [
+        lsp::TextEdit {
+          range: lsp::Range::at(0, 4, 0, 17),
+          new_text: "shell".into(),
+        },
+        lsp::TextEdit {
+          range: lsp::Range::at(0, 0, 0, 0),
+          new_text: "[windows]\n".into(),
+        },
+      ],
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_windows_shell_setting_with_multiline_value() {
+    Test::new(indoc! {
+      "
+      set windows-shell := [
+        'foo',
+        'bar',
+      ]
+      "
+    })
+    .range(lsp::Range::at(0, 4, 0, 4))
+    .quickfix(Quickfix::new(
+      "Replace `windows-shell` with `[windows] set shell`",
+      [
+        lsp::TextEdit {
+          range: lsp::Range::at(0, 4, 0, 17),
+          new_text: "shell".into(),
+        },
+        lsp::TextEdit {
+          range: lsp::Range::at(0, 0, 0, 0),
+          new_text: "[windows]\n".into(),
+        },
+      ],
+    ))
+    .run();
+  }
+
+  #[test]
+  fn replaces_windows_shell_setting_with_windows_attribute() {
+    Test::new(indoc! {
+      "
+      [windows]
+      set windows-shell := [
+        'foo',
+        'bar',
+      ]
+      "
+    })
+    .range(lsp::Range::at(1, 4, 1, 4))
     .quickfix(Quickfix::edit(
       "Replace `windows-shell` with `[windows] set shell`",
-      lsp::Range::at(0, 0, 1, 0),
-      indoc! {
-        "
-        [windows]
-        set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
-        "
-      },
+      lsp::Range::at(1, 4, 1, 17),
+      "shell",
     ))
     .run();
   }

@@ -1389,6 +1389,42 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn code_action_windows_shell_with_non_windows_attributes() -> Result {
+    for (attributes, line) in [
+      ("[linux]", 1),
+      ("[unix]", 1),
+      ("[linux, windows]", 1),
+      ("[windows]\n[linux]", 2),
+    ] {
+      let range = lsp::Range::at(line, 4, line, 17);
+
+      Test::new()
+        .ready()
+        .open(
+          "foo.just",
+          &format!("{attributes}\nset windows-shell := ['foo']\n"),
+        )
+        .diagnostics(
+          "foo.just",
+          Some(1),
+          [Diagnostic {
+            id: "deprecated-setting".into(),
+            ..Diagnostic::warning(
+              "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+              range,
+            )
+          }
+          .into()],
+        )
+        .code_actions("foo.just", range, [])
+        .run()
+        .await?;
+    }
+
+    Ok(())
+  }
+
+  #[tokio::test]
   async fn code_action_with_recipes() -> Result {
     Test::new()
       .initialize()
@@ -1719,10 +1755,18 @@ mod tests {
       .quickfixes(
         "foo.just",
         range,
-        [Quickfix::edit(
+        [Quickfix::new(
           "Replace `windows-shell` with `[windows] set shell`",
-          lsp::Range::at(0, 0, 1, 0),
-          "[windows]\nset shell := ['foo']\n",
+          [
+            lsp::TextEdit {
+              range: lsp::Range::at(0, 4, 0, 17),
+              new_text: "shell".into(),
+            },
+            lsp::TextEdit {
+              range: lsp::Range::at(0, 0, 0, 0),
+              new_text: "[windows]\n".into(),
+            },
+          ],
         )],
       )
       .run()
