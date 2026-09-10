@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Checks that dependency invocations supply the correct number of arguments
   /// for the referenced recipe's signature.
-  DependencyArgumentRule {
-    id: "dependency-arguments",
+  InvalidDependencyArgumentCountRule {
+    id: "invalid-dependency-argument-count",
     message: "invalid dependency arguments",
     run(context) {
       let mut diagnostics = Vec::new();
