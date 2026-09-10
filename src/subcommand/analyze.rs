@@ -88,14 +88,12 @@ impl Analyze {
 
         let start = document
           .content
-          .lsp_position_to_position(diagnostic.range.start)
-          .char
+          .lsp_position_to_char(diagnostic.range.start)
           .min(source_len);
 
         let end = document
           .content
-          .lsp_position_to_position(diagnostic.range.end)
-          .char
+          .lsp_position_to_char(diagnostic.range.end)
           .min(source_len);
 
         let (start, end) = (start.min(end), start.max(end));

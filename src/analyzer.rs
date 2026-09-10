@@ -3933,6 +3933,14 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_bare_carriage_returns() {
+    Test::new("foo := 'bar\rbaz' + qux\r\nbar := '🧪\rqux' + foo\n")
+      .error("Variable `qux` not found", lsp::Range::at(1, 7, 1, 10))
+      .warning("Variable `bar` appears unused", lsp::Range::at(2, 0, 2, 3))
+      .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_double_braces_in_backticks() {
     Test::new(indoc! {
       r#"

@@ -307,12 +307,11 @@ impl Document {
   /// Returns the syntax tree node at the given LSP `Position`.
   #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
-    let point = self.content.lsp_position_to_position(position).point;
+    let byte = self
+      .content
+      .char_to_byte(self.content.lsp_position_to_char(position));
 
-    self
-      .tree
-      .root_node()
-      .descendant_for_point_range(point, point)
+    self.tree.root_node().descendant_for_byte_range(byte, byte)
   }
 
   /// Parses the current document contents and updates the cached syntax tree.
