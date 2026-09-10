@@ -64,7 +64,7 @@ mod function_arguments;
 mod function_parameters;
 mod inconsistent_indentation;
 mod invalid_import_path;
-mod invalid_setting_kind;
+mod invalid_setting_type;
 mod invalid_setting_value;
 mod list_feature_gate;
 mod mapped_dependencies;
