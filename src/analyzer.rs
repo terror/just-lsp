@@ -5233,6 +5233,10 @@ mod tests {
       "duplicate-recipe-parameters",
       "foo bar bar:\n  echo {{bar}}\n",
     );
+    case(
+      "invalid-dependency-argument-count",
+      "foo bar:\n  echo {{bar}}\nbaz: foo\n",
+    );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
