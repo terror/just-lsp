@@ -5230,17 +5230,28 @@ mod tests {
     }
 
     case(
+      "duplicate-function-parameter",
+      "set unstable\n_foo(bar, bar) := bar\n",
+    );
+    case("duplicate-recipe", "foo:\nfoo:\n");
+    case(
       "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
+    case("invalid-attribute-argument-count", "[group]\nfoo:\n");
+    case(
+      "invalid-mapped-dependency",
+      "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
+    );
     case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("syntax-error", "foo\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
     );
-    case("unused-recipe-parameters", "foo bar:\n");
+    case("unused-recipe-parameter", "foo bar:\n");
     case("unused-variable", "foo := 'bar'\n");
   }
 
