@@ -5230,6 +5230,10 @@ mod tests {
     }
 
     case(
+      "assignment-unexport-conflict",
+      "export foo := 'bar'\nunexport foo\n",
+    );
+    case(
       "duplicate-recipe-parameters",
       "foo bar bar:\n  echo {{bar}}\n",
     );

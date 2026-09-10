@@ -1,8 +1,8 @@
 use super::*;
 
 define_rule! {
-  ExportUnexportConflictRule {
-    id: "export-unexport-conflict",
+  AssignmentUnexportConflictRule {
+    id: "assignment-unexport-conflict",
     message: "export/unexport conflict",
     run(context) {
       let mut unexports = ConflictTracker::default();
