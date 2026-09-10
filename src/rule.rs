@@ -65,6 +65,7 @@ mod invalid_dependency_argument_count;
 mod invalid_function_argument_count;
 mod invalid_import_path;
 mod invalid_mapped_dependency;
+mod invalid_recipe_parameter_order;
 mod invalid_setting_type;
 mod invalid_setting_value;
 mod list_feature_gate;
