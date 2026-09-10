@@ -52,7 +52,7 @@ mod duplicate_alias;
 mod duplicate_attribute;
 mod duplicate_dependencies;
 mod duplicate_function;
-mod duplicate_recipe_parameters;
+mod duplicate_recipe_parameter;
 mod duplicate_recipes;
 mod duplicate_setting;
 mod duplicate_unexports;
