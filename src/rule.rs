@@ -74,7 +74,7 @@ mod mixed_indentation;
 mod parallel_dependencies;
 mod recipe_dependency_cycles;
 mod script_shell_conflict;
-mod syntax;
+mod syntax_error;
 mod undefined_identifiers;
 mod unknown_attribute;
 mod unknown_function;

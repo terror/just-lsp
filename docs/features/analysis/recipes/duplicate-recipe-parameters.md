@@ -7,7 +7,7 @@ Reports duplicate recipe parameter names and invalid ordering of required, defau
 
 - Each parameter name must be unique within a recipe.
 - A required nonvariadic parameter cannot follow a parameter with a default value.
-- A variadic parameter, introduced by `*` or `+`, must be last. Multiple variadic parameters therefore also violate the ordering requirement. Malformed variadic lists can be reported as `syntax-errors` before this rule runs.
+- A variadic parameter, introduced by `*` or `+`, must be last. Multiple variadic parameters therefore also violate the ordering requirement. Malformed variadic lists can be reported as `syntax-error` before this rule runs.
 
 ## How to fix it
 

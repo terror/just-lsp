@@ -648,7 +648,7 @@ fn analyze_reports_syntax_errors_and_fails() -> Result {
     .expected_status(1)
     .expected_stdout(indoc! {
       r#"
-      error[syntax-errors]: syntax errors
+      error[syntax-error]: syntax errors
          ╭─[ justfile:1:1 ]
          │
        1 │ ╭─▶ foo

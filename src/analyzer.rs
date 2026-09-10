@@ -5234,6 +5234,7 @@ mod tests {
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
+    case("syntax-error", "foo\n");
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
   }
