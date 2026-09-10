@@ -34,6 +34,7 @@ macro_rules! define_rule {
 inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
+mod assignment_unexport_conflict;
 mod attribute_argument_expressions;
 mod attribute_invalid_target;
 mod backtick_shebang;
@@ -56,13 +57,12 @@ mod duplicate_setting;
 mod duplicate_unexports;
 mod duplicate_variables;
 mod exit_message_conflict;
-mod export_unexport_conflict;
 mod extension_without_script;
-mod function_arguments;
 mod inconsistent_indentation;
 mod ineffective_parallel_attribute;
 mod invalid_arg_attribute;
 mod invalid_attribute_argument_count;
+mod invalid_function_argument_count;
 mod invalid_import_path;
 mod invalid_mapped_dependency;
 mod invalid_setting_kind;
