@@ -4,7 +4,7 @@ define_rule! {
   /// Finds non-exported global variables that are never referenced in the
   /// document or any of its imports.
   UnusedVariableRule {
-    id: "unused-variables",
+    id: "unused-variable",
     message: "unused variable",
     run(context) {
       let mut diagnostics = Vec::new();
