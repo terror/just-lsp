@@ -5229,6 +5229,7 @@ mod tests {
       Test::new(source).config(config).run();
     }
 
+    case("duplicate-recipe", "foo:\nfoo:\n");
     case(
       "duplicate-recipe-parameters",
       "foo bar bar:\n  echo {{bar}}\n",
