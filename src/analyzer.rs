@@ -5230,6 +5230,10 @@ mod tests {
     }
 
     case(
+      "duplicate-function-parameter",
+      "set unstable\n_foo(bar, bar) := bar\n",
+    );
+    case(
       "duplicate-recipe-parameters",
       "foo bar bar:\n  echo {{bar}}\n",
     );
