@@ -51,73 +51,74 @@ impl Analyze {
 
     workspace.load_project(uri.clone())?;
 
-    let document = workspace.documents.get(&uri).unwrap();
+    let diagnostics = workspace.diagnostics(None);
 
-    let content = document.content.to_string();
-
-    let analyzer = Analyzer {
-      config: None,
-      view: ProjectView::new(
-        document,
-        &workspace.projects[&uri].import_scope,
-        &workspace.documents,
-      ),
-    };
-
-    let diagnostics = analyzer.analyze();
-
-    if diagnostics.is_empty() {
-      return Ok(());
-    }
-
-    let any_error = diagnostics.iter().any(|diagnostic| {
+    let any_error = diagnostics.values().flatten().any(|diagnostic| {
       matches!(diagnostic.severity, lsp::DiagnosticSeverity::ERROR)
     });
 
-    let source_id = path.to_string_lossy().to_string();
+    for (document_uri, diagnostics) in diagnostics {
+      if diagnostics.is_empty() {
+        continue;
+      }
 
-    let mut cache = sources(vec![(source_id.clone(), content.as_str())]);
+      let document = workspace.documents.get(&document_uri).unwrap();
 
-    let source_len = document.content.len_chars();
+      let content = document.content.to_string();
 
-    for diagnostic in diagnostics {
-      let (severity_label, color) =
-        Self::severity_to_style(diagnostic.severity)?;
+      let path = if document_uri == uri {
+        path.clone()
+      } else {
+        document_uri.to_file_path().unwrap()
+      };
 
-      let kind_label = format!("{severity_label}[{}]", diagnostic.id.trim());
+      let source_id = path
+        .to_str()
+        .map_or_else(|| document_uri.to_string(), str::to_owned);
 
-      let start = document
-        .content
-        .lsp_position_to_position(diagnostic.range.start)
-        .char
-        .min(source_len);
+      let mut cache = sources(vec![(source_id.clone(), content.as_str())]);
 
-      let end = document
-        .content
-        .lsp_position_to_position(diagnostic.range.end)
-        .char
-        .min(source_len);
+      let source_len = document.content.len_chars();
 
-      let (start, end) = (start.min(end), start.max(end));
+      for diagnostic in diagnostics {
+        let (severity_label, color) =
+          Self::severity_to_style(diagnostic.severity)?;
 
-      let span = (source_id.clone(), start..end);
+        let kind_label = format!("{severity_label}[{}]", diagnostic.id.trim());
 
-      let report = Report::build(
-        ReportKind::Custom(kind_label.as_str(), color),
-        span.clone(),
-      )
-      .with_message(&diagnostic.display)
-      .with_label(
-        Label::new(span.clone())
-          .with_message(diagnostic.message.trim().to_string())
-          .with_color(color),
-      );
+        let start = document
+          .content
+          .lsp_position_to_position(diagnostic.range.start)
+          .char
+          .min(source_len);
 
-      let report = report.finish();
+        let end = document
+          .content
+          .lsp_position_to_position(diagnostic.range.end)
+          .char
+          .min(source_len);
 
-      report
-        .print(&mut cache)
-        .map_err(|error| anyhow!("failed to render diagnostic: {error}"))?;
+        let (start, end) = (start.min(end), start.max(end));
+
+        let span = (source_id.clone(), start..end);
+
+        let report = Report::build(
+          ReportKind::Custom(kind_label.as_str(), color),
+          span.clone(),
+        )
+        .with_message(&diagnostic.display)
+        .with_label(
+          Label::new(span.clone())
+            .with_message(diagnostic.message.trim().to_string())
+            .with_color(color),
+        );
+
+        let report = report.finish();
+
+        report
+          .print(&mut cache)
+          .map_err(|error| anyhow!("failed to render diagnostic: {error}"))?;
+      }
     }
 
     if any_error {

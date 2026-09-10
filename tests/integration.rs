@@ -248,18 +248,6 @@ fn analyze_accepts_clean_justfile() -> Result {
 }
 
 #[test]
-fn analyze_accepts_deprecated_setting_in_import() -> Result {
-  Test::new()?
-    .file(
-      "settings.just",
-      "\n\n\n\n\nset windows-shell := [\"powershell.exe\"]\n",
-    )
-    .file("justfile", "import 'settings.just'\n")
-    .argument("justfile")
-    .run()
-}
-
-#[test]
 fn analyze_accepts_home_directory_import() -> Result {
   #[track_caller]
   fn case(source: &str) -> Result {
@@ -395,6 +383,26 @@ fn analyze_finds_nearest_dot_justfile() -> Result {
 }
 
 #[test]
+fn analyze_reports_deprecated_setting_in_import() -> Result {
+  Test::new()?
+    .file("foo.just", "\n\n\n\n\nset windows-shell := ['bar']\n")
+    .file("justfile", "import 'foo.just'\n")
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      "
+      warning[deprecated-setting]: deprecated setting
+         ╭─[ [ROOT]/foo.just:6:5 ]
+         │
+       6 │ set windows-shell := ['bar']
+         │     ──────┬──────
+         │           ╰──────── `windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead
+      ───╯
+      "
+    })
+    .run()
+}
+
+#[test]
 fn analyze_reports_diagnostics_for_nested_relative_path() -> Result {
   Test::new()?
     .file(
@@ -502,6 +510,26 @@ fn analyze_reports_errors_and_fails() -> Result {
 }
 
 #[test]
+fn analyze_reports_imported_recipe_parameters() -> Result {
+  Test::new()?
+    .file("foo.just", "foo bar:\n  echo baz\n")
+    .file("justfile", "import 'foo.just'\n\nbar:\n  echo bar\n")
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      "
+      warning[unused-recipe-parameters]: unused parameter
+         ╭─[ [ROOT]/foo.just:1:5 ]
+         │
+       1 │ foo bar:
+         │     ─┬─
+         │      ╰─── Parameter `bar` appears unused
+      ───╯
+      "
+    })
+    .run()
+}
+
+#[test]
 fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
   Test::new()?
     .file(
@@ -534,6 +562,38 @@ fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
          │           ╰─── Unknown function `qux`
       ───╯
       "#
+    })
+    .run()
+}
+
+#[test]
+fn analyze_reports_nested_import_errors_and_fails() -> Result {
+  Test::new()?
+    .file("bar.just", "baz:\n  echo {{qux()}}\n")
+    .file("foo.just", "import 'bar.just'\n")
+    .file(
+      "foo/justfile",
+      "import '../foo.just'\n\nfoo bar:\n  echo baz\n",
+    )
+    .argument("foo/justfile")
+    .expected_status(1)
+    .expected_stdout(indoc! {
+      "
+      error[unknown-function]: unknown function
+         ╭─[ [ROOT]/bar.just:2:10 ]
+         │
+       2 │   echo {{qux()}}
+         │          ─┬─
+         │           ╰─── Unknown function `qux`
+      ───╯
+      warning[unused-recipe-parameters]: unused parameter
+         ╭─[ foo/justfile:3:5 ]
+         │
+       3 │ foo bar:
+         │     ─┬─
+         │      ╰─── Parameter `bar` appears unused
+      ───╯
+      "
     })
     .run()
 }
