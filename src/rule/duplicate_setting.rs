@@ -8,15 +8,15 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let mut conflicts = ConflictTracker::default();
-
-      for setting in context.settings() {
-        if conflicts.record(&setting.name, &setting.attributes) {
-          diagnostics.push(Diagnostic::error(
-            format!("Duplicate setting `{}`", setting.name.value),
-            setting.range,
-          ));
-        }
+      for setting in context.duplicate_declarations(
+        context.settings(),
+        |setting| &setting.name,
+        |setting| &setting.attributes,
+      ) {
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate setting `{}`", setting.name.value),
+          setting.range,
+        ));
       }
 
       diagnostics

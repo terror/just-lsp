@@ -48,7 +48,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.local_declarations(context.settings()) {
         let Some(validation) = SETTING_VALIDATIONS
           .iter()
           .find(|validation| validation.name == setting.name.value)

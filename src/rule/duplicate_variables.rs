@@ -13,15 +13,17 @@ define_rule! {
         return Vec::new();
       }
 
-      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
+      let mut diagnostics = Vec::new();
 
-      for variable in context.variables() {
-        if conflicts.record(&variable.name, &variable.attributes) {
-          diagnostics.push(Diagnostic::error(
-            format!("Duplicate variable `{}`", variable.name.value),
-            variable.range,
-          ));
-        }
+      for variable in context.duplicate_declarations(
+        context.variables(),
+        |variable| &variable.name,
+        |variable| &variable.attributes,
+      ) {
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate variable `{}`", variable.name.value),
+          variable.range,
+        ));
       }
 
       diagnostics

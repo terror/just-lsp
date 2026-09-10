@@ -7,7 +7,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         let script_attribute = recipe.find_attribute("script");
 
         let shell_attribute = recipe.find_attribute("shell");

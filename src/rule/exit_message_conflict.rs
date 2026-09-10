@@ -7,7 +7,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         let exit_message_attribute = recipe.find_attribute("exit-message");
 
         let no_exit_message_attribute = recipe.find_attribute("no-exit-message");

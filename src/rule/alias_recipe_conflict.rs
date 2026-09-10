@@ -1,8 +1,8 @@
 use super::*;
 
 enum Item<'a> {
-  Alias(&'a Alias),
-  Recipe(&'a Recipe),
+  Alias(&'a Located<Alias>),
+  Recipe(&'a Located<Recipe>),
 }
 
 impl Item<'_> {
@@ -33,6 +33,13 @@ impl Item<'_> {
       Item::Recipe(recipe) => recipe.name.range,
     }
   }
+
+  fn uri(&self) -> &lsp::Url {
+    match self {
+      Item::Alias(alias) => &alias.uri,
+      Item::Recipe(recipe) => &recipe.uri,
+    }
+  }
 }
 
 define_rule! {
@@ -48,33 +55,49 @@ define_rule! {
         return Vec::new();
       }
 
-      let mut items = aliases
+      let items = aliases
         .iter()
         .map(Item::Alias)
         .chain(recipes.iter().map(Item::Recipe))
         .collect::<Vec<_>>();
 
-      items.sort_by_key(|item| {
-        let range = item.range();
-        (range.start.line, range.start.character)
-      });
+      let mut imported = HashMap::<&str, Vec<&Item>>::new();
 
-      items
+      for item in &items {
+        if item.uri() != &context.document().uri {
+          imported.entry(item.name()).or_default().push(item);
+        }
+      }
+
+      let mut local = items
         .iter()
+        .filter(|item| item.uri() == &context.document().uri)
+        .collect::<Vec<_>>();
+
+      local.sort_by_key(|item| item.range().start);
+
+      local
+        .into_iter()
         .fold(
           (HashMap::<&str, &Item>::new(), Vec::new()),
           |(mut seen, mut diagnostics), item| {
             let name = item.name();
 
-            match seen.get(name) {
-              Some(first) if !first.is_same_kind(item) => {
-                diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
-              }
-              None => {
-                seen.insert(name, item);
-              }
-              _ => {}
+            let first = imported
+              .get(name)
+              .and_then(|items| {
+                items.iter().copied().find(|previous| !previous.is_same_kind(item))
+              })
+              .or_else(|| {
+                seen.get(name).copied().filter(|first| !first.is_same_kind(item))
+              });
+
+            if let Some(first) = first {
+              diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
             }
+
+            seen.entry(name).or_insert(item);
+
             (seen, diagnostics)
           },
         )

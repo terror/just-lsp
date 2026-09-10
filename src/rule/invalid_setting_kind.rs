@@ -9,7 +9,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.settings() {
+      for setting in context.local_declarations(context.settings()) {
         let Some(Builtin::Setting { kind, .. }) =
           context.builtin_setting(&setting.name.value)
         else {

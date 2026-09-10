@@ -40,8 +40,7 @@ define_rule! {
       let default_script = context.setting_enabled("default-script");
 
       context
-        .recipes()
-        .iter()
+        .local_declarations(context.recipes())
         .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(|recipe| {
           recipe

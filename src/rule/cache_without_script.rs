@@ -9,7 +9,7 @@ define_rule! {
 
       let mut diagnostics = Vec::new();
 
-      for recipe in context.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         let Some(cache_attribute) = recipe.find_attribute("cache") else {
           continue;
         };

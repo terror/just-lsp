@@ -15,15 +15,15 @@ define_rule! {
 
       let mut diagnostics = Vec::new();
 
-      let mut conflicts = ConflictTracker::default();
-
-      for recipe in context.recipes() {
-        if conflicts.record(&recipe.name, &recipe.attributes) {
-          diagnostics.push(Diagnostic::error(
-            format!("Duplicate recipe name `{}`", recipe.name.value),
-            recipe.range,
-          ));
-        }
+      for recipe in context.duplicate_declarations(
+        context.recipes(),
+        |recipe| &recipe.name,
+        |recipe| &recipe.attributes,
+      ) {
+        diagnostics.push(Diagnostic::error(
+          format!("Duplicate recipe name `{}`", recipe.name.value),
+          recipe.range,
+        ));
       }
 
       diagnostics

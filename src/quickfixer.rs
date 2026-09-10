@@ -84,11 +84,21 @@ mod tests {
     }
 
     fn imported_document(self, content: &str) -> Self {
+      let document = Document::new(
+        content,
+        lsp::Url::parse(&format!(
+          "file:///foo{}.just",
+          self.imported_documents.len()
+        ))
+        .unwrap(),
+      )
+      .unwrap();
+
       Self {
         imported_documents: self
           .imported_documents
           .into_iter()
-          .chain([Document::from(content)])
+          .chain([document])
           .collect(),
         ..self
       }
