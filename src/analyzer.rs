@@ -5243,6 +5243,7 @@ mod tests {
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
+    case("invalid-arg-attribute", "[arg('bar')]\nfoo:\n");
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
     case(
       "invalid-dependency-argument-count",
