@@ -5239,6 +5239,21 @@ mod tests {
   }
 
   #[test]
+  fn rule_config_off_suppresses_invalid_attribute_placement() {
+    let config = serde_json::from_value::<Config>(serde_json::json!({
+      "rules": {
+        "invalid-attribute-placement": "off"
+      }
+    }))
+    .unwrap();
+
+    Test::new("[private]\n")
+      .config(config)
+      .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
+      .run();
+  }
+
+  #[test]
   fn rule_config_overrides_severity_to_error() {
     let config = serde_json::from_value::<Config>(serde_json::json!({
       "rules": {
