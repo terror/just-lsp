@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Verifies function calls use a valid argument count and respect variadic
   /// constraints.
-  FunctionArgumentsRule {
-    id: "function-arguments",
+  InvalidFunctionArgumentCountRule {
+    id: "invalid-function-argument-count",
     message: "invalid function arguments",
     run(context) {
       let mut diagnostics = Vec::new();
