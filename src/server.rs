@@ -2544,21 +2544,21 @@ mod tests {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
               "
-          Don't change directory before executing the recipe.
+              Don't change directory before executing the recipe.
 
-          Normally `just` runs recipes with the current directory set to
-          the directory containing the `justfile`. With `[no-cd]`, the
-          recipe runs with the current directory unchanged, so it can use
-          paths relative to the invocation directory or operate on the
-          user's current directory.
+              Normally `just` runs recipes with the current directory set to
+              the directory containing the `justfile`. With `[no-cd]`, the
+              recipe runs with the current directory unchanged, so it can use
+              paths relative to the invocation directory or operate on the
+              user's current directory.
 
-          ```just
-          [no-cd]
-          commit file:
-            git add {{file}}
-            git commit
-          ```
-          "
+              ```just
+              [no-cd]
+              commit file:
+                git add {{file}}
+                git commit
+              ```
+              "
             }
             .into(),
           }),
@@ -2590,17 +2590,17 @@ mod tests {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
               "
-          Instruction set architecture of the host machine.
+              Instruction set architecture of the host machine.
 
-          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
-          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
-          `x86`, `x86_64`, or `xcore`.
+              Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+              `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+              `x86`, `x86_64`, or `xcore`.
 
-          ```just
-          system-info:
-            @echo This is an {{arch()}} machine.
-          ```
-          "
+              ```just
+              system-info:
+                @echo This is an {{arch()}} machine.
+              ```
+              "
             }
             .into(),
           }),
@@ -2635,15 +2635,15 @@ mod tests {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
               "
-          Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
+              Lowercase hexadecimal digit string: `\"0123456789abcdef\"`.
 
-          Useful as the alphabet argument to `choose()` for generating
-          random hex strings.
+              Useful as the alphabet argument to `choose()` for generating
+              random hex strings.
 
-          ```just
-          token := choose('32', HEX)
-          ```
-          "
+              ```just
+              token := choose('32', HEX)
+              ```
+              "
             }
             .into(),
           }),
@@ -2810,17 +2810,17 @@ mod tests {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
               "
-          Instruction set architecture of the host machine.
+              Instruction set architecture of the host machine.
 
-          Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
-          `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
-          `x86`, `x86_64`, or `xcore`.
+              Returns one of: `aarch64`, `arm`, `asmjs`, `hexagon`, `mips`,
+              `msp430`, `powerpc`, `powerpc64`, `s390x`, `sparc`, `wasm32`,
+              `x86`, `x86_64`, or `xcore`.
 
-          ```just
-          system-info:
-            @echo This is an {{arch()}} machine.
-          ```
-          "
+              ```just
+              system-info:
+                @echo This is an {{arch()}} machine.
+              ```
+              "
             }
             .into(),
           }),
@@ -2854,23 +2854,23 @@ mod tests {
             kind: lsp::MarkupKind::Markdown,
             value: indoc! {
               "
-          Export every top-level `just` variable as an environment
-          variable.
+              Export every top-level `just` variable as an environment
+              variable.
 
-          Equivalent to prefixing each assignment with `export`, so
-          recipes and backticks see the variables as `$NAME` rather than
-          needing `{{ name }}` interpolation.
+              Equivalent to prefixing each assignment with `export`, so
+              recipes and backticks see the variables as `$NAME` rather than
+              needing `{{ name }}` interpolation.
 
-          ```just
-          set export
+              ```just
+              set export
 
-          a := \"hello\"
+              a := \"hello\"
 
-          @foo b:
-            echo $a
-            echo $b
-          ```
-          "
+              @foo b:
+                echo $a
+                echo $b
+              ```
+              "
             }
             .into(),
           }),
@@ -3329,11 +3329,13 @@ mod tests {
           .initialize()
           .open(
             "file:///foo.just",
-            indoc! {"
+            indoc! {
+              "
               foo := 'bar'
               baz foo=foo bar=foo:
                 echo {{ foo }}
-            "},
+              "
+            },
           )
           .request::<request::Rename>(
             lsp::RenameParams {
