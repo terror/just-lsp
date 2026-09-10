@@ -5250,7 +5250,7 @@ mod tests {
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
     );
-    case("unused-recipe-parameters", "foo bar:\n");
+    case("unused-recipe-parameter", "foo bar:\n");
     case("unused-variable", "foo := 'bar'\n");
   }
 

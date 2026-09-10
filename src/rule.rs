@@ -82,7 +82,7 @@ mod unstable_feature_gate;
 mod unsupported_attribute_target;
 mod unused_function;
 mod unused_function_parameter;
-mod unused_recipe_parameters;
+mod unused_recipe_parameter;
 mod unused_variable;
 mod working_directory_conflict;
 
