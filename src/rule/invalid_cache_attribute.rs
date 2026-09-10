@@ -3,8 +3,8 @@ use super::*;
 const VALID_KWARGS: &[&str] = &["environment", "extra", "inputs", "outputs"];
 
 define_rule! {
-  CacheAttributeRule {
-    id: "cache-attribute",
+  InvalidCacheAttributeRule {
+    id: "invalid-cache-attribute",
     message: "invalid cache attribute",
     run(context) {
       let document = context.document();
