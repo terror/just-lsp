@@ -2,8 +2,8 @@ use super::*;
 
 define_rule! {
   /// Flags aliases that point to recipes which aren't defined.
-  MissingRecipeForAliasRule {
-    id: "missing-recipe-for-alias",
+  UnresolvedAliasTargetRule {
+    id: "unresolved-alias-target",
     message: "alias target not found",
     run(context) {
       let mut diagnostics = Vec::new();
