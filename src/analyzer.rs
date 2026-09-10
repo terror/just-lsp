@@ -5263,6 +5263,7 @@ mod tests {
     case("recipe-dependency-cycle", "foo: foo\n");
     case("syntax-error", "foo\n");
     case("undefined-identifier", "foo:\n  echo {{bar}}\n");
+    case("unresolved-alias-target", "alias foo := bar\n");
     case(
       "unsupported-attribute-target",
       "[group('foo')]\nalias bar := baz\nbaz:\n",
