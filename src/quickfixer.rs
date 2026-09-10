@@ -389,10 +389,10 @@ mod tests {
       "Replace `windows-shell` with `[windows] set shell`",
       lsp::Range::at(0, 0, 1, 0),
       indoc! {
-          "
-          [windows]
-          set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
-          "
+        "
+        [windows]
+        set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+        "
       },
     ))
     .run();

@@ -140,23 +140,27 @@ mod tests {
       Document::new("", lsp::Url::parse("file:///justfile").unwrap()).unwrap();
 
     let direct = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'foo'
         foo() := 'foo'
         foo:
           echo foo
-      "},
+        "
+      },
       lsp::Url::parse("file:///foo.just").unwrap(),
     )
     .unwrap();
 
     let nested = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'bar'
         foo() := 'bar'
         foo:
           echo bar
-      "},
+        "
+      },
       lsp::Url::parse("file:///bar.just").unwrap(),
     )
     .unwrap();
@@ -190,23 +194,27 @@ mod tests {
       Document::new("", lsp::Url::parse("file:///justfile").unwrap()).unwrap();
 
     let first = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'foo'
         foo() := 'foo'
         foo:
           echo foo
-      "},
+        "
+      },
       lsp::Url::parse("file:///foo.just").unwrap(),
     )
     .unwrap();
 
     let second = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'bar'
         foo() := 'bar'
         foo:
           echo bar
-      "},
+        "
+      },
       lsp::Url::parse("file:///bar.just").unwrap(),
     )
     .unwrap();
@@ -237,7 +245,8 @@ mod tests {
   #[test]
   fn later_declaration_in_document_wins() {
     let root = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'foo'
         foo() := 'foo'
         foo:
@@ -247,7 +256,8 @@ mod tests {
         foo() := 'bar'
         foo:
           echo bar
-      "},
+        "
+      },
       lsp::Url::parse("file:///justfile").unwrap(),
     )
     .unwrap();
@@ -262,23 +272,27 @@ mod tests {
   #[test]
   fn root_overrides_imported_declarations() {
     let root = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'foo'
         foo() := 'foo'
         foo:
           echo foo
-      "},
+        "
+      },
       lsp::Url::parse("file:///justfile").unwrap(),
     )
     .unwrap();
 
     let imported = Document::new(
-      indoc! {"
+      indoc! {
+        "
         foo := 'bar'
         foo() := 'bar'
         foo:
           echo bar
-      "},
+        "
+      },
       lsp::Url::parse("file:///foo.just").unwrap(),
     )
     .unwrap();
