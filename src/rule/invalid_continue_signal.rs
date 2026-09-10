@@ -3,8 +3,8 @@ use super::*;
 const SIGNALS: &[&str] = &["SIGHUP", "SIGINT", "SIGQUIT"];
 
 define_rule! {
-  ContinueSignalsRule {
-    id: "continue-signals",
+  InvalidContinueSignalRule {
+    id: "invalid-continue-signal",
     message: "invalid continue signal",
     run(context) {
       context
