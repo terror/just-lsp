@@ -4,7 +4,7 @@ define_rule! {
   /// Reports expressions that reference variables or parameters which are not
   /// defined and aren't builtins.
   UndefinedIdentifierRule {
-    id: "undefined-identifiers",
+    id: "undefined-identifier",
     message: "undefined identifier",
     run(context) {
       let mut diagnostics = Vec::new();

@@ -6,7 +6,7 @@ order: 10
 Reports `[parallel]` on a recipe with fewer than two dependencies.
 
 - With zero or one dependency, there is no pair of dependencies to run in parallel.
-- The check counts dependency entries on the recipe. Repeated entries are checked separately by `duplicate-dependencies`.
+- The check counts dependency entries on the recipe. Repeated entries are checked separately by `duplicate-dependency`.
 
 ## How to fix it
 
