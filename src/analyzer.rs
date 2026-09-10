@@ -5233,6 +5233,7 @@ mod tests {
       "duplicate-recipe-parameter",
       "foo bar bar:\n  echo {{bar}}\n",
     );
+    case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case("unused-recipe-parameters", "foo bar:\n");
     case("unused-variables", "foo := 'bar'\n");
