@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Ensures attributes only appear on syntax nodes that actually accept
   /// attributes.
-  AttributeInvalidTargetRule {
-    id: "attribute-invalid-target",
+  InvalidAttributePlacementRule {
+    id: "invalid-attribute-placement",
     message: "invalid attribute target",
     run(context) {
       let mut diagnostics = Vec::new();
