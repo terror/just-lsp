@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Warn when `[parallel]` is applied to a recipe that lacks enough
   /// dependencies for the attribute to have any effect.
-  ParallelDependenciesRule {
-    id: "parallel-dependencies",
+  IneffectiveParallelAttributeRule {
+    id: "ineffective-parallel-attribute",
     message: "unnecessary parallel attribute",
     run(context) {
       context
@@ -42,7 +42,7 @@ define_rule! {
   }
 }
 
-impl ParallelDependenciesRule {
+impl IneffectiveParallelAttributeRule {
   fn attribute_removal_quickfix(
     attribute: &Attribute,
     document: &Document,
