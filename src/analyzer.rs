@@ -5233,6 +5233,7 @@ mod tests {
       "assignment-unexport-conflict",
       "export foo := 'bar'\nunexport foo\n",
     );
+    case("duplicate-dependency", "foo:\nbar: foo foo\n");
     case(
       "duplicate-function-parameter",
       "set unstable\n_foo(bar, bar) := bar\n",
