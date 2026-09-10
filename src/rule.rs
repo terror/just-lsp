@@ -72,7 +72,7 @@ mod missing_dependencies;
 mod missing_recipe_for_alias;
 mod mixed_indentation;
 mod parallel_dependencies;
-mod recipe_dependency_cycles;
+mod recipe_dependency_cycle;
 mod script_shell_conflict;
 mod syntax;
 mod undefined_identifiers;
