@@ -3,8 +3,8 @@ use super::*;
 define_rule! {
   /// Ensures each `set` statement uses the correct value type (boolean, string,
   /// or array) for the targeted builtin setting.
-  InvalidSettingKindRule {
-    id: "invalid-setting-kind",
+  InvalidSettingTypeRule {
+    id: "invalid-setting-type",
     message: "invalid setting kind",
     run(context) {
       let mut diagnostics = Vec::new();

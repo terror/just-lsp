@@ -5256,6 +5256,7 @@ mod tests {
       "invalid-mapped-dependency",
       "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
     );
+    case("invalid-setting-type", "set export := 'foo'\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case("syntax-error", "foo\n");
     case(
