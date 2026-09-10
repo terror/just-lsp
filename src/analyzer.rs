@@ -5238,6 +5238,7 @@ mod tests {
       "foo bar bar:\n  echo {{bar}}\n",
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
+    case("invalid-attribute-argument-count", "[group]\nfoo:\n");
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case(
       "unsupported-attribute-target",
