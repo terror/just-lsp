@@ -4,7 +4,7 @@ define_rule! {
   /// Detects circular dependency chains between recipes to prevent infinite
   /// execution loops.
   RecipeDependencyCycleRule {
-    id: "recipe-dependency-cycles",
+    id: "recipe-dependency-cycle",
     message: "circular dependency",
     run(context) {
       let recipes = context.view().resolved_recipes();
