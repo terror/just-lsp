@@ -1365,7 +1365,7 @@ mod tests {
     let range = lsp::Range::at(0, 8, 0, 11);
 
     let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "undefined-identifiers".into(),
+      id: "undefined-identifier".into(),
       ..Diagnostic::error(
         "Variable `bar` not found. Did you mean `baz`?",
         range,

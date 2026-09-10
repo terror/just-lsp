@@ -75,7 +75,7 @@ mod parallel_dependencies;
 mod recipe_dependency_cycles;
 mod script_shell_conflict;
 mod syntax;
-mod undefined_identifiers;
+mod undefined_identifier;
 mod unknown_attribute;
 mod unknown_function;
 mod unknown_setting;
