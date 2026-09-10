@@ -5239,6 +5239,10 @@ mod tests {
     );
     case("ineffective-parallel-attribute", "[parallel]\nfoo:\n");
     case("invalid-attribute-argument-count", "[group]\nfoo:\n");
+    case(
+      "invalid-mapped-dependency",
+      "set unstable\nset lists\nfoo bar:\n  echo {{bar}}\nbaz: *(foo 'bar')\n",
+    );
     case("list-feature-gate", "foo:\n  echo {{bool('bar')}}\n");
     case(
       "unsupported-attribute-target",
