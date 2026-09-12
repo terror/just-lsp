@@ -18,7 +18,10 @@ impl Executor {
     Self { client }
   }
 
-  async fn run_recipe(&self, recipe_name: &str, directory: PathBuf) {
+  async fn run_recipe(&self, recipe_name: &str, justfile: PathBuf) {
+    let directory =
+      justfile.parent().map(Path::to_path_buf).unwrap_or_default();
+
     let document_uri = lsp::Url::parse(&format!(
       "just-recipe:/{}/{}",
       directory.display(),
@@ -28,7 +31,7 @@ impl Executor {
 
     let mut command = AsyncCommand::new("just");
 
-    command.arg(recipe_name);
+    command.arg("--justfile").arg(justfile).arg(recipe_name);
 
     command
       .current_dir(directory.clone())
@@ -195,11 +198,9 @@ impl Executor {
             Value::Array(params.arguments),
           )?;
 
-        let directory = uri
+        let justfile = uri
           .to_file_path()
-          .ok()
-          .and_then(|path| path.parent().map(Path::to_path_buf))
-          .unwrap_or_default();
+          .map_err(|()| just_lsp::Error::InvalidDocumentUri(uri))?;
 
         if parameters
           .iter()
@@ -216,7 +217,7 @@ impl Executor {
           return Ok(());
         }
 
-        self.run_recipe(&recipe_name, directory).await;
+        self.run_recipe(&recipe_name, justfile).await;
       }
     }
 
