@@ -2501,6 +2501,28 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn execute_command_rejects_non_file_uri() -> Result {
+    Test::new()
+      .initialize()
+      .request::<request::ExecuteCommand>(
+        lsp::ExecuteCommandParams {
+          command: Command::RunRecipe.to_string(),
+          arguments: vec![json!("foo"), json!("untitled:foo.just"), json!([])],
+          ..Default::default()
+        },
+        Ok(None),
+      )
+      .client_notification::<notification::ShowMessage>(
+        lsp::ShowMessageParams {
+          typ: lsp::MessageType::ERROR,
+          message: "document URI `untitled:foo.just` is not a file URI".into(),
+        },
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn folding_range() -> Result {
     Test::new()
       .initialize()
