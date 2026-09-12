@@ -110,7 +110,7 @@ impl Executor {
                     document_uri.clone(),
                     vec![lsp::TextEdit {
                       range: lsp::Range::at(current_line, 0, current_line, 0),
-                      new_text: buffer.trim().into(),
+                      new_text: buffer.clone(),
                     }],
                   )]);
 
@@ -144,7 +144,7 @@ impl Executor {
               document_uri.clone(),
               vec![lsp::TextEdit {
                 range: lsp::Range::at(current_line, 0, current_line, 0),
-                new_text: buffer.trim().into(),
+                new_text: buffer,
               }],
             )]);
 
