@@ -239,6 +239,38 @@ mod tests {
   }
 
   #[test]
+  fn removes_disabled_windows_powershell_setting() {
+    #[track_caller]
+    fn case(content: &str, range: lsp::Range) {
+      Test::new(content)
+        .range(range)
+        .quickfix(Quickfix::removal(range, "Remove `set windows-powershell`"))
+        .run();
+    }
+
+    case(
+      indoc! {
+        "
+        set windows-powershell := false
+        set shell := ['foo']
+        "
+      },
+      lsp::Range::at(0, 0, 1, 0),
+    );
+
+    case(
+      indoc! {
+        "
+        [windows]
+        set windows-powershell := false
+        set shell := ['foo']
+        "
+      },
+      lsp::Range::at(0, 0, 2, 0),
+    );
+  }
+
+  #[test]
   fn removes_parallel_attribute() {
     Test::new(indoc! {
       "
@@ -270,18 +302,6 @@ mod tests {
       "Remove `[parallel]`",
     ))
     .run();
-  }
-
-  #[test]
-  fn replaces_deprecated_setting() {
-    Test::new("set windows-powershell := true\n")
-      .range(lsp::Range::at(0, 4, 0, 4))
-      .quickfix(Quickfix::edit(
-        "Replace `windows-powershell` with `windows-shell`",
-        lsp::Range::at(0, 4, 0, 22),
-        "windows-shell",
-      ))
-      .run();
   }
 
   #[test]
@@ -380,6 +400,60 @@ mod tests {
   }
 
   #[test]
+  fn replaces_windows_powershell_setting() {
+    #[track_caller]
+    fn case(content: &str, range: lsp::Range) {
+      Test::new(content)
+        .range(range)
+        .quickfix(Quickfix::edit(
+          "Replace `windows-powershell` with `windows-shell`",
+          range,
+          r#"windows-shell := ["powershell.exe", "-NoLogo", "-Command"]"#,
+        ))
+        .run();
+    }
+
+    case(
+      "set windows-powershell := true\n",
+      lsp::Range::at(0, 4, 0, 30),
+    );
+
+    case("set windows-powershell\n", lsp::Range::at(0, 4, 0, 22));
+
+    case(
+      indoc! {
+        "
+        [windows]
+        set windows-powershell := true
+        "
+      },
+      lsp::Range::at(1, 4, 1, 30),
+    );
+
+    case(
+      indoc! {
+        "
+        set shell := ['foo']
+        set windows-powershell := true
+        "
+      },
+      lsp::Range::at(1, 4, 1, 30),
+    );
+
+    case(
+      indoc! {
+        "
+        [unix]
+        set windows-shell := ['foo']
+        [windows]
+        set windows-powershell := true
+        "
+      },
+      lsp::Range::at(3, 4, 3, 30),
+    );
+  }
+
+  #[test]
   fn replaces_windows_shell_setting() {
     Test::new(
       "set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]\n",
@@ -461,6 +535,48 @@ mod tests {
       .config(config)
       .range(lsp::Range::at(0, 10, 0, 10))
       .run();
+  }
+
+  #[test]
+  fn skips_invalid_windows_powershell_setting() {
+    #[track_caller]
+    fn case(content: &str) {
+      Test::new(content).range(lsp::Range::at(0, 4, 0, 4)).run();
+    }
+
+    case("set windows-powershell := 'foo'\n");
+    case("set windows-powershell := ['foo']\n");
+  }
+
+  #[test]
+  fn skips_windows_powershell_setting_when_imported_replacement_exists() {
+    Test::new("set windows-powershell := true\n")
+      .imported_document("set windows-shell := ['foo']\n")
+      .range(lsp::Range::at(0, 4, 0, 4))
+      .run();
+  }
+
+  #[test]
+  fn skips_windows_powershell_setting_when_replacement_exists() {
+    #[track_caller]
+    fn case(content: &str) {
+      Test::new(content).range(lsp::Range::at(0, 4, 0, 4)).run();
+    }
+
+    case(indoc! {
+      "
+      set windows-powershell := true
+      set windows-shell := ['foo']
+      "
+    });
+
+    case(indoc! {
+      "
+      set windows-powershell := true
+      [windows]
+      set windows-shell := ['foo']
+      "
+    });
   }
 
   #[test]

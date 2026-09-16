@@ -2867,7 +2867,10 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       for a more flexible, version-agnostic alternative.
       "
     },
-    deprecated: Some(Deprecation::Replacement("windows-shell")),
+    deprecated: Some(Deprecation::BooleanSetting {
+      setting: "windows-shell",
+      value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]",
+    }),
   },
   Builtin::Setting {
     name: "windows-shell",
