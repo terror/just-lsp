@@ -23,6 +23,35 @@ define_rule! {
           );
 
           let diagnostic = match *deprecation {
+            Deprecation::BooleanSetting {
+              setting: replacement,
+              value,
+            } => {
+              let groups = GroupSet::from_attributes(&setting.attributes);
+
+              let replacement_exists = context.settings().iter().any(|candidate| {
+                candidate.name.value == replacement
+                  && GroupSet::from_attributes(&candidate.attributes)
+                    .conflicts_with(&groups)
+              });
+
+              match setting.kind {
+                SettingKind::Boolean(false) => diagnostic.quickfix(
+                  Quickfix::removal(
+                    setting.range,
+                    format!("Remove `set {}`", setting.name.value),
+                  )
+                ),
+                SettingKind::Boolean(true) if !replacement_exists => diagnostic.quickfix(
+                  Quickfix::edit(
+                    format!("Replace `{}` with `{replacement}`", setting.name.value),
+                    lsp::Range::new(setting.name.range.start, setting.value.range.end),
+                    format!("{replacement} := {value}"),
+                  )
+                ),
+                _ => diagnostic,
+              }
+            }
             Deprecation::Replacement(replacement) => {
               diagnostic.quickfix(Quickfix::replacement(&setting.name, replacement))
             }
