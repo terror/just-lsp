@@ -87,7 +87,7 @@ mod unused_recipe_parameter;
 mod unused_variable;
 mod working_directory_conflict;
 
-pub trait Rule: Sync {
+pub(crate) trait Rule: Sync {
   /// Whether the rule is enabled by its configuration.
   fn enabled(&self, config: &RuleConfig) -> bool {
     config.level() != Some(RuleLevel::Off)

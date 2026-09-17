@@ -120,6 +120,7 @@ mod tests {
       } = self;
 
       let mut documents = DocumentStore::default();
+
       let mut project = Project::new(document.uri.clone());
 
       for (index, text) in imported_documents.into_iter().enumerate() {
