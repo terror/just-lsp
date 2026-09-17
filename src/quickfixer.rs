@@ -1,8 +1,8 @@
 use super::*;
 
-pub struct Quickfixer<'a> {
-  pub diagnostics: &'a [Diagnostic],
-  pub parameters: &'a lsp::CodeActionParams,
+pub(crate) struct Quickfixer<'a> {
+  pub(crate) diagnostics: &'a [Diagnostic],
+  pub(crate) parameters: &'a lsp::CodeActionParams,
 }
 
 impl Quickfixer<'_> {
@@ -42,7 +42,7 @@ impl Quickfixer<'_> {
   }
 
   #[must_use]
-  pub fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
+  pub(crate) fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
     self
       .diagnostics
       .iter()
@@ -65,7 +65,8 @@ mod tests {
   struct Test {
     config: Config,
     diagnostics: Option<Vec<Diagnostic>>,
-    project: TestProject,
+    document: Document,
+    imported_documents: Vec<String>,
     quickfixes: Vec<Quickfix>,
     range: lsp::Range,
   }
@@ -83,7 +84,7 @@ mod tests {
     }
 
     fn imported_document(mut self, content: &str) -> Self {
-      self.project.imported_document(content);
+      self.imported_documents.push(content.into());
       self
     }
 
@@ -91,7 +92,8 @@ mod tests {
       Self {
         config: Config::default(),
         diagnostics: None,
-        project: TestProject::new(Document::from(content)),
+        document: Document::from(content),
+        imported_documents: Vec::new(),
         quickfixes: Vec::new(),
         range: lsp::Range::at(0, 0, 0, 0),
       }
@@ -111,14 +113,49 @@ mod tests {
       let Test {
         config,
         diagnostics,
-        project,
+        document,
+        imported_documents,
         quickfixes,
         range,
       } = self;
 
+      let mut documents = DocumentStore::default();
+
+      let mut project = Project::new(document.uri.clone());
+
+      for (index, text) in imported_documents.into_iter().enumerate() {
+        let uri = lsp::Url::parse(&format!("file:///foo{index}.just")).unwrap();
+
+        documents
+          .open(lsp::DidOpenTextDocumentParams {
+            text_document: lsp::TextDocumentItem {
+              uri: uri.clone(),
+              language_id: "just".into(),
+              version: 1,
+              text,
+            },
+          })
+          .unwrap();
+
+        project
+          .dependencies
+          .entry(document.uri.clone())
+          .or_default()
+          .push(ProjectDependency {
+            kind: ProjectDependencyKind::Import {
+              attributes: Vec::new(),
+              optional: false,
+            },
+            location: lsp::Range::default(),
+            target: ProjectDependencyTarget::Resolved(uri),
+          });
+      }
+
+      let import_scope = ImportScope::from(&project);
+
       let parameters = lsp::CodeActionParams {
         text_document: lsp::TextDocumentIdentifier {
-          uri: project.document.uri.clone(),
+          uri: document.uri.clone(),
         },
         range,
         context: lsp::CodeActionContext {
@@ -131,7 +168,7 @@ mod tests {
 
       let analyzer = Analyzer {
         config: Some(&config),
-        view: project.view(),
+        view: ProjectView::new(&document, &import_scope, &documents),
       };
 
       let actual_diagnostics = analyzer
@@ -160,7 +197,7 @@ mod tests {
             diagnostics: None,
             edit: Some(lsp::WorkspaceEdit {
               changes: Some(HashMap::from([(
-                project.document.uri.clone(),
+                document.uri.clone(),
                 quickfix.edits().to_vec(),
               )])),
               ..Default::default()
