@@ -1,11 +1,11 @@
 use super::*;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct GroupSet(HashSet<Group>);
+pub(crate) struct GroupSet(HashSet<Group>);
 
 impl GroupSet {
   #[must_use]
-  pub fn conflicts_with(&self, other: &Self) -> bool {
+  pub(crate) fn conflicts_with(&self, other: &Self) -> bool {
     self
       .0
       .iter()
@@ -36,7 +36,7 @@ impl GroupSet {
   }
 
   #[must_use]
-  pub fn from_attributes(attributes: &[Attribute]) -> Self {
+  pub(crate) fn from_attributes(attributes: &[Attribute]) -> Self {
     let mut groups = Self::default();
 
     for attribute in attributes {
@@ -52,17 +52,18 @@ impl GroupSet {
     }
   }
 
+  #[cfg(test)]
   #[must_use]
-  pub fn insert(&mut self, group: Group) -> bool {
+  pub(crate) fn insert(&mut self, group: Group) -> bool {
     self.0.insert(group)
   }
 
   #[must_use]
-  pub fn is_empty(&self) -> bool {
+  pub(crate) fn is_empty(&self) -> bool {
     self.0.is_empty()
   }
 
-  pub fn union_with(&mut self, other: Self) {
+  pub(crate) fn union_with(&mut self, other: Self) {
     self.0.extend(other.0);
   }
 }
