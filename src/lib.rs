@@ -16,7 +16,7 @@ use {
   rule::Rule,
   rule_context::RuleContext,
   scope::Scope,
-  serde::{Deserialize, Serialize},
+  serde::Deserialize,
   std::{
     cmp::Reverse,
     collections::{
@@ -72,7 +72,7 @@ pub use {
   located::Located,
   module::Module,
   node_ext::NodeExt,
-  parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
+  parameter::{Parameter, ParameterKind, VariadicType},
   project::Project,
   project_dependency::ProjectDependency,
   project_dependency_kind::ProjectDependencyKind,

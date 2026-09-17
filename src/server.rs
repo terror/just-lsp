@@ -231,11 +231,10 @@ impl LanguageServer for Server {
     for recipe in document.recipes() {
       let title = recipe.name.value.clone();
 
-      let parameters = recipe
+      let has_required_parameters = recipe
         .parameters
-        .into_iter()
-        .map(ParameterJson::from)
-        .collect::<Vec<_>>();
+        .iter()
+        .any(|parameter| parameter.default_value.is_none());
 
       actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
         title: title.clone(),
@@ -246,7 +245,7 @@ impl LanguageServer for Server {
           arguments: Some(vec![
             json(&recipe.name.value)?,
             json(&params.text_document.uri)?,
-            json(parameters)?,
+            Value::Bool(has_required_parameters),
           ]),
         }),
         ..Default::default()
@@ -281,11 +280,10 @@ impl LanguageServer for Server {
       let mut lenses = Vec::new();
 
       for recipe in document.recipes() {
-        let parameters = recipe
+        let has_required_parameters = recipe
           .parameters
-          .into_iter()
-          .map(ParameterJson::from)
-          .collect::<Vec<ParameterJson>>();
+          .iter()
+          .any(|parameter| parameter.default_value.is_none());
 
         let recipe_name = serde_json::to_value(&recipe.name.value)
           .map_err(|_| jsonrpc::Error::parse_error())?;
@@ -293,15 +291,16 @@ impl LanguageServer for Server {
         let uri = serde_json::to_value(uri)
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
-        let parameters = serde_json::to_value(parameters)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
-
         lenses.push(lsp::CodeLens {
           range: recipe.name.range,
           command: Some(lsp::Command {
             title: "Run".into(),
             command: Command::RunRecipe.to_string(),
-            arguments: Some(vec![recipe_name, uri, parameters]),
+            arguments: Some(vec![
+              recipe_name,
+              uri,
+              Value::Bool(has_required_parameters),
+            ]),
           }),
           data: None,
         });
@@ -1437,6 +1436,9 @@ mod tests {
 
           bar arg1 arg2='default':
             echo bar
+
+          baz qux='quux':
+            echo baz
           "
         },
       )
@@ -1453,7 +1455,7 @@ mod tests {
               arguments: Some(vec![
                 json!("foo"),
                 json!("file:///test.just"),
-                json!([]),
+                json!(false),
               ]),
             }),
             ..Default::default()
@@ -1467,16 +1469,21 @@ mod tests {
               arguments: Some(vec![
                 json!("bar"),
                 json!("file:///test.just"),
-                json!(vec![
-                  ParameterJson {
-                    name: "arg1".into(),
-                    default_value: None,
-                  },
-                  ParameterJson {
-                    name: "arg2".into(),
-                    default_value: Some("'default'".to_string()),
-                  },
-                ]),
+                json!(true),
+              ]),
+            }),
+            ..Default::default()
+          }),
+          lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+            title: "baz".into(),
+            kind: Some(lsp::CodeActionKind::SOURCE),
+            command: Some(lsp::Command {
+              title: "baz".into(),
+              command: Command::RunRecipe.to_string(),
+              arguments: Some(vec![
+                json!("baz"),
+                json!("file:///test.just"),
+                json!(false),
               ]),
             }),
             ..Default::default()
@@ -1519,6 +1526,9 @@ mod tests {
 
           bar arg1 arg2='default':
             echo bar
+
+          baz qux='quux':
+            echo baz
           "
         },
       )
@@ -1539,7 +1549,7 @@ mod tests {
               arguments: Some(vec![
                 json!("foo"),
                 json!("file:///test.just"),
-                json!([]),
+                json!(false),
               ]),
             }),
             data: None,
@@ -1552,10 +1562,20 @@ mod tests {
               arguments: Some(vec![
                 json!("bar"),
                 json!("file:///test.just"),
-                json!([
-                  { "name": "arg1", "default_value": null },
-                  { "name": "arg2", "default_value": "'default'" }
-                ]),
+                json!(true),
+              ]),
+            }),
+            data: None,
+          },
+          lsp::CodeLens {
+            range: lsp::Range::at(6, 0, 6, 3),
+            command: Some(lsp::Command {
+              title: "Run".into(),
+              command: Command::RunRecipe.to_string(),
+              arguments: Some(vec![
+                json!("baz"),
+                json!("file:///test.just"),
+                json!(false),
               ]),
             }),
             data: None,
@@ -2507,7 +2527,11 @@ mod tests {
       .request::<request::ExecuteCommand>(
         lsp::ExecuteCommandParams {
           command: Command::RunRecipe.to_string(),
-          arguments: vec![json!("foo"), json!("untitled:foo.just"), json!([])],
+          arguments: vec![
+            json!("foo"),
+            json!("untitled:foo.just"),
+            json!(false),
+          ],
           ..Default::default()
         },
         Ok(None),
@@ -2516,6 +2540,34 @@ mod tests {
         lsp::ShowMessageParams {
           typ: lsp::MessageType::ERROR,
           message: "document URI `untitled:foo.just` is not a file URI".into(),
+        },
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn execute_command_rejects_required_arguments() -> Result {
+    let test = Test::new();
+
+    let uri = test.uri("foo.just");
+
+    test
+      .initialize()
+      .request::<request::ExecuteCommand>(
+        lsp::ExecuteCommandParams {
+          command: Command::RunRecipe.to_string(),
+          arguments: vec![json!("foo"), json!(uri), json!(true)],
+          ..Default::default()
+        },
+        Ok(None),
+      )
+      .client_notification::<notification::ShowMessage>(
+        lsp::ShowMessageParams {
+          typ: lsp::MessageType::WARNING,
+          message:
+            "Running a recipe with required arguments is not yet supported."
+              .into(),
         },
       )
       .run()
