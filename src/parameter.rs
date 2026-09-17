@@ -12,21 +12,6 @@ pub enum VariadicType {
   ZeroOrMore,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ParameterJson {
-  pub default_value: Option<String>,
-  pub name: String,
-}
-
-impl From<Parameter> for ParameterJson {
-  fn from(parameter: Parameter) -> Self {
-    ParameterJson {
-      name: parameter.name,
-      default_value: parameter.default_value,
-    }
-  }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
   pub content: String,

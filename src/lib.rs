@@ -8,7 +8,7 @@ use {
   project_view_document::ProjectViewDocument,
   recipe_line::{IndentKind, RecipeLine},
   ropey::Rope,
-  serde::{Deserialize, Serialize},
+  serde::Deserialize,
   std::{
     cmp::Reverse,
     collections::{
@@ -66,7 +66,7 @@ pub use {
   located::Located,
   module::Module,
   node_ext::NodeExt,
-  parameter::{Parameter, ParameterJson, ParameterKind, VariadicType},
+  parameter::{Parameter, ParameterKind, VariadicType},
   point_ext::PointExt,
   project::Project,
   project_dependency::ProjectDependency,
