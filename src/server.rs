@@ -2548,12 +2548,16 @@ mod tests {
 
   #[tokio::test]
   async fn execute_command_rejects_required_arguments() -> Result {
-    Test::new()
+    let test = Test::new();
+
+    let uri = test.uri("foo.just");
+
+    test
       .initialize()
       .request::<request::ExecuteCommand>(
         lsp::ExecuteCommandParams {
           command: Command::RunRecipe.to_string(),
-          arguments: vec![json!("foo"), json!("file:///foo.just"), json!(true)],
+          arguments: vec![json!("foo"), json!(uri), json!(true)],
           ..Default::default()
         },
         Ok(None),
