@@ -1,6 +1,6 @@
 use super::*;
 
-pub trait StrExt {
+pub(crate) trait StrExt {
   /// Returns the closest candidate within two edits.
   fn find_suggestion<'a>(
     &self,
