@@ -9,80 +9,35 @@ define_rule! {
     run(context) {
       let recipes = context.view().resolved_recipes();
 
-      let mut traversal = TraversalState {
-        diagnostics: Vec::new(),
-        document: context.document(),
-        path: Vec::new(),
-        recipes: &recipes,
-        reported_recipes: HashSet::new(),
-        visited: HashSet::new(),
-      };
+      let graph = recipes
+        .values()
+        .flat_map(|recipe| {
+          recipe.dependencies.iter().map(move |dependency| {
+            (recipe.name.value.as_str(), dependency.name.value.as_str())
+          })
+        })
+        .collect::<Graph>();
 
-      for recipe in context.document().recipes() {
-        traversal.visited.clear();
-        traversal.detect_cycle(&recipe.name.value);
-      }
+      recipes
+        .values()
+        .filter(|recipe| recipe.uri == context.document().uri)
+        .filter_map(|recipe| {
+          let name = &recipe.name.value;
 
-      traversal.diagnostics
+          let cycle = graph.cycle(name)?;
+
+          let message = if cycle.len() == 2 {
+            format!("Recipe `{name}` depends on itself")
+          } else {
+            format!(
+              "Recipe `{name}` has circular dependency `{}`",
+              cycle.join(" -> ")
+            )
+          };
+
+          Some(Diagnostic::error(message, recipe.range))
+        })
+        .collect()
     }
-  }
-}
-
-struct TraversalState<'a> {
-  diagnostics: Vec<Diagnostic>,
-  document: &'a Document,
-  path: Vec<String>,
-  recipes: &'a HashMap<String, Located<Recipe>>,
-  reported_recipes: HashSet<String>,
-  visited: HashSet<String>,
-}
-
-impl TraversalState<'_> {
-  fn detect_cycle(&mut self, recipe_name: &str) {
-    if self.visited.contains(recipe_name) {
-      return;
-    }
-
-    let Some(recipe) = self.recipes.get(recipe_name) else {
-      return;
-    };
-
-    if let Some(cycle_start_idx) =
-      self.path.iter().position(|r| r == recipe_name)
-    {
-      let mut cycle = self.path[cycle_start_idx..].to_vec();
-      cycle.push(recipe_name.to_string());
-
-      if recipe.uri == self.document.uri {
-        let message = if cycle.len() == 2 {
-          format!("Recipe `{recipe_name}` depends on itself")
-        } else {
-          format!(
-            "Recipe `{recipe_name}` has circular dependency `{}`",
-            cycle.join(" -> ")
-          )
-        };
-
-        if !self.reported_recipes.insert(recipe_name.to_string()) {
-          return;
-        }
-
-        self
-          .diagnostics
-          .push(Diagnostic::error(message, recipe.range));
-      }
-
-      return;
-    }
-
-    self.path.push(recipe_name.to_string());
-
-    for dependency in &recipe.dependencies {
-      self.detect_cycle(&dependency.name.value);
-    }
-
-    self.visited.insert(recipe_name.to_string());
-
-    self.path.pop();
   }
 }

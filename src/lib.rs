@@ -2,6 +2,7 @@ use {
   conflict_tracker::ConflictTracker,
   document_entry::DocumentEntry,
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
+  graph::Graph,
   indoc::indoc,
   path_ext::PathExt,
   project_view_document::ProjectViewDocument,
@@ -10,7 +11,9 @@ use {
   serde::{Deserialize, Serialize},
   std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, hash_map::Entry},
+    collections::{
+      BTreeMap, BTreeSet, HashMap, HashSet, VecDeque, hash_map::Entry,
+    },
     env,
     fmt::{self, Debug, Display, Formatter},
     fs,
@@ -111,6 +114,7 @@ mod function;
 mod function_call;
 mod function_parameter;
 mod function_signature;
+mod graph;
 mod group;
 mod group_set;
 mod import;
