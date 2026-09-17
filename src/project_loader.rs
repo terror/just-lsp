@@ -1,6 +1,6 @@
 use super::*;
 
-pub struct ProjectLoader<'a> {
+pub(crate) struct ProjectLoader<'a> {
   active: HashSet<lsp::Url>,
   documents: &'a mut DocumentStore,
   expanded: HashSet<lsp::Url>,
@@ -28,7 +28,7 @@ impl<'a> ProjectLoader<'a> {
   /// # Errors
   ///
   /// Returns an [`Error`] if the root document cannot be loaded.
-  pub fn load(
+  pub(crate) fn load(
     documents: &'a mut DocumentStore,
     root: &lsp::Url,
   ) -> Result<Project> {
