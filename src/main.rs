@@ -6,10 +6,9 @@ use {
   command::Command,
   executor::Executor,
   just_lsp::*,
-  parameter_json::ParameterJson,
   resolver::Resolver,
   ropey::Rope,
-  serde::{Deserialize, Serialize},
+  serde::Serialize,
   serde_json::Value,
   server::Server,
   std::{
@@ -47,7 +46,6 @@ use {
 mod arguments;
 mod command;
 mod executor;
-mod parameter_json;
 mod resolver;
 mod server;
 mod subcommand;

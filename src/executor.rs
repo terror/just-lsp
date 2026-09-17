@@ -193,19 +193,16 @@ impl Executor {
   async fn try_execute(&self, params: lsp::ExecuteCommandParams) -> Result {
     match Command::try_from(params.command.as_str())? {
       Command::RunRecipe => {
-        let (recipe_name, uri, parameters) =
-          serde_json::from_value::<(String, lsp::Url, Vec<ParameterJson>)>(
-            Value::Array(params.arguments),
-          )?;
+        let (recipe_name, uri, has_required_parameters) =
+          serde_json::from_value::<(String, lsp::Url, bool)>(Value::Array(
+            params.arguments,
+          ))?;
 
         let justfile = uri
           .to_file_path()
           .map_err(|()| just_lsp::Error::InvalidDocumentUri(uri))?;
 
-        if parameters
-          .iter()
-          .any(|parameter| parameter.default_value.is_none())
-        {
+        if has_required_parameters {
           self
             .client
             .show_message(
