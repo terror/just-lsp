@@ -75,7 +75,6 @@ pub use {
   project_loader::ProjectLoader,
   project_view::ProjectView,
   quickfix::Quickfix,
-  quickfixer::Quickfixer,
   range_ext::RangeExt,
   recipe::Recipe,
   rope_ext::{Edit, Position as RopePosition, RopeExt},
@@ -134,7 +133,6 @@ mod project_loader;
 mod project_view;
 mod project_view_document;
 mod quickfix;
-mod quickfixer;
 mod range_ext;
 mod recipe;
 mod recipe_line;

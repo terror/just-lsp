@@ -6,6 +6,7 @@ use {
   command::Command,
   executor::Executor,
   just_lsp::*,
+  quickfixer::Quickfixer,
   resolver::Resolver,
   ropey::Rope,
   serde::Serialize,
@@ -46,6 +47,7 @@ use {
 mod arguments;
 mod command;
 mod executor;
+mod quickfixer;
 mod resolver;
 mod server;
 mod subcommand;
