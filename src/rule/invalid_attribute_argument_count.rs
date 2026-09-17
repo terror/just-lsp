@@ -12,7 +12,7 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        let Some(Builtin::Attribute { kind, .. }) =
+        let Some(Builtin::Attribute { signature, .. }) =
           context.builtin_attribute(attribute_name)
         else {
           continue;
@@ -20,7 +20,7 @@ define_rule! {
 
         let argument_count = attribute.arguments.len();
 
-        let range = kind.argument_range();
+        let range = signature.positional.argument_range();
 
         if range.contains(&argument_count) {
           continue;

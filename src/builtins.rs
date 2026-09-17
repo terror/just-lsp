@@ -3,7 +3,11 @@ use super::*;
 pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
     name: "android",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on Android.
@@ -24,7 +28,57 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "arg",
-    kind: AttributeKind::UnaryPlus,
+    signature: AttributeSignature {
+      positional: AttributeKind::UnaryPlus,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[
+        AttributeKeyword {
+          name: "flag",
+          expression: AttributeExpressionKind::Any,
+          value_required: false,
+        },
+        AttributeKeyword {
+          name: "help",
+          expression: AttributeExpressionKind::Const,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "long",
+          expression: AttributeExpressionKind::StringLiteral,
+          value_required: false,
+        },
+        AttributeKeyword {
+          name: "max",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "min",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "multiple",
+          expression: AttributeExpressionKind::Any,
+          value_required: false,
+        },
+        AttributeKeyword {
+          name: "pattern",
+          expression: AttributeExpressionKind::Const,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "short",
+          expression: AttributeExpressionKind::StringLiteral,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "value",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+      ],
+    },
     description: indoc! {
       "
       Configure a recipe parameter.
@@ -68,7 +122,32 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "cache",
-    kind: AttributeKind::Variadic,
+    signature: AttributeSignature {
+      positional: AttributeKind::Variadic,
+      expression: AttributeExpressionKind::Any,
+      keywords: &[
+        AttributeKeyword {
+          name: "environment",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "extra",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "inputs",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+        AttributeKeyword {
+          name: "outputs",
+          expression: AttributeExpressionKind::Any,
+          value_required: true,
+        },
+      ],
+    },
     description: indoc! {
       "
       Skip recipe invocations when a matching entry exists in the
@@ -96,7 +175,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "confirm",
-    kind: AttributeKind::Optional,
+    signature: AttributeSignature {
+      positional: AttributeKind::Optional,
+      expression: AttributeExpressionKind::Any,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Require confirmation in the terminal prior to executing the recipe.
@@ -127,7 +210,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "continue",
-    kind: AttributeKind::Variadic,
+    signature: AttributeSignature {
+      positional: AttributeKind::Variadic,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Continue execution normally if a command is interrupted by any
@@ -152,7 +239,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "default",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Use this recipe as the module's default recipe.
@@ -172,7 +263,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "doc",
-    kind: AttributeKind::Optional,
+    signature: AttributeSignature {
+      positional: AttributeKind::Optional,
+      expression: AttributeExpressionKind::Const,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Set or suppress the recipe's or module's documentation comment.
@@ -198,7 +293,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "dragonfly",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on DragonFly BSD.
@@ -220,7 +319,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "env",
-    kind: AttributeKind::Binary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Binary,
+      expression: AttributeExpressionKind::Any,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Set environment variable `ENV_VAR` to `VALUE` for the recipe.
@@ -240,7 +343,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "exit-message",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Print an error message if the recipe fails.
@@ -254,7 +361,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "extension",
-    kind: AttributeKind::Unary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Unary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Set the file extension used when writing a shebang recipe's script
@@ -276,7 +387,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "freebsd",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on FreeBSD.
@@ -296,7 +411,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "group",
-    kind: AttributeKind::Unary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Unary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Place the recipe or module in the named group `NAME`.
@@ -321,7 +440,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "linux",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on Linux.
@@ -347,7 +470,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "macos",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on macOS.
@@ -369,7 +496,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "metadata",
-    kind: AttributeKind::UnaryPlus,
+    signature: AttributeSignature {
+      positional: AttributeKind::UnaryPlus,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Attach arbitrary metadata `METADATA` to the recipe.
@@ -389,7 +520,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "netbsd",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on NetBSD.
@@ -403,7 +538,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "no-cd",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Don't change directory before executing the recipe.
@@ -426,7 +565,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "no-exit-message",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Don't print an error message if the recipe fails.
@@ -448,7 +591,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "no-quiet",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Override globally quiet recipes and always echo the recipe lines.
@@ -470,7 +617,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "openbsd",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on OpenBSD.
@@ -484,7 +635,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "parallel",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Run this recipe's dependencies in parallel.
@@ -504,7 +659,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "positional-arguments",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Turn on positional arguments for this recipe.
@@ -530,7 +689,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "private",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Make a recipe, alias, variable, or module private.
@@ -556,7 +719,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "script",
-    kind: AttributeKind::Variadic,
+    signature: AttributeSignature {
+      positional: AttributeKind::Variadic,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Execute the recipe as a script.
@@ -591,7 +758,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "shell",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Execute the recipe as a shell recipe.
@@ -612,7 +783,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "timestamp",
-    kind: AttributeKind::Optional,
+    signature: AttributeSignature {
+      positional: AttributeKind::Optional,
+      expression: AttributeExpressionKind::Any,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Print timestamps before commands in this recipe.
@@ -635,7 +810,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "unix",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable the recipe on Unix-like platforms, including macOS.
@@ -656,7 +835,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "windows",
-    kind: AttributeKind::Nullary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Nullary,
+      expression: AttributeExpressionKind::StringLiteral,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Enable a recipe or setting on Windows.
@@ -677,7 +860,11 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   },
   Builtin::Attribute {
     name: "working-directory",
-    kind: AttributeKind::Unary,
+    signature: AttributeSignature {
+      positional: AttributeKind::Unary,
+      expression: AttributeExpressionKind::Any,
+      keywords: &[],
+    },
     description: indoc! {
       "
       Set the recipe's working directory to `PATH`.

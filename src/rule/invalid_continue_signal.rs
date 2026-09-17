@@ -11,9 +11,9 @@ define_rule! {
         .attributes()
         .iter()
         .filter(|attribute| attribute.name.value == "continue")
-        .flat_map(|attribute| &attribute.arguments)
+        .flat_map(Attribute::positional_arguments)
         .filter_map(|argument| {
-          let signal = argument.value.literal()?;
+          let signal = argument.text.value.literal()?;
 
           if SIGNALS.contains(&signal.as_str()) {
             None
@@ -22,7 +22,7 @@ define_rule! {
               format!(
                 "Invalid signal `{signal}`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`"
               ),
-              argument.range,
+              argument.text.range,
             ))
           }
         })

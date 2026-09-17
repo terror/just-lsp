@@ -388,21 +388,34 @@ impl Document {
           .find_all("^identifier")
           .into_iter()
           .map(move |identifier| {
+            let name = TextNode::from_node(&identifier, self);
+
+            let parenthesized = identifier
+              .next_sibling()
+              .is_some_and(|node| node.kind() == "(");
+
+            let keywords = parenthesized
+              && BUILTINS.iter().any(|builtin| match builtin {
+                Builtin::Attribute {
+                  name: builtin_name,
+                  signature,
+                  ..
+                } => {
+                  *builtin_name == name.value && !signature.keywords.is_empty()
+                }
+                _ => false,
+              });
+
             let arguments = identifier
               .siblings()
               .take_while(|sibling| sibling.kind() != "identifier")
-              .filter(|sibling| {
-                sibling.start_byte() != sibling.end_byte()
-                  && matches!(
-                    sibling.kind(),
-                    "string" | "expression" | "attribute_named_param"
-                  )
+              .filter_map(|argument| {
+                AttributeArgument::from_node(&argument, self, keywords)
               })
-              .map(|argument| TextNode::from_node(&argument, self))
               .collect::<Vec<_>>();
 
             Attribute {
-              name: TextNode::from_node(&identifier, self),
+              name,
               arguments,
               target,
               range: self.get_range(&attribute),
@@ -1770,10 +1783,13 @@ mod tests {
             value: "group".into(),
             range: lsp::Range::at(0, 1, 0, 6),
           },
-          arguments: vec![TextNode {
-            value: "\"foo\"".into(),
-            range: lsp::Range::at(0, 7, 0, 12),
-          }],
+          arguments: vec![AttributeArgument::Positional(AttributeExpression {
+            kind: AttributeExpressionKind::StringLiteral,
+            text: TextNode {
+              value: "\"foo\"".into(),
+              range: lsp::Range::at(0, 7, 0, 12),
+            }
+          })],
           target: Some(AttributeTarget::Setting),
           range: lsp::Range::at(0, 0, 1, 0),
         }],
@@ -2037,6 +2053,105 @@ mod tests {
   }
 
   #[test]
+  fn list_document_attribute_arguments() {
+    let document = Document::from(indoc! {
+      "
+      [arg('foo', long='bar', multiple), doc: 'baz']
+      foo:
+      "
+    });
+
+    let expression = |value: &str, start, end| AttributeExpression {
+      kind: AttributeExpressionKind::StringLiteral,
+      text: TextNode {
+        value: value.into(),
+        range: lsp::Range::at(0, start, 0, end),
+      },
+    };
+
+    assert_eq!(
+      document.attributes(),
+      vec![
+        Attribute {
+          arguments: vec![
+            AttributeArgument::Positional(expression("'foo'", 5, 10)),
+            AttributeArgument::Keyword {
+              name: TextNode {
+                value: "long".into(),
+                range: lsp::Range::at(0, 12, 0, 16),
+              },
+              value: Some(expression("'bar'", 17, 22)),
+              range: lsp::Range::at(0, 12, 0, 22),
+            },
+            AttributeArgument::Keyword {
+              name: TextNode {
+                value: "multiple".into(),
+                range: lsp::Range::at(0, 24, 0, 32),
+              },
+              value: None,
+              range: lsp::Range::at(0, 24, 0, 32),
+            },
+          ],
+          name: TextNode {
+            value: "arg".into(),
+            range: lsp::Range::at(0, 1, 0, 4),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Recipe),
+        },
+        Attribute {
+          arguments: vec![AttributeArgument::Positional(expression(
+            "'baz'", 40, 45
+          ))],
+          name: TextNode {
+            value: "doc".into(),
+            range: lsp::Range::at(0, 35, 0, 38),
+          },
+          range: lsp::Range::at(0, 0, 1, 0),
+          target: Some(AttributeTarget::Recipe),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn list_document_attribute_expression_kinds() {
+    #[track_caller]
+    fn case(value: &str, kind: AttributeExpressionKind) {
+      let document = Document::from(format!("[foo: {value}]\nbar:\n").as_str());
+
+      assert_eq!(
+        document.attributes()[0].arguments,
+        vec![AttributeArgument::Positional(AttributeExpression {
+          kind,
+          text: TextNode {
+            value: value.into(),
+            range: lsp::Range::at(
+              0,
+              6,
+              0,
+              6 + u32::try_from(value.encode_utf16().count()).unwrap()
+            ),
+          },
+        })],
+      );
+    }
+
+    case("'foo'", AttributeExpressionKind::StringLiteral);
+    case("x'foo'", AttributeExpressionKind::StringLiteral);
+    case("'''foo'''", AttributeExpressionKind::StringLiteral);
+    case("'😊'", AttributeExpressionKind::StringLiteral);
+    case("foo", AttributeExpressionKind::Const);
+    case("f'foo'", AttributeExpressionKind::Const);
+    case("'foo' + 'bar'", AttributeExpressionKind::Const);
+    case("/'foo'", AttributeExpressionKind::Const);
+    case("('foo')", AttributeExpressionKind::Const);
+    case("arch()", AttributeExpressionKind::Any);
+    case("`foo`", AttributeExpressionKind::Any);
+    case("'foo' + arch()", AttributeExpressionKind::Any);
+  }
+
+  #[test]
   fn list_document_attributes() {
     let document = Document::from(indoc! {
       "
@@ -2082,10 +2197,13 @@ mod tests {
           target: Some(AttributeTarget::Recipe),
         },
         Attribute {
-          arguments: vec![TextNode {
-            value: "\"desc\"".into(),
-            range: lsp::Range::at(0, 23, 0, 29),
-          }],
+          arguments: vec![AttributeArgument::Positional(AttributeExpression {
+            kind: AttributeExpressionKind::StringLiteral,
+            text: TextNode {
+              value: "\"desc\"".into(),
+              range: lsp::Range::at(0, 23, 0, 29),
+            }
+          })],
           name: TextNode {
             value: "description".into(),
             range: lsp::Range::at(0, 10, 0, 21),
@@ -2103,10 +2221,13 @@ mod tests {
           target: Some(AttributeTarget::Alias),
         },
         Attribute {
-          arguments: vec![TextNode {
-            value: "\"value\"".into(),
-            range: lsp::Range::at(7, 10, 7, 17),
-          }],
+          arguments: vec![AttributeArgument::Positional(AttributeExpression {
+            kind: AttributeExpressionKind::StringLiteral,
+            text: TextNode {
+              value: "\"value\"".into(),
+              range: lsp::Range::at(7, 10, 7, 17),
+            }
+          })],
           name: TextNode {
             value: "var_attr".into(),
             range: lsp::Range::at(7, 1, 7, 9),
@@ -2908,10 +3029,13 @@ mod tests {
             value: "description".into(),
             range: lsp::Range::at(1, 1, 1, 12),
           },
-          arguments: vec![TextNode {
-            value: "\"This is a test recipe\"".into(),
-            range: lsp::Range::at(1, 14, 1, 37),
-          }],
+          arguments: vec![AttributeArgument::Positional(AttributeExpression {
+            kind: AttributeExpressionKind::StringLiteral,
+            text: TextNode {
+              value: "\"This is a test recipe\"".into(),
+              range: lsp::Range::at(1, 14, 1, 37),
+            }
+          })],
           target: Some(AttributeTarget::Recipe),
           range: lsp::Range::at(1, 0, 2, 0),
         },
@@ -2921,14 +3045,20 @@ mod tests {
             range: lsp::Range::at(2, 1, 2, 5),
           },
           arguments: vec![
-            TextNode {
-              value: "\"test\"".into(),
-              range: lsp::Range::at(2, 6, 2, 12),
-            },
-            TextNode {
-              value: "\"example\"".into(),
-              range: lsp::Range::at(2, 14, 2, 23),
-            }
+            AttributeArgument::Positional(AttributeExpression {
+              kind: AttributeExpressionKind::StringLiteral,
+              text: TextNode {
+                value: "\"test\"".into(),
+                range: lsp::Range::at(2, 6, 2, 12),
+              }
+            }),
+            AttributeArgument::Positional(AttributeExpression {
+              kind: AttributeExpressionKind::StringLiteral,
+              text: TextNode {
+                value: "\"example\"".into(),
+                range: lsp::Range::at(2, 14, 2, 23),
+              }
+            })
           ],
           target: Some(AttributeTarget::Recipe),
           range: lsp::Range::at(2, 0, 3, 0),

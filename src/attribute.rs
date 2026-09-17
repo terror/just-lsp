@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Attribute {
-  pub arguments: Vec<TextNode>,
+  pub arguments: Vec<AttributeArgument>,
   pub name: TextNode,
   pub range: lsp::Range,
   pub target: Option<AttributeTarget>,
@@ -16,5 +16,14 @@ impl Attribute {
       "unix" => Some(cfg!(unix)),
       _ => None,
     }
+  }
+
+  pub(crate) fn positional_arguments(
+    &self,
+  ) -> impl Iterator<Item = &AttributeExpression> {
+    self.arguments.iter().filter_map(|argument| match argument {
+      AttributeArgument::Positional(expression) => Some(expression),
+      AttributeArgument::Keyword { .. } => None,
+    })
   }
 }
