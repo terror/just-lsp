@@ -2121,6 +2121,30 @@ mod tests {
   }
 
   #[test]
+  fn circular_dependencies_shortest_return_path() {
+    Test::new(indoc! {
+      "
+      foo: bar
+      bar: baz foo
+      baz: foo
+      "
+    })
+    .error(
+      "Recipe `foo` has circular dependency `foo -> bar -> foo`",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .error(
+      "Recipe `bar` has circular dependency `bar -> baz -> foo -> bar`",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .error(
+      "Recipe `baz` has circular dependency `baz -> foo -> bar -> baz`",
+      lsp::Range::at(2, 0, 3, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn circular_dependencies_simple() {
     Test::new(indoc! {
       "
