@@ -16,6 +16,7 @@ include = [
   "/README.md",
   "/build.rs",
   "/src/",
+  "/tests/",
   "/queries/**",
   "/vendor/*-src/**.c",
   "/vendor/*-src/**/**.h"
