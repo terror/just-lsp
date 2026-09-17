@@ -10,7 +10,7 @@ impl TextNode {
   #[must_use]
   pub fn from_node(node: &Node, document: &Document) -> Self {
     Self {
-      range: node.get_range(document),
+      range: document.get_range(node),
       value: document.get_node_text(node),
     }
   }

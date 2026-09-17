@@ -3,10 +3,7 @@ use super::*;
 pub trait NodeExt {
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
-  fn get_function(&self, document: &Document) -> Option<Function>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
-  fn get_range(&self, document: &Document) -> lsp::Range;
-  fn get_recipe(&self, document: &Document) -> Option<Recipe>;
   fn has_any_parent(&self, kinds: &[&str]) -> bool;
   fn siblings(&self) -> impl Iterator<Item = Node<'_>>;
 }
@@ -69,15 +66,6 @@ impl NodeExt for Node<'_> {
     collect_nodes_by_kind(*self, selector)
   }
 
-  fn get_function(&self, document: &Document) -> Option<Function> {
-    let range = self.get_parent("function_definition")?.get_range(document);
-
-    document
-      .functions()
-      .into_iter()
-      .find(|function| function.range == range)
-  }
-
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
     let mut current = *self;
 
@@ -90,22 +78,6 @@ impl NodeExt for Node<'_> {
     }
 
     None
-  }
-
-  fn get_range(&self, document: &Document) -> lsp::Range {
-    lsp::Range {
-      start: document.content.byte_to_lsp_position(self.start_byte()),
-      end: document.content.byte_to_lsp_position(self.end_byte()),
-    }
-  }
-
-  fn get_recipe(&self, document: &Document) -> Option<Recipe> {
-    let range = self.get_parent("recipe")?.get_range(document);
-
-    document
-      .recipes()
-      .into_iter()
-      .find(|recipe| recipe.range == range)
   }
 
   fn has_any_parent(&self, kinds: &[&str]) -> bool {

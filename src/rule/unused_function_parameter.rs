@@ -29,7 +29,7 @@ define_rule! {
           (!name.starts_with('_') && !used).then(|| {
             Diagnostic::warning(
               format!("Function parameter `{name}` appears unused"),
-              parameter.get_range(document),
+              document.get_range(&parameter),
             )
           })
         })

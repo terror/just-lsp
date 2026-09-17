@@ -26,7 +26,7 @@ define_rule! {
           for argument in arguments.iter().filter(|node| node.kind() == "expression") {
             diagnostics.push(Diagnostic::error(
               "Attribute `cache` only accepts keyword arguments",
-              argument.get_range(document),
+              document.get_range(argument),
             ));
           }
 
@@ -46,12 +46,12 @@ define_rule! {
                   "Unknown `[cache]` keyword `{name}`, expected one of {}",
                   VALID_KWARGS.join(", ")
                 ),
-                argument.get_range(document),
+                document.get_range(argument),
               ));
             } else if argument.child_by_field_name("value").is_none() {
               diagnostics.push(Diagnostic::error(
                 format!("`[cache]` keyword `{name}` requires a value"),
-                argument.get_range(document),
+                document.get_range(argument),
               ));
             }
           }

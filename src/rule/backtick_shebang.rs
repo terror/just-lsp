@@ -51,7 +51,7 @@ define_rule! {
         .map(|command| {
           Diagnostic::error(
             "Backticks may not start with `#!`",
-            command.get_range(document),
+            document.get_range(&command),
           )
         })
         .collect()

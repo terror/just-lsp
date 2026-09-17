@@ -70,7 +70,7 @@ impl InvalidAttributeArgumentExpressionRule {
               format!(
                 "Attribute `{attribute_name}` arguments must be const expressions"
               ),
-              node.get_range(document),
+              document.get_range(&node),
             )
           })
           .collect();
@@ -88,7 +88,7 @@ impl InvalidAttributeArgumentExpressionRule {
           format!(
             "Attribute `{attribute_name}` arguments must be string literals"
           ),
-          node.get_range(document),
+          document.get_range(&node),
         )
       })
       .collect()

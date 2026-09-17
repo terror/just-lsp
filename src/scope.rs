@@ -98,7 +98,7 @@ impl<'a> Scope<'a> {
       self.unresolved_identifiers.push((
         TextNode {
           value: name,
-          range: identifier.get_range(self.document),
+          range: self.document.get_range(&identifier),
         },
         suggestion,
       ));

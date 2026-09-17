@@ -98,7 +98,7 @@ define_rule! {
                 "{} attribute {key} is duplicated",
                 target.target_name()
               ),
-              attribute_node.get_range(document),
+              document.get_range(&attribute_node),
             ));
           }
         }
