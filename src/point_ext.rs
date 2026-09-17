@@ -1,8 +1,9 @@
 use super::*;
 
-pub trait PointExt {
+pub(crate) trait PointExt {
   #[must_use]
   fn advance(self, delta: Point) -> Self;
+  #[cfg(test)]
   fn position(&self, document: &Document) -> lsp::Position;
 }
 
@@ -23,6 +24,7 @@ impl PointExt for Point {
   /// We take the document line for the point’s row, convert the byte column
   /// into a char index, and then into a UTF-16 offset to produce an
   /// `lsp::Position`.
+  #[cfg(test)]
   fn position(&self, document: &Document) -> lsp::Position {
     let byte = if self.row == 0 {
       0
