@@ -47,6 +47,7 @@ impl<'a> Graph<'a> {
 
   pub(super) fn cycle(&self, start: &str) -> Option<Vec<&'a str>> {
     let (&start, dependencies) = self.edges.get_key_value(start)?;
+
     let component = self.components[start];
 
     let dependency = dependencies
