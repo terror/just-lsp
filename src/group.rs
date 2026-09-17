@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Group {
+pub(crate) enum Group {
   Android,
   Any,
   Dragonfly,
@@ -13,7 +13,7 @@ pub enum Group {
 
 impl Group {
   #[must_use]
-  pub fn conflicts_with(self, other: Group) -> bool {
+  pub(crate) fn conflicts_with(self, other: Group) -> bool {
     matches!((self, other), (Group::Any, _) | (_, Group::Any)) || self == other
   }
 }

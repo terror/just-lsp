@@ -25,8 +25,9 @@ impl Recipe {
       .find(|attribute| attribute.name.value == name)
   }
 
+  #[cfg(test)]
   #[must_use]
-  pub fn groups(&self) -> GroupSet {
+  pub(crate) fn groups(&self) -> GroupSet {
     GroupSet::from_attributes(&self.attributes)
   }
 
