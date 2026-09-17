@@ -788,7 +788,7 @@ mod tests {
       "
     })
     .error(
-      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+      "Attribute `arg` got 0 arguments but takes 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
     .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
@@ -796,19 +796,138 @@ mod tests {
   }
 
   #[test]
-  fn arg_attribute_missing_parameter_name() {
+  fn arg_attribute_extra_positional_argument() {
     Test::new(indoc! {
       "
-      [arg]
+      [arg('foo', 'bar')]
       bar foo:
         echo {{foo}}
       "
     })
     .error(
-      "Attribute `arg` got 0 arguments but takes at least 1 argument",
+      "Attribute `arg` got 2 arguments but takes 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
     .run();
+  }
+
+  #[test]
+  fn arg_attribute_invalid_parameter_expression() {
+    #[track_caller]
+    fn case(attribute: &str, range: lsp::Range) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .error("Attribute `arg` arguments must be string literals", range)
+      .run();
+    }
+
+    case("[arg('foo' + 'bar')]", lsp::Range::at(0, 5, 0, 18));
+    case("[arg(arch())]", lsp::Range::at(0, 5, 0, 11));
+    case("[arg: foo]", lsp::Range::at(0, 6, 0, 9));
+  }
+
+  #[test]
+  fn arg_attribute_keywords_without_parameter_name() {
+    #[track_caller]
+    fn case(arguments: &str, message: &'static str, start: u32, end: u32) {
+      Test::new(&formatdoc! {
+        "
+        [arg({arguments})]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(
+        "Attribute `arg` got 0 arguments but takes 1 argument",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .error(message, lsp::Range::at(0, start, 0, end))
+      .run();
+    }
+
+    case(
+      "foo='bar'",
+      "Unknown `[arg]` keyword `foo`, expected one of flag, help, long, max, min, multiple, pattern, short, value",
+      5,
+      14,
+    );
+
+    case(
+      "help=arch()",
+      "Attribute `arg` arguments must be const expressions",
+      10,
+      16,
+    );
+
+    case(
+      "pattern=`foo`",
+      "Attribute `arg` arguments must be const expressions",
+      13,
+      18,
+    );
+
+    case(
+      "long='foo' + 'bar'",
+      "Attribute `arg` arguments must be string literals",
+      10,
+      23,
+    );
+
+    case(
+      "value='foo'",
+      "`[arg]` `value=` requires `long=` or `short=`",
+      5,
+      16,
+    );
+  }
+
+  #[test]
+  fn arg_attribute_missing_keyword_value() {
+    #[track_caller]
+    fn case(keyword: &str, message: &'static str) {
+      Test::new(&formatdoc! {
+        "
+        [arg('foo', {keyword})]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(
+        message,
+        lsp::Range::at(0, 12, 0, 12 + u32::try_from(keyword.len()).unwrap()),
+      )
+      .run();
+    }
+
+    case("help", "`[arg]` keyword `help` requires a value");
+    case("short", "`[arg]` keyword `short` requires a value");
+  }
+
+  #[test]
+  fn arg_attribute_missing_parameter_name() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(
+        "Attribute `arg` got 0 arguments but takes 1 argument",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+    }
+
+    case("[arg]");
+    case("[arg(long='foo')]");
   }
 
   #[test]
@@ -872,14 +991,22 @@ mod tests {
 
   #[test]
   fn arg_attribute_valid() {
-    Test::new(indoc! {
-      "
-      [arg('foo', help=\"Help text\")]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .run();
+    #[track_caller]
+    fn case(name: &str) {
+      Test::new(&formatdoc! {
+        "
+        [arg({name}, help='bar')]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .run();
+    }
+
+    case("'foo'");
+    case("'''foo'''");
+    case(r#""\u{66}oo""#);
+    case("x'foo'");
   }
 
   #[test]
@@ -1082,6 +1209,48 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn attribute_unsupported_keyword() {
+    #[track_caller]
+    fn case(attribute: &str, message: &'static str) {
+      let test = Test::new(&formatdoc! {
+        "
+        [{attribute}(foo='bar')]
+        foo:
+          echo foo
+        "
+      });
+
+      let test = if attribute == "group" {
+        test.error(
+          "Attribute `group` got 0 arguments but takes 1 argument",
+          lsp::Range::at(0, 0, 1, 0),
+        )
+      } else {
+        test
+      };
+
+      let start = 2 + u32::try_from(attribute.len()).unwrap();
+
+      test
+        .error(message, lsp::Range::at(0, start, 0, start + 9))
+        .run();
+    }
+
+    case(
+      "group",
+      "Attribute `group` does not accept keyword arguments",
+    );
+    case(
+      "private",
+      "Attribute `private` does not accept keyword arguments",
+    );
+    case(
+      "script",
+      "Attribute `script` does not accept keyword arguments",
+    );
   }
 
   #[test]
@@ -1822,8 +1991,8 @@ mod tests {
       "
     })
     .error(
-      "Attribute `cache` only accepts keyword arguments",
-      lsp::Range::at(3, 7, 3, 12),
+      "Attribute `cache` got 1 argument but takes 0 arguments",
+      lsp::Range::at(3, 0, 4, 0),
     )
     .run();
   }
