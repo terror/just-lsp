@@ -9,6 +9,23 @@ pub struct Document {
 }
 
 impl Document {
+  /// Returns the alias declarations in source order.
+  ///
+  /// Duplicate aliases are preserved. An alias is omitted if either side of
+  /// its declaration is absent from the syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("alias foo := bar\nbar:\n");
+  ///
+  /// let aliases = document.aliases();
+  ///
+  /// assert_eq!(aliases[0].name.value, "foo");
+  /// assert_eq!(aliases[0].value.value, "bar");
+  /// ```
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
     self
@@ -33,11 +50,58 @@ impl Document {
       .collect()
   }
 
-  /// Applies incremental edits from the client and reparses the syntax tree.
+  /// Applies the client's changes and reparses the syntax tree.
+  ///
+  /// Changes are applied in order, so each range refers to the contents after
+  /// the preceding change. A change without a range replaces the entire
+  /// document. Range columns are measured in UTF-16 code units.
+  ///
+  /// The document's version is set to the version supplied by the client.
+  /// The contents, version, and tree edits are retained if parsing fails.
+  /// Syntax errors in the contents are represented in the tree and do not
+  /// cause this method to return an error.
   ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if tree-sitter fails to parse the updated document.
+  /// Returns an error if the just grammar cannot be loaded or tree-sitter
+  /// fails to produce a syntax tree.
+  ///
+  /// # Panics
+  ///
+  /// Panics if a change's start position is after its end position after
+  /// conversion to character offsets.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Document,
+  ///   tower_lsp::lsp_types::{
+  ///     DidChangeTextDocumentParams, TextDocumentContentChangeEvent,
+  ///     VersionedTextDocumentIdentifier,
+  ///   },
+  /// };
+  ///
+  /// let mut document = Document::from("foo:\n");
+  ///
+  /// document
+  ///   .apply_change(DidChangeTextDocumentParams {
+  ///     text_document: VersionedTextDocumentIdentifier {
+  ///       uri: document.uri.clone(),
+  ///       version: 2,
+  ///     },
+  ///     content_changes: vec![TextDocumentContentChangeEvent {
+  ///       range: None,
+  ///       range_length: None,
+  ///       text: "bar:\n".into(),
+  ///     }],
+  ///   })
+  ///   .unwrap();
+  ///
+  /// assert_eq!(document.content.to_string(), "bar:\n");
+  /// assert_eq!(document.recipes()[0].name.value, "bar");
+  /// assert_eq!(document.version, 2);
+  /// ```
   pub fn apply_change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -63,6 +127,30 @@ impl Document {
     Ok(())
   }
 
+  /// Returns the attributes throughout the document in source order.
+  ///
+  /// Each name in an attribute list produces a separate [`Attribute`]. These
+  /// attributes share the range of the whole list, but retain their own name
+  /// and argument ranges. Attributes without a recognized target are
+  /// included with a `None` target.
+  ///
+  /// To restrict the search to a subtree, use [`Document::get_attributes`].
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("[private, group('foo')]\nbar:\n");
+  ///
+  /// let names = document
+  ///   .attributes()
+  ///   .into_iter()
+  ///   .map(|attribute| attribute.name.value)
+  ///   .collect::<Vec<_>>();
+  ///
+  /// assert_eq!(names, ["private", "group"]);
+  /// ```
   #[must_use]
   pub fn attributes(&self) -> Vec<Attribute> {
     self
@@ -74,9 +162,40 @@ impl Document {
       .collect()
   }
 
+  /// Returns the document's contents formatted by `just --fmt`.
+  ///
+  /// This runs `just --fmt --unstable --quiet` on a temporary file, using the
+  /// indentation in `config` when one is provided. If the URI can be converted
+  /// to a local file path, the temporary file is created alongside the
+  /// document so relative paths can be resolved. Otherwise, the system's
+  /// temporary directory is used.
+  ///
+  /// The document's contents, syntax tree, and version are unchanged.
+  ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if formatting fails.
+  /// Returns an error if the file path has no parent, the temporary file
+  /// cannot be created, written, or read as UTF-8, or `just` cannot be run.
+  /// A nonzero exit status from `just` is returned as [`Error::Format`] with
+  /// the command's standard error output.
+  ///
+  /// # Example
+  ///
+  /// This requires `just` to be available on `PATH`.
+  ///
+  /// ```no_run
+  /// use {
+  ///   just_lsp::{Document, FormattingConfig},
+  ///   tower_lsp::lsp_types::Url,
+  /// };
+  ///
+  /// let uri = Url::parse("untitled:foo").unwrap();
+  /// let document = Document::new("foo:= 'bar'\n", uri).unwrap();
+  ///
+  /// let formatted = document.format(&FormattingConfig::default()).unwrap();
+  ///
+  /// assert_eq!(formatted, "foo := 'bar'\n");
+  /// ```
   pub fn format(&self, config: &FormattingConfig) -> Result<String> {
     let file = if let Ok(path) = self.uri.file_path() {
       tempfile::Builder::new()
@@ -116,6 +235,27 @@ impl Document {
     Ok(fs::read_to_string(&file)?)
   }
 
+  /// Returns the function calls throughout the document in source order.
+  ///
+  /// Nested calls are included, with an outer call preceding calls in its
+  /// arguments. Arguments retain their source text and are not evaluated. Calls
+  /// without an identifier in the syntax tree are omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("foo := bar(baz('qux'))\n");
+  ///
+  /// let names = document
+  ///   .function_calls()
+  ///   .into_iter()
+  ///   .map(|call| call.name.value)
+  ///   .collect::<Vec<_>>();
+  ///
+  /// assert_eq!(names, ["bar", "baz"]);
+  /// ```
   #[must_use]
   pub fn function_calls(&self) -> Vec<FunctionCall> {
     self
@@ -146,6 +286,25 @@ impl Document {
       .collect()
   }
 
+  /// Returns the user-defined functions in source order.
+  ///
+  /// Each function includes its attributes, parameters, body text, and source
+  /// range. The complete declaration text is trimmed of surrounding
+  /// whitespace. Definitions without a name node are omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("foo(bar) := bar + 'baz'\n");
+  ///
+  /// let functions = document.functions();
+  ///
+  /// assert_eq!(functions[0].name.value, "foo");
+  /// assert_eq!(functions[0].parameters[0].value, "bar");
+  /// assert_eq!(functions[0].body, "bar + 'baz'");
+  /// ```
   #[must_use]
   pub fn functions(&self) -> Vec<Function> {
     self
@@ -184,6 +343,32 @@ impl Document {
       .collect()
   }
 
+  /// Returns the attributes in the subtree rooted at `node` in source order.
+  ///
+  /// If `node` is itself an attribute list, its attributes are included. Each
+  /// name in a list produces a separate [`Attribute`] with the list's range.
+  ///
+  /// The target is inferred from `node`, or from its parent when `node` is an
+  /// attribute list. All returned attributes use this target, which is `None`
+  /// if the node kind is not a supported attribute target. To infer the target
+  /// separately for each list in the document, use [`Document::attributes`].
+  ///
+  /// `node` must belong to this document's current syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{AttributeTarget, Document, NodeExt};
+  ///
+  /// let document = Document::from("[private]\nfoo:\n");
+  ///
+  /// let root = document.tree.root_node();
+  /// let recipe = root.find("recipe").unwrap();
+  /// let attributes = document.get_attributes(&recipe);
+  ///
+  /// assert_eq!(attributes[0].name.value, "private");
+  /// assert_eq!(attributes[0].target, Some(AttributeTarget::Recipe));
+  /// ```
   #[must_use]
   pub fn get_attributes(&self, node: &Node) -> Vec<Attribute> {
     let target = if node.kind() == "attribute" {
@@ -228,6 +413,27 @@ impl Document {
       .collect()
   }
 
+  /// Returns the function definition enclosing `node`.
+  ///
+  /// Only ancestors are searched; `node` itself is not considered. Returns
+  /// `None` if there is no enclosing function or its definition cannot be
+  /// extracted by [`Document::functions`].
+  ///
+  /// `node` must belong to this document's current syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt};
+  ///
+  /// let document = Document::from("foo(bar) := bar\n");
+  ///
+  /// let root = document.tree.root_node();
+  /// let name = root.find("identifier").unwrap();
+  ///
+  /// assert_eq!(document.get_function(&name), document.functions().pop());
+  /// assert_eq!(document.get_function(&root), None);
+  /// ```
   #[must_use]
   pub fn get_function(&self, node: &Node) -> Option<Function> {
     let range = self.get_range(&node.get_parent("function_definition")?);
@@ -238,6 +444,26 @@ impl Document {
       .find(|function| function.range == range)
   }
 
+  /// Returns a copy of the source text covered by `node`.
+  ///
+  /// Whitespace and delimiters within the node's range are preserved. `node`
+  /// must belong to this document's current syntax tree.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the node's byte range extends beyond the document's contents.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("foo:\n  bar\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// assert_eq!(document.get_node_text(&root), "foo:\n  bar\n");
+  /// ```
   #[must_use]
   pub fn get_node_text(&self, node: &Node) -> String {
     self
@@ -249,6 +475,37 @@ impl Document {
       .to_string()
   }
 
+  /// Returns the LSP range covered by `node`.
+  ///
+  /// Lines and columns are zero-based, and columns are measured in UTF-16
+  /// code units. The end position is exclusive. `node` must belong to this
+  /// document's current syntax tree.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the node's byte range extends beyond the document's contents,
+  /// or if a line or UTF-16 column cannot be represented as a `u32`.
+  ///
+  /// # Example
+  ///
+  /// This string contains a character that occupies two UTF-16 code units.
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{Document, NodeExt},
+  ///   tower_lsp::lsp_types::{Position, Range},
+  /// };
+  ///
+  /// let document = Document::from("foo := '🧪'\n");
+  ///
+  /// let root = document.tree.root_node();
+  /// let string = root.find("string").unwrap();
+  ///
+  /// assert_eq!(
+  ///   document.get_range(&string),
+  ///   Range::new(Position::new(0, 7), Position::new(0, 11)),
+  /// );
+  /// ```
   #[must_use]
   pub fn get_range(&self, node: &Node) -> lsp::Range {
     lsp::Range {
@@ -257,6 +514,27 @@ impl Document {
     }
   }
 
+  /// Returns the recipe enclosing `node`.
+  ///
+  /// Only ancestors are searched; `node` itself is not considered. Returns
+  /// `None` if there is no enclosing recipe or its declaration cannot be
+  /// extracted by [`Document::recipes`].
+  ///
+  /// `node` must belong to this document's current syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt};
+  ///
+  /// let document = Document::from("foo:\n  bar\n");
+  ///
+  /// let root = document.tree.root_node();
+  /// let name = root.find("identifier").unwrap();
+  ///
+  /// assert_eq!(document.get_recipe(&name), document.recipes().pop());
+  /// assert_eq!(document.get_recipe(&root), None);
+  /// ```
   #[must_use]
   pub fn get_recipe(&self, node: &Node) -> Option<Recipe> {
     let range = self.get_range(&node.get_parent("recipe")?);
@@ -267,6 +545,25 @@ impl Document {
       .find(|recipe| recipe.range == range)
   }
 
+  /// Returns the import declarations in source order.
+  ///
+  /// Paths retain their source spelling, including quotes and any string
+  /// prefix. Optional imports are included. This method does not resolve
+  /// paths or read imported files. Declarations without a path node are
+  /// omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("import? 'foo.just'\n");
+  ///
+  /// let imports = document.imports();
+  ///
+  /// assert_eq!(imports[0].path.value, "'foo.just'");
+  /// assert!(imports[0].optional);
+  /// ```
   #[must_use]
   pub fn imports(&self) -> Vec<Import> {
     self
@@ -287,6 +584,26 @@ impl Document {
       .collect()
   }
 
+  /// Returns the module declarations in source order.
+  ///
+  /// A module's path is `None` when no explicit path is given. Explicit paths
+  /// retain their source spelling, including quotes and any string prefix.
+  /// Optional modules are included. This method does not resolve paths or
+  /// load modules. Declarations without a name node are omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("mod? foo\n");
+  ///
+  /// let modules = document.modules();
+  ///
+  /// assert_eq!(modules[0].name.value, "foo");
+  /// assert!(modules[0].optional);
+  /// assert_eq!(modules[0].path, None);
+  /// ```
   #[must_use]
   pub fn modules(&self) -> Vec<Module> {
     self
@@ -312,10 +629,32 @@ impl Document {
       .collect()
   }
 
+  /// Creates a document by parsing `source` and associating it with `uri`.
+  ///
+  /// The initial version is `0`. The URI identifies the document; its
+  /// contents are taken entirely from `source`, without reading a file.
+  ///
+  /// Source containing syntax errors is accepted. Use
+  /// `document.tree.root_node().has_error()` to check for those errors.
+  ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
-  /// contents fail to parse.
+  /// Returns an error if the just grammar cannot be loaded or tree-sitter
+  /// fails to produce a syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::Document, tower_lsp::lsp_types::Url};
+  ///
+  /// let uri = Url::parse("file:///foo.just").unwrap();
+  /// let document = Document::new("foo :=\n", uri.clone()).unwrap();
+  ///
+  /// assert_eq!(document.content.to_string(), "foo :=\n");
+  /// assert_eq!(document.uri, uri);
+  /// assert_eq!(document.version, 0);
+  /// assert!(document.tree.root_node().has_error());
+  /// ```
   pub fn new(source: &str, uri: lsp::Url) -> Result<Self> {
     let content = Rope::from_str(source);
 
@@ -329,7 +668,29 @@ impl Document {
     })
   }
 
-  /// Returns the syntax tree node at the given LSP `Position`.
+  /// Returns the smallest syntax tree node at the given LSP position.
+  ///
+  /// The line and column are zero-based, and the column is measured in UTF-16
+  /// code units. Columns beyond the line's contents are clamped to the end of
+  /// that line, before its line ending. Lines beyond the document are clamped
+  /// to the end of the document. A position within a surrogate pair refers to
+  /// the start of that character.
+  ///
+  /// The result can be an unnamed node, such as punctuation, or an enclosing
+  /// node when the position falls between children.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::Document, tower_lsp::lsp_types::Position};
+  ///
+  /// let document = Document::from("foo:\n");
+  ///
+  /// let node = document.node_at_position(Position::new(0, 1)).unwrap();
+  ///
+  /// assert_eq!(node.kind(), "identifier");
+  /// assert_eq!(document.get_node_text(&node), "foo");
+  /// ```
   #[must_use]
   pub fn node_at_position(&self, position: lsp::Position) -> Option<Node<'_>> {
     let byte = self
@@ -339,18 +700,64 @@ impl Document {
     self.tree.root_node().descendant_for_byte_range(byte, byte)
   }
 
-  /// Parses the current document contents and updates the cached syntax tree.
+  /// Reparses the current contents, reusing the existing syntax tree.
+  ///
+  /// If the contents have changed, the existing tree must first be updated
+  /// with matching [`Tree::edit`] calls. [`Document::apply_change`] handles
+  /// both the text and tree edits for changes received from the client.
+  ///
+  /// Syntax errors in the contents are represented in the new tree. The
+  /// contents and version are unchanged, and the existing tree is replaced
+  /// only when parsing succeeds.
   ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the tree-sitter parser cannot be created or the
-  /// contents fail to parse.
+  /// Returns an error if the just grammar cannot be loaded or tree-sitter
+  /// fails to produce a syntax tree.
+  ///
+  /// # Example
+  ///
+  /// This applies an edit directly before reparsing the contents.
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{Document, RopeExt},
+  ///   tower_lsp::lsp_types::TextDocumentContentChangeEvent,
+  /// };
+  ///
+  /// let mut document = Document::from("foo:\n");
+  ///
+  /// let change = TextDocumentContentChangeEvent {
+  ///   range: None,
+  ///   range_length: None,
+  ///   text: "bar:\n".into(),
+  /// };
+  ///
+  /// let edit = document.content.build_edit(&change);
+  ///
+  /// document.content.apply_edit(&edit);
+  /// document.tree.edit(&edit.input_edit);
+  ///
+  /// document.parse().unwrap();
+  ///
+  /// assert_eq!(document.recipes()[0].name.value, "bar");
+  /// assert_eq!(document.version, 1);
+  /// ```
   pub fn parse(&mut self) -> Result {
     self.tree = Self::parse_tree(&self.content, Some(&self.tree))?;
 
     Ok(())
   }
 
+  /// Parses `content` with the just grammar, optionally reusing `old_tree`.
+  ///
+  /// A reused tree must already have been edited to match `content`. Syntax
+  /// errors are preserved in the returned tree.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the grammar cannot be loaded or tree-sitter fails to
+  /// produce a syntax tree.
   fn parse_tree(content: &Rope, old_tree: Option<&Tree>) -> Result<Tree> {
     let mut parser = Parser::new();
 
@@ -362,6 +769,31 @@ impl Document {
       .ok_or(Error::Parse)
   }
 
+  /// Returns the recipe declarations in source order.
+  ///
+  /// Each recipe includes its attributes, parameters, dependencies, body,
+  /// shebang, and source range. Dependencies retain their order and whether
+  /// they occur before or after `&&`. They are not resolved to other recipes.
+  /// Declarations without a name node are omitted.
+  ///
+  /// Body entries preserve indentation and omit blank lines. Newlines inside
+  /// interpolations do not split an entry. The complete declaration text is
+  /// trimmed of surrounding whitespace.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("foo bar: baz\n  echo {{bar}}\n");
+  ///
+  /// let recipes = document.recipes();
+  ///
+  /// assert_eq!(recipes[0].name.value, "foo");
+  /// assert_eq!(recipes[0].parameters[0].name, "bar");
+  /// assert_eq!(recipes[0].dependencies[0].name.value, "baz");
+  /// assert_eq!(recipes[0].body[0].value, "  echo {{bar}}");
+  /// ```
   #[must_use]
   pub fn recipes(&self) -> Vec<Recipe> {
     self
@@ -533,6 +965,26 @@ impl Document {
       .collect()
   }
 
+  /// Returns the setting declarations in source order.
+  ///
+  /// Values retain their source text. A boolean flag with no explicit value
+  /// has an empty value and a [`SettingKind::Boolean`] kind set to `true`.
+  /// Declarations that cannot be extracted by [`Setting::from_node`] are
+  /// omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, SettingKind};
+  ///
+  /// let document = Document::from("set dotenv-load\n");
+  ///
+  /// let settings = document.settings();
+  ///
+  /// assert_eq!(settings[0].name.value, "dotenv-load");
+  /// assert_eq!(settings[0].value.value, "");
+  /// assert!(matches!(settings[0].kind, SettingKind::Boolean(true)));
+  /// ```
   #[must_use]
   pub fn settings(&self) -> Vec<Setting> {
     self
@@ -544,6 +996,27 @@ impl Document {
       .collect()
   }
 
+  /// Returns the `unexport` declarations in source order.
+  ///
+  /// Each declaration includes its attributes, variable name, and source
+  /// range. Declarations without a name node are omitted. This method does
+  /// not modify the environment.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("unexport foo\n");
+  ///
+  /// let names = document
+  ///   .unexports()
+  ///   .into_iter()
+  ///   .map(|unexport| unexport.name.value)
+  ///   .collect::<Vec<_>>();
+  ///
+  /// assert_eq!(names, ["foo"]);
+  /// ```
   #[must_use]
   pub fn unexports(&self) -> Vec<Unexport> {
     self
@@ -563,6 +1036,27 @@ impl Document {
       .collect()
   }
 
+  /// Returns the variable assignments in source order.
+  ///
+  /// Ordinary, exported, and eager assignments are included. Attributes on
+  /// an `export` or `eager` declaration are attached to its variable, while
+  /// the content and range cover the assignment itself. The content is
+  /// trimmed of surrounding whitespace. Assignments without a name node
+  /// are omitted.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("export foo := 'bar'\n");
+  ///
+  /// let variables = document.variables();
+  ///
+  /// assert_eq!(variables[0].name.value, "foo");
+  /// assert!(variables[0].export);
+  /// assert_eq!(variables[0].content, "foo := 'bar'");
+  /// ```
   #[must_use]
   pub fn variables(&self) -> Vec<Variable> {
     self
@@ -591,6 +1085,15 @@ impl Document {
 }
 
 impl From<&str> for Document {
+  /// Creates a document with URI `file:///test.just` and version `1`.
+  ///
+  /// This is a convenience for tests and examples. Use [`Document::new`] to
+  /// supply a URI and handle parser errors. Syntax errors in `value` are
+  /// accepted and represented in the syntax tree.
+  ///
+  /// # Panics
+  ///
+  /// Panics if [`Document::new`] returns an error.
   fn from(value: &str) -> Self {
     Self {
       version: 1,
@@ -602,6 +1105,15 @@ impl From<&str> for Document {
 impl TryFrom<lsp::DidOpenTextDocumentParams> for Document {
   type Error = Error;
 
+  /// Creates a document from a client's `textDocument/didOpen` notification.
+  ///
+  /// The supplied text is parsed with the just grammar, and the URI and
+  /// version are preserved. The language identifier is ignored.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if [`Document::new`] fails. Syntax errors in the text
+  /// are accepted and represented in the syntax tree.
   fn try_from(params: lsp::DidOpenTextDocumentParams) -> Result<Self> {
     let lsp::TextDocumentItem {
       text, uri, version, ..
