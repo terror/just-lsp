@@ -4,7 +4,7 @@ use super::*;
 pub enum Builtin<'a> {
   Attribute {
     name: &'a str,
-    kind: AttributeKind,
+    signature: AttributeSignature<'a>,
     description: &'a str,
     targets: &'a [AttributeTarget],
   },

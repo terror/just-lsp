@@ -49,7 +49,12 @@ pub use {
   alias::Alias,
   analyzer::Analyzer,
   attribute::Attribute,
+  attribute_argument::AttributeArgument,
+  attribute_expression::AttributeExpression,
+  attribute_expression_kind::AttributeExpressionKind,
+  attribute_keyword::AttributeKeyword,
   attribute_kind::AttributeKind,
+  attribute_signature::AttributeSignature,
   attribute_target::AttributeTarget,
   builtin::Builtin,
   builtins::BUILTINS,
@@ -93,7 +98,12 @@ pub use {
 mod alias;
 mod analyzer;
 mod attribute;
+mod attribute_argument;
+mod attribute_expression;
+mod attribute_expression_kind;
+mod attribute_keyword;
 mod attribute_kind;
+mod attribute_signature;
 mod attribute_target;
 mod builtin;
 mod builtins;
