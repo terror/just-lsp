@@ -103,8 +103,14 @@ const Home = () => {
               >
                 Neovim
               </Link>
-              : with Neovim 0.11.3+ and nvim-lspconfig installed, add the
-              following to your configuration.
+              : with Neovim 0.11.3+ and{' '}
+              <a
+                href='https://github.com/neovim/nvim-lspconfig'
+                className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
+              >
+                nvim-lspconfig
+              </a>{' '}
+              installed, add the following to your configuration.
               <pre className='bg-muted my-4 overflow-x-auto rounded-md border px-4 py-3'>
                 <code className='text-foreground font-mono text-sm'>
                   vim.lsp.enable('just')
@@ -137,7 +143,7 @@ const Home = () => {
             id='reference'
             className='mb-4 text-xl font-semibold tracking-tight'
           >
-            Reference
+            Resources
           </h2>
           <ul className='list-disc space-y-2 pl-5'>
             <li className='text-muted-foreground'>
@@ -146,17 +152,17 @@ const Home = () => {
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Configuration
-              </Link>{' '}
-              — formatting options and diagnostic severity levels.
+              </Link>
+              : adjust formatting and diagnostic severity levels.
             </li>
             <li className='text-muted-foreground'>
               <Link
-                to='/documentation'
+                to='/documentation#features'
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
-                Documentation
-              </Link>{' '}
-              — configuration, diagnostic rules, examples, and fixes.
+                Features
+              </Link>
+              : learn what just-lsp can do and how to use it.
             </li>
             <li className='text-muted-foreground'>
               <Link
@@ -164,8 +170,8 @@ const Home = () => {
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Command line
-              </Link>{' '}
-              — check a justfile with{' '}
+              </Link>
+              : check justfiles from your terminal with{' '}
               <code className='text-foreground font-mono text-sm'>
                 just-lsp analyze
               </code>
@@ -177,8 +183,8 @@ const Home = () => {
                 className='text-foreground underline decoration-current/30 underline-offset-4 hover:decoration-current'
               >
                 Playground
-              </Link>{' '}
-              — edit a justfile and explore its syntax tree in your browser.
+              </Link>
+              : edit a justfile and inspect its syntax tree in your browser.
             </li>
           </ul>
         </section>
