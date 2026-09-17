@@ -6,17 +6,17 @@ struct LocalScope {
   recipe: Option<String>,
 }
 
-pub struct Scope<'a> {
+pub(crate) struct Scope<'a> {
   document: &'a Document,
   globals: HashSet<String>,
-  pub recipe_identifier_usage: HashMap<String, HashSet<String>>,
+  pub(crate) recipe_identifier_usage: HashMap<String, HashSet<String>>,
   root: bool,
-  pub unresolved_identifiers: Vec<(TextNode, Option<String>)>,
-  pub variable_usage: HashMap<String, bool>,
+  pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
+  pub(crate) variable_usage: HashMap<String, bool>,
 }
 
 impl<'a> Scope<'a> {
-  pub fn analyze(context: &RuleContext<'a>) -> Self {
+  pub(crate) fn analyze(context: &RuleContext<'a>) -> Self {
     let mut scope = Self::new(context);
 
     scope.walk_document(context.document(), true);
