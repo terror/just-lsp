@@ -24,7 +24,7 @@ impl<'a> Resolver<'a> {
     Some(match self.resolve_symbol(identifier)? {
       Symbol::Builtin(_) => lsp::Location::new(
         self.view.document().uri.clone(),
-        identifier.get_range(self.view.document()),
+        self.view.document().get_range(identifier),
       ),
       Symbol::Function(function) => function.location(function.name.range),
       Symbol::FunctionParameter(parameter) => {
@@ -72,7 +72,7 @@ impl<'a> Resolver<'a> {
           },
         },
       ),
-      range: Some(identifier.get_range(self.view.document())),
+      range: Some(self.view.document().get_range(identifier)),
     })
   }
 
@@ -107,7 +107,7 @@ impl<'a> Resolver<'a> {
       })
       .map(|found| lsp::Location {
         uri: self.view.document().uri.clone(),
-        range: found.get_range(self.view.document()),
+        range: self.view.document().get_range(&found),
       })
       .collect()
   }
@@ -159,8 +159,10 @@ impl<'a> Resolver<'a> {
       "function_definition" => {
         self.view.find_function(&name).map(Symbol::Function)
       }
-      "function_parameters" => identifier
-        .get_function(self.view.document())
+      "function_parameters" => self
+        .view
+        .document()
+        .get_function(identifier)
         .and_then(|function| {
           function
             .parameters
@@ -169,8 +171,10 @@ impl<'a> Resolver<'a> {
             .cloned()
             .map(Symbol::FunctionParameter)
         }),
-      "parameter" | "variadic_parameter" => identifier
-        .get_recipe(self.view.document())
+      "parameter" | "variadic_parameter" => self
+        .view
+        .document()
+        .get_recipe(identifier)
         .and_then(|recipe| {
           recipe
             .parameters
@@ -185,8 +189,10 @@ impl<'a> Resolver<'a> {
           .or_else(|| identifier.get_parent("variadic_parameter"));
 
         match containing_parameter {
-          None => identifier
-            .get_recipe(self.view.document())
+          None => self
+            .view
+            .document()
+            .get_recipe(identifier)
             .and_then(|recipe| {
               recipe
                 .parameters
@@ -196,7 +202,7 @@ impl<'a> Resolver<'a> {
                 .map(Symbol::Parameter)
             })
             .or_else(|| {
-              identifier.get_function(self.view.document()).and_then(
+              self.view.document().get_function(identifier).and_then(
                 |function| {
                   function
                     .parameters
@@ -215,8 +221,10 @@ impl<'a> Resolver<'a> {
               .document()
               .get_node_text(&containing_parameter.find("identifier")?);
 
-            identifier
-              .get_recipe(self.view.document())
+            self
+              .view
+              .document()
+              .get_recipe(identifier)
               .and_then(|recipe| {
                 recipe
                   .parameters

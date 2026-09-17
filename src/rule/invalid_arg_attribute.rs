@@ -54,7 +54,7 @@ define_rule! {
               format!(
                 "`[arg]` attribute for parameter `{parameter_name}` is duplicated"
               ),
-              attribute.get_range(document),
+              document.get_range(&attribute),
             ));
           }
         }
@@ -144,7 +144,7 @@ impl InvalidArgAttributeRule {
       Self::parameter_unknown(context, attribute, &parameter_name).then(|| {
         Diagnostic::error(
           format!("`[arg]` references unknown parameter `{parameter_name}`"),
-          name_node.get_range(document),
+          document.get_range(&name_node),
         )
       });
 
@@ -159,7 +159,7 @@ impl InvalidArgAttributeRule {
             "Unknown `[arg]` keyword `{name}`, expected one of {}",
             VALID_KWARGS.join(", ")
           ),
-          node.get_range(document),
+          document.get_range(node),
         )
       })
     });
@@ -192,7 +192,7 @@ impl InvalidArgAttributeRule {
           } else {
             "Attribute `arg` arguments must be string literals".to_string()
           },
-          value.get_range(document),
+          document.get_range(&value),
         )
       })
     });
@@ -208,7 +208,7 @@ impl InvalidArgAttributeRule {
       .map(|node| {
         Diagnostic::error(
           "`[arg]` `value=` requires `long=` or `short=`".to_string(),
-          node.get_range(document),
+          document.get_range(node),
         )
       });
 

@@ -12,7 +12,7 @@ pub struct Setting {
 impl Setting {
   #[must_use]
   pub fn from_node(node: &Node, document: &Document) -> Option<Self> {
-    let range = node.get_range(document);
+    let range = document.get_range(node);
 
     let name_node = node.child_by_field_name("left")?;
 
@@ -67,7 +67,7 @@ impl Setting {
     };
 
     Some(Setting {
-      attributes: document.attributes_for_node(node),
+      attributes: document.get_attributes(node),
       kind,
       name,
       range,

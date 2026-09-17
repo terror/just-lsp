@@ -29,14 +29,14 @@ impl SyntaxErrorRule {
     if node.is_error() {
       diagnostics.push(Diagnostic::error(
         SyntaxErrorRule::error_message(document, &node),
-        node.get_range(document),
+        document.get_range(&node),
       ));
     }
 
     if node.is_missing() {
       diagnostics.push(Diagnostic::error(
         SyntaxErrorRule::missing_message(&node),
-        node.get_range(document),
+        document.get_range(&node),
       ));
     }
 

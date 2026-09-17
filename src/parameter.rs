@@ -71,7 +71,7 @@ impl Parameter {
       export,
       default_value,
       content: document.get_node_text(node).trim().to_string(),
-      range: node.get_range(document),
+      range: document.get_range(node),
     })
   }
 }

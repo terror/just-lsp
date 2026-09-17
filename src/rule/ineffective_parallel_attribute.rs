@@ -52,7 +52,7 @@ impl IneffectiveParallelAttributeRule {
     let attribute_node = root
       .find_all("attribute")
       .into_iter()
-      .find(|node| node.get_range(document) == attribute.range)?;
+      .find(|node| document.get_range(node) == attribute.range)?;
 
     let mut cursor = attribute_node.walk();
 
@@ -65,14 +65,14 @@ impl IneffectiveParallelAttributeRule {
 
     let index = identifiers
       .iter()
-      .position(|node| node.get_range(document) == attribute.name.range)?;
+      .position(|node| document.get_range(node) == attribute.name.range)?;
 
     let range = if identifiers.len() == 1 {
       attribute.range
     } else if let Some(next) = identifiers.get(index + 1) {
       lsp::Range {
         start: attribute.name.range.start,
-        end: next.get_range(document).start,
+        end: document.get_range(next).start,
       }
     } else {
       let identifier = identifiers[index];
@@ -88,8 +88,8 @@ impl IneffectiveParallelAttributeRule {
       })?;
 
       lsp::Range {
-        start: previous.get_range(document).end,
-        end: closing_bracket.get_range(document).start,
+        start: document.get_range(&previous).end,
+        end: document.get_range(closing_bracket).start,
       }
     };
 

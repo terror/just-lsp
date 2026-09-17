@@ -18,7 +18,7 @@ impl Document {
       .iter()
       .filter_map(|alias_node| {
         Some(Alias {
-          attributes: self.attributes_for_node(alias_node),
+          attributes: self.get_attributes(alias_node),
           name: TextNode::from_node(
             &alias_node.child_by_field_name("left")?,
             self,
@@ -27,7 +27,7 @@ impl Document {
             &alias_node.child_by_field_name("right")?,
             self,
           ),
-          range: alias_node.get_range(self),
+          range: self.get_range(alias_node),
         })
       })
       .collect()
@@ -70,54 +70,7 @@ impl Document {
       .root_node()
       .find_all("attribute")
       .into_iter()
-      .flat_map(|node| self.attributes_for_node(&node))
-      .collect()
-  }
-
-  pub(super) fn attributes_for_node(&self, node: &Node) -> Vec<Attribute> {
-    let (attributes, target) = if node.kind() == "attribute" {
-      (
-        vec![*node],
-        node
-          .parent()
-          .and_then(|parent| AttributeTarget::try_from_kind(parent.kind())),
-      )
-    } else {
-      (
-        node.find_all("attribute"),
-        AttributeTarget::try_from_kind(node.kind()),
-      )
-    };
-
-    attributes
-      .into_iter()
-      .flat_map(|attribute| {
-        attribute
-          .find_all("^identifier")
-          .into_iter()
-          .map(move |identifier| {
-            let arguments = identifier
-              .siblings()
-              .take_while(|sibling| sibling.kind() != "identifier")
-              .filter(|sibling| {
-                sibling.start_byte() != sibling.end_byte()
-                  && matches!(
-                    sibling.kind(),
-                    "string" | "expression" | "attribute_named_param"
-                  )
-              })
-              .map(|argument| TextNode::from_node(&argument, self))
-              .collect::<Vec<_>>();
-
-            Attribute {
-              name: TextNode::from_node(&identifier, self),
-              arguments,
-              target,
-              range: attribute.get_range(self),
-            }
-          })
-          .collect::<Vec<_>>()
-      })
+      .flat_map(|node| self.get_attributes(&node))
       .collect()
   }
 
@@ -187,7 +140,7 @@ impl Document {
         Some(FunctionCall {
           name: TextNode::from_node(&identifier_node, self),
           arguments,
-          range: function_call_node.get_range(self),
+          range: self.get_range(&function_call_node),
         })
       })
       .collect()
@@ -220,15 +173,69 @@ impl Document {
           .unwrap_or_default();
 
         Some(Function {
-          attributes: self.attributes_for_node(function_node),
+          attributes: self.get_attributes(function_node),
           name: TextNode::from_node(&name_node, self),
           parameters,
           body,
           content: self.get_node_text(function_node).trim().to_string(),
-          range: function_node.get_range(self),
+          range: self.get_range(function_node),
         })
       })
       .collect()
+  }
+
+  #[must_use]
+  pub fn get_attributes(&self, node: &Node) -> Vec<Attribute> {
+    let target = if node.kind() == "attribute" {
+      node.parent()
+    } else {
+      Some(*node)
+    };
+
+    let target =
+      target.and_then(|node| AttributeTarget::try_from_kind(node.kind()));
+
+    node
+      .find_all("attribute")
+      .into_iter()
+      .flat_map(|attribute| {
+        attribute
+          .find_all("^identifier")
+          .into_iter()
+          .map(move |identifier| {
+            let arguments = identifier
+              .siblings()
+              .take_while(|sibling| sibling.kind() != "identifier")
+              .filter(|sibling| {
+                sibling.start_byte() != sibling.end_byte()
+                  && matches!(
+                    sibling.kind(),
+                    "string" | "expression" | "attribute_named_param"
+                  )
+              })
+              .map(|argument| TextNode::from_node(&argument, self))
+              .collect::<Vec<_>>();
+
+            Attribute {
+              name: TextNode::from_node(&identifier, self),
+              arguments,
+              target,
+              range: self.get_range(&attribute),
+            }
+          })
+          .collect::<Vec<_>>()
+      })
+      .collect()
+  }
+
+  #[must_use]
+  pub fn get_function(&self, node: &Node) -> Option<Function> {
+    let range = self.get_range(&node.get_parent("function_definition")?);
+
+    self
+      .functions()
+      .into_iter()
+      .find(|function| function.range == range)
   }
 
   #[must_use]
@@ -243,6 +250,24 @@ impl Document {
   }
 
   #[must_use]
+  pub fn get_range(&self, node: &Node) -> lsp::Range {
+    lsp::Range {
+      start: self.content.byte_to_lsp_position(node.start_byte()),
+      end: self.content.byte_to_lsp_position(node.end_byte()),
+    }
+  }
+
+  #[must_use]
+  pub fn get_recipe(&self, node: &Node) -> Option<Recipe> {
+    let range = self.get_range(&node.get_parent("recipe")?);
+
+    self
+      .recipes()
+      .into_iter()
+      .find(|recipe| recipe.range == range)
+  }
+
+  #[must_use]
   pub fn imports(&self) -> Vec<Import> {
     self
       .tree
@@ -253,10 +278,10 @@ impl Document {
         let path_node = import_node.find("string")?;
 
         Some(Import {
-          attributes: self.attributes_for_node(import_node),
+          attributes: self.get_attributes(import_node),
           optional: import_node.find("^?").is_some(),
           path: TextNode::from_node(&path_node, self),
-          range: import_node.get_range(self),
+          range: self.get_range(import_node),
         })
       })
       .collect()
@@ -277,11 +302,11 @@ impl Document {
           .map(|path_node| TextNode::from_node(&path_node, self));
 
         Some(Module {
-          attributes: self.attributes_for_node(module_node),
+          attributes: self.get_attributes(module_node),
           name: TextNode::from_node(&name_node, self),
           optional: module_node.find("^?").is_some(),
           path,
-          range: module_node.get_range(self),
+          range: self.get_range(module_node),
         })
       })
       .collect()
@@ -432,7 +457,7 @@ impl Document {
                           match argument_node.kind() {
                             "expression" => Some(DependencyArgument {
                               value: self.get_node_text(&argument_node),
-                              range: argument_node.get_range(self),
+                              range: self.get_range(&argument_node),
                               starred: None,
                             }),
                             "starred_dependency_argument" => {
@@ -441,10 +466,10 @@ impl Document {
 
                               Some(DependencyArgument {
                                 value: self.get_node_text(&value_node),
-                                range: value_node.get_range(self),
+                                range: self.get_range(&value_node),
                                 starred: argument_node
                                   .child_by_field_name("star")
-                                  .map(|node| node.get_range(self)),
+                                  .map(|node| self.get_range(&node)),
                               })
                             }
                             _ => None,
@@ -459,7 +484,7 @@ impl Document {
                     .and_then(|dependency_expression_node| {
                       dependency_expression_node
                         .child_by_field_name("map")
-                        .map(|node| node.get_range(self))
+                        .map(|node| self.get_range(&node))
                     });
 
                   dependencies.push(Dependency {
@@ -467,7 +492,7 @@ impl Document {
                     arguments,
                     mapped,
                     phase,
-                    range: dependency_node.get_range(self),
+                    range: self.get_range(&dependency_node),
                   });
                 }
                 _ => {}
@@ -496,12 +521,12 @@ impl Document {
 
         Some(Recipe {
           name: recipe_name,
-          attributes: self.attributes_for_node(recipe_node),
+          attributes: self.get_attributes(recipe_node),
           body,
           dependencies,
           content: self.get_node_text(recipe_node).trim().to_string(),
           parameters,
-          range: recipe_node.get_range(self),
+          range: self.get_range(recipe_node),
           shebang,
         })
       })
@@ -530,9 +555,9 @@ impl Document {
         let name_node = unexport_node.child_by_field_name("name")?;
 
         Some(Unexport {
-          attributes: self.attributes_for_node(unexport_node),
+          attributes: self.get_attributes(unexport_node),
           name: TextNode::from_node(&name_node, self),
-          range: unexport_node.get_range(self),
+          range: self.get_range(unexport_node),
         })
       })
       .collect()
@@ -554,11 +579,11 @@ impl Document {
           .unwrap_or(*assignment_node);
 
         Some(Variable {
-          attributes: self.attributes_for_node(&attribute_node),
+          attributes: self.get_attributes(&attribute_node),
           name: TextNode::from_node(&identifier_node, self),
           export: identifier_node.get_parent("export").is_some(),
           content: self.get_node_text(assignment_node).trim().to_string(),
-          range: assignment_node.get_range(self),
+          range: self.get_range(assignment_node),
         })
       })
       .collect()

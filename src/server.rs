@@ -822,7 +822,7 @@ impl LanguageServer for Server {
         })
         .map(
           |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
-            range: identifier.get_range(document),
+            range: document.get_range(&identifier),
             placeholder: document.get_node_text(&identifier),
           },
         )
