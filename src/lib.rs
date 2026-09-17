@@ -1,5 +1,6 @@
 use {
   conflict_tracker::ConflictTracker,
+  count::Count,
   document_entry::DocumentEntry,
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
   graph::Graph,
@@ -45,7 +46,6 @@ pub use {
   builtin::Builtin,
   builtins::BUILTINS,
   config::{Config, FormattingConfig, RuleConfig, RuleLevel},
-  count::Count,
   dependency::Dependency,
   dependency_argument::DependencyArgument,
   dependency_phase::DependencyPhase,
