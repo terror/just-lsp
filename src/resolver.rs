@@ -121,6 +121,10 @@ impl<'a> Resolver<'a> {
   /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
   #[must_use]
   pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+    if self.view.document().is_attribute_keyword(identifier) {
+      return None;
+    }
+
     let name = self.view.document().get_node_text(identifier);
 
     let parent_kind = identifier.parent()?.kind();
@@ -183,7 +187,7 @@ impl<'a> Resolver<'a> {
             .cloned()
             .map(Symbol::Parameter)
         }),
-      "value" => {
+      "attribute_named_param" | "value" => {
         let containing_parameter = identifier
           .get_parent("parameter")
           .or_else(|| identifier.get_parent("variadic_parameter"));
@@ -326,6 +330,38 @@ mod tests {
         }
         .to_string(),
       })
+    );
+  }
+
+  #[test]
+  fn resolve_attribute_argument_references() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+      [env('bar', foo)]
+      [arg(foo)]
+      bar:
+      "
+    });
+
+    assert_eq!(
+      Resolver::new(&document).resolve_identifier_references(
+        &document
+          .tree
+          .root_node()
+          .find("assignment > identifier")
+          .unwrap(),
+      ),
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 0, 0, 3),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(1, 12, 1, 15),
+        },
+      ],
     );
   }
 
