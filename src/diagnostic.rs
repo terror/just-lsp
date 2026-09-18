@@ -29,9 +29,11 @@ impl Diagnostic {
   }
 
   #[must_use]
-  pub fn quickfix(mut self, quickfix: impl Into<Option<Quickfix>>) -> Self {
-    self.quickfixes.extend(quickfix.into());
-    self
+  pub fn quickfix(self, quickfix: impl Into<Option<Quickfix>>) -> Self {
+    Self {
+      quickfixes: self.quickfixes.into_iter().chain(quickfix.into()).collect(),
+      ..self
+    }
   }
 
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
