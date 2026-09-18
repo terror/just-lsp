@@ -1,4 +1,4 @@
-import { type Extension, RangeSetBuilder } from '@codemirror/state';
+import { type Extension } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -23,11 +23,6 @@ const BASE_CAPTURE_TO_CLASS: Record<string, string> = {
   variable: 'cm-just-variable',
 };
 
-const captureNameToClass = (name: string): string | undefined => {
-  const [base] = name.split('.');
-  return BASE_CAPTURE_TO_CLASS[base];
-};
-
 const buildDecorations = (parser: Parser, query: Query, content: string) => {
   const tree = parser.parse(content);
 
@@ -36,7 +31,11 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
   }
 
   const captures = query.captures(tree.rootNode);
-  const ranges = new Map<string, Set<string>>();
+
+  const ranges = new Map<
+    string,
+    { from: number; to: number; classes: Set<string> }
+  >();
 
   for (const { name, node } of captures) {
     const from = node.startIndex;
@@ -46,34 +45,27 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
       continue;
     }
 
-    const className = captureNameToClass(name);
+    const className = BASE_CAPTURE_TO_CLASS[name.split('.')[0]];
 
     if (className === undefined) {
       continue;
     }
 
     const key = `${from}:${to}`;
-    const classSet = ranges.get(key) ?? new Set<string>();
+    const range = ranges.get(key) ?? { from, to, classes: new Set<string>() };
 
-    classSet.add(className);
-    ranges.set(key, classSet);
+    range.classes.add(className);
+    ranges.set(key, range);
   }
-
-  const builder = new RangeSetBuilder<Decoration>();
-
-  Array.from(ranges.entries())
-    .map(([key, classSet]) => {
-      const [from, to] = key.split(':').map(Number);
-      return { from, to, className: Array.from(classSet).join(' ') };
-    })
-    .sort((a, b) => a.from - b.from || a.to - b.to)
-    .forEach(({ from, to, className }) => {
-      builder.add(from, to, Decoration.mark({ class: className }));
-    });
 
   tree.delete();
 
-  return builder.finish();
+  return Decoration.set(
+    Array.from(ranges.values(), ({ from, to, classes }) =>
+      Decoration.mark({ class: Array.from(classes).join(' ') }).range(from, to)
+    ),
+    true
+  );
 };
 
 export const createSyntaxHighlightExtension = (
