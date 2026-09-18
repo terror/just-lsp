@@ -6,8 +6,15 @@ import {
 import { highlightEffect } from '@/lib/extensions/highlight';
 import { EditorView } from '@codemirror/view';
 import { Loader2 } from 'lucide-react';
-import { useCallback, useDeferredValue, useEffect, useState } from 'react';
-import { useDefaultLayout } from 'react-resizable-panels';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+} from 'react';
+import { useDefaultLayout, useGroupRef } from 'react-resizable-panels';
 
 import defaultJustfile from '../../../justfile?raw';
 import { EditorPane } from '../components/editor-pane';
@@ -29,9 +36,21 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
+  const groupRef = useGroupRef();
+
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: `${PANEL_LAYOUT_STORAGE_KEY}:${panelDirection}`,
   });
+
+  const restoreLayout = useEffectEvent(() => {
+    groupRef.current?.setLayout(
+      defaultLayout ?? { 'editor-panel': 50, 'tree-panel': 50 }
+    );
+  });
+
+  useLayoutEffect(() => {
+    restoreLayout();
+  }, [panelDirection]);
 
   const theme = useTheme();
 
@@ -42,10 +61,12 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
 
   const treeDoc = useDeferredValue(doc);
 
-  const [editor, setEditor] = useState<EditorView>();
+  const editorRef = useRef<EditorView | null>(null);
 
   const handleHighlightChange = useCallback(
     (range: { from: number; to: number } | undefined) => {
+      const editor = editorRef.current;
+
       if (!editor) return;
 
       const highlight =
@@ -64,7 +85,7 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
         ],
       });
     },
-    [editor, treeDoc]
+    [treeDoc]
   );
 
   return (
@@ -73,8 +94,8 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
 
       <div className='flex-1 overflow-hidden p-4'>
         <ResizablePanelGroup
-          key={panelDirection}
           defaultLayout={defaultLayout}
+          groupRef={groupRef}
           onLayoutChanged={onLayoutChanged}
           orientation={panelDirection}
           className='h-full rounded border'
@@ -84,7 +105,9 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
               analysis={analysis}
               value={doc}
               onChange={setDoc}
-              onCreateEditor={setEditor}
+              onCreateEditor={(editor) => {
+                editorRef.current = editor;
+              }}
               onReset={() => setDoc(defaultJustfile.trim())}
               language={language}
               darkMode={theme.darkMode}
