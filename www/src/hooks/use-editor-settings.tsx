@@ -3,7 +3,7 @@ import {
   FONT_SIZES,
   TAB_SIZES,
   defaultSettings,
-} from '@/contexts/editor-settings-context';
+} from '@/lib/editor-settings';
 import { readStorage, writeStorage } from '@/lib/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
@@ -20,7 +20,7 @@ const settingsSchema = z
   })
   .catch(defaultSettings);
 
-export function usePersistedSettings() {
+export function useEditorSettings() {
   const [settings, setSettings] = useState<EditorSettings>(() => {
     const saved = readStorage(SETTINGS_STORAGE_KEY);
 

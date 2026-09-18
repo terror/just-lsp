@@ -1,4 +1,4 @@
-import { useEditorSettings } from '@/contexts/editor-settings-context';
+import { useEditorSettings } from '@/hooks/use-editor-settings';
 import type { AnalysisClient } from '@/lib/analysis/client';
 import {
   base16SetiDarkTheme,
@@ -37,7 +37,7 @@ export const EditorPane = ({
   language,
   darkMode,
 }: EditorPaneProps) => {
-  const { settings } = useEditorSettings();
+  const { settings, updateSettings } = useEditorSettings();
 
   const basicSetup = useMemo(
     () => ({
@@ -96,10 +96,16 @@ export const EditorPane = ({
     <div className='flex h-full min-h-0 flex-col overflow-hidden'>
       <div className='bg-muted/50 flex items-center justify-end gap-1 border-b px-2 py-1'>
         <EditorResetDialog onReset={onReset} />
-        <EditorSettingsDialog />
+        <EditorSettingsDialog
+          settings={settings}
+          updateSettings={updateSettings}
+        />
       </div>
       <div className='flex-1 overflow-hidden'>
-        <div className='editor-host h-full w-full overflow-hidden'>
+        <div
+          className='editor-host h-full w-full overflow-hidden'
+          style={{ fontSize: settings.fontSize }}
+        >
           <CodeMirror
             value={value}
             extensions={extensions}
