@@ -30,84 +30,88 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
     return Decoration.none;
   }
 
-  const captures = query.captures(tree.rootNode);
+  try {
+    const captures = query.captures(tree.rootNode);
 
-  const ranges = new Map<
-    string,
-    { from: number; to: number; classes: Set<string> }
-  >();
+    const ranges = new Map<
+      string,
+      { from: number; to: number; classes: Set<string> }
+    >();
 
-  for (const { name, node } of captures) {
-    const from = node.startIndex;
-    const to = node.endIndex;
+    for (const { name, node } of captures) {
+      const from = node.startIndex;
+      const to = node.endIndex;
 
-    if (from === to) {
-      continue;
+      if (from === to) {
+        continue;
+      }
+
+      const className = BASE_CAPTURE_TO_CLASS[name.split('.')[0]];
+
+      if (className === undefined) {
+        continue;
+      }
+
+      const key = `${from}:${to}`;
+      const range = ranges.get(key) ?? { from, to, classes: new Set<string>() };
+
+      range.classes.add(className);
+      ranges.set(key, range);
     }
 
-    const className = BASE_CAPTURE_TO_CLASS[name.split('.')[0]];
-
-    if (className === undefined) {
-      continue;
-    }
-
-    const key = `${from}:${to}`;
-    const range = ranges.get(key) ?? { from, to, classes: new Set<string>() };
-
-    range.classes.add(className);
-    ranges.set(key, range);
+    return Decoration.set(
+      Array.from(ranges.values(), ({ from, to, classes }) =>
+        Decoration.mark({ class: Array.from(classes).join(' ') }).range(
+          from,
+          to
+        )
+      ),
+      true
+    );
+  } finally {
+    tree.delete();
   }
-
-  tree.delete();
-
-  return Decoration.set(
-    Array.from(ranges.values(), ({ from, to, classes }) =>
-      Decoration.mark({ class: Array.from(classes).join(' ') }).range(from, to)
-    ),
-    true
-  );
 };
 
 export const createSyntaxHighlightExtension = (
   language: Language
 ): Extension => {
-  let query: Query;
-
-  try {
-    query = new Query(language, highlightsQuerySource);
-  } catch (error) {
-    console.error('Failed to compile Just highlight query', error);
-    return [];
-  }
-
   return ViewPlugin.fromClass(
     class {
       decorations = Decoration.none;
       private parser: Parser;
+      private query: Query;
 
       constructor(view: EditorView) {
         this.parser = new Parser();
 
-        this.parser.setLanguage(language);
+        try {
+          this.parser.setLanguage(language);
+          this.query = new Query(language, highlightsQuerySource);
 
-        this.decorations = buildDecorations(
-          this.parser,
-          query,
-          view.state.doc.toString()
-        );
+          this.decorations = buildDecorations(
+            this.parser,
+            this.query,
+            view.state.doc.toString()
+          );
+        } catch (error) {
+          this.destroy();
+          throw error;
+        }
       }
 
       update(update: ViewUpdate) {
         if (update.docChanged) {
           this.decorations = buildDecorations(
             this.parser,
-            query,
+            this.query,
             update.state.doc.toString()
           );
         }
       }
 
       destroy() {
+        this.query?.delete();
         this.parser.delete();
       }
     },

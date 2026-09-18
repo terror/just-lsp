@@ -6,7 +6,6 @@ import runtime from 'web-tree-sitter/web-tree-sitter.wasm?url';
 export interface PlaygroundRuntime {
   analysis: AnalysisClient;
   language: Language;
-  parser: Parser;
 }
 
 type PlaygroundState =
@@ -16,26 +15,12 @@ type PlaygroundState =
 
 let initialization: Promise<Language> | undefined;
 
-function initializeLanguage(): Promise<Language> {
-  initialization ??= Parser.init({ locateFile: () => runtime })
-    .then(() =>
-      Language.load(`${import.meta.env.BASE_URL}tree-sitter-just.wasm`)
-    )
-    .catch((error) => {
-      initialization = undefined;
-      throw error;
-    });
-
-  return initialization;
-}
-
 export function usePlaygroundRuntime(): PlaygroundState {
   const [state, setState] = useState<PlaygroundState>({ status: 'loading' });
 
   useEffect(() => {
     let active = true;
     let analysis: AnalysisClient | undefined;
-    let parser: Parser | undefined;
 
     const initialize = async () => {
       setState({ status: 'loading' });
@@ -43,22 +28,25 @@ export function usePlaygroundRuntime(): PlaygroundState {
       try {
         analysis = new AnalysisClient();
 
+        initialization ??= Parser.init({ locateFile: () => runtime })
+          .then(() =>
+            Language.load(`${import.meta.env.BASE_URL}tree-sitter-just.wasm`)
+          )
+          .catch((error) => {
+            initialization = undefined;
+            throw error;
+          });
+
         const [language] = await Promise.all([
-          initializeLanguage(),
+          initialization,
           analysis.initialize(),
         ]);
 
         if (!active) return;
 
-        parser = new Parser();
-        parser.setLanguage(language);
-
-        setState({ status: 'ready', runtime: { analysis, language, parser } });
+        setState({ status: 'ready', runtime: { analysis, language } });
       } catch (error) {
         analysis?.dispose();
-
-        parser?.delete();
-        parser = undefined;
 
         if (active) {
           setState({
@@ -74,7 +62,6 @@ export function usePlaygroundRuntime(): PlaygroundState {
     return () => {
       active = false;
       analysis?.dispose();
-      parser?.delete();
     };
   }, []);
 

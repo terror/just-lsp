@@ -1,22 +1,22 @@
 import { memo } from 'react';
-import type { Parser } from 'web-tree-sitter';
+import type { Language } from 'web-tree-sitter';
 
 import { useSyntaxTree } from '../hooks/use-syntax-tree';
 import { TreeNode } from './tree-node';
 
 interface TreePaneProps {
-  parser: Parser;
+  language: Language;
   code: string;
   onHighlightChange: (range: { from: number; to: number } | undefined) => void;
 }
 
 export const TreePane = memo(function TreePane({
-  parser,
+  language,
   code,
   onHighlightChange,
 }: TreePaneProps) {
   const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
-    parser,
+    language,
     code,
   });
 
