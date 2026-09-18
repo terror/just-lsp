@@ -850,6 +850,8 @@ mod tests {
       .run();
     }
 
+    case("flag", "`flag` arguments require `set lists`", 5, 9);
+
     case(
       "foo='bar'",
       "Unknown `[arg]` keyword `foo`, expected one of flag, help, long, max, min, multiple, pattern, short, value",
@@ -927,6 +929,7 @@ mod tests {
     }
 
     case("[arg]");
+    case("[arg(long)]");
     case("[arg(long='foo')]");
   }
 
@@ -1251,6 +1254,20 @@ mod tests {
       "script",
       "Attribute `script` does not accept keyword arguments",
     );
+  }
+
+  #[test]
+  fn attribute_variable_argument_usage() {
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+
+      [env('bar', foo)]
+      bar:
+        echo bar
+      "
+    })
+    .run();
   }
 
   #[test]

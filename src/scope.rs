@@ -123,7 +123,7 @@ impl<'a> Scope<'a> {
 
     let local = LocalScope::default();
 
-    for identifier in root_node.find_all("value > identifier") {
+    for identifier in document.get_expression_identifiers(&root_node) {
       if identifier.has_any_parent(&["function_definition", "recipe"]) {
         continue;
       }
@@ -149,7 +149,7 @@ impl<'a> Scope<'a> {
     };
 
     if let Some(body_node) = function_node.child_by_field_name("body") {
-      for identifier in body_node.find_all("value > identifier") {
+      for identifier in self.document.get_expression_identifiers(&body_node) {
         self.record(identifier, &local);
       }
     }
@@ -191,7 +191,9 @@ impl<'a> Scope<'a> {
         if let Some(default_node) =
           parameter_node.child_by_field_name("default")
         {
-          for identifier in default_node.find_all("value > identifier") {
+          for identifier in
+            self.document.get_expression_identifiers(&default_node)
+          {
             self.record(identifier, &local);
           }
         }
@@ -204,7 +206,7 @@ impl<'a> Scope<'a> {
       }
     }
 
-    for identifier in recipe_node.find_all("value > identifier") {
+    for identifier in self.document.get_expression_identifiers(&recipe_node) {
       if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
         continue;
       }

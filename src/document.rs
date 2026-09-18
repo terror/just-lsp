@@ -426,6 +426,18 @@ impl Document {
       .collect()
   }
 
+  #[must_use]
+  pub fn get_expression_identifiers<'a>(
+    &self,
+    node: &'a Node,
+  ) -> Vec<Node<'a>> {
+    node
+      .find_all("value > identifier, attribute_named_param > identifier")
+      .into_iter()
+      .filter(|identifier| !self.is_attribute_keyword(identifier))
+      .collect()
+  }
+
   /// Returns the function definition enclosing `node`.
   ///
   /// Only ancestors are searched; `node` itself is not considered. Returns
@@ -595,6 +607,23 @@ impl Document {
         })
       })
       .collect()
+  }
+
+  #[must_use]
+  pub fn is_attribute_keyword(&self, node: &Node) -> bool {
+    let Some(attribute) = node.get_parent("attribute") else {
+      return false;
+    };
+
+    let range = self.get_range(node);
+
+    self
+      .get_attributes(&attribute)
+      .iter()
+      .flat_map(|attribute| &attribute.arguments)
+      .any(|argument| {
+        matches!(argument, AttributeArgument::Keyword { name, .. } if name.range == range)
+      })
   }
 
   /// Returns the module declarations in source order.
