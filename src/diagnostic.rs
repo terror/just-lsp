@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Diagnostic {
   /// A short header summarizing the diagnostic.
   pub display: String,
@@ -58,5 +58,11 @@ impl From<Diagnostic> for lsp::Diagnostic {
       source: Some("just-lsp".to_string()),
       ..Default::default()
     }
+  }
+}
+
+impl PartialEq<lsp::Diagnostic> for Diagnostic {
+  fn eq(&self, other: &lsp::Diagnostic) -> bool {
+    lsp::Diagnostic::from(self.clone()).eq(other)
   }
 }

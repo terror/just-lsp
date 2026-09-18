@@ -16,13 +16,7 @@ impl Quickfixer<'_> {
       .context
       .diagnostics
       .iter()
-      .filter(|diagnostic| {
-        diagnostic.range == source.range
-          && matches!(
-            &diagnostic.code,
-            Some(lsp::NumberOrString::String(value)) if value == &source.id
-          )
-      })
+      .filter(|diagnostic| source == *diagnostic)
       .cloned()
       .collect::<Vec<_>>();
 
