@@ -1,8 +1,9 @@
 import { Text } from '@codemirror/state';
 
 import type { AnalyzerRequest, AnalyzerResponse } from './analyzer';
-import { analyzeDocument } from './diagnostics';
-import init from './just-lsp-wasm/just_lsp_wasm';
+import { toEditorDiagnostics } from './diagnostics';
+import init, { analyze } from './just-lsp-wasm/just_lsp_wasm';
+import type { Diagnostic } from './types';
 
 let initialization: ReturnType<typeof init> | undefined;
 
@@ -16,7 +17,10 @@ self.addEventListener(
 
       self.postMessage({
         id,
-        diagnostics: analyzeDocument(Text.of(source.split('\n'))),
+        diagnostics: toEditorDiagnostics(
+          Text.of(source.split('\n')),
+          analyze(source) as Diagnostic[]
+        ),
       } satisfies AnalyzerResponse);
     } catch (error) {
       self.postMessage({

@@ -1,7 +1,6 @@
 import type * as lint from '@codemirror/lint';
 import type { Text } from '@codemirror/state';
 
-import { analyze } from './just-lsp-wasm/just_lsp_wasm';
 import type { Diagnostic } from './types';
 
 export function toEditorDiagnostics(
@@ -28,8 +27,4 @@ export function toEditorDiagnostics(
     message: diagnostic.message,
     source: diagnostic.id,
   }));
-}
-
-export function analyzeDocument(doc: Text): lint.Diagnostic[] {
-  return toEditorDiagnostics(doc, analyze(doc.toString()) as Diagnostic[]);
 }
