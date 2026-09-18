@@ -82,6 +82,9 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
   .map_err(|error| JsError::new(&error.to_string()))
 }
 
+/// # Errors
+///
+/// Returns a `JsError` if serialization of hover information fails.
 #[wasm_bindgen]
 pub fn hover(
   source: &str,

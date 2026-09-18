@@ -74,15 +74,12 @@ export class AnalysisClient {
   private request(
     request: Extract<AnalysisOperation, { method: 'initialize' }>
   ): Promise<undefined>;
-
   private request(
     request: Extract<AnalysisOperation, { method: 'analyze' }>
   ): Promise<Diagnostic[]>;
-
   private request(
     request: Extract<AnalysisOperation, { method: 'hover' }>
   ): Promise<Hover | undefined>;
-
   private request(
     request: AnalysisOperation
   ): Promise<AnalysisResult['result']> {
