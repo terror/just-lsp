@@ -39,16 +39,27 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --editor-active-line: #f2f7f9;
+  --editor-background: #ffffff;
+  --editor-cursor: var(--editor-foreground);
+  --editor-cursor-secondary: #55b5db4d;
+  --editor-fat-cursor: #55b5db80;
+  --editor-foreground: #151718;
+  --editor-gutter-border: #e8eef1;
+  --editor-gutter-foreground: #7d8e96;
+  --editor-highlight-background: #e1f3f8;
+  --editor-highlight-outline: #78bdd6;
+  --editor-nonmatching-bracket-background: #f9dcde;
   --just-hl-keyword: #8055a5;
   --just-hl-function: #147fa8;
   --just-hl-namespace: #168a78;
-  --just-hl-variable: #151718;
+  --just-hl-variable: var(--editor-foreground);
   --just-hl-string: #5d861e;
   --just-hl-comment: #667984;
-  --just-hl-operator: #168a78;
+  --just-hl-operator: var(--just-hl-namespace);
   --just-hl-punctuation: #70828b;
   --just-hl-boolean: #a84f24;
-  --just-hl-attribute: #a84f24;
+  --just-hl-attribute: var(--just-hl-boolean);
   --just-hl-error: #cd3f45;
 }
 
@@ -86,17 +97,25 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --editor-active-line: #282a2b;
+  --editor-background: #151718;
+  --editor-cursor: #eeeeee;
+  --editor-foreground: #d6d6d6;
+  --editor-gutter-border: var(--editor-active-line);
+  --editor-gutter-foreground: #70838c;
+  --editor-highlight-background: #3b758c;
+  --editor-highlight-outline: var(--just-hl-function);
+  --editor-nonmatching-bracket-background: #4a2428;
   --just-hl-keyword: #a074c4;
   --just-hl-function: #55b5db;
   --just-hl-namespace: #55dbbe;
-  --just-hl-variable: #d6d6d6;
+  --just-hl-variable: var(--editor-foreground);
   --just-hl-string: #9fca56;
   --just-hl-comment: #78909c;
-  --just-hl-operator: #55dbbe;
+  --just-hl-operator: var(--just-hl-namespace);
   --just-hl-punctuation: #91a7b0;
   --just-hl-boolean: #db7b55;
-  --just-hl-attribute: #db7b55;
-  --just-hl-error: #cd3f45;
+  --just-hl-attribute: var(--just-hl-boolean);
 }
 
 @theme inline {
@@ -151,8 +170,8 @@
 }
 
 .cm-highlighted-node {
-  background-color: var(--editor-highlight-background, rgba(59, 117, 140, 0.3));
-  outline: 1px solid var(--editor-highlight-outline, rgba(85, 181, 219, 0.6));
+  background-color: var(--editor-highlight-background);
+  outline: 1px solid var(--editor-highlight-outline);
   border-radius: 2px;
 }
 
@@ -228,25 +247,17 @@
 }
 
 .editor-host .cm-gutters {
-  background-color: var(--editor-gutter-background, transparent);
-  border-right: var(--editor-gutter-border, none);
-  color: var(--editor-gutter-foreground, inherit);
   padding-right: 8px;
 }
 
-.editor-host .cm-activeLineGutter,
-.editor-host .cm-activeLine {
-  background-color: var(--editor-active-line, rgba(59, 117, 140, 0.3));
-}
-
 .editor-host .cm-fat-cursor {
-  background-color: var(--editor-fat-cursor, rgba(85, 181, 219, 0.5));
+  background-color: var(--editor-fat-cursor);
   border-left: none;
   width: 0.6em;
 }
 
 .editor-host .cm-cursor-secondary {
-  background-color: var(--editor-cursor-secondary, rgba(85, 181, 219, 0.3));
+  background-color: var(--editor-cursor-secondary);
 }
 
 ::-webkit-scrollbar {
