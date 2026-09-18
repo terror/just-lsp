@@ -13,7 +13,6 @@ import defaultJustfile from '../../../justfile?raw';
 import { EditorPane } from '../components/editor-pane';
 import { Header } from '../components/header';
 import { TreePane } from '../components/tree-pane';
-import { useEditorExtensions } from '../hooks/use-editor-extensions';
 import { useMediaQuery } from '../hooks/use-media-query';
 import { usePersistedDoc } from '../hooks/use-persisted-doc';
 import {
@@ -68,11 +67,6 @@ const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
     [editor, treeDoc]
   );
 
-  const extensions = useEditorExtensions({
-    language,
-    darkMode: theme.darkMode,
-  });
-
   return (
     <div className='flex h-screen max-w-full flex-col'>
       <Header theme={theme} />
@@ -90,7 +84,8 @@ const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
               value={doc}
               onChange={setDoc}
               onCreateEditor={setEditor}
-              extensions={extensions}
+              language={language}
+              darkMode={theme.darkMode}
             />
           </ResizablePanel>
 
