@@ -86,9 +86,11 @@ pub use {
   quickfix::Quickfix,
   range_ext::RangeExt,
   recipe::Recipe,
+  resolver::Resolver,
   rope_ext::{Edit, Position as RopePosition, RopeExt},
   setting::Setting,
   setting_kind::SettingKind,
+  symbol::Symbol,
   text_node::TextNode,
   unexport::Unexport,
   variable::Variable,
@@ -146,6 +148,7 @@ mod quickfix;
 mod range_ext;
 mod recipe;
 mod recipe_line;
+mod resolver;
 mod rope_ext;
 mod rule;
 mod rule_context;
@@ -156,6 +159,7 @@ mod str_ext;
 mod string_delimiter;
 mod string_kind;
 mod string_literal;
+mod symbol;
 #[cfg(test)]
 mod test_project;
 mod text_node;

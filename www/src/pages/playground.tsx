@@ -26,7 +26,11 @@ const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
-const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
+const PlaygroundEditor = ({
+  analysis,
+  parser,
+  language,
+}: PlaygroundRuntime) => {
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
@@ -82,6 +86,7 @@ const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
         >
           <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
             <EditorPane
+              analysis={analysis}
               value={doc}
               onChange={setDoc}
               onCreateEditor={setEditor}

@@ -7,7 +7,6 @@ use {
   executor::Executor,
   just_lsp::*,
   quickfixer::Quickfixer,
-  resolver::Resolver,
   ropey::Rope,
   serde::Serialize,
   serde_json::Value,
@@ -28,7 +27,6 @@ use {
     time::Instant,
   },
   subcommand::Subcommand,
-  symbol::Symbol,
   tokenizer::Tokenizer,
   tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -38,7 +36,6 @@ use {
   },
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
   tracing::{Level, info, warn},
-  tree_sitter::Node,
   tree_sitter_highlight::{
     Highlight, HighlightConfiguration, HighlightEvent, Highlighter,
   },
@@ -48,10 +45,8 @@ mod arguments;
 mod command;
 mod executor;
 mod quickfixer;
-mod resolver;
 mod server;
 mod subcommand;
-mod symbol;
 mod tokenizer;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

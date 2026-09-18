@@ -1,14 +1,14 @@
 use super::*;
 
 #[derive(Debug)]
-pub(crate) struct Resolver<'a> {
+pub struct Resolver<'a> {
   view: ProjectView<'a>,
 }
 
 impl<'a> Resolver<'a> {
   /// Creates a new `Resolver` bound to the given `ProjectView`.
   #[must_use]
-  pub(crate) fn new(view: impl Into<ProjectView<'a>>) -> Self {
+  pub fn new(view: impl Into<ProjectView<'a>>) -> Self {
     Self { view: view.into() }
   }
 
@@ -17,7 +17,7 @@ impl<'a> Resolver<'a> {
   /// returned instead, letting editors anchor inline documentation at the
   /// cursor.
   #[must_use]
-  pub(crate) fn resolve_identifier_definition(
+  pub fn resolve_identifier_definition(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Location> {
@@ -42,7 +42,7 @@ impl<'a> Resolver<'a> {
   /// show their source text; builtins show their Markdown documentation from
   /// the static [`BUILTINS`] table.
   #[must_use]
-  pub(crate) fn resolve_identifier_hover(
+  pub fn resolve_identifier_hover(
     &self,
     identifier: &Node,
   ) -> Option<lsp::Hover> {
@@ -84,7 +84,7 @@ impl<'a> Resolver<'a> {
   /// Variable references inside parameter defaults (e.g. `a=a`) are treated as
   /// belonging to the outer scope, not the parameter being defined.
   #[must_use]
-  pub(crate) fn resolve_identifier_references(
+  pub fn resolve_identifier_references(
     &self,
     identifier: &Node,
   ) -> Vec<lsp::Location> {
@@ -120,7 +120,7 @@ impl<'a> Resolver<'a> {
   /// parameter name in a recipe header) are looked up through the document so
   /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
   #[must_use]
-  pub(crate) fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
+  pub fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     if self.view.document().is_attribute_keyword(identifier) {
       return None;
     }

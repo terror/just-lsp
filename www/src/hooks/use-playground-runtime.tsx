@@ -1,9 +1,10 @@
-import { analyzeSource } from '@/lib/analyzer';
+import { AnalysisClient } from '@/lib/analysis/client';
 import { useEffect, useState } from 'react';
 import { Language, Parser } from 'web-tree-sitter';
 import runtime from 'web-tree-sitter/web-tree-sitter.wasm?url';
 
 export interface PlaygroundRuntime {
+  analysis: AnalysisClient;
   language: Language;
   parser: Parser;
 }
@@ -15,33 +16,47 @@ type PlaygroundState =
 
 let initialization: Promise<Language> | undefined;
 
+function initializeLanguage(): Promise<Language> {
+  initialization ??= Parser.init({ locateFile: () => runtime })
+    .then(() =>
+      Language.load(`${import.meta.env.BASE_URL}tree-sitter-just.wasm`)
+    )
+    .catch((error) => {
+      initialization = undefined;
+      throw error;
+    });
+
+  return initialization;
+}
+
 export function usePlaygroundRuntime(): PlaygroundState {
   const [state, setState] = useState<PlaygroundState>({ status: 'loading' });
 
   useEffect(() => {
     let active = true;
+    let analysis: AnalysisClient | undefined;
     let parser: Parser | undefined;
 
     const initialize = async () => {
       setState({ status: 'loading' });
 
       try {
-        initialization ??= Promise.all([
-          Parser.init({ locateFile: () => runtime }).then(() =>
-            Language.load(`${import.meta.env.BASE_URL}tree-sitter-just.wasm`)
-          ),
-          analyzeSource(''),
-        ]).then(([language]) => language);
+        analysis = new AnalysisClient();
 
-        const language = await initialization;
+        const [language] = await Promise.all([
+          initializeLanguage(),
+          analysis.initialize(),
+        ]);
 
         if (!active) return;
 
         parser = new Parser();
         parser.setLanguage(language);
 
-        setState({ status: 'ready', runtime: { language, parser } });
+        setState({ status: 'ready', runtime: { analysis, language, parser } });
       } catch (error) {
+        analysis?.dispose();
+
         parser?.delete();
         parser = undefined;
 
@@ -58,6 +73,7 @@ export function usePlaygroundRuntime(): PlaygroundState {
 
     return () => {
       active = false;
+      analysis?.dispose();
       parser?.delete();
     };
   }, []);
