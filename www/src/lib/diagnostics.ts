@@ -16,14 +16,9 @@ export function toEditorDiagnostics(
   };
 
   return diagnostics.map((diagnostic) => ({
-    from: offset(diagnostic.start_line, diagnostic.start_character),
-    to: offset(diagnostic.end_line, diagnostic.end_character),
-    severity:
-      diagnostic.severity === 'error' ||
-      diagnostic.severity === 'warning' ||
-      diagnostic.severity === 'hint'
-        ? diagnostic.severity
-        : 'info',
+    from: offset(diagnostic.startLine, diagnostic.startCharacter),
+    to: offset(diagnostic.endLine, diagnostic.endCharacter),
+    severity: diagnostic.severity,
     message: diagnostic.message,
     source: diagnostic.id,
   }));

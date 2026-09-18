@@ -7,13 +7,35 @@ use {
 };
 
 #[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+#[typeshare]
+enum Severity {
+  Error,
+  Hint,
+  Info,
+  Warning,
+}
+
+impl From<DiagnosticSeverity> for Severity {
+  fn from(severity: DiagnosticSeverity) -> Self {
+    match severity {
+      DiagnosticSeverity::ERROR => Self::Error,
+      DiagnosticSeverity::HINT => Self::Hint,
+      DiagnosticSeverity::WARNING => Self::Warning,
+      _ => Self::Info,
+    }
+  }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[typeshare]
 struct Diagnostic {
   end_character: u32,
   end_line: u32,
   id: String,
   message: String,
-  severity: &'static str,
+  severity: Severity,
   start_character: u32,
   start_line: u32,
 }
@@ -37,13 +59,7 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
       end_line: diagnostic.range.end.line,
       id: diagnostic.id,
       message: diagnostic.message,
-      severity: match diagnostic.severity {
-        DiagnosticSeverity::ERROR => "error",
-        DiagnosticSeverity::HINT => "hint",
-        DiagnosticSeverity::INFORMATION => "information",
-        DiagnosticSeverity::WARNING => "warning",
-        _ => "unknown",
-      },
+      severity: diagnostic.severity.into(),
       start_character: diagnostic.range.start.character,
       start_line: diagnostic.range.start.line,
     })
