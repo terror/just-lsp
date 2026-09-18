@@ -1,10 +1,14 @@
 import { linter } from '@codemirror/lint';
 
-import { analyzeSource } from '../analyzer';
+import type { AnalysisClient } from '../analysis/client';
+import { toEditorDiagnostics } from '../diagnostics';
 
-export const diagnosticsExtension = linter(
-  (view) => analyzeSource(view.state.doc.toString()),
-  {
-    delay: 250,
-  }
-);
+export const createDiagnosticsExtension = (client: AnalysisClient) =>
+  linter(
+    async (view) => {
+      const { doc } = view.state;
+
+      return toEditorDiagnostics(doc, await client.analyze(doc.toString()));
+    },
+    { delay: 250 }
+  );

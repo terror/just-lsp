@@ -1,11 +1,12 @@
 import { useEditorSettings } from '@/contexts/editor-settings-context';
+import type { AnalysisClient } from '@/lib/analysis/client';
 import {
   base16SetiDarkTheme,
   base16SetiLightTheme,
 } from '@/lib/base16-seti-theme';
-import { diagnosticsExtension } from '@/lib/extensions/diagnostics';
+import { createDiagnosticsExtension } from '@/lib/extensions/diagnostics';
 import { highlightExtension } from '@/lib/extensions/highlight';
-import { hoverExtension } from '@/lib/extensions/hover';
+import { createHoverExtension } from '@/lib/extensions/hover';
 import { createSyntaxHighlightExtension } from '@/lib/extensions/syntax-highlight';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -17,6 +18,7 @@ import { Language } from 'web-tree-sitter';
 import { EditorSettingsDialog } from './editor-settings-dialog';
 
 interface EditorPaneProps {
+  analysis: AnalysisClient;
   value: string;
   onChange: (value: string) => void;
   onCreateEditor: (view: EditorView) => void;
@@ -25,6 +27,7 @@ interface EditorPaneProps {
 }
 
 export const EditorPane = ({
+  analysis,
   value,
   onChange,
   onCreateEditor,
@@ -51,14 +54,21 @@ export const EditorPane = ({
     [language]
   );
 
+  const analysisExtensions = useMemo(
+    () => [
+      createDiagnosticsExtension(analysis),
+      createHoverExtension(analysis),
+    ],
+    [analysis]
+  );
+
   const extensions = useMemo(() => {
     const extensions: Extension[] = [
       darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
-      diagnosticsExtension,
+      ...analysisExtensions,
       syntaxHighlighting,
       highlightExtension,
-      hoverExtension,
     ];
 
     if (settings.keybindings === 'vim') {
@@ -75,6 +85,7 @@ export const EditorPane = ({
     settings.keybindings,
     settings.lineWrapping,
     syntaxHighlighting,
+    analysisExtensions,
     darkMode,
   ]);
 
