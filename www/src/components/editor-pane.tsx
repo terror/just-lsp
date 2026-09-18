@@ -5,7 +5,7 @@ import {
 } from '@/lib/base16-seti-theme';
 import { diagnosticsExtension } from '@/lib/extensions/diagnostics';
 import { highlightExtension } from '@/lib/extensions/highlight';
-import { createJustSyntaxHighlightingExtension } from '@/lib/just-syntax-highlighting';
+import { createSyntaxHighlightExtension } from '@/lib/extensions/syntax-highlight';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
@@ -46,7 +46,7 @@ export const EditorPane = ({
   );
 
   const syntaxHighlighting = useMemo(
-    () => createJustSyntaxHighlightingExtension(language),
+    () => createSyntaxHighlightExtension(language),
     [language]
   );
 
@@ -55,7 +55,7 @@ export const EditorPane = ({
       darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
       diagnosticsExtension,
-      ...syntaxHighlighting,
+      syntaxHighlighting,
       highlightExtension,
     ];
 
