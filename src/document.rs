@@ -426,6 +426,34 @@ impl Document {
       .collect()
   }
 
+  /// Returns the variable references in the subtree rooted at `node`.
+  ///
+  /// Identifiers used as expression values and bare positional attribute
+  /// arguments are included. Declaration names, function call names, and
+  /// attribute keywords are excluded. References are not resolved or
+  /// deduplicated.
+  ///
+  /// `node` must belong to this document's current syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from(
+  ///   "foo := bar\n[arg('baz', value=foo, flag)]\nqux baz:\n",
+  /// );
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let names = document
+  ///   .get_expression_identifiers(&root)
+  ///   .into_iter()
+  ///   .map(|node| document.get_node_text(&node))
+  ///   .collect::<Vec<_>>();
+  ///
+  /// assert_eq!(names, ["bar", "foo"]);
+  /// ```
   #[must_use]
   pub fn get_expression_identifiers<'a>(
     &self,
@@ -609,6 +637,33 @@ impl Document {
       .collect()
   }
 
+  /// Returns whether `node` names an attribute keyword argument.
+  ///
+  /// This includes names in `name=value` arguments and bare identifiers in
+  /// parenthesized attributes whose built-in signature accepts keywords.
+  /// The keyword name itself is not checked against the signature.
+  /// Positional arguments and nodes outside attributes return `false`.
+  ///
+  /// `node` must belong to this document's current syntax tree.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt};
+  ///
+  /// let document = Document::from("[arg('foo', value=bar, flag)]\nbaz foo:\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let keywords = root
+  ///   .find_all("identifier")
+  ///   .into_iter()
+  ///   .filter(|node| document.is_attribute_keyword(node))
+  ///   .map(|node| document.get_node_text(&node))
+  ///   .collect::<Vec<_>>();
+  ///
+  /// assert_eq!(keywords, ["value", "flag"]);
+  /// ```
   #[must_use]
   pub fn is_attribute_keyword(&self, node: &Node) -> bool {
     let Some(attribute) = node.get_parent("attribute") else {
