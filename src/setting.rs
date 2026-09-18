@@ -16,7 +16,10 @@ impl Setting {
 
     let name_node = node.child_by_field_name("left")?;
 
-    let name = TextNode::from_node(&name_node, document);
+    let name = TextNode {
+      range: document.get_range(&name_node),
+      value: document.get_node_text(&name_node),
+    };
 
     let mut cursor = node.walk();
 
@@ -46,7 +49,10 @@ impl Setting {
           },
           value: String::new(),
         },
-        |value| TextNode::from_node(value, document),
+        |value| TextNode {
+          range: document.get_range(value),
+          value: document.get_node_text(value),
+        },
       );
 
     let kind = if expression_child.is_some_and(|expression| {
