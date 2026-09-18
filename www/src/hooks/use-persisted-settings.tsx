@@ -1,5 +1,7 @@
 import {
   EditorSettings,
+  FONT_SIZES,
+  TAB_SIZES,
   defaultSettings,
 } from '@/contexts/editor-settings-context';
 import { readStorage, writeStorage } from '@/lib/storage';
@@ -10,22 +12,16 @@ const SETTINGS_STORAGE_KEY = 'editor-settings';
 
 const settingsSchema = z
   .object({
-    fontSize: z
-      .number()
-      .refine((value) => [12, 14, 16, 18].includes(value))
-      .catch(defaultSettings.fontSize),
+    fontSize: z.literal(FONT_SIZES).catch(defaultSettings.fontSize),
     keybindings: z.enum(['default', 'vim']).catch(defaultSettings.keybindings),
     lineNumbers: z.boolean().catch(defaultSettings.lineNumbers),
     lineWrapping: z.boolean().catch(defaultSettings.lineWrapping),
-    tabSize: z
-      .number()
-      .refine((value) => [2, 4, 8].includes(value))
-      .catch(defaultSettings.tabSize),
+    tabSize: z.literal(TAB_SIZES).catch(defaultSettings.tabSize),
   })
   .catch(defaultSettings);
 
 export function usePersistedSettings() {
-  const [settings, setSettings] = useState(() => {
+  const [settings, setSettings] = useState<EditorSettings>(() => {
     const saved = readStorage(SETTINGS_STORAGE_KEY);
 
     if (saved === null) return defaultSettings;

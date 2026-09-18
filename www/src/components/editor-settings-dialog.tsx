@@ -16,7 +16,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useEditorSettings } from '@/contexts/editor-settings-context';
+import {
+  FONT_SIZES,
+  TAB_SIZES,
+  useEditorSettings,
+} from '@/contexts/editor-settings-context';
 import { Settings } from 'lucide-react';
 
 export const EditorSettingsDialog = () => {
@@ -74,10 +78,11 @@ export const EditorSettingsDialog = () => {
                 <SelectValue placeholder='Font size' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='12'>12px</SelectItem>
-                <SelectItem value='14'>14px</SelectItem>
-                <SelectItem value='16'>16px</SelectItem>
-                <SelectItem value='18'>18px</SelectItem>
+                {FONT_SIZES.map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size}px
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -112,9 +117,11 @@ export const EditorSettingsDialog = () => {
                 <SelectValue placeholder='Tab Size' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='2'>2 spaces</SelectItem>
-                <SelectItem value='4'>4 spaces</SelectItem>
-                <SelectItem value='8'>8 spaces</SelectItem>
+                {TAB_SIZES.map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size} spaces
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
