@@ -49,7 +49,6 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
-    diagnostics: Option<Vec<Diagnostic>>,
     document: Document,
     imported_documents: Vec<String>,
     quickfixes: Vec<Quickfix>,
@@ -61,22 +60,20 @@ mod tests {
       Self { config, ..self }
     }
 
-    fn diagnostics(self, diagnostics: Vec<Diagnostic>) -> Self {
+    fn imported_document(self, content: &str) -> Self {
       Self {
-        diagnostics: Some(diagnostics),
+        imported_documents: self
+          .imported_documents
+          .into_iter()
+          .chain([content.into()])
+          .collect(),
         ..self
       }
-    }
-
-    fn imported_document(mut self, content: &str) -> Self {
-      self.imported_documents.push(content.into());
-      self
     }
 
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
-        diagnostics: None,
         document: Document::from(content),
         imported_documents: Vec::new(),
         quickfixes: Vec::new(),
@@ -84,9 +81,11 @@ mod tests {
       }
     }
 
-    fn quickfix(mut self, quickfix: Quickfix) -> Self {
-      self.quickfixes.push(quickfix);
-      self
+    fn quickfix(self, quickfix: Quickfix) -> Self {
+      Self {
+        quickfixes: self.quickfixes.into_iter().chain([quickfix]).collect(),
+        ..self
+      }
     }
 
     fn range(self, range: lsp::Range) -> Self {
@@ -95,20 +94,11 @@ mod tests {
 
     #[track_caller]
     fn run(self) {
-      let Test {
-        config,
-        diagnostics,
-        document,
-        imported_documents,
-        quickfixes,
-        range,
-      } = self;
-
       let mut documents = DocumentStore::default();
 
-      let mut project = Project::new(document.uri.clone());
+      let mut project = Project::new(self.document.uri.clone());
 
-      for (index, text) in imported_documents.into_iter().enumerate() {
+      for (index, text) in self.imported_documents.into_iter().enumerate() {
         let uri = lsp::Url::parse(&format!("file:///foo{index}.just")).unwrap();
 
         documents
@@ -122,58 +112,45 @@ mod tests {
           })
           .unwrap();
 
-        project
-          .dependencies
-          .entry(document.uri.clone())
-          .or_default()
-          .push(ProjectDependency {
+        project.add_dependency(
+          &self.document.uri,
+          ProjectDependency {
             kind: ProjectDependencyKind::Import {
               attributes: Vec::new(),
               optional: false,
             },
             location: lsp::Range::default(),
             target: ProjectDependencyTarget::Resolved(uri),
-          });
+          },
+        );
       }
 
       let import_scope = ImportScope::from(&project);
 
       let parameters = lsp::CodeActionParams {
         text_document: lsp::TextDocumentIdentifier {
-          uri: document.uri.clone(),
+          uri: self.document.uri.clone(),
         },
-        range,
-        context: lsp::CodeActionContext {
-          diagnostics: Vec::new(),
-          ..Default::default()
-        },
+        range: self.range,
+        context: lsp::CodeActionContext::default(),
         work_done_progress_params: lsp::WorkDoneProgressParams::default(),
         partial_result_params: lsp::PartialResultParams::default(),
       };
 
-      let analyzer = Analyzer {
-        config: Some(&config),
-        view: ProjectView::new(&document, &import_scope, &documents),
-      };
-
-      let actual_diagnostics = analyzer
-        .analyze()
-        .into_iter()
-        .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
-        .collect::<Vec<_>>();
-
-      if let Some(diagnostics) = diagnostics {
-        assert_eq!(actual_diagnostics, diagnostics);
+      let diagnostics = Analyzer {
+        config: Some(&self.config),
+        view: ProjectView::new(&self.document, &import_scope, &documents),
       }
+      .analyze();
 
-      let quickfixer = Quickfixer {
-        diagnostics: &actual_diagnostics,
+      let actions = Quickfixer {
+        diagnostics: &diagnostics,
         parameters: &parameters,
-      };
+      }
+      .collect();
 
-      let actions = quickfixer.collect();
-
-      let expected = quickfixes
+      let expected = self
+        .quickfixes
         .into_iter()
         .map(|quickfix| {
           lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
@@ -182,7 +159,7 @@ mod tests {
             diagnostics: None,
             edit: Some(lsp::WorkspaceEdit {
               changes: Some(HashMap::from([(
-                document.uri.clone(),
+                self.document.uri.clone(),
                 quickfix.edits().to_vec(),
               )])),
               ..Default::default()
@@ -245,18 +222,12 @@ mod tests {
       bar := env_var(\"BAR\")
       "
     })
-    .diagnostics(vec![Diagnostic {
-      display: "deprecated function".into(),
-      id: "deprecated-function".into(),
-      message: "`env_var` is deprecated, use `env` instead".into(),
-      quickfixes: vec![Quickfix::edit(
-        "Replace `env_var` with `env`",
-        lsp::Range::at(1, 7, 1, 14),
-        "env",
-      )],
-      range: lsp::Range::at(1, 7, 1, 14),
-      severity: lsp::DiagnosticSeverity::WARNING,
-    }])
+    .range(lsp::Range::at(0, 0, 2, 0))
+    .quickfix(Quickfix::edit(
+      "Replace `env_var` with `env`",
+      lsp::Range::at(1, 7, 1, 14),
+      "env",
+    ))
     .run();
   }
 
