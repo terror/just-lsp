@@ -14,13 +14,11 @@ import { Language as TSLanguage } from 'web-tree-sitter';
 
 interface UseEditorExtensionsOptions {
   language: TSLanguage;
-  highlight: { from: number; to: number } | undefined;
   darkMode: boolean;
 }
 
 export function useEditorExtensions({
   language,
-  highlight,
   darkMode,
 }: UseEditorExtensionsOptions): Extension[] {
   const { settings } = useEditorSettings();
@@ -36,7 +34,7 @@ export function useEditorExtensions({
       EditorState.tabSize.of(settings.tabSize),
       diagnosticsExtension,
       ...syntaxHighlighting,
-      highlightExtension(highlight),
+      highlightExtension,
     ];
 
     if (settings.keybindings === 'vim') {
@@ -53,7 +51,6 @@ export function useEditorExtensions({
     settings.keybindings,
     settings.lineWrapping,
     syntaxHighlighting,
-    highlight,
     darkMode,
   ]);
 }

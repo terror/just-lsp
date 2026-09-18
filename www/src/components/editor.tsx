@@ -1,15 +1,22 @@
 import { useEditorSettings } from '@/contexts/editor-settings-context';
 import { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 import { useMemo } from 'react';
 
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
+  onCreateEditor: (view: EditorView) => void;
   extensions: Extension[];
 }
 
-export const Editor = ({ value, onChange, extensions }: EditorProps) => {
+export const Editor = ({
+  value,
+  onChange,
+  onCreateEditor,
+  extensions,
+}: EditorProps) => {
   const { settings } = useEditorSettings();
 
   const basicSetup = useMemo(
@@ -37,6 +44,7 @@ export const Editor = ({ value, onChange, extensions }: EditorProps) => {
         extensions={extensions}
         basicSetup={basicSetup}
         onChange={onChange}
+        onCreateEditor={onCreateEditor}
         height='100%'
         style={{ height: '100%' }}
       />

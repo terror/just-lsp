@@ -1,4 +1,5 @@
 import { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 
 import { Editor } from './editor';
 import { EditorSettingsDialog } from './editor-settings-dialog';
@@ -6,12 +7,14 @@ import { EditorSettingsDialog } from './editor-settings-dialog';
 interface EditorPaneProps {
   value: string;
   onChange: (value: string) => void;
+  onCreateEditor: (view: EditorView) => void;
   extensions: Extension[];
 }
 
 export const EditorPane = ({
   value,
   onChange,
+  onCreateEditor,
   extensions,
 }: EditorPaneProps) => {
   return (
@@ -20,7 +23,12 @@ export const EditorPane = ({
         <EditorSettingsDialog />
       </div>
       <div className='flex-1 overflow-hidden'>
-        <Editor value={value} onChange={onChange} extensions={extensions} />
+        <Editor
+          value={value}
+          onChange={onChange}
+          onCreateEditor={onCreateEditor}
+          extensions={extensions}
+        />
       </div>
     </div>
   );

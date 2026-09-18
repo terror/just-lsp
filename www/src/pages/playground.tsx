@@ -3,6 +3,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { highlightEffect } from '@/lib/extensions/highlight';
+import { EditorView } from '@codemirror/view';
 import { Loader2 } from 'lucide-react';
 import { useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useDefaultLayout } from 'react-resizable-panels';
@@ -41,20 +43,33 @@ const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
 
   const treeDoc = useDeferredValue(doc);
 
-  const [highlight, setHighlight] = useState<
-    { from: number; to: number; source: string } | undefined
-  >(undefined);
+  const [editor, setEditor] = useState<EditorView>();
 
   const handleHighlightChange = useCallback(
     (range: { from: number; to: number } | undefined) => {
-      setHighlight(range ? { ...range, source: treeDoc } : undefined);
+      if (!editor) return;
+
+      const highlight =
+        treeDoc === editor.state.doc.toString() &&
+        range &&
+        range.from < range.to
+          ? range
+          : null;
+
+      editor.dispatch({
+        effects: [
+          highlightEffect.of(highlight),
+          ...(highlight
+            ? [EditorView.scrollIntoView(highlight.from, { y: 'center' })]
+            : []),
+        ],
+      });
     },
-    [treeDoc]
+    [editor, treeDoc]
   );
 
   const extensions = useEditorExtensions({
     language,
-    highlight: highlight?.source === doc ? highlight : undefined,
     darkMode: theme.darkMode,
   });
 
@@ -71,7 +86,12 @@ const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
           className='h-full rounded border'
         >
           <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
-            <EditorPane value={doc} onChange={setDoc} extensions={extensions} />
+            <EditorPane
+              value={doc}
+              onChange={setDoc}
+              onCreateEditor={setEditor}
+              extensions={extensions}
+            />
           </ResizablePanel>
 
           <ResizableHandle withHandle />
