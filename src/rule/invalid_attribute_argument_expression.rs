@@ -1,96 +1,59 @@
 use super::*;
 
-const EXPRESSION_ATTRIBUTES: &[&str] =
-  &["cache", "confirm", "env", "timestamp", "working-directory"];
-const CONST_EXPRESSION_ATTRIBUTES: &[&str] = &["doc"];
-
 define_rule! {
   InvalidAttributeArgumentExpressionRule {
     id: "invalid-attribute-argument-expression",
     message: "invalid attribute argument expression",
     run(context) {
-      context
-        .tree()
-        .root_node()
-        .find_all("attribute")
-        .into_iter()
-        .flat_map(|attribute| {
-          attribute
-            .find_all("^identifier")
-            .into_iter()
-            .flat_map(|identifier| Self::validate(context, identifier))
-            .collect::<Vec<_>>()
-        })
-        .collect()
-    }
-  }
-}
+      let mut diagnostics = Vec::new();
 
-impl InvalidAttributeArgumentExpressionRule {
-  fn const_expression(node: Node) -> bool {
-    node.find("function_call").is_none()
-      && node.find("external_command").is_none()
-  }
+      for attribute in context.attributes() {
+        let attribute_name = &attribute.name.value;
 
-  fn string_literal_expression(node: Node) -> bool {
-    let Some(value) = node.find("^value") else {
-      return false;
-    };
+        let Some(Builtin::Attribute { signature, .. }) =
+          context.builtin_attribute(attribute_name)
+        else {
+          continue;
+        };
 
-    let mut cursor = value.walk();
+        for argument in &attribute.arguments {
+          let (kind, expression) = match argument {
+            AttributeArgument::Positional(expression) => {
+              (signature.expression, expression)
+            }
+            AttributeArgument::Keyword { name, value: Some(value), .. } => {
+              let Some(keyword) = signature
+                .keywords
+                .iter()
+                .find(|keyword| keyword.name == name.value)
+              else {
+                continue;
+              };
 
-    let children = value.named_children(&mut cursor).collect::<Vec<_>>();
+              (keyword.expression, value)
+            }
+            AttributeArgument::Keyword { value: None, .. } => continue,
+          };
 
-    match children.as_slice() {
-      [child] => {
-        child.kind() == "string" && child.find("format_string").is_none()
+          let expected = match (kind, expression.kind) {
+            (AttributeExpressionKind::Const, AttributeExpressionKind::Any) => {
+              "const expressions"
+            }
+            (
+              AttributeExpressionKind::StringLiteral,
+              AttributeExpressionKind::Any | AttributeExpressionKind::Const,
+            ) => "string literals",
+            _ => continue,
+          };
+
+          diagnostics.push(Diagnostic::error(
+            format!("Attribute `{attribute_name}` arguments must be {expected}"),
+            expression.text.range,
+          ));
+        }
       }
-      _ => false,
+
+      diagnostics
     }
-  }
-
-  fn validate(context: &RuleContext, identifier: Node) -> Vec<Diagnostic> {
-    let document = context.document();
-
-    let attribute_name = document.get_node_text(&identifier);
-
-    match context.builtin_attribute(&attribute_name) {
-      None => return Vec::new(),
-      _ if EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
-        return Vec::new();
-      }
-      _ if CONST_EXPRESSION_ATTRIBUTES.contains(&attribute_name.as_str()) => {
-        return identifier
-          .siblings()
-          .take_while(|node| node.kind() != "identifier")
-          .filter(|node| node.kind() == "expression")
-          .filter(|node| !Self::const_expression(*node))
-          .map(|node| {
-            Diagnostic::error(
-              format!(
-                "Attribute `{attribute_name}` arguments must be const expressions"
-              ),
-              document.get_range(&node),
-            )
-          })
-          .collect();
-      }
-      _ => {}
-    }
-
-    identifier
-      .siblings()
-      .take_while(|node| node.kind() != "identifier")
-      .filter(|node| node.kind() == "expression")
-      .filter(|node| !Self::string_literal_expression(*node))
-      .map(|node| {
-        Diagnostic::error(
-          format!(
-            "Attribute `{attribute_name}` arguments must be string literals"
-          ),
-          document.get_range(&node),
-        )
-      })
-      .collect()
   }
 }

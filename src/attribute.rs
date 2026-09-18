@@ -18,6 +18,15 @@ impl Attribute {
     }
   }
 
+  pub(crate) fn keyword_argument(
+    &self,
+    name: &str,
+  ) -> Option<&AttributeArgument> {
+    self.arguments.iter().find(|argument| {
+      matches!(argument, AttributeArgument::Keyword { name: keyword, .. } if keyword.value == name)
+    })
+  }
+
   pub(crate) fn positional_arguments(
     &self,
   ) -> impl Iterator<Item = &AttributeExpression> {

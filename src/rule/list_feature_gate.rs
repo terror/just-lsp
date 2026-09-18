@@ -14,6 +14,23 @@ define_rule! {
         return diagnostics;
       }
 
+      diagnostics.extend(
+        context
+          .attributes()
+          .iter()
+          .filter(|attribute| attribute.name.value == "arg")
+          .flat_map(|attribute| &attribute.arguments)
+          .filter_map(|argument| match argument {
+            AttributeArgument::Keyword { name, .. } if name.value == "flag" => {
+              Some(Diagnostic::error(
+                "`flag` arguments require `set lists`",
+                name.range,
+              ))
+            }
+            _ => None,
+          }),
+      );
+
       Self::validate_node(
         context,
         context.document(),
@@ -27,27 +44,6 @@ define_rule! {
 }
 
 impl ListFeatureGateRule {
-  fn arg_flag_range(document: &Document, node: Node<'_>) -> Option<lsp::Range> {
-    let name = node.child_by_field_name("name")?;
-
-    if document.get_node_text(&name) != "flag" {
-      return None;
-    }
-
-    let mut sibling = node.prev_sibling();
-
-    while let Some(node) = sibling {
-      if node.kind() == "identifier" {
-        return (document.get_node_text(&node) == "arg")
-          .then(|| document.get_range(&name));
-      }
-
-      sibling = node.prev_sibling();
-    }
-
-    None
-  }
-
   fn comparison_operator(node: Node<'_>) -> Option<Node<'_>> {
     Self::operator(node, COMPARISON_OPERATORS)
   }
@@ -118,14 +114,6 @@ impl ListFeatureGateRule {
     diagnostics: &mut Vec<Diagnostic>,
   ) {
     match node.kind() {
-      "attribute_named_param" => {
-        if let Some(range) = Self::arg_flag_range(document, node) {
-          diagnostics.push(Diagnostic::error(
-            "`flag` arguments require `set lists`",
-            range,
-          ));
-        }
-      }
       "condition" => {
         if Self::condition_comparison_operator(node).is_none() {
           diagnostics.push(Diagnostic::error(

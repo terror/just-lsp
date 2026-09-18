@@ -3,16 +3,23 @@ severity: error
 order: 10
 ---
 
-Validates the parameter name and keyword arguments in `[arg(NAME, ...)]`.
+Validates parameter references and option dependencies in `[arg(NAME, ...)]`.
 
-- The first argument must name an existing recipe parameter. Configuring the same parameter more than once in one recipe is an error.
-- Recognized keywords are `flag`, `help`, `long`, `max`, `min`, `multiple`, `pattern`, `short`, and `value`.
-- `long` and `short` require string literals. `help` and `pattern` allow constant expressions but reject function calls and backtick commands.
-- `value=` must be paired with `long=` or `short=`. The `flag` keyword also requires list mode, checked separately by `list-feature-gate`.
+- The first argument must name an existing recipe parameter. Configuring the
+  same parameter more than once in one recipe is an error.
+- The `value` keyword must be paired with `long` or `short`.
+
+Argument counts are checked by
+[invalid-attribute-argument-count](#invalid-attribute-argument-count). Keyword
+names and required values are checked by
+[invalid-attribute-keyword](#invalid-attribute-keyword), and value expressions
+by
+[invalid-attribute-argument-expression](#invalid-attribute-argument-expression).
 
 ## How to fix it
 
-Use the exact parameter name, configure it once, and supply supported keywords with the required value forms. Add `long=` or `short=` when using `value=`.
+Use the exact parameter name, configure it once, and add `long` or `short` when
+using `value`.
 
 ## Examples
 

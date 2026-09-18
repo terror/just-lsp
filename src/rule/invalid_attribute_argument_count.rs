@@ -18,7 +18,7 @@ define_rule! {
           continue;
         };
 
-        let argument_count = attribute.arguments.len();
+        let argument_count = attribute.positional_arguments().count();
 
         let range = signature.positional.argument_range();
 

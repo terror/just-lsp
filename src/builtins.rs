@@ -29,7 +29,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
     name: "arg",
     signature: AttributeSignature {
-      positional: AttributeKind::UnaryPlus,
+      positional: AttributeKind::Unary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[
         AttributeKeyword {
@@ -123,7 +123,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Attribute {
     name: "cache",
     signature: AttributeSignature {
-      positional: AttributeKind::Variadic,
+      positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::Any,
       keywords: &[
         AttributeKeyword {

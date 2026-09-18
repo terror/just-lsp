@@ -57,4 +57,11 @@ impl AttributeArgument {
       _ => None,
     }
   }
+
+  pub(crate) fn range(&self) -> lsp::Range {
+    match self {
+      Self::Keyword { range, .. } => *range,
+      Self::Positional(expression) => expression.text.range,
+    }
+  }
 }
