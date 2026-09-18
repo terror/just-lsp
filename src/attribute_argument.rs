@@ -33,7 +33,10 @@ impl AttributeArgument {
     {
       return Some(if keywords {
         Self::Keyword {
-          name: TextNode::from_node(&name, document),
+          name: TextNode {
+            range: document.get_range(&name),
+            value: document.get_node_text(&name),
+          },
           value: None,
           range: document.get_range(node),
         }
@@ -43,14 +46,21 @@ impl AttributeArgument {
     }
 
     match node.kind() {
-      "attribute_named_param" => Some(Self::Keyword {
-        name: TextNode::from_node(&node.child_by_field_name("name")?, document),
-        value: node
-          .child_by_field_name("value")
-          .filter(|value| value.start_byte() != value.end_byte())
-          .map(|value| AttributeExpression::from_node(&value, document)),
-        range: document.get_range(node),
-      }),
+      "attribute_named_param" => {
+        let name = node.child_by_field_name("name")?;
+
+        Some(Self::Keyword {
+          name: TextNode {
+            range: document.get_range(&name),
+            value: document.get_node_text(&name),
+          },
+          value: node
+            .child_by_field_name("value")
+            .filter(|value| value.start_byte() != value.end_byte())
+            .map(|value| AttributeExpression::from_node(&value, document)),
+          range: document.get_range(node),
+        })
+      }
       "expression" | "string" => Some(Self::Positional(
         AttributeExpression::from_node(node, document),
       )),

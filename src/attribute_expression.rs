@@ -29,7 +29,10 @@ impl AttributeExpression {
 
     Self {
       kind,
-      text: TextNode::from_node(node, document),
+      text: TextNode {
+        range: document.get_range(node),
+        value: document.get_node_text(node),
+      },
     }
   }
 }
