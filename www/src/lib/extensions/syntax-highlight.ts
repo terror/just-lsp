@@ -5,28 +5,27 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view';
-import type { Language, Parser } from 'web-tree-sitter';
-import { Query, Parser as TreeSitterParser } from 'web-tree-sitter';
+import { type Language, Parser, Query } from 'web-tree-sitter';
 
-import highlightsQuerySource from '../../../queries/highlights.scm?raw';
+import highlightsQuerySource from '../../../../queries/highlights.scm?raw';
 
-const BASE_CAPTURE_TO_CLASSES: Record<string, string[]> = {
-  attribute: ['cm-just-attribute'],
-  boolean: ['cm-just-boolean'],
-  comment: ['cm-just-comment'],
-  error: ['cm-just-error'],
-  function: ['cm-just-function'],
-  keyword: ['cm-just-keyword'],
-  module: ['cm-just-namespace'],
-  operator: ['cm-just-operator'],
-  punctuation: ['cm-just-punctuation'],
-  string: ['cm-just-string'],
-  variable: ['cm-just-variable'],
+const BASE_CAPTURE_TO_CLASS: Record<string, string> = {
+  attribute: 'cm-just-attribute',
+  boolean: 'cm-just-boolean',
+  comment: 'cm-just-comment',
+  error: 'cm-just-error',
+  function: 'cm-just-function',
+  keyword: 'cm-just-keyword',
+  module: 'cm-just-namespace',
+  operator: 'cm-just-operator',
+  punctuation: 'cm-just-punctuation',
+  string: 'cm-just-string',
+  variable: 'cm-just-variable',
 };
 
-const captureNameToClasses = (name: string): string[] => {
+const captureNameToClass = (name: string): string | undefined => {
   const [base] = name.split('.');
-  return BASE_CAPTURE_TO_CLASSES[base] ?? [];
+  return BASE_CAPTURE_TO_CLASS[base];
 };
 
 const buildDecorations = (parser: Parser, query: Query, content: string) => {
@@ -47,16 +46,16 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
       continue;
     }
 
-    const classes = captureNameToClasses(name);
+    const className = captureNameToClass(name);
 
-    if (classes.length === 0) {
+    if (className === undefined) {
       continue;
     }
 
     const key = `${from}:${to}`;
     const classSet = ranges.get(key) ?? new Set<string>();
 
-    classes.forEach((cls) => classSet.add(cls));
+    classSet.add(className);
     ranges.set(key, classSet);
   }
 
@@ -77,9 +76,9 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
   return builder.finish();
 };
 
-export const createJustSyntaxHighlightingExtension = (
+export const createSyntaxHighlightExtension = (
   language: Language
-): Extension[] => {
+): Extension => {
   let query: Query;
 
   try {
@@ -88,16 +87,17 @@ export const createJustSyntaxHighlightingExtension = (
     console.error('Failed to compile Just highlight query', error);
     return [];
   }
-  const lang = language;
 
-  const plugin = ViewPlugin.fromClass(
+  return ViewPlugin.fromClass(
     class {
       decorations = Decoration.none;
       private parser: Parser;
 
       constructor(view: EditorView) {
-        this.parser = new TreeSitterParser();
-        this.parser.setLanguage(lang);
+        this.parser = new Parser();
+
+        this.parser.setLanguage(language);
+
         this.decorations = buildDecorations(
           this.parser,
           query,
@@ -123,6 +123,4 @@ export const createJustSyntaxHighlightingExtension = (
       decorations: (v) => v.decorations,
     }
   );
-
-  return [plugin];
 };
