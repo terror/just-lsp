@@ -1,29 +1,35 @@
-import { Extension } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin } from '@codemirror/view';
+import { StateEffect, StateField } from '@codemirror/state';
+import { Decoration, DecorationSet, EditorView } from '@codemirror/view';
 
 const highlightMark = Decoration.mark({ class: 'cm-highlighted-node' });
 
-export const highlightExtension = (
-  range: { from: number; to: number } | undefined
-): Extension => {
-  if (!range) return [];
+export const highlightEffect = StateEffect.define<{
+  from: number;
+  to: number;
+} | null>();
 
-  const { from, to } = range;
+export const highlightExtension = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(decorations, transaction) {
+    if (transaction.docChanged) {
+      decorations = Decoration.none;
+    }
 
-  const decorations = Decoration.set([highlightMark.range(from, to)]);
+    for (const effect of transaction.effects) {
+      if (effect.is(highlightEffect)) {
+        const range = effect.value;
 
-  return [
-    EditorView.decorations.of(() => decorations),
-    ViewPlugin.fromClass(
-      class {
-        constructor(view: EditorView) {
-          queueMicrotask(() => {
-            view.dispatch({
-              effects: EditorView.scrollIntoView(from, { y: 'center' }),
-            });
-          });
-        }
+        decorations =
+          range &&
+          range.from >= 0 &&
+          range.from < range.to &&
+          range.to <= transaction.newDoc.length
+            ? Decoration.set([highlightMark.range(range.from, range.to)])
+            : Decoration.none;
       }
-    ),
-  ];
-};
+    }
+
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
