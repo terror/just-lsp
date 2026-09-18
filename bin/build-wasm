@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -euxo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+just -f vendor/tree-sitter-just/justfile build-wasm
+
+cp \
+  vendor/tree-sitter-just/tree-sitter-just.wasm \
+  www/public/tree-sitter-just.wasm
+
+cargo build \
+  --package just-lsp-wasm \
+  --target wasm32-unknown-unknown \
+  --release \
+  --locked
+
+wasm-bindgen \
+  --target web \
+  --out-dir www/src/lib/just-lsp-wasm \
+  target/wasm32-unknown-unknown/release/just_lsp_wasm.wasm
+
+RUST_LOG=warn typeshare \
+  -l typescript \
+  -o www/src/lib/types.ts \
+  crates/just-lsp-wasm

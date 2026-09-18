@@ -1,0 +1,5 @@
+*
+!.gitignore
+!just_lsp_wasm.d.ts
+!just_lsp_wasm.js
+!just_lsp_wasm_bg.wasm

@@ -1,20 +1,25 @@
-import type { Node } from 'web-tree-sitter';
+import { memo } from 'react';
+import type { Parser } from 'web-tree-sitter';
 
+import { useSyntaxTree } from '../hooks/use-syntax-tree';
 import { TreeNode } from './tree-node';
 
 interface TreePaneProps {
-  root: Node | undefined;
-  collapsedNodes: Set<Node>;
-  toggleExpand: (node: Node) => void;
+  parser: Parser;
+  code: string;
   onHighlightChange: (range: { from: number; to: number } | undefined) => void;
 }
 
-export const TreePane = ({
-  root,
-  collapsedNodes,
-  toggleExpand,
+export const TreePane = memo(function TreePane({
+  parser,
+  code,
   onHighlightChange,
-}: TreePaneProps) => {
+}: TreePaneProps) {
+  const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
+    parser,
+    code,
+  });
+
   return (
     <div className='h-full overflow-auto'>
       {root ? (
@@ -34,4 +39,4 @@ export const TreePane = ({
       )}
     </div>
   );
-};
+});

@@ -23,9 +23,7 @@ build:
 
 [group: 'dev']
 build-wasm:
-  just -f vendor/tree-sitter-just/justfile build-wasm
-  cp vendor/tree-sitter-just/tree-sitter-just.wasm www/public/tree-sitter-just.wasm
-  RUST_LOG=warn typeshare -l typescript -o www/src/lib/types.ts crates/just-lsp-wasm
+  ./bin/build-wasm
 
 [group: 'check']
 check:

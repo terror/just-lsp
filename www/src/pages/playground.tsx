@@ -4,7 +4,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useDefaultLayout } from 'react-resizable-panels';
 
 import defaultJustfile from '../../../justfile?raw';
@@ -14,17 +14,17 @@ import { TreePane } from '../components/tree-pane';
 import { useEditorExtensions } from '../hooks/use-editor-extensions';
 import { useMediaQuery } from '../hooks/use-media-query';
 import { usePersistedDoc } from '../hooks/use-persisted-doc';
-import { useSyntaxTree } from '../hooks/use-syntax-tree';
+import {
+  type PlaygroundRuntime,
+  usePlaygroundRuntime,
+} from '../hooks/use-playground-runtime';
 import { useTheme } from '../hooks/use-theme';
-import { useTreeSitter } from '../hooks/use-tree-sitter';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
 const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
-const Playground = () => {
-  const { parser, language: justLanguage, loading, error } = useTreeSitter();
-
+const PlaygroundEditor = ({ parser, language }: PlaygroundRuntime) => {
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
@@ -34,48 +34,29 @@ const Playground = () => {
 
   const theme = useTheme();
 
-  useEffect(() => {
-    document.title = 'Playground - just-lsp';
-  }, []);
-
   const [doc, setDoc] = usePersistedDoc(
     EDITOR_STORAGE_KEY,
     defaultJustfile.trim()
   );
 
-  const { root, collapsedNodes, toggleExpand } = useSyntaxTree({
-    parser,
-    code: doc,
-  });
+  const treeDoc = useDeferredValue(doc);
 
   const [highlight, setHighlight] = useState<
-    { from: number; to: number } | undefined
+    { from: number; to: number; source: string } | undefined
   >(undefined);
 
   const handleHighlightChange = useCallback(
     (range: { from: number; to: number } | undefined) => {
-      setHighlight(range);
+      setHighlight(range ? { ...range, source: treeDoc } : undefined);
     },
-    []
+    [treeDoc]
   );
 
   const extensions = useEditorExtensions({
-    language: justLanguage,
-    highlight,
+    language,
+    highlight: highlight?.source === doc ? highlight : undefined,
     darkMode: theme.darkMode,
   });
-
-  if (error) {
-    return <div className='p-4'>error: {error}</div>;
-  }
-
-  if (loading || !parser || !justLanguage) {
-    return (
-      <div className='flex h-screen items-center justify-center'>
-        <Loader2 className='text-muted-foreground h-8 w-8 animate-spin' />
-      </div>
-    );
-  }
 
   return (
     <div className='flex h-screen max-w-full flex-col'>
@@ -97,9 +78,8 @@ const Playground = () => {
 
           <ResizablePanel id='tree-panel' defaultSize='50%' minSize='30%'>
             <TreePane
-              root={root}
-              collapsedNodes={collapsedNodes}
-              toggleExpand={toggleExpand}
+              parser={parser}
+              code={treeDoc}
               onHighlightChange={handleHighlightChange}
             />
           </ResizablePanel>
@@ -107,6 +87,27 @@ const Playground = () => {
       </div>
     </div>
   );
+};
+
+const Playground = () => {
+  const state = usePlaygroundRuntime();
+
+  useEffect(() => {
+    document.title = 'Playground - just-lsp';
+  }, []);
+
+  switch (state.status) {
+    case 'loading':
+      return (
+        <div className='flex h-screen items-center justify-center'>
+          <Loader2 className='text-muted-foreground h-8 w-8 animate-spin' />
+        </div>
+      );
+    case 'error':
+      return <div className='p-4'>error: {state.error}</div>;
+    case 'ready':
+      return <PlaygroundEditor {...state.runtime} />;
+  }
 };
 
 export default Playground;

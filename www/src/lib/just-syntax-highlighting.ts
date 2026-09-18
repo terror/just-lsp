@@ -78,12 +78,8 @@ const buildDecorations = (parser: Parser, query: Query, content: string) => {
 };
 
 export const createJustSyntaxHighlightingExtension = (
-  language: Language | undefined
+  language: Language
 ): Extension[] => {
-  if (!language) {
-    return [];
-  }
-
   let query: Query;
 
   try {
