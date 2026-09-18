@@ -17,6 +17,15 @@ export function analyze(source) {
     return takeFromExternrefTable0(ret[0]);
 }
 
+/**
+ * # Errors
+ *
+ * Returns a `JsError` if serialization of hover information fails.
+ * @param {string} source
+ * @param {number} line
+ * @param {number} character
+ * @returns {any}
+ */
 export function hover(source, line, character) {
     const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc_command_export, wasm.__wbindgen_realloc_command_export);
     const len0 = WASM_VECTOR_LEN;

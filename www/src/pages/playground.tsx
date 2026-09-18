@@ -90,6 +90,7 @@ const PlaygroundEditor = ({
               value={doc}
               onChange={setDoc}
               onCreateEditor={setEditor}
+              onReset={() => setDoc(defaultJustfile.trim())}
               language={language}
               darkMode={theme.darkMode}
             />
