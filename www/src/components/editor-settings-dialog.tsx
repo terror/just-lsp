@@ -36,7 +36,7 @@ export const EditorSettingsDialog = () => {
           variant='ghost'
           size='icon'
           title='Settings'
-          className='ml-auto h-7 w-7 cursor-pointer'
+          className='h-7 w-7 cursor-pointer'
         >
           <Settings className='h-4 w-4' />
         </Button>

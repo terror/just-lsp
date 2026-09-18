@@ -8,6 +8,11 @@
  */
 export function analyze(source: string): any;
 
+/**
+ * # Errors
+ *
+ * Returns a `JsError` if serialization of hover information fails.
+ */
 export function hover(source: string, line: number, character: number): any;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
