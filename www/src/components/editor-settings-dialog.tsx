@@ -25,8 +25,9 @@ import { Settings } from 'lucide-react';
 import { useId } from 'react';
 
 export const EditorSettingsDialog = () => {
-  const { settings, updateSettings } = useEditorSettings();
   const id = useId();
+
+  const { settings, updateSettings } = useEditorSettings();
 
   return (
     <Dialog>
