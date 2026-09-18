@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { useEditorSettings } from '@/contexts/editor-settings-context';
 import type { AnalysisClient } from '@/lib/analysis/client';
 import {
@@ -13,10 +12,10 @@ import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
 import CodeMirror from '@uiw/react-codemirror';
-import { RotateCcw } from 'lucide-react';
 import { useMemo } from 'react';
 import { Language } from 'web-tree-sitter';
 
+import { EditorResetDialog } from './editor-reset-dialog';
 import { EditorSettingsDialog } from './editor-settings-dialog';
 
 interface EditorPaneProps {
@@ -96,16 +95,7 @@ export const EditorPane = ({
   return (
     <div className='flex h-full min-h-0 flex-col overflow-hidden'>
       <div className='bg-muted/50 flex items-center justify-end gap-1 border-b px-2 py-1'>
-        <Button
-          variant='ghost'
-          size='icon'
-          className='h-7 w-7 cursor-pointer'
-          onClick={onReset}
-          aria-label='Reset to default justfile'
-          title='Reset to default justfile'
-        >
-          <RotateCcw className='h-4 w-4' aria-hidden='true' />
-        </Button>
+        <EditorResetDialog onReset={onReset} />
         <EditorSettingsDialog />
       </div>
       <div className='flex-1 overflow-hidden'>
