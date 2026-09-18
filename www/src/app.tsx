@@ -2,7 +2,6 @@ import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 
 import Home from './pages/home';
-import { EditorSettingsProvider } from './providers/editor-settings-provider';
 
 const Documentation = lazy(() => import('./pages/documentation'));
 const Playground = lazy(() => import('./pages/playground'));
@@ -30,20 +29,18 @@ const App = () => (
     <Route
       path='/playground'
       element={
-        <EditorSettingsProvider>
-          <Suspense
-            fallback={
-              <div
-                role='status'
-                className='text-muted-foreground flex h-screen items-center justify-center'
-              >
-                Loading playground…
-              </div>
-            }
-          >
-            <Playground />
-          </Suspense>
-        </EditorSettingsProvider>
+        <Suspense
+          fallback={
+            <div
+              role='status'
+              className='text-muted-foreground flex h-screen items-center justify-center'
+            >
+              Loading playground…
+            </div>
+          }
+        >
+          <Playground />
+        </Suspense>
       }
     />
     <Route path='*' element={<Navigate to='/' replace />} />
