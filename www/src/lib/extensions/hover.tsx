@@ -1,5 +1,6 @@
 import { HoverContent } from '@/components/hover-content';
 import { hoverTooltip } from '@codemirror/view';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
 import type { AnalysisClient } from '../analysis/client';
@@ -38,7 +39,8 @@ export const createHoverExtension = (client: AnalysisClient) =>
             'max-h-80 max-w-[min(36rem,calc(100vw-2rem))] overflow-auto p-3';
 
           const root = createRoot(dom);
-          root.render(<HoverContent {...hover} />);
+
+          flushSync(() => root.render(<HoverContent {...hover} />));
 
           return { dom, destroy: () => root.unmount() };
         },
