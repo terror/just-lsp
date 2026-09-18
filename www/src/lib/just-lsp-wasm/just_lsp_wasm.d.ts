@@ -8,11 +8,14 @@
  */
 export function analyze(source: string): any;
 
+export function hover(source: string, line: number, character: number): any;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly analyze: (a: number, b: number) => [number, number, number];
+    readonly hover: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly memcmp: (a: number, b: number, c: number) => number;
     readonly strlen: (a: number) => number;
     readonly abort: () => void;

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(crate) enum Symbol {
+pub enum Symbol {
   Builtin(&'static Builtin<'static>),
   Function(Located<Function>),
   FunctionParameter(TextNode),
@@ -11,7 +11,7 @@ pub(crate) enum Symbol {
 
 impl Symbol {
   #[must_use]
-  pub(crate) fn is_renameable(&self) -> bool {
+  pub fn is_renameable(&self) -> bool {
     matches!(
       self,
       Self::Function(_)

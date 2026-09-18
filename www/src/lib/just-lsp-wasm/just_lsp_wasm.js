@@ -16,6 +16,16 @@ export function analyze(source) {
     }
     return takeFromExternrefTable0(ret[0]);
 }
+
+export function hover(source, line, character) {
+    const ptr0 = passStringToWasm0(source, wasm.__wbindgen_malloc_command_export, wasm.__wbindgen_realloc_command_export);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.hover(ptr0, len0, line, character);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

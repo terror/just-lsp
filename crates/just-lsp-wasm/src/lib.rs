@@ -1,7 +1,9 @@
 use {
-  just_lsp::{Analyzer, Document},
+  just_lsp::{Analyzer, Document, Resolver},
   serde::Serialize,
-  tower_lsp::lsp_types::DiagnosticSeverity,
+  tower_lsp::lsp_types::{
+    DiagnosticSeverity, HoverContents, MarkupKind, Position,
+  },
   typeshare_annotation::typeshare,
   wasm_bindgen::prelude::*,
 };
@@ -40,6 +42,18 @@ struct Diagnostic {
   start_line: u32,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[typeshare]
+struct Hover {
+  content: String,
+  end_character: u32,
+  end_line: u32,
+  markdown: bool,
+  start_character: u32,
+  start_line: u32,
+}
+
 /// # Errors
 ///
 /// Returns a `JsError` if serialization of diagnostics fails.
@@ -66,4 +80,39 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
     .collect::<Vec<_>>(),
   )
   .map_err(|error| JsError::new(&error.to_string()))
+}
+
+#[wasm_bindgen]
+pub fn hover(
+  source: &str,
+  line: u32,
+  character: u32,
+) -> Result<JsValue, JsError> {
+  let document = Document::from(source);
+
+  let hover = document
+    .node_at_position(Position::new(line, character))
+    .filter(|node| node.kind() == "identifier")
+    .and_then(|identifier| {
+      Resolver::new(&document).resolve_identifier_hover(&identifier)
+    })
+    .and_then(|hover| {
+      let HoverContents::Markup(contents) = hover.contents else {
+        return None;
+      };
+
+      let range = hover.range?;
+
+      Some(Hover {
+        content: contents.value,
+        end_character: range.end.character,
+        end_line: range.end.line,
+        markdown: contents.kind == MarkupKind::Markdown,
+        start_character: range.start.character,
+        start_line: range.start.line,
+      })
+    });
+
+  serde_wasm_bindgen::to_value(&hover)
+    .map_err(|error| JsError::new(&error.to_string()))
 }

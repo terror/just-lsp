@@ -1,12 +1,16 @@
 import type { Diagnostic } from '@codemirror/lint';
 
+import type { Hover } from './types';
+
 export interface AnalyzerRequest {
   id: number;
+  position?: { line: number; character: number };
   source: string;
 }
 
 export type AnalyzerResponse =
-  { id: number; diagnostics: Diagnostic[] } | { id: number; error: string };
+  | { id: number; result: Diagnostic[] | Hover | undefined }
+  | { id: number; error: string };
 
 export class Analyzer {
   private id = 0;
@@ -14,7 +18,7 @@ export class Analyzer {
   private pending = new Map<
     number,
     {
-      resolve: (diagnostics: Diagnostic[]) => void;
+      resolve: (result: Diagnostic[] | Hover | undefined) => void;
       reject: (error: Error) => void;
     }
   >();
@@ -29,7 +33,7 @@ export class Analyzer {
         if ('error' in event.data) {
           pending?.reject(new Error(event.data.error));
         } else {
-          pending?.resolve(event.data.diagnostics);
+          pending?.resolve(event.data.result);
         }
       }
     );
@@ -46,25 +50,54 @@ export class Analyzer {
   }
 
   analyze(source: string): Promise<Diagnostic[]> {
+    return this.request({ source });
+  }
+
+  hover(
+    source: string,
+    line: number,
+    character: number
+  ): Promise<Hover | undefined> {
+    return this.request({ source, position: { line, character } });
+  }
+
+  private request<T extends Diagnostic[] | Hover | undefined>(
+    request: Omit<AnalyzerRequest, 'id'>
+  ): Promise<T> {
     if (this.error) return Promise.reject(this.error);
 
     const id = this.id++;
 
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ id, source } satisfies AnalyzerRequest);
+      this.pending.set(id, {
+        resolve: (result) => resolve(result as T),
+        reject,
+      });
+      this.worker.postMessage({ id, ...request } satisfies AnalyzerRequest);
     });
   }
 }
 
 let analyzer: Analyzer | undefined;
 
-export async function analyzeSource(source: string): Promise<Diagnostic[]> {
+function getAnalyzer(): Analyzer {
   analyzer ??= new Analyzer(
     new Worker(new URL('./analyzer-worker.ts', import.meta.url), {
       type: 'module',
     })
   );
 
-  return analyzer.analyze(source);
+  return analyzer;
+}
+
+export async function analyzeSource(source: string): Promise<Diagnostic[]> {
+  return getAnalyzer().analyze(source);
+}
+
+export async function hoverSource(
+  source: string,
+  line: number,
+  character: number
+): Promise<Hover | undefined> {
+  return getAnalyzer().hover(source, line, character);
 }

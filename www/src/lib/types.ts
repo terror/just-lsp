@@ -18,3 +18,12 @@ export interface Diagnostic {
   startCharacter: number;
   startLine: number;
 }
+
+export interface Hover {
+  content: string;
+  endCharacter: number;
+  endLine: number;
+  markdown: boolean;
+  startCharacter: number;
+  startLine: number;
+}

@@ -5,6 +5,7 @@ import {
 } from '@/lib/base16-seti-theme';
 import { diagnosticsExtension } from '@/lib/extensions/diagnostics';
 import { highlightExtension } from '@/lib/extensions/highlight';
+import { hoverExtension } from '@/lib/extensions/hover';
 import { createSyntaxHighlightExtension } from '@/lib/extensions/syntax-highlight';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -57,6 +58,7 @@ export const EditorPane = ({
       diagnosticsExtension,
       syntaxHighlighting,
       highlightExtension,
+      hoverExtension,
     ];
 
     if (settings.keybindings === 'vim') {
