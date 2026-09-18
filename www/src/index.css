@@ -229,7 +229,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  font-size: var(--editor-font-size, 14px);
 }
 
 .editor-host .cm-scroller {

@@ -20,7 +20,6 @@ import {
   usePlaygroundRuntime,
 } from '../hooks/use-playground-runtime';
 import { useTheme } from '../hooks/use-theme';
-import { EditorSettingsProvider } from '../providers/editor-settings-provider';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
@@ -128,11 +127,7 @@ const Playground = () => {
     case 'error':
       return <div className='p-4'>error: {state.error}</div>;
     case 'ready':
-      return (
-        <EditorSettingsProvider>
-          <PlaygroundEditor {...state.runtime} />
-        </EditorSettingsProvider>
-      );
+      return <PlaygroundEditor {...state.runtime} />;
   }
 };
 

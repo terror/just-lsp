@@ -16,18 +16,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import {
-  FONT_SIZES,
-  TAB_SIZES,
-  useEditorSettings,
-} from '@/contexts/editor-settings-context';
+import { EditorSettings, FONT_SIZES, TAB_SIZES } from '@/lib/editor-settings';
 import { Settings } from 'lucide-react';
 import { useId } from 'react';
 
-export const EditorSettingsDialog = () => {
-  const id = useId();
+interface EditorSettingsDialogProps {
+  settings: EditorSettings;
+  updateSettings: (settings: Partial<EditorSettings>) => void;
+}
 
-  const { settings, updateSettings } = useEditorSettings();
+export const EditorSettingsDialog = ({
+  settings,
+  updateSettings,
+}: EditorSettingsDialogProps) => {
+  const id = useId();
 
   return (
     <Dialog>
