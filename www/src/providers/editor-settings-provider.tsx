@@ -1,9 +1,5 @@
-import {
-  EditorSettings,
-  EditorSettingsContext,
-  defaultSettings,
-} from '@/contexts/editor-settings-context';
-import { usePersistedState } from '@/hooks/use-persisted-state';
+import { EditorSettingsContext } from '@/contexts/editor-settings-context';
+import { usePersistedSettings } from '@/hooks/use-persisted-settings';
 import { ReactNode, useEffect } from 'react';
 
 export const EditorSettingsProvider = ({
@@ -11,10 +7,7 @@ export const EditorSettingsProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const [settings, updateSettings] = usePersistedState<EditorSettings>(
-    'editor-settings',
-    defaultSettings
-  );
+  const { settings, updateSettings } = usePersistedSettings();
 
   useEffect(() => {
     document.documentElement.style.setProperty(
