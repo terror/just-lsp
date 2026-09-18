@@ -37,6 +37,7 @@ export function usePersistedSettings() {
         `Error reading ${SETTINGS_STORAGE_KEY} from localStorage:`,
         error
       );
+
       return defaultSettings;
     }
   });
