@@ -9,7 +9,7 @@ pub struct Project {
 }
 
 impl Project {
-  pub(super) fn add_dependency(
+  pub fn add_dependency(
     &mut self,
     source: &lsp::Url,
     dependency: ProjectDependency,
