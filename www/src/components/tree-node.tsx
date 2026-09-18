@@ -21,13 +21,19 @@ export const TreeNode: React.FC<TreeNodeProps> = ({
 
   return (
     <>
-      <div
-        className='tree-node hover:bg-accent flex cursor-pointer items-center py-1 font-mono text-sm whitespace-nowrap'
+      <button
+        type='button'
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        className='tree-node hover:bg-accent focus-visible:outline-ring flex w-full cursor-pointer items-center py-1 text-left font-mono text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2'
         style={{ paddingLeft: `${level * 16 + 4}px` }}
         onMouseEnter={() =>
           onHighlightChange({ from: node.startIndex, to: node.endIndex })
         }
         onMouseLeave={() => onHighlightChange(undefined)}
+        onFocus={() =>
+          onHighlightChange({ from: node.startIndex, to: node.endIndex })
+        }
+        onBlur={() => onHighlightChange(undefined)}
         onClick={() => hasChildren && toggleExpand(node)}
       >
         <span className='mr-1 flex w-4 justify-center'>
@@ -44,7 +50,7 @@ export const TreeNode: React.FC<TreeNodeProps> = ({
           [{node.startPosition.row}: {node.startPosition.column}] [
           {node.endPosition.row}: {node.endPosition.column}]
         </span>
-      </div>
+      </button>
       {isExpanded &&
         hasChildren &&
         node.children.map((child) => (

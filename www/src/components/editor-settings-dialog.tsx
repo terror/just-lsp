@@ -22,9 +22,11 @@ import {
   useEditorSettings,
 } from '@/contexts/editor-settings-context';
 import { Settings } from 'lucide-react';
+import { useId } from 'react';
 
 export const EditorSettingsDialog = () => {
   const { settings, updateSettings } = useEditorSettings();
+  const id = useId();
 
   return (
     <Dialog>
@@ -47,8 +49,14 @@ export const EditorSettingsDialog = () => {
         </DialogHeader>
         <div className='grid gap-4 py-4'>
           <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>Line numbers</Label>
+            <Label
+              htmlFor={`${id}-line-numbers`}
+              className='text-sm font-medium'
+            >
+              Line numbers
+            </Label>
             <Switch
+              id={`${id}-line-numbers`}
               checked={settings.lineNumbers}
               onCheckedChange={(checked) =>
                 updateSettings({ lineNumbers: checked })
@@ -57,8 +65,11 @@ export const EditorSettingsDialog = () => {
           </div>
 
           <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>Word wrap</Label>
+            <Label htmlFor={`${id}-word-wrap`} className='text-sm font-medium'>
+              Word wrap
+            </Label>
             <Switch
+              id={`${id}-word-wrap`}
               checked={settings.lineWrapping}
               onCheckedChange={(checked) =>
                 updateSettings({ lineWrapping: checked })
@@ -67,14 +78,16 @@ export const EditorSettingsDialog = () => {
           </div>
 
           <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>Font size</Label>
+            <Label htmlFor={`${id}-font-size`} className='text-sm font-medium'>
+              Font size
+            </Label>
             <Select
               value={settings.fontSize.toString()}
               onValueChange={(value) =>
                 updateSettings({ fontSize: parseInt(value) })
               }
             >
-              <SelectTrigger className='w-28'>
+              <SelectTrigger id={`${id}-font-size`} className='w-28'>
                 <SelectValue placeholder='Font size' />
               </SelectTrigger>
               <SelectContent>
@@ -88,14 +101,19 @@ export const EditorSettingsDialog = () => {
           </div>
 
           <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>Keybindings</Label>
+            <Label
+              htmlFor={`${id}-keybindings`}
+              className='text-sm font-medium'
+            >
+              Keybindings
+            </Label>
             <Select
               value={settings.keybindings.toString()}
               onValueChange={(value) =>
                 updateSettings({ keybindings: value as 'default' | 'vim' })
               }
             >
-              <SelectTrigger className='w-28'>
+              <SelectTrigger id={`${id}-keybindings`} className='w-28'>
                 <SelectValue placeholder='Default' />
               </SelectTrigger>
               <SelectContent>
@@ -106,14 +124,16 @@ export const EditorSettingsDialog = () => {
           </div>
 
           <div className='flex items-center justify-between'>
-            <Label className='text-sm font-medium'>Tab size</Label>
+            <Label htmlFor={`${id}-tab-size`} className='text-sm font-medium'>
+              Tab size
+            </Label>
             <Select
               value={settings.tabSize.toString()}
               onValueChange={(value) =>
                 updateSettings({ tabSize: parseInt(value) })
               }
             >
-              <SelectTrigger className='w-28'>
+              <SelectTrigger id={`${id}-tab-size`} className='w-28'>
                 <SelectValue placeholder='Tab Size' />
               </SelectTrigger>
               <SelectContent>
