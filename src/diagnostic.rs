@@ -18,21 +18,13 @@ pub struct Diagnostic {
 
 impl Diagnostic {
   pub fn error(message: impl Into<String>, range: lsp::Range) -> Self {
-    Self::new(message, range, lsp::DiagnosticSeverity::ERROR)
-  }
-
-  pub fn new(
-    message: impl Into<String>,
-    range: lsp::Range,
-    severity: lsp::DiagnosticSeverity,
-  ) -> Self {
     Self {
       display: String::new(),
       id: String::new(),
       message: message.into(),
       quickfixes: Vec::new(),
       range,
-      severity,
+      severity: lsp::DiagnosticSeverity::ERROR,
     }
   }
 
@@ -43,7 +35,14 @@ impl Diagnostic {
   }
 
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
-    Self::new(message, range, lsp::DiagnosticSeverity::WARNING)
+    Self {
+      display: String::new(),
+      id: String::new(),
+      message: message.into(),
+      quickfixes: Vec::new(),
+      range,
+      severity: lsp::DiagnosticSeverity::WARNING,
+    }
   }
 }
 
