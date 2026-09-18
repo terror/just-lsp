@@ -6,46 +6,37 @@ pub(crate) struct Quickfixer<'a> {
 }
 
 impl Quickfixer<'_> {
-  fn action(
-    &self,
-    source: &Diagnostic,
-    quickfix: &Quickfix,
-  ) -> lsp::CodeActionOrCommand {
-    let diagnostics = self
-      .parameters
-      .context
-      .diagnostics
-      .iter()
-      .filter(|diagnostic| source == *diagnostic)
-      .cloned()
-      .collect::<Vec<_>>();
-
-    lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-      title: quickfix.title().to_string(),
-      kind: Some(lsp::CodeActionKind::QUICKFIX),
-      diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
-      edit: Some(lsp::WorkspaceEdit {
-        changes: Some(HashMap::from([(
-          self.parameters.text_document.uri.clone(),
-          quickfix.edits().to_vec(),
-        )])),
-        ..Default::default()
-      }),
-      ..Default::default()
-    })
-  }
-
   #[must_use]
   pub(crate) fn collect(&self) -> Vec<lsp::CodeActionOrCommand> {
     self
       .diagnostics
       .iter()
       .filter(|diagnostic| diagnostic.range.overlaps(self.parameters.range))
-      .flat_map(|diagnostic| {
-        diagnostic
-          .quickfixes
-          .iter()
-          .map(move |quickfix| self.action(diagnostic, quickfix))
+      .flat_map(|source| {
+        source.quickfixes.iter().map(move |quickfix| {
+          let diagnostics = self
+            .parameters
+            .context
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| source == *diagnostic)
+            .cloned()
+            .collect::<Vec<_>>();
+
+          lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+            title: quickfix.title().to_string(),
+            kind: Some(lsp::CodeActionKind::QUICKFIX),
+            diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
+            edit: Some(lsp::WorkspaceEdit {
+              changes: Some(HashMap::from([(
+                self.parameters.text_document.uri.clone(),
+                quickfix.edits().to_vec(),
+              )])),
+              ..Default::default()
+            }),
+            ..Default::default()
+          })
+        })
       })
       .collect()
   }
