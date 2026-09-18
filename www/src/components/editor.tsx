@@ -1,6 +1,7 @@
 import { useEditorSettings } from '@/contexts/editor-settings-context';
 import { Extension } from '@codemirror/state';
 import CodeMirror from '@uiw/react-codemirror';
+import { useMemo } from 'react';
 
 interface EditorProps {
   value: string;
@@ -11,24 +12,30 @@ interface EditorProps {
 export const Editor = ({ value, onChange, extensions }: EditorProps) => {
   const { settings } = useEditorSettings();
 
+  const basicSetup = useMemo(
+    () => ({
+      lineNumbers: settings.lineNumbers,
+      highlightActiveLineGutter: true,
+      highlightActiveLine: true,
+      bracketMatching: true,
+      history: true,
+      indentOnInput: true,
+      syntaxHighlighting: true,
+      foldGutter: false,
+      closeBrackets: false,
+      autocompletion: false,
+      highlightSelectionMatches: false,
+      lintKeymap: false,
+    }),
+    [settings.lineNumbers]
+  );
+
   return (
     <div className='editor-host h-full w-full overflow-hidden'>
       <CodeMirror
         value={value}
         extensions={extensions}
-        basicSetup={{
-          lineNumbers: settings.lineNumbers,
-          highlightActiveLineGutter: true,
-          highlightActiveLine: true,
-          bracketMatching: true,
-          history: true,
-          indentOnInput: true,
-          syntaxHighlighting: true,
-          foldGutter: false,
-          closeBrackets: false,
-          autocompletion: false,
-          highlightSelectionMatches: false,
-        }}
+        basicSetup={basicSetup}
         onChange={onChange}
         height='100%'
         style={{ height: '100%' }}

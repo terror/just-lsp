@@ -3,7 +3,8 @@ import {
   base16SetiDarkTheme,
   base16SetiLightTheme,
 } from '@/lib/base16-seti-theme';
-import { highlightExtension } from '@/lib/cm-highlight-extension';
+import { diagnosticsExtension } from '@/lib/extensions/diagnostics';
+import { highlightExtension } from '@/lib/extensions/highlight';
 import { createJustSyntaxHighlightingExtension } from '@/lib/just-syntax-highlighting';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -12,7 +13,7 @@ import { useMemo } from 'react';
 import { Language as TSLanguage } from 'web-tree-sitter';
 
 interface UseEditorExtensionsOptions {
-  language: TSLanguage | undefined;
+  language: TSLanguage;
   highlight: { from: number; to: number } | undefined;
   darkMode: boolean;
 }
@@ -33,6 +34,7 @@ export function useEditorExtensions({
     const extensions: Extension[] = [
       darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
+      diagnosticsExtension,
       ...syntaxHighlighting,
       highlightExtension(highlight),
     ];

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { Node, Parser } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
-  parser: Parser | undefined;
+  parser: Parser;
   code: string;
 }
 
@@ -16,7 +16,7 @@ export function useSyntaxTree({
   parser,
   code,
 }: UseSyntaxTreeOptions): UseSyntaxTree {
-  const root = useMemo(() => parser?.parse(code)?.rootNode, [parser, code]);
+  const root = useMemo(() => parser.parse(code)?.rootNode, [parser, code]);
 
   const [collapsed, setCollapsed] = useState<{
     root: Node | undefined;
