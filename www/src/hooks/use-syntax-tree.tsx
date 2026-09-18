@@ -1,9 +1,19 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { Node, Parser } from 'web-tree-sitter';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { type Language, type Node, Parser, type Tree } from 'web-tree-sitter';
 
 interface UseSyntaxTreeOptions {
-  parser: Parser;
+  language: Language;
   code: string;
+}
+
+interface ParsedTree {
+  tree: Tree | null;
 }
 
 interface UseSyntaxTree {
@@ -13,23 +23,80 @@ interface UseSyntaxTree {
 }
 
 export function useSyntaxTree({
-  parser,
+  language,
   code,
 }: UseSyntaxTreeOptions): UseSyntaxTree {
-  const root = useMemo(() => parser.parse(code)?.rootNode, [parser, code]);
+  const parser = useRef<Parser | null>(null);
 
-  const [collapsed, setCollapsed] = useState<{
+  const trees = useRef(new Set<ParsedTree>());
+
+  const [state, setState] = useState<{
+    parsed: ParsedTree;
     root: Node | undefined;
-    nodes: Set<Node>;
+    collapsedNodes: Set<Node>;
   }>();
 
-  const collapsedNodes =
-    collapsed && collapsed.root === root ? collapsed.nodes : new Set<Node>();
+  const parsed = state?.parsed;
+
+  useEffect(() => {
+    const allocated = trees.current;
+
+    return () => {
+      for (const { tree } of allocated) {
+        tree?.delete();
+      }
+
+      allocated.clear();
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const instance = new Parser();
+
+    try {
+      instance.setLanguage(language);
+    } catch (error) {
+      instance.delete();
+      throw error;
+    }
+
+    parser.current = instance;
+
+    return () => {
+      parser.current = null;
+      instance.delete();
+    };
+  }, [language]);
+
+  useLayoutEffect(() => {
+    const parsed = { tree: parser.current?.parse(code) ?? null };
+
+    trees.current.add(parsed);
+
+    setState({
+      parsed,
+      root: parsed.tree?.rootNode,
+      collapsedNodes: new Set<Node>(),
+    });
+  }, [language, code]);
+
+  useEffect(() => {
+    if (!parsed || !trees.current.has(parsed)) return;
+
+    for (const previous of trees.current) {
+      if (previous === parsed) break;
+
+      previous.tree?.delete();
+      trees.current.delete(previous);
+    }
+  }, [parsed]);
 
   const toggleExpand = useCallback(
     (node: Node) => {
-      setCollapsed((prev) => {
-        const nodes = new Set(prev?.root === root ? prev?.nodes : []);
+      setState((prev) => {
+        if (!prev || prev.parsed !== parsed) return prev;
+
+        const nodes = new Set(prev.collapsedNodes);
 
         if (nodes.has(node)) {
           nodes.delete(node);
@@ -37,11 +104,15 @@ export function useSyntaxTree({
           nodes.add(node);
         }
 
-        return { root, nodes };
+        return { ...prev, collapsedNodes: nodes };
       });
     },
-    [root]
+    [parsed]
   );
 
-  return { root, collapsedNodes, toggleExpand };
+  return {
+    root: state?.root,
+    collapsedNodes: state?.collapsedNodes ?? new Set<Node>(),
+    toggleExpand,
+  };
 }
