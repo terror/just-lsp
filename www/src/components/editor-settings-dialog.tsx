@@ -91,7 +91,7 @@ export const EditorSettingsDialog = ({
         </Button>
       </DialogTrigger>
       <DialogContent className='max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 sm:max-w-[560px]'>
-        <DialogHeader className='px-6 pt-6 pb-2'>
+        <DialogHeader className='px-6 pt-6 pb-2 text-left'>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             Customize your editor experience with these settings.
