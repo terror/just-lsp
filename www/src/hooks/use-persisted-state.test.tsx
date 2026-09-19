@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { usePersistedDoc } from './use-persisted-doc';
+import { usePersistedState } from './use-persisted-state';
 
 const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -13,20 +13,19 @@ afterEach(() => {
   }
 });
 
-function Document() {
-  const [doc] = usePersistedDoc('foo', 'bar');
-
-  return doc;
+function Value() {
+  const [value] = usePersistedState('foo', 'bar');
+  return value;
 }
 
-describe('usePersistedDoc', () => {
+describe('usePersistedState', () => {
   it('uses the fallback without a window', () => {
     Reflect.deleteProperty(globalThis, 'window');
 
-    expect(renderToStaticMarkup(<Document />)).toBe('bar');
+    expect(renderToStaticMarkup(<Value />)).toBe('bar');
   });
 
-  it('uses the fallback only when no document is saved', () => {
+  it('uses the fallback only when no value is saved', () => {
     for (const [stored, expected] of [
       [null, 'bar'],
       ['', ''],
@@ -37,7 +36,7 @@ describe('usePersistedDoc', () => {
         value: { localStorage: { getItem: () => stored } },
       });
 
-      expect(renderToStaticMarkup(<Document />)).toBe(expected);
+      expect(renderToStaticMarkup(<Value />)).toBe(expected);
     }
   });
 });

@@ -4,6 +4,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { highlightEffect } from '@/lib/extensions/highlight';
+import { getSample, samples } from '@/lib/samples';
 import { EditorView } from '@codemirror/view';
 import { Loader2 } from 'lucide-react';
 import {
@@ -16,12 +17,11 @@ import {
 } from 'react';
 import { useDefaultLayout, useGroupRef } from 'react-resizable-panels';
 
-import defaultJustfile from '../../../justfile?raw';
 import { EditorPane } from '../components/editor-pane';
 import { Header } from '../components/header';
 import { TreePane } from '../components/tree-pane';
 import { useMediaQuery } from '../hooks/use-media-query';
-import { usePersistedDoc } from '../hooks/use-persisted-doc';
+import { usePersistedState } from '../hooks/use-persisted-state';
 import {
   type PlaygroundRuntime,
   usePlaygroundRuntime,
@@ -30,9 +30,20 @@ import { useTheme } from '../hooks/use-theme';
 
 const EDITOR_STORAGE_KEY = 'just-lsp:editor-code';
 const PANEL_LAYOUT_STORAGE_KEY = 'just-lsp:panel-layout';
+const SAMPLE_STORAGE_KEY = 'just-lsp:sample';
 const STACKED_LAYOUT_QUERY = '(max-width: 767px)';
 
-const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
+interface PlaygroundEditorProps extends PlaygroundRuntime {
+  onSampleChange: (name: string) => void;
+  sample: ReturnType<typeof getSample>;
+}
+
+const PlaygroundEditor = ({
+  analysis,
+  language,
+  onSampleChange,
+  sample,
+}: PlaygroundEditorProps) => {
   const stackedLayout = useMediaQuery(STACKED_LAYOUT_QUERY);
   const panelDirection = stackedLayout ? 'vertical' : 'horizontal';
 
@@ -54,12 +65,12 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
 
   const theme = useTheme();
 
-  const [doc, setDoc] = usePersistedDoc(
-    EDITOR_STORAGE_KEY,
-    defaultJustfile.trim()
+  const [code, setCode] = usePersistedState(
+    `${EDITOR_STORAGE_KEY}:${sample.name}`,
+    sample.code
   );
 
-  const treeDoc = useDeferredValue(doc);
+  const treeDoc = useDeferredValue(code);
 
   const editorRef = useRef<EditorView | null>(null);
 
@@ -103,12 +114,14 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
           <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
             <EditorPane
               analysis={analysis}
-              value={doc}
-              onChange={setDoc}
+              value={code}
+              onChange={setCode}
               onCreateEditor={(editor) => {
                 editorRef.current = editor;
               }}
-              onReset={() => setDoc(defaultJustfile.trim())}
+              onReset={() => setCode(sample.code)}
+              sample={sample.name}
+              onSampleChange={onSampleChange}
               language={language}
               darkMode={theme.darkMode}
             />
@@ -137,6 +150,13 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
 const Playground = () => {
   const state = usePlaygroundRuntime();
 
+  const [selectedSample, setSelectedSample] = usePersistedState(
+    SAMPLE_STORAGE_KEY,
+    samples[0].name
+  );
+
+  const sample = getSample(selectedSample);
+
   useEffect(() => {
     document.title = 'Playground - just-lsp';
   }, []);
@@ -151,7 +171,14 @@ const Playground = () => {
     case 'error':
       return <div className='p-4'>error: {state.error}</div>;
     case 'ready':
-      return <PlaygroundEditor {...state.runtime} />;
+      return (
+        <PlaygroundEditor
+          key={sample.name}
+          {...state.runtime}
+          sample={sample}
+          onSampleChange={setSelectedSample}
+        />
+      );
   }
 };
 

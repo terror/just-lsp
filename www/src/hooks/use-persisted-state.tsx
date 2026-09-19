@@ -1,7 +1,7 @@
 import { readStorage, writeStorage } from '@/lib/storage';
 import { useEffect, useState } from 'react';
 
-export function usePersistedDoc(
+export function usePersistedState(
   key: string,
   fallback: string
 ): [string, (value: string) => void] {
