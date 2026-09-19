@@ -618,6 +618,84 @@ impl Document {
       .find(|recipe| recipe.range == range)
   }
 
+  /// Returns the nonblank body entries of `recipe` in source order.
+  ///
+  /// Entries split at `\n` outside interpolations, including escaped newlines.
+  /// The separating `\n` is omitted; indentation, comments, shebangs, and
+  /// newlines inside interpolations are preserved. Each entry includes its
+  /// source range.
+  ///
+  /// Returns an empty vector if `recipe` has no body node.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::Document;
+  ///
+  /// let document = Document::from("foo:\n  {{'\nbar\n'}}\n\n  baz\n");
+  ///
+  /// let recipes = document.recipes();
+  ///
+  /// assert_eq!(
+  ///   recipes[0]
+  ///     .body
+  ///     .iter()
+  ///     .map(|line| line.value.as_str())
+  ///     .collect::<Vec<_>>(),
+  ///   ["  {{'\nbar\n'}}", "  baz"],
+  /// );
+  /// ```
+  fn get_recipe_body(&self, recipe: &Node) -> Vec<TextNode> {
+    let Some(node) = recipe.find("^recipe_body") else {
+      return Vec::new();
+    };
+
+    let interpolations = node.find_all("interpolation");
+
+    let offset = node.start_byte() - node.start_position().column;
+
+    let ends = self
+      .content
+      .byte_slice(offset..node.end_byte())
+      .bytes()
+      .enumerate()
+      .filter_map(|(index, byte)| (byte == b'\n').then_some(offset + index))
+      .chain(once(node.end_byte()));
+
+    let mut start = offset;
+
+    let mut body = Vec::new();
+
+    for end in ends {
+      if interpolations
+        .iter()
+        .any(|node| node.byte_range().contains(&end))
+      {
+        continue;
+      }
+
+      let range = start..end;
+
+      start = end + 1;
+
+      let value = self.content.byte_slice(range.clone()).to_string();
+
+      if value.trim().is_empty() {
+        continue;
+      }
+
+      body.push(TextNode {
+        value,
+        range: lsp::Range {
+          start: self.content.byte_to_lsp_position(range.start),
+          end: self.content.byte_to_lsp_position(range.end),
+        },
+      });
+    }
+
+    body
+  }
+
   /// Returns the import declarations in source order.
   ///
   /// Paths retain their source spelling, including quotes and any string
@@ -933,50 +1011,6 @@ impl Document {
           value: self.get_node_text(&name_node),
         };
 
-        let body =
-          recipe_node
-            .find("^recipe_body")
-            .map_or_else(Vec::new, |body_node| {
-              let interpolations = body_node.find_all("interpolation");
-
-              let offset =
-                body_node.start_byte() - body_node.start_position().column;
-
-              self
-                .content
-                .byte_slice(offset..body_node.end_byte())
-                .bytes()
-                .enumerate()
-                .filter_map(|(index, byte)| {
-                  (byte == b'\n').then_some(offset + index)
-                })
-                .chain(once(body_node.end_byte()))
-                .filter(|end| {
-                  !interpolations.iter().any(|interpolation| {
-                    interpolation.start_byte() <= *end
-                      && *end < interpolation.end_byte()
-                  })
-                })
-                .scan(offset, |start, end| {
-                  let range = *start..end;
-                  *start = end + 1;
-                  Some(range)
-                })
-                .filter_map(|range| {
-                  let value =
-                    self.content.byte_slice(range.clone()).to_string();
-
-                  (!value.trim().is_empty()).then(|| TextNode {
-                    value,
-                    range: lsp::Range {
-                      start: self.content.byte_to_lsp_position(range.start),
-                      end: self.content.byte_to_lsp_position(range.end),
-                    },
-                  })
-                })
-                .collect()
-            });
-
         let dependencies = recipe_node
           .find("recipe_header > dependencies")
           .map_or_else(Vec::new, |dependencies_node| {
@@ -1021,7 +1055,7 @@ impl Document {
         Some(Recipe {
           name: recipe_name,
           attributes: self.get_attributes(recipe_node),
-          body,
+          body: self.get_recipe_body(recipe_node),
           dependencies,
           content: self.get_node_text(recipe_node).trim().to_string(),
           parameters,
