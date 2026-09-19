@@ -21,5 +21,20 @@ export function toEditorDiagnostics(
     severity: diagnostic.severity,
     message: diagnostic.message,
     source: diagnostic.id,
+    actions: diagnostic.quickfixes.map((quickfix) => ({
+      name: quickfix.title,
+      apply(view) {
+        if (view.state.doc !== doc) return;
+
+        view.dispatch({
+          changes: quickfix.edits.map((edit) => ({
+            from: offset(edit.startLine, edit.startCharacter),
+            to: offset(edit.endLine, edit.endCharacter),
+            insert: edit.newText,
+          })),
+          userEvent: 'input.quickfix',
+        });
+      },
+    })),
   }));
 }

@@ -61,7 +61,7 @@ export const EditorPane = ({
       closeBrackets: false,
       autocompletion: false,
       highlightSelectionMatches: false,
-      lintKeymap: false,
+      lintKeymap: true,
     }),
     [settings.lineNumbers, settings.tabSize]
   );
