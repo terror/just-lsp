@@ -92,7 +92,7 @@ export const EditorPane = ({
 
   return (
     <div className='flex h-full min-h-0 flex-col overflow-hidden'>
-      <div className='bg-muted/50 flex items-center justify-end gap-1 border-b px-2 py-1'>
+      <div className='bg-muted/50 flex shrink-0 items-center justify-end gap-1 border-b px-2 py-1'>
         <EditorResetDialog onReset={onReset} />
         <EditorSettingsDialog
           settings={settings}
