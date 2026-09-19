@@ -979,91 +979,24 @@ impl Document {
 
         let dependencies = recipe_node
           .find("recipe_header > dependencies")
-          .map(|dependencies_node| {
-            let mut dependencies = Vec::new();
-            let mut phase = DependencyPhase::Prior;
+          .map_or_else(Vec::new, |dependencies_node| {
+            let mut cursor = dependencies_node.walk();
 
-            for index in 0..dependencies_node.child_count() {
-              let Some(node) = dependencies_node.child(index) else {
-                continue;
-              };
-
-              match node.kind() {
-                "&&" => {
-                  phase = DependencyPhase::Subsequent;
+            dependencies_node
+              .children(&mut cursor)
+              .scan(DependencyPhase::Prior, |phase, node| {
+                if node.kind() == "&&" {
+                  *phase = DependencyPhase::Subsequent;
                 }
-                "dependency" => {
-                  let dependency_node = node;
 
-                  let Some(dependency_name_node) =
-                    dependency_node.child_by_field_name("name").or_else(|| {
-                      dependency_node
-                        .find("dependency_expression")
-                        .and_then(|node| node.child_by_field_name("name"))
-                    })
-                  else {
-                    continue;
-                  };
-
-                  let arguments = dependency_node
-                    .find("dependency_expression")
-                    .map(|dependency_expression_node| {
-                      let mut cursor = dependency_expression_node.walk();
-
-                      dependency_expression_node
-                        .named_children(&mut cursor)
-                        .filter_map(|argument_node| {
-                          match argument_node.kind() {
-                            "expression" => Some(DependencyArgument {
-                              value: self.get_node_text(&argument_node),
-                              range: self.get_range(&argument_node),
-                              starred: None,
-                            }),
-                            "starred_dependency_argument" => {
-                              let value_node = argument_node
-                                .child_by_field_name("argument")?;
-
-                              Some(DependencyArgument {
-                                value: self.get_node_text(&value_node),
-                                range: self.get_range(&value_node),
-                                starred: argument_node
-                                  .child_by_field_name("star")
-                                  .map(|node| self.get_range(&node)),
-                              })
-                            }
-                            _ => None,
-                          }
-                        })
-                        .collect()
-                    })
-                    .unwrap_or_default();
-
-                  let mapped = dependency_node
-                    .find("dependency_expression")
-                    .and_then(|dependency_expression_node| {
-                      dependency_expression_node
-                        .child_by_field_name("map")
-                        .map(|node| self.get_range(&node))
-                    });
-
-                  dependencies.push(Dependency {
-                    name: TextNode {
-                      range: self.get_range(&dependency_name_node),
-                      value: self.get_node_text(&dependency_name_node),
-                    },
-                    arguments,
-                    mapped,
-                    phase,
-                    range: self.get_range(&dependency_node),
-                  });
-                }
-                _ => {}
-              }
-            }
-
-            dependencies
-          })
-          .unwrap_or_default();
+                Some((node, *phase))
+              })
+              .filter(|(node, _)| node.kind() == "dependency")
+              .filter_map(|(node, phase)| {
+                Dependency::from_node(&node, self, phase)
+              })
+              .collect()
+          });
 
         let parameters = recipe_node
           .find("recipe_header > parameters")
