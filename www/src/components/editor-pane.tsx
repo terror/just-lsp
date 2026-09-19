@@ -17,7 +17,7 @@ import { createHoverExtension } from '@/lib/extensions/hover';
 import { createSyntaxHighlightExtension } from '@/lib/extensions/syntax-highlight';
 import { samples } from '@/lib/samples';
 import { EditorState, Extension } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
 import CodeMirror from '@uiw/react-codemirror';
 import { useMemo } from 'react';
@@ -31,6 +31,7 @@ interface EditorPaneProps {
   value: string;
   onChange: (value: string) => void;
   onCreateEditor: (view: EditorView) => void;
+  onUpdate: (update: ViewUpdate) => void;
   onReset: () => void;
   sample: string;
   onSampleChange: (name: string) => void;
@@ -43,6 +44,7 @@ export const EditorPane = ({
   value,
   onChange,
   onCreateEditor,
+  onUpdate,
   onReset,
   sample,
   onSampleChange,
@@ -140,6 +142,7 @@ export const EditorPane = ({
             basicSetup={basicSetup}
             onChange={onChange}
             onCreateEditor={onCreateEditor}
+            onUpdate={onUpdate}
             height='100%'
             style={{ height: '100%' }}
           />

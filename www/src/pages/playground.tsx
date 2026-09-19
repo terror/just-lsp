@@ -5,7 +5,8 @@ import {
 } from '@/components/ui/resizable';
 import { highlightEffect } from '@/lib/extensions/highlight';
 import { getSample, samples } from '@/lib/samples';
-import { EditorView } from '@codemirror/view';
+import type { EditorState } from '@codemirror/state';
+import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { Loader2 } from 'lucide-react';
 import {
   useCallback,
@@ -14,11 +15,13 @@ import {
   useEffectEvent,
   useLayoutEffect,
   useRef,
+  useState,
 } from 'react';
 import { useDefaultLayout, useGroupRef } from 'react-resizable-panels';
 
 import { EditorPane } from '../components/editor-pane';
 import { Header } from '../components/header';
+import { StatusBar } from '../components/status-bar';
 import { TreePane } from '../components/tree-pane';
 import { useMediaQuery } from '../hooks/use-media-query';
 import { usePersistedState } from '../hooks/use-persisted-state';
@@ -73,6 +76,11 @@ const PlaygroundEditor = ({
   const treeDoc = useDeferredValue(code);
 
   const editorRef = useRef<EditorView | null>(null);
+  const [editorState, setEditorState] = useState<EditorState>();
+
+  const handleEditorUpdate = useCallback((update: ViewUpdate) => {
+    setEditorState(update.state);
+  }, []);
 
   const handleHighlightChange = useCallback(
     (range: { from: number; to: number } | undefined) => {
@@ -104,44 +112,49 @@ const PlaygroundEditor = ({
       <Header theme={theme} />
 
       <div className='flex-1 overflow-hidden p-4'>
-        <ResizablePanelGroup
-          defaultLayout={defaultLayout}
-          groupRef={groupRef}
-          onLayoutChanged={onLayoutChanged}
-          orientation={panelDirection}
-          className='h-full rounded border'
-        >
-          <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
-            <EditorPane
-              analysis={analysis}
-              value={code}
-              onChange={setCode}
-              onCreateEditor={(editor) => {
-                editorRef.current = editor;
-              }}
-              onReset={() => setCode(sample.code)}
-              sample={sample.name}
-              onSampleChange={onSampleChange}
-              language={language}
-              darkMode={theme.darkMode}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle />
-
-          <ResizablePanel
-            id='tree-panel'
-            defaultSize='50%'
-            minSize='30%'
-            collapsible
+        <div className='flex h-full flex-col overflow-hidden rounded border'>
+          <ResizablePanelGroup
+            defaultLayout={defaultLayout}
+            groupRef={groupRef}
+            onLayoutChanged={onLayoutChanged}
+            orientation={panelDirection}
+            className='min-h-0 flex-1'
           >
-            <TreePane
-              language={language}
-              code={treeDoc}
-              onHighlightChange={handleHighlightChange}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            <ResizablePanel id='editor-panel' defaultSize='50%' minSize='30%'>
+              <EditorPane
+                analysis={analysis}
+                value={code}
+                onChange={setCode}
+                onCreateEditor={(editor) => {
+                  editorRef.current = editor;
+                  setEditorState(editor.state);
+                }}
+                onUpdate={handleEditorUpdate}
+                onReset={() => setCode(sample.code)}
+                sample={sample.name}
+                onSampleChange={onSampleChange}
+                language={language}
+                darkMode={theme.darkMode}
+              />
+            </ResizablePanel>
+
+            <ResizableHandle />
+
+            <ResizablePanel
+              id='tree-panel'
+              defaultSize='50%'
+              minSize='30%'
+              collapsible
+            >
+              <TreePane
+                language={language}
+                code={treeDoc}
+                onHighlightChange={handleHighlightChange}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+          <StatusBar state={editorState} />
+        </div>
       </div>
     </div>
   );
