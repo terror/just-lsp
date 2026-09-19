@@ -13,17 +13,21 @@ import { RotateCcw } from 'lucide-react';
 
 interface EditorResetDialogProps {
   onReset: () => void;
+  sample: string;
 }
 
-export const EditorResetDialog = ({ onReset }: EditorResetDialogProps) => (
+export const EditorResetDialog = ({
+  onReset,
+  sample,
+}: EditorResetDialogProps) => (
   <Dialog>
     <DialogTrigger asChild>
       <Button
         variant='ghost'
         size='icon'
         className='h-7 w-7 cursor-pointer'
-        aria-label='Reset to default justfile'
-        title='Reset to default justfile'
+        aria-label={`Reset to ${sample} sample`}
+        title={`Reset to ${sample} sample`}
       >
         <RotateCcw className='h-4 w-4' aria-hidden='true' />
       </Button>
@@ -32,8 +36,8 @@ export const EditorResetDialog = ({ onReset }: EditorResetDialogProps) => (
       <DialogHeader>
         <DialogTitle>Reset editor?</DialogTitle>
         <DialogDescription>
-          This will replace your current editor contents with the default
-          justfile.
+          This will replace your current editor contents with the {sample}{' '}
+          sample justfile.
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>
