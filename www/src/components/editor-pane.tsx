@@ -67,7 +67,6 @@ export const EditorPane = ({
 
   const extensions = useMemo(() => {
     const extensions: Extension[] = [
-      darkMode ? base16SetiDarkTheme : base16SetiLightTheme,
       EditorState.tabSize.of(settings.tabSize),
       ...analysisExtensions,
       syntaxHighlighting,
@@ -89,7 +88,6 @@ export const EditorPane = ({
     settings.lineWrapping,
     syntaxHighlighting,
     analysisExtensions,
-    darkMode,
   ]);
 
   return (
@@ -108,6 +106,7 @@ export const EditorPane = ({
         >
           <CodeMirror
             value={value}
+            theme={darkMode ? base16SetiDarkTheme : base16SetiLightTheme}
             extensions={extensions}
             basicSetup={basicSetup}
             onChange={onChange}
