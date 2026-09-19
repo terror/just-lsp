@@ -37,6 +37,7 @@ struct Diagnostic {
   end_line: u32,
   id: String,
   message: String,
+  quickfixes: Vec<Quickfix>,
   severity: Severity,
   start_character: u32,
   start_line: u32,
@@ -50,6 +51,24 @@ struct Hover {
   end_character: u32,
   end_line: u32,
   markdown: bool,
+  start_character: u32,
+  start_line: u32,
+}
+
+#[derive(Serialize)]
+#[typeshare]
+struct Quickfix {
+  edits: Vec<TextEdit>,
+  title: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[typeshare]
+struct TextEdit {
+  end_character: u32,
+  end_line: u32,
+  new_text: String,
   start_character: u32,
   start_line: u32,
 }
@@ -73,6 +92,24 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
       end_line: diagnostic.range.end.line,
       id: diagnostic.id,
       message: diagnostic.message,
+      quickfixes: diagnostic
+        .quickfixes
+        .into_iter()
+        .map(|quickfix| Quickfix {
+          edits: quickfix
+            .edits()
+            .iter()
+            .map(|edit| TextEdit {
+              end_character: edit.range.end.character,
+              end_line: edit.range.end.line,
+              new_text: edit.new_text.clone(),
+              start_character: edit.range.start.character,
+              start_line: edit.range.start.line,
+            })
+            .collect(),
+          title: quickfix.title().into(),
+        })
+        .collect(),
       severity: diagnostic.severity.into(),
       start_character: diagnostic.range.start.character,
       start_line: diagnostic.range.start.line,
