@@ -116,7 +116,12 @@ const PlaygroundEditor = ({ analysis, language }: PlaygroundRuntime) => {
 
           <ResizableHandle />
 
-          <ResizablePanel id='tree-panel' defaultSize='50%' minSize='30%'>
+          <ResizablePanel
+            id='tree-panel'
+            defaultSize='50%'
+            minSize='30%'
+            collapsible
+          >
             <TreePane
               language={language}
               code={treeDoc}
