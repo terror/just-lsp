@@ -1,0 +1,139 @@
+name: PyPI
+
+on:
+  pull_request:
+    paths:
+    - .github/workflows/pypi.yaml
+    - Cargo.lock
+    - Cargo.toml
+    - build.rs
+    - pyproject.toml
+    - tests/pypi.py
+    - vendor/**
+  push:
+    tags:
+    - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: aarch64-apple-darwin
+          os: macos-latest
+        - target: x86_64-apple-darwin
+          os: macos-15-intel
+        - target: aarch64-pc-windows-msvc
+          os: windows-11-arm
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+        - target: aarch64-unknown-linux-gnu
+          os: ubuntu-24.04-arm
+          manylinux: '2014'
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+          manylinux: '2014'
+        - target: aarch64-unknown-linux-musl
+          os: ubuntu-24.04-arm
+          manylinux: musllinux_1_2
+        - target: x86_64-unknown-linux-musl
+          os: ubuntu-latest
+          manylinux: musllinux_1_2
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Build wheel
+      uses: PyO3/maturin-action@v1
+      with:
+        maturin-version: v1.15.0
+        target: ${{ matrix.target }}
+        manylinux: ${{ matrix.manylinux }}
+        args: --release --locked --out dist
+
+    - name: Test wheel
+      if: ${{ !contains(matrix.target, 'musl') }}
+      run: |
+        python -m pip install --no-index --find-links dist just-lsp
+        python tests/pypi.py
+
+    - name: Test musllinux wheel
+      if: ${{ contains(matrix.target, 'musl') }}
+      run: >-
+        docker run --rm --volume "$PWD:/io" --workdir /io python:3.12-alpine
+        sh -c 'pip install --no-index --find-links dist just-lsp && python tests/pypi.py'
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: wheels-${{ matrix.target }}
+        path: dist/*.whl
+        if-no-files-found: error
+
+  sdist:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Check release version
+      if: ${{ github.event_name == 'push' }}
+      run: |
+        python -c 'import os, tomllib; assert tomllib.load(open("Cargo.toml", "rb"))["package"]["version"] == os.environ["GITHUB_REF_NAME"]'
+
+    - name: Build source distribution
+      uses: PyO3/maturin-action@v1
+      with:
+        maturin-version: v1.15.0
+        command: sdist
+        args: --out dist
+
+    - name: Test source distribution
+      run: |
+        python -m pip install dist/*.tar.gz
+        python tests/pypi.py
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+        if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+    needs:
+    - wheels
+    - sdist
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/just-lsp/
+
+    permissions:
+      id-token: write
+
+    steps:
+    - uses: actions/download-artifact@v8
+      with:
+        path: dist
+        merge-multiple: true
+
+    - uses: pypa/gh-action-pypi-publish@v1.14.2
