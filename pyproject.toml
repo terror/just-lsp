@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "just-lsp"
+requires-python = ">=3.8"
+dynamic = ["version", "description", "readme", "authors", "license", "keywords", "urls"]
+classifiers = [
+  "Programming Language :: Rust",
+  "Topic :: Text Editors :: Integrated Development Environments (IDE)",
+]
+
+[tool.maturin]
+bindings = "bin"
+strip = true
