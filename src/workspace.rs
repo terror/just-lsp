@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, Default)]
 pub struct Workspace {
+  config: Config,
   documents: DocumentStore,
   projects: HashMap<lsp::Url, Project>,
 }
@@ -20,7 +21,6 @@ impl Workspace {
   fn analyze_document(
     &self,
     document: &Document,
-    config: Option<&Config>,
     projects: &[&Project],
   ) -> Vec<Diagnostic> {
     let analyses = projects
@@ -28,7 +28,7 @@ impl Workspace {
       .filter(|project| project.import_scope.contains(&document.uri))
       .map(|project| {
         Analyzer {
-          config,
+          config: Some(&self.config),
           view: ProjectView::new(
             document,
             &project.import_scope,
@@ -146,10 +146,12 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn diagnostics(
-    &self,
-    config: Option<&Config>,
-  ) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
+  pub fn config(&self) -> &Config {
+    &self.config
+  }
+
+  #[must_use]
+  pub fn diagnostics(&self) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
     let projects = self.root_projects();
 
     projects
@@ -162,7 +164,7 @@ impl Workspace {
       .map(|document| {
         (
           document.uri.clone(),
-          self.analyze_document(document, config, &projects),
+          self.analyze_document(document, &projects),
         )
       })
       .collect()
@@ -174,13 +176,9 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn document_diagnostics(
-    &self,
-    uri: &lsp::Url,
-    config: Option<&Config>,
-  ) -> Vec<Diagnostic> {
+  pub fn document_diagnostics(&self, uri: &lsp::Url) -> Vec<Diagnostic> {
     self.documents.get(uri).map_or_else(Vec::new, |document| {
-      self.analyze_document(document, config, &self.root_projects())
+      self.analyze_document(document, &self.root_projects())
     })
   }
 
@@ -284,6 +282,10 @@ impl Workspace {
     projects.sort_by_key(|project| &project.root);
 
     projects
+  }
+
+  pub fn set_config(&mut self, config: Config) {
+    self.config = config;
   }
 }
 

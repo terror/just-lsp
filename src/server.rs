@@ -2,7 +2,6 @@ use super::*;
 
 pub(crate) struct Server {
   client: Client,
-  config: RwLock<Config>,
   diagnostics: Mutex<BTreeMap<lsp::Url, lsp::PublishDiagnosticsParams>>,
   executor: Executor,
   initialized: AtomicBool,
@@ -75,7 +74,6 @@ impl Server {
 
     Self {
       client,
-      config: RwLock::new(Config::default()),
       diagnostics: Mutex::new(BTreeMap::new()),
       executor,
       initialized: AtomicBool::new(false),
@@ -91,11 +89,10 @@ impl Server {
     let mut previous = self.diagnostics.lock().await;
 
     let diagnostics = {
-      let config = self.config.read().await;
       let workspace = self.workspace.read().await;
 
       workspace
-        .diagnostics(Some(&config))
+        .diagnostics()
         .into_iter()
         .map(|(uri, diagnostics)| {
           let version = workspace
@@ -194,8 +191,6 @@ impl LanguageServer for Server {
       serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
     }
 
-    let config = self.config.read().await;
-
     let workspace = self.workspace.read().await;
 
     let Some(document) = workspace.open_document(&params.text_document.uri)
@@ -230,7 +225,7 @@ impl LanguageServer for Server {
     }
 
     let diagnostics = workspace
-      .document_diagnostics(&params.text_document.uri, Some(&config))
+      .document_diagnostics(&params.text_document.uri)
       .into_iter()
       .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
       .collect::<Vec<_>>();
@@ -628,8 +623,6 @@ impl LanguageServer for Server {
     &self,
     params: lsp::DocumentFormattingParams,
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
-    let config = self.config.read().await;
-
     let workspace = self.workspace.read().await;
 
     let Some(document) = workspace.open_document(&params.text_document.uri)
@@ -639,7 +632,7 @@ impl LanguageServer for Server {
 
     let content = document.content.to_string();
 
-    match document.format(&config.formatting) {
+    match document.format(&workspace.config().formatting) {
       Ok(formatted) if formatted == content => Ok(Some(vec![])),
       Ok(formatted) => {
         let end = document
@@ -731,7 +724,7 @@ impl LanguageServer for Server {
 
     if let Some(options) = params.initialization_options {
       match serde_json::from_value::<Config>(options) {
-        Ok(config) => *self.config.write().await = config,
+        Ok(config) => self.workspace.write().await.set_config(config),
         Err(error) => {
           warn!(%error, "failed to parse initialization options");
         }
@@ -3195,6 +3188,55 @@ mod tests {
   #[tokio::test]
   async fn initialize() -> Result {
     Test::new().initialize().run().await
+  }
+
+  #[tokio::test]
+  async fn initialize_configures_workspace() -> Result {
+    let (service, _) = LspService::new(Server::new);
+
+    let server = service.inner();
+
+    server
+      .initialize(lsp::InitializeParams {
+        initialization_options: Some(json!({
+          "formatting": { "indentation": "\t" },
+          "rules": { "unresolved-dependency": "off" },
+        })),
+        ..Default::default()
+      })
+      .await?;
+
+    let mut workspace = server.workspace.write().await;
+
+    assert_eq!(
+      workspace.config().formatting,
+      FormattingConfig {
+        indentation: Some("\t".into()),
+      },
+    );
+
+    let uri = lsp::Url::parse("file:///foo.just")?;
+
+    workspace.open(lsp::DidOpenTextDocumentParams {
+      text_document: lsp::TextDocumentItem::new(
+        uri.clone(),
+        "just".into(),
+        1,
+        "foo: bar\n".into(),
+      ),
+    })?;
+
+    assert_eq!(
+      workspace.diagnostics(),
+      BTreeMap::from([(uri.clone(), Vec::new())]),
+    );
+
+    assert_eq!(
+      workspace.document_diagnostics(&uri),
+      Vec::<Diagnostic>::new()
+    );
+
+    Ok(())
   }
 
   #[tokio::test]

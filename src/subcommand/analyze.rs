@@ -48,7 +48,7 @@ impl Analyze {
         error => anyhow!(error),
       })?;
 
-    let diagnostics = workspace.diagnostics(None);
+    let diagnostics = workspace.diagnostics();
 
     let any_error = diagnostics.values().flatten().any(|diagnostic| {
       matches!(diagnostic.severity, lsp::DiagnosticSeverity::ERROR)
