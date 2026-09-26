@@ -34,8 +34,7 @@ impl Analyze {
     let mut workspace = Workspace::default();
 
     workspace
-      .documents
-      .load(&uri)
+      .load_project(uri.clone())
       .map_err(|error| match error {
         just_lsp::Error::Io(error) => match error.kind() {
           io::ErrorKind::NotFound => {
@@ -49,8 +48,6 @@ impl Analyze {
         error => anyhow!(error),
       })?;
 
-    workspace.load_project(uri.clone())?;
-
     let diagnostics = workspace.diagnostics(None);
 
     let any_error = diagnostics.values().flatten().any(|diagnostic| {
@@ -62,7 +59,7 @@ impl Analyze {
         continue;
       }
 
-      let document = workspace.documents.get(&document_uri).unwrap();
+      let document = workspace.document(&document_uri).unwrap();
 
       let content = document.content.to_string();
 
