@@ -99,8 +99,7 @@ impl Server {
         .into_iter()
         .map(|(uri, diagnostics)| {
           let version = workspace
-            .documents
-            .get_open(&uri)
+            .open_document(&uri)
             .map(|document| document.version);
 
           let params = lsp::PublishDiagnosticsParams {
@@ -158,22 +157,11 @@ impl Server {
     &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let uri = params.text_document.uri.clone();
+    let changed = self.workspace.write().await.change(params)?;
 
-    {
-      let mut workspace = self.workspace.write().await;
-
-      if !workspace.documents.is_open(&uri) {
-        return Ok(());
-      }
-
-      let roots = workspace.affected_roots(&uri);
-
-      workspace.documents.change(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
+    if changed {
+      self.publish_diagnostics().await;
     }
-
-    self.publish_diagnostics().await;
 
     Ok(())
   }
@@ -182,17 +170,7 @@ impl Server {
     &self,
     params: lsp::DidOpenTextDocumentParams,
   ) -> Result {
-    let uri = params.text_document.uri.clone();
-
-    {
-      let mut workspace = self.workspace.write().await;
-      let mut roots = workspace.affected_roots(&uri);
-
-      roots.insert(uri.clone());
-
-      workspace.documents.open(params)?;
-      workspace.load_projects(roots.iter().cloned())?;
-    }
+    self.workspace.write().await.open(params)?;
 
     self.publish_diagnostics().await;
 
@@ -220,8 +198,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    let Some(document) =
-      workspace.documents.get_open(&params.text_document.uri)
+    let Some(document) = workspace.open_document(&params.text_document.uri)
     else {
       return Ok(None);
     };
@@ -276,7 +253,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.documents.get_open(uri) {
+    if let Some(document) = workspace.open_document(uri) {
       let mut lenses = Vec::new();
 
       for recipe in document.recipes() {
@@ -320,7 +297,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.documents.get_open(&uri) {
+    if let Some(document) = workspace.open_document(&uri) {
       let mut completion_items = Vec::new();
 
       let recipes = document.recipes();
@@ -403,24 +380,10 @@ impl LanguageServer for Server {
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    let uri = params.text_document.uri.clone();
-
-    {
-      let mut workspace = self.workspace.write().await;
-      let mut roots = workspace.affected_roots(&uri);
-
-      let closed = workspace.documents.close(&params);
-
-      if !closed {
-        return;
-      }
-
-      if workspace.documents.get(&uri).is_none() {
-        workspace.projects.remove(&uri);
-        roots.remove(&uri);
-      }
-
-      if let Err(error) = workspace.load_projects(roots.iter().cloned()) {
+    match self.workspace.write().await.close(&params) {
+      Ok(false) => return,
+      Ok(true) => {}
+      Err(error) => {
         warn!(%error, "failed to rebuild affected projects");
       }
     }
@@ -447,7 +410,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.documents.get_open(&uri).and_then(|document| {
+    Ok(workspace.open_document(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -474,13 +437,13 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    let Some(document) = workspace.documents.get_open(uri) else {
+    let Some(document) = workspace.open_document(uri) else {
       return Ok(None);
     };
 
     let mut links = Vec::new();
 
-    if let Some(project) = workspace.projects.get(uri) {
+    if let Some(project) = workspace.project(uri) {
       for dependency in project.dependencies(uri) {
         if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
           links.push(lsp::DocumentLink {
@@ -522,7 +485,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.documents.get_open(uri) {
+    if let Some(document) = workspace.open_document(uri) {
       let mut symbols = Vec::new();
 
       for recipe in document.recipes() {
@@ -627,7 +590,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.documents.get_open(uri) {
+    if let Some(document) = workspace.open_document(uri) {
       let recipes = document.recipes();
 
       let folding_ranges = recipes
@@ -669,8 +632,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    let Some(document) =
-      workspace.documents.get_open(&params.text_document.uri)
+    let Some(document) = workspace.open_document(&params.text_document.uri)
     else {
       return Ok(None);
     };
@@ -717,8 +679,7 @@ impl LanguageServer for Server {
     let workspace = self.workspace.read().await;
 
     if let Some(target) = workspace
-      .projects
-      .get(&uri)
+      .project(&uri)
       .and_then(|project| project.dependency_at(&uri, position))
       .and_then(|dependency| match &dependency.target {
         ProjectDependencyTarget::Resolved(target) => Some(target),
@@ -808,7 +769,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.documents.get_open(uri).and_then(|document| {
+    Ok(workspace.open_document(uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -838,7 +799,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.documents.get_open(&uri).and_then(|document| {
+    Ok(workspace.open_document(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -860,7 +821,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.documents.get_open(&uri).and_then(|document| {
+    Ok(workspace.open_document(&uri).and_then(|document| {
       let resolver = Resolver::new(document);
 
       document
@@ -898,7 +859,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.documents.get_open(&uri) {
+    if let Some(document) = workspace.open_document(&uri) {
       let tokenizer = Tokenizer::new(document);
 
       match tokenizer.tokenize() {

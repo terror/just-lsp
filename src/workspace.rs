@@ -2,13 +2,13 @@ use super::*;
 
 #[derive(Debug, Default)]
 pub struct Workspace {
-  pub documents: DocumentStore,
-  pub projects: HashMap<lsp::Url, Project>,
+  documents: DocumentStore,
+  projects: HashMap<lsp::Url, Project>,
 }
 
 impl Workspace {
   #[must_use]
-  pub fn affected_roots(&self, uri: &lsp::Url) -> HashSet<lsp::Url> {
+  fn affected_roots(&self, uri: &lsp::Url) -> HashSet<lsp::Url> {
     self
       .projects
       .iter()
@@ -88,6 +88,63 @@ impl Workspace {
     diagnostics
   }
 
+  /// Applies changes to an open document and rebuilds affected projects.
+  ///
+  /// Returns `false` if the document is not open.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the changed document cannot be parsed or an
+  /// affected project root cannot be loaded.
+  pub fn change(
+    &mut self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result<bool> {
+    let uri = &params.text_document.uri;
+
+    if !self.documents.is_open(uri) {
+      return Ok(false);
+    }
+
+    let roots = self.affected_roots(uri);
+
+    self.documents.change(params)?;
+
+    self.load_projects(roots)?;
+
+    Ok(true)
+  }
+
+  /// Closes a document and rebuilds affected projects.
+  ///
+  /// Restores the document from disk, or removes it if it cannot be loaded.
+  /// Returns `false` if the document is not open.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if an affected project root cannot be loaded.
+  pub fn close(
+    &mut self,
+    params: &lsp::DidCloseTextDocumentParams,
+  ) -> Result<bool> {
+    let uri = &params.text_document.uri;
+
+    let mut roots = self.affected_roots(uri);
+
+    if !self.documents.close(params) {
+      return Ok(false);
+    }
+
+    if self.documents.get(uri).is_none() {
+      self.projects.remove(uri);
+      roots.remove(uri);
+    }
+
+    self.load_projects(roots)?;
+
+    Ok(true)
+  }
+
   #[must_use]
   pub fn diagnostics(
     &self,
@@ -109,6 +166,11 @@ impl Workspace {
         )
       })
       .collect()
+  }
+
+  #[must_use]
+  pub fn document(&self, uri: &lsp::Url) -> Option<&Document> {
+    self.documents.get(uri)
   }
 
   #[must_use]
@@ -136,7 +198,7 @@ impl Workspace {
   /// # Errors
   ///
   /// Returns an [`Error`] if a project root cannot be loaded.
-  pub fn load_projects(
+  fn load_projects(
     &mut self,
     roots: impl IntoIterator<Item = lsp::Url>,
   ) -> Result {
@@ -160,6 +222,32 @@ impl Workspace {
     });
 
     Ok(())
+  }
+
+  /// Opens a document and rebuilds its project and affected projects.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if the opened document cannot be parsed or a
+  /// project root cannot be loaded.
+  pub fn open(&mut self, params: lsp::DidOpenTextDocumentParams) -> Result {
+    let mut roots = self.affected_roots(&params.text_document.uri);
+
+    roots.insert(params.text_document.uri.clone());
+
+    self.documents.open(params)?;
+
+    self.load_projects(roots)
+  }
+
+  #[must_use]
+  pub fn open_document(&self, uri: &lsp::Url) -> Option<&Document> {
+    self.documents.get_open(uri)
+  }
+
+  #[must_use]
+  pub fn project(&self, uri: &lsp::Url) -> Option<&Project> {
+    self.projects.get(uri)
   }
 
   #[must_use]
@@ -204,8 +292,130 @@ mod tests {
   use {super::*, pretty_assertions::assert_eq};
 
   #[test]
+  fn change_ignores_closed_document() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let root = tempdir.path().join("justfile");
+
+    fs::write(&root, "foo:").unwrap();
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+
+    let mut workspace = Workspace::default();
+
+    workspace.load_project(root.clone()).unwrap();
+
+    assert!(
+      !workspace
+        .change(lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: root.clone(),
+            version: 1,
+          },
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: "bar:".into(),
+          }],
+        })
+        .unwrap()
+    );
+
+    assert_eq!(
+      workspace.document(&root).unwrap().content.to_string(),
+      "foo:",
+    );
+
+    assert!(workspace.open_document(&root).is_none());
+
+    assert_eq!(
+      workspace.projects.keys().collect::<HashSet<_>>(),
+      HashSet::from([&root]),
+    );
+  }
+
+  #[test]
+  fn change_ignores_unknown_document() {
+    let uri = lsp::Url::parse("file:///foo.just").unwrap();
+
+    let mut workspace = Workspace::default();
+
+    assert!(
+      !workspace
+        .change(lsp::DidChangeTextDocumentParams {
+          text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: uri.clone(),
+            version: 1,
+          },
+          content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: "bar:".into(),
+          }],
+        })
+        .unwrap()
+    );
+
+    assert!(workspace.document(&uri).is_none());
+    assert!(workspace.projects.is_empty());
+  }
+
+  #[test]
+  fn close_ignores_closed_document() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let root = tempdir.path().join("justfile");
+    fs::write(&root, "foo:").unwrap();
+
+    let root = lsp::Url::from_file_path(root).unwrap();
+
+    let mut workspace = Workspace::default();
+
+    workspace.load_project(root.clone()).unwrap();
+
+    assert!(
+      !workspace
+        .close(&lsp::DidCloseTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier { uri: root.clone() },
+        })
+        .unwrap()
+    );
+
+    assert_eq!(
+      workspace.document(&root).unwrap().content.to_string(),
+      "foo:",
+    );
+
+    assert!(workspace.open_document(&root).is_none());
+
+    assert_eq!(
+      workspace.projects.keys().collect::<HashSet<_>>(),
+      HashSet::from([&root]),
+    );
+  }
+
+  #[test]
+  fn close_ignores_unknown_document() {
+    let uri = lsp::Url::parse("file:///foo.just").unwrap();
+
+    let mut workspace = Workspace::default();
+
+    assert!(
+      !workspace
+        .close(&lsp::DidCloseTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier { uri: uri.clone() },
+        })
+        .unwrap()
+    );
+
+    assert!(workspace.document(&uri).is_none());
+    assert!(workspace.projects.is_empty());
+  }
+
+  #[test]
   fn unloaded_projects_reload_imports() {
     let tempdir = tempfile::tempdir().unwrap();
+
     let root = tempdir.path().join("justfile");
     let imported = tempdir.path().join("foo.just");
 
@@ -213,24 +423,39 @@ mod tests {
     fs::write(&imported, "foo:").unwrap();
 
     let root = lsp::Url::from_file_path(root).unwrap();
+
     let mut workspace = Workspace::default();
 
-    workspace.load_project(root.clone()).unwrap();
-    workspace.load_projects([]).unwrap();
+    let params = lsp::DidOpenTextDocumentParams {
+      text_document: lsp::TextDocumentItem {
+        uri: root.clone(),
+        language_id: "just".into(),
+        version: 1,
+        text: "import 'foo.just'".into(),
+      },
+    };
+
+    workspace.open(params.clone()).unwrap();
+
+    assert!(
+      workspace
+        .close(&lsp::DidCloseTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier { uri: root.clone() },
+        })
+        .unwrap()
+    );
+
+    assert!(workspace.projects.is_empty());
+    assert!(workspace.document(&root).is_none());
 
     fs::write(&imported, "bar:").unwrap();
 
-    workspace.load_project(root).unwrap();
+    workspace.open(params).unwrap();
 
     let imported = lsp::Url::from_file_path(imported).unwrap();
 
     assert_eq!(
-      workspace
-        .documents
-        .get(&imported)
-        .unwrap()
-        .content
-        .to_string(),
+      workspace.document(&imported).unwrap().content.to_string(),
       "bar:",
     );
   }
