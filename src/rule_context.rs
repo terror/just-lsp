@@ -2,7 +2,7 @@ use super::*;
 
 type BuiltinRef = &'static Builtin<'static>;
 
-pub(crate) struct RuleContext<'a> {
+pub(crate) struct RuleContext<'view, 'doc> {
   aliases: OnceLock<Vec<Located<Alias>>>,
   attributes: OnceLock<Vec<Attribute>>,
   builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
@@ -13,16 +13,16 @@ pub(crate) struct RuleContext<'a> {
   functions: OnceLock<Vec<Located<Function>>>,
   recipe_names: OnceLock<HashSet<String>>,
   recipes: OnceLock<Vec<Located<Recipe>>>,
-  scope: OnceLock<Scope<'a>>,
+  scope: OnceLock<Scope<'doc>>,
   settings: OnceLock<Vec<Located<Setting>>>,
   unexports: OnceLock<Vec<Located<Unexport>>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
   variables: OnceLock<Vec<Located<Variable>>>,
-  view: &'a ProjectView<'a>,
+  view: &'view ProjectView<'doc>,
 }
 
-impl<'a> RuleContext<'a> {
+impl<'view, 'doc> RuleContext<'view, 'doc> {
   pub(crate) fn aliases(&self) -> &[Located<Alias>] {
     self
       .aliases
@@ -192,7 +192,7 @@ impl<'a> RuleContext<'a> {
       .collect()
   }
 
-  pub(crate) fn document(&self) -> &'a Document {
+  pub(crate) fn document(&self) -> &'doc Document {
     self.view.document()
   }
 
@@ -244,7 +244,7 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn imported_documents(
     &self,
-  ) -> impl Iterator<Item = &'a Document> + '_ {
+  ) -> impl Iterator<Item = &'doc Document> + '_ {
     self
       .view
       .documents()
@@ -262,7 +262,7 @@ impl<'a> RuleContext<'a> {
   }
 
   #[must_use]
-  pub(crate) fn new(view: &'a ProjectView<'a>) -> Self {
+  pub(crate) fn new(view: &'view ProjectView<'doc>) -> Self {
     Self {
       aliases: OnceLock::new(),
       attributes: OnceLock::new(),
@@ -356,7 +356,7 @@ impl<'a> RuleContext<'a> {
       .as_slice()
   }
 
-  pub(crate) fn view(&self) -> &ProjectView<'a> {
+  pub(crate) fn view(&self) -> &ProjectView<'doc> {
     self.view
   }
 }
@@ -367,7 +367,7 @@ mod tests {
     super::*, indoc::indoc, pretty_assertions::assert_eq, tempfile::Builder,
   };
 
-  fn context(path: &Path, test: impl FnOnce(&RuleContext<'_>)) {
+  fn context(path: &Path, test: impl FnOnce(&RuleContext<'_, '_>)) {
     let uri = lsp::Url::from_file_path(path).unwrap();
 
     let mut documents = DocumentStore::default();
@@ -377,6 +377,7 @@ mod tests {
     test(&RuleContext::new(&ProjectView::new(
       documents.get(&uri).unwrap(),
       &project.import_scope,
+      &project,
       &documents,
     )));
   }
@@ -392,7 +393,9 @@ mod tests {
         .unwrap();
 
     let view = ProjectView {
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
+      context: None,
       document: &document,
       documents: vec![
         ProjectViewDocument {

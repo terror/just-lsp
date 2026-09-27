@@ -439,7 +439,9 @@ impl LanguageServer for Server {
     let mut links = Vec::new();
 
     if let Some(project) = workspace.project(uri) {
-      for dependency in project.dependencies(uri) {
+      for dependency in project.dependencies(uri).filter(|dependency| {
+        matches!(dependency.kind, ProjectDependencyKind::Import)
+      }) {
         if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
           links.push(lsp::DocumentLink {
             range: dependency.location,
@@ -1541,6 +1543,36 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn qualified_dependency_module_edits_republish_diagnostics() -> Result {
+    Test::new()
+      .file("child.just", "all:\n")
+      .ready()
+      .open("justfile", "[private]\nmod child\ncheck: child::all\n")
+      .diagnostics("justfile", Some(1), [])
+      .open("child.just", "other:\n")
+      .diagnostics("child.just", Some(1), [])
+      .diagnostics(
+        "justfile",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::error(
+            "Recipe `child::all` not found",
+            lsp::Range::at(2, 7, 2, 17),
+          )
+        }
+        .into()],
+      )
+      .change("child.just", 2, "all:\n")
+      .diagnostics("child.just", Some(2), [])
+      .diagnostics("justfile", Some(1), [])
+      .close("child.just")
+      .diagnostics("child.just", None, [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn dependency_open_republishes_root_diagnostics() -> Result {
     Test::new()
       .file("foo.just", "")
@@ -2590,6 +2622,33 @@ mod tests {
       )
       .run()
       .await
+  }
+
+  #[tokio::test]
+  async fn goto_module_definition() -> Result {
+    for (source, position) in [
+      ("mod child\n", lsp::Position::new(0, 5)),
+      ("mod child 'child.just'\n", lsp::Position::new(0, 12)),
+    ] {
+      let test = Test::new().file("child.just", "all:\n");
+      let target = test.uri("child.just");
+
+      test
+        .initialize()
+        .open("justfile", source)
+        .definition(
+          "justfile",
+          position,
+          Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+            uri: target,
+            range: lsp::Range::default(),
+          })),
+        )
+        .run()
+        .await?;
+    }
+
+    Ok(())
   }
 
   #[tokio::test]

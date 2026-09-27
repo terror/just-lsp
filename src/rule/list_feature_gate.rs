@@ -108,7 +108,7 @@ impl ListFeatureGateRule {
   }
 
   fn validate_node(
-    context: &RuleContext<'_>,
+    context: &RuleContext<'_, '_>,
     document: &Document,
     node: Node<'_>,
     diagnostics: &mut Vec<Diagnostic>,
