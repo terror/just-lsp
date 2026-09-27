@@ -15,7 +15,7 @@ for [just](https://github.com/casey/just), the command runner.
 [Documentation](https://www.just-lsp.systems/documentation) ·
 [Playground](https://www.just-lsp.systems/playground)
 
-<img width="1667" alt="demo" src="screenshot.png" />
+<img width="1667" alt="demo" src="https://raw.githubusercontent.com/terror/just-lsp/master/screenshot.png" />
 
 `just-lsp` brings rich editor support to your justfiles, including completions,
 hover docs, diagnostics, navigation, renaming, formatting, and running recipes.
