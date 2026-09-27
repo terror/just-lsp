@@ -11,11 +11,9 @@ define_rule! {
 
       let lists = context.setting_enabled("lists");
 
-      let recipes = context.view().resolved_recipes();
-
       for recipe in context.document().recipes() {
         for dependency in &recipe.dependencies {
-          if let Some(recipe) = recipes.get(&dependency.name.value) {
+          if let Some(recipe) = context.view().find_recipe(&dependency.name.value) {
             let parameters = &recipe.parameters;
 
             let required_parameters = parameters
