@@ -22,7 +22,7 @@ macro_rules! define_rule {
         $message
       }
 
-      fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
+      fn run(&self, $context: &RuleContext<'_, '_>) -> Vec<Diagnostic> {
         $body
       }
     }
@@ -100,5 +100,5 @@ pub(crate) trait Rule: Sync {
   fn message(&self) -> &'static str;
 
   /// Execute the rule and return diagnostics.
-  fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
+  fn run(&self, context: &RuleContext<'_, '_>) -> Vec<Diagnostic>;
 }

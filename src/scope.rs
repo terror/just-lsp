@@ -16,7 +16,7 @@ pub(crate) struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-  pub(crate) fn analyze(context: &RuleContext<'a>) -> Self {
+  pub(crate) fn analyze(context: &RuleContext<'_, 'a>) -> Self {
     let mut scope = Self::new(context);
 
     scope.walk_document(context.document(), true);
@@ -28,7 +28,7 @@ impl<'a> Scope<'a> {
     scope
   }
 
-  fn new(context: &RuleContext<'a>) -> Self {
+  fn new(context: &RuleContext<'_, 'a>) -> Self {
     Self {
       document: context.document(),
       globals: context.variable_and_builtin_names().clone(),

@@ -145,6 +145,48 @@ mod tests {
   }
 
   #[test]
+  fn qualified_dependency_argument_counts() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+      dir.path().join("child.just"),
+      "all value:\n  echo {{value}}\n",
+    )
+    .unwrap();
+    let root = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+
+    for (dependency, expected) in [
+      (
+        "child::all",
+        Some("Dependency `child::all` requires 1 argument, but 0 provided"),
+      ),
+      ("(child::all 'a')", None),
+      ("(child :: all 'a')", None),
+      (
+        "(child::all 'a' 'b')",
+        Some("Dependency `child::all` accepts 1 argument, but 2 provided"),
+      ),
+    ] {
+      fs::write(
+        dir.path().join("justfile"),
+        format!("mod child\ncheck: {dependency}\n"),
+      )
+      .unwrap();
+      let mut workspace = Workspace::default();
+      workspace.load_project(root.clone()).unwrap();
+      let diagnostics = workspace.document_diagnostics(&root);
+
+      assert_eq!(
+        diagnostics
+          .iter()
+          .map(|diagnostic| diagnostic.message.as_str())
+          .collect::<Vec<_>>(),
+        expected.into_iter().collect::<Vec<_>>(),
+        "{dependency}",
+      );
+    }
+  }
+
+  #[test]
   fn accepts_logical_operators_with_lists() {
     Test::new(indoc! {
       "

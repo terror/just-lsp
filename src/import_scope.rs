@@ -15,18 +15,10 @@ impl ImportScope {
     &self.documents
   }
 
-  pub(super) fn new(uri: lsp::Url) -> Self {
-    Self {
-      documents: vec![ImportScopeDocument { load_depth: 0, uri }],
-    }
-  }
-}
-
-impl From<&Project> for ImportScope {
-  fn from(project: &Project) -> Self {
+  pub(super) fn for_root(project: &Project, root: &lsp::Url) -> Self {
     let mut depths = HashMap::new();
 
-    let mut stack = vec![(0, project.root.clone())];
+    let mut stack = vec![(0, root.clone())];
 
     while let Some((depth, source)) = stack.pop() {
       if depths.contains_key(&source) {
@@ -35,7 +27,9 @@ impl From<&Project> for ImportScope {
 
       depths.insert(source.clone(), depth);
 
-      for dependency in project.dependencies(&source) {
+      for dependency in project.dependencies(&source).filter(|dependency| {
+        matches!(dependency.kind, ProjectDependencyKind::Import)
+      }) {
         if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
           stack.push((depth + 1, target.clone()));
         }
@@ -44,8 +38,8 @@ impl From<&Project> for ImportScope {
 
     let mut documents = Vec::new();
 
-    let mut seen = HashSet::from([project.root.clone()]);
-    let mut stack = vec![project.root.clone()];
+    let mut seen = HashSet::from([root.clone()]);
+    let mut stack = vec![root.clone()];
 
     while let Some(source) = stack.pop() {
       documents.push(ImportScopeDocument {
@@ -53,7 +47,9 @@ impl From<&Project> for ImportScope {
         uri: source.clone(),
       });
 
-      for dependency in project.dependencies(&source) {
+      for dependency in project.dependencies(&source).filter(|dependency| {
+        matches!(dependency.kind, ProjectDependencyKind::Import)
+      }) {
         let ProjectDependencyTarget::Resolved(target) = &dependency.target
         else {
           continue;
@@ -66,5 +62,17 @@ impl From<&Project> for ImportScope {
     }
 
     Self { documents }
+  }
+
+  pub(super) fn new(uri: lsp::Url) -> Self {
+    Self {
+      documents: vec![ImportScopeDocument { load_depth: 0, uri }],
+    }
+  }
+}
+
+impl From<&Project> for ImportScope {
+  fn from(project: &Project) -> Self {
+    Self::for_root(project, &project.root)
   }
 }

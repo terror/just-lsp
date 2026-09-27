@@ -2,8 +2,10 @@ use super::*;
 
 #[derive(Debug)]
 pub struct ProjectView<'a> {
+  pub(super) context: Option<(&'a Project, &'a DocumentStore)>,
   pub(super) document: &'a Document,
   pub(super) documents: Vec<ProjectViewDocument<'a>>,
+  pub(super) modules: OnceLock<HashMap<String, ProjectView<'a>>>,
   pub(super) recipes: OnceLock<HashMap<String, Located<Recipe>>>,
 }
 
@@ -55,8 +57,51 @@ impl<'a> ProjectView<'a> {
     self.resolved_functions().remove(name)
   }
 
+  fn find_module(&self, name: &str) -> Option<&Self> {
+    let (project, store) = self.context?;
+
+    self
+      .modules
+      .get_or_init(|| {
+        self
+          .declarations(
+            |document| {
+              project
+                .dependencies(&document.uri)
+                .filter_map(|dependency| match &dependency.kind {
+                  ProjectDependencyKind::Module { name } => {
+                    Some((name.as_str(), dependency))
+                  }
+                  ProjectDependencyKind::Import => None,
+                })
+                .collect()
+            },
+            |(name, _)| name,
+            |(_, dependency)| dependency.location.start,
+          )
+          .into_iter()
+          .filter_map(|(name, dependency)| {
+            let (_, dependency) = dependency.into_inner();
+            let ProjectDependencyTarget::Resolved(uri) = &dependency.target
+            else {
+              return None;
+            };
+            let scope = ImportScope::for_root(project, uri);
+            Some((name, Self::new(store.get(uri)?, &scope, project, store)))
+          })
+          .collect()
+      })
+      .get(name)
+  }
+
   #[must_use]
   pub fn find_recipe(&self, name: &str) -> Option<&Located<Recipe>> {
+    let name = name.trim();
+
+    if let Some((module, rest)) = name.split_once("::") {
+      return self.find_module(module.trim())?.find_recipe(rest);
+    }
+
     self.resolved_recipes().get(name)
   }
 
@@ -74,8 +119,9 @@ impl<'a> ProjectView<'a> {
   #[must_use]
   pub fn new(
     document: &'a Document,
-    import_scope: &'a ImportScope,
-    documents: &'a DocumentStore,
+    import_scope: &ImportScope,
+    project: &'a Project,
+    store: &'a DocumentStore,
   ) -> Self {
     let documents = import_scope
       .documents()
@@ -84,7 +130,7 @@ impl<'a> ProjectView<'a> {
         let scoped_document = if scope_document.uri == document.uri {
           document
         } else {
-          documents.get(&scope_document.uri)?
+          store.get(&scope_document.uri)?
         };
 
         Some(ProjectViewDocument {
@@ -95,8 +141,10 @@ impl<'a> ProjectView<'a> {
       .collect();
 
     Self {
+      context: Some((project, store)),
       document,
       documents,
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
     }
   }
@@ -125,11 +173,13 @@ impl<'a> ProjectView<'a> {
 impl<'a> From<&'a Document> for ProjectView<'a> {
   fn from(document: &'a Document) -> Self {
     Self {
+      context: None,
       document,
       documents: vec![ProjectViewDocument {
         document,
         load_depth: 0,
       }],
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
     }
   }
@@ -138,6 +188,92 @@ impl<'a> From<&'a Document> for ProjectView<'a> {
 #[cfg(test)]
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[test]
+  fn qualified_dependencies_resolve_without_leaking_module_scope() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("justfile"), "mod linting 'lint.just'\n")
+      .unwrap();
+    fs::write(
+      dir.path().join("lint.just"),
+      indoc! {
+        "
+        import 'shared.just'
+        mod nested 'nested.just'
+        all:
+        "
+      },
+    )
+    .unwrap();
+    fs::write(dir.path().join("shared.just"), "imported:\n").unwrap();
+    fs::write(dir.path().join("nested.just"), "leaf:\n").unwrap();
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+    let mut store = DocumentStore::default();
+    let project = ProjectLoader::load(&mut store, &uri).unwrap();
+    let document = store.get(&uri).unwrap();
+    let view =
+      ProjectView::new(document, &project.import_scope, &project, &store);
+    for name in [
+      "linting::all",
+      "linting::imported",
+      "linting::nested::leaf",
+      "linting :: all",
+      "linting :: nested :: leaf",
+    ] {
+      assert!(view.find_recipe(name).is_some(), "{name}");
+    }
+    for name in ["all", "imported", "linting::missing", "missing::all"] {
+      assert!(view.find_recipe(name).is_none(), "{name}");
+    }
+  }
+
+  #[test]
+  fn qualified_dependency_module_declared_in_import() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join("nested")).unwrap();
+    fs::write(
+      dir.path().join("nested/shared.just"),
+      "mod child 'child.just'\n",
+    )
+    .unwrap();
+    fs::write(dir.path().join("nested/child.just"), "all:\n").unwrap();
+    fs::write(dir.path().join("root.just"), "all:\n").unwrap();
+    let uri = lsp::Url::from_file_path(dir.path().join("justfile")).unwrap();
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    for (declaration, expected) in [
+      (String::new(), Some("nested/child.just")),
+      (
+        format!("[{disabled}]\nmod child 'root.just'"),
+        Some("nested/child.just"),
+      ),
+      ("mod child 'root.just'".into(), Some("root.just")),
+      ("mod child 'missing.just'".into(), None),
+    ] {
+      fs::write(
+        dir.path().join("justfile"),
+        format!("import 'nested/shared.just'\n{declaration}\n"),
+      )
+      .unwrap();
+      let mut store = DocumentStore::default();
+      let project = ProjectLoader::load(&mut store, &uri).unwrap();
+      let view = ProjectView::new(
+        store.get(&uri).unwrap(),
+        &project.import_scope,
+        &project,
+        &store,
+      );
+
+      assert_eq!(
+        view
+          .find_recipe("child::all")
+          .map(|recipe| recipe.uri.clone()),
+        expected
+          .map(|path| lsp::Url::from_file_path(dir.path().join(path)).unwrap()),
+        "{declaration}",
+      );
+    }
+  }
 
   #[test]
   fn direct_import_overrides_nested_import() {
@@ -171,7 +307,9 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
+      context: None,
       document: &root,
       documents: vec![
         ProjectViewDocument {
@@ -226,7 +364,9 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
+      context: None,
       document: &root,
       documents: vec![
         ProjectViewDocument {
@@ -305,7 +445,9 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      modules: OnceLock::new(),
       recipes: OnceLock::new(),
+      context: None,
       document: &root,
       documents: vec![
         ProjectViewDocument {
