@@ -4,6 +4,7 @@ use super::*;
 pub struct ProjectView<'a> {
   pub(super) document: &'a Document,
   pub(super) documents: Vec<ProjectViewDocument<'a>>,
+  pub(super) recipes: OnceLock<HashMap<String, Located<Recipe>>>,
 }
 
 impl<'a> ProjectView<'a> {
@@ -55,8 +56,8 @@ impl<'a> ProjectView<'a> {
   }
 
   #[must_use]
-  pub fn find_recipe(&self, name: &str) -> Option<Located<Recipe>> {
-    self.resolved_recipes().remove(name)
+  pub fn find_recipe(&self, name: &str) -> Option<&Located<Recipe>> {
+    self.resolved_recipes().get(name)
   }
 
   #[must_use]
@@ -96,6 +97,7 @@ impl<'a> ProjectView<'a> {
     Self {
       document,
       documents,
+      recipes: OnceLock::new(),
     }
   }
 
@@ -109,12 +111,14 @@ impl<'a> ProjectView<'a> {
     )
   }
 
-  pub(super) fn resolved_recipes(&self) -> HashMap<String, Located<Recipe>> {
-    self.declarations(
-      Document::recipes,
-      |recipe| &recipe.name.value,
-      |recipe| recipe.range.start,
-    )
+  pub(super) fn resolved_recipes(&self) -> &HashMap<String, Located<Recipe>> {
+    self.recipes.get_or_init(|| {
+      self.declarations(
+        Document::recipes,
+        |recipe| &recipe.name.value,
+        |recipe| recipe.range.start,
+      )
+    })
   }
 }
 
@@ -126,6 +130,7 @@ impl<'a> From<&'a Document> for ProjectView<'a> {
         document,
         load_depth: 0,
       }],
+      recipes: OnceLock::new(),
     }
   }
 }
@@ -166,6 +171,7 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      recipes: OnceLock::new(),
       document: &root,
       documents: vec![
         ProjectViewDocument {
@@ -220,6 +226,7 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      recipes: OnceLock::new(),
       document: &root,
       documents: vec![
         ProjectViewDocument {
@@ -298,6 +305,7 @@ mod tests {
     .unwrap();
 
     let view = ProjectView {
+      recipes: OnceLock::new(),
       document: &root,
       documents: vec![
         ProjectViewDocument {
