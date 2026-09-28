@@ -1367,7 +1367,12 @@ mod tests {
         typ: lsp::MessageType::ERROR,
         message: format!(
           "failed to parse configuration `{}`: {}",
-          test.tempdir.path().join("bar/just-lsp.toml").display(),
+          test
+            .tempdir
+            .path()
+            .join("bar")
+            .join("just-lsp.toml")
+            .display(),
           indoc! {
             "
             TOML parse error at line 1, column 4
@@ -2002,7 +2007,12 @@ mod tests {
         typ: lsp::MessageType::ERROR,
         message: format!(
           "failed to parse configuration `{}`: {}",
-          test.tempdir.path().join("foo/just-lsp.toml").display(),
+          test
+            .tempdir
+            .path()
+            .join("foo")
+            .join("just-lsp.toml")
+            .display(),
           indoc! {
             "
             TOML parse error at line 1, column 4
