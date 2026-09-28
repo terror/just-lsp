@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.10.0](https://github.com/terror/just-lsp/releases/tag/0.10.0) - 2026-09-28
+
+### Added
+
+- Publish package to PyPI ([#788](https://github.com/terror/just-lsp/pull/788) by [terror](https://github.com/terror))
+- Expose quickfixes in web playground ([#780](https://github.com/terror/just-lsp/pull/780) by [terror](https://github.com/terror))
+- Add playground status bar ([#778](https://github.com/terror/just-lsp/pull/778) by [terror](https://github.com/terror))
+- Add sample justfiles to playground ([#777](https://github.com/terror/just-lsp/pull/777) by [terror](https://github.com/terror))
+- Make playground syntax pane collapsible ([#776](https://github.com/terror/just-lsp/pull/776) by [terror](https://github.com/terror))
+- Add parser information dialog to playground ([#774](https://github.com/terror/just-lsp/pull/774) by [terror](https://github.com/terror))
+- Confirm before resetting playground editor ([#768](https://github.com/terror/just-lsp/pull/768) by [terror](https://github.com/terror))
+- Add reset button to web playground ([#767](https://github.com/terror/just-lsp/pull/767) by [terror](https://github.com/terror))
+- Add hover information to web playground ([#766](https://github.com/terror/just-lsp/pull/766) by [terror](https://github.com/terror))
+- Add inline diagnostics to web playground ([#756](https://github.com/terror/just-lsp/pull/756) by [terror](https://github.com/terror))
+- Validate attributes using signatures ([#737](https://github.com/terror/just-lsp/pull/737) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Fix screenshot in pypi readme ([#794](https://github.com/terror/just-lsp/pull/794) by [terror](https://github.com/terror))
+- Keep playground settings header left-aligned ([#784](https://github.com/terror/just-lsp/pull/784) by [terror](https://github.com/terror))
+- Preserve playground editor state across layout changes ([#772](https://github.com/terror/just-lsp/pull/772) by [terror](https://github.com/terror))
+- Improve tree and settings accessibility ([#765](https://github.com/terror/just-lsp/pull/765) by [terror](https://github.com/terror))
+- Consolidate editor configuration and fix indentation ([#758](https://github.com/terror/just-lsp/pull/758) by [terror](https://github.com/terror))
+- Resolve attribute argument references correctly ([#738](https://github.com/terror/just-lsp/pull/738) by [terror](https://github.com/terror))
+- Include integration tests in published package ([#731](https://github.com/terror/just-lsp/pull/731) by [terror](https://github.com/terror))
+
+### Misc
+
+- Move configuration into `Workspace` ([#793](https://github.com/terror/just-lsp/pull/793) by [terror](https://github.com/terror))
+- Move document lifecycle orchestration into `Workspace` ([#792](https://github.com/terror/just-lsp/pull/792) by [terror](https://github.com/terror))
+- Simplify tree traversal ([#791](https://github.com/terror/just-lsp/pull/791) by [terror](https://github.com/terror))
+- Bump clap from 4.6.6 to 4.6.7 ([#785](https://github.com/terror/just-lsp/pull/785) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.4.5 to 1.4.7 ([#786](https://github.com/terror/just-lsp/pull/786) by [app/dependabot](https://github.com/app/dependabot))
+- Refactor recipe body parsing ([#783](https://github.com/terror/just-lsp/pull/783) by [terror](https://github.com/terror))
+- Refactor recipe dependency parsing ([#782](https://github.com/terror/just-lsp/pull/782) by [terror](https://github.com/terror))
+- Remove `www` readme ([#781](https://github.com/terror/just-lsp/pull/781) by [terror](https://github.com/terror))
+- Update editor settings interface ([#779](https://github.com/terror/just-lsp/pull/779) by [terror](https://github.com/terror))
+- Remove playground resize handle ([#775](https://github.com/terror/just-lsp/pull/775) by [terror](https://github.com/terror))
+- Pass custom `CodeMirror` theme through `theme` prop ([#773](https://github.com/terror/just-lsp/pull/773) by [terror](https://github.com/terror))
+- Localize playground tree-sitter ownership ([#771](https://github.com/terror/just-lsp/pull/771) by [terror](https://github.com/terror))
+- Simplify syntax highlight decoration construction ([#770](https://github.com/terror/just-lsp/pull/770) by [terror](https://github.com/terror))
+- Simplify editor settings state ([#769](https://github.com/terror/just-lsp/pull/769) by [terror](https://github.com/terror))
+- Simplify syntax highlighting extension ([#764](https://github.com/terror/just-lsp/pull/764) by [terror](https://github.com/terror))
+- Share editor settings option lists ([#763](https://github.com/terror/just-lsp/pull/763) by [terror](https://github.com/terror))
+- Lazy-load playground settings provider ([#762](https://github.com/terror/just-lsp/pull/762) by [terror](https://github.com/terror))
+- Use Radix `DialogTrigger` for editor settings ([#761](https://github.com/terror/just-lsp/pull/761) by [terror](https://github.com/terror))
+- Simplify settings persistence ([#760](https://github.com/terror/just-lsp/pull/760) by [terror](https://github.com/terror))
+- Centralize editor colors in CSS variables ([#759](https://github.com/terror/just-lsp/pull/759) by [terror](https://github.com/terror))
+- Update hover highlights without reconfiguring `CodeMirror` ([#757](https://github.com/terror/just-lsp/pull/757) by [terror](https://github.com/terror))
+- Inline `TextNode::from_node` associated function ([#755](https://github.com/terror/just-lsp/pull/755) by [terror](https://github.com/terror))
+- Document remaining `Document` methods ([#754](https://github.com/terror/just-lsp/pull/754) by [terror](https://github.com/terror))
+- Simplify quickfixer test harness ([#753](https://github.com/terror/just-lsp/pull/753) by [terror](https://github.com/terror))
+- Inline `Quickfixer::action` method ([#752](https://github.com/terror/just-lsp/pull/752) by [terror](https://github.com/terror))
+- Compare complete LSP diagnostics in quickfixer ([#751](https://github.com/terror/just-lsp/pull/751) by [terror](https://github.com/terror))
+- Return a new diagnostic when adding a quickfix ([#750](https://github.com/terror/just-lsp/pull/750) by [terror](https://github.com/terror))
+- Inline `Diagnostic::new` method ([#749](https://github.com/terror/just-lsp/pull/749) by [terror](https://github.com/terror))
+- Preserve typed attribute arguments ([#736](https://github.com/terror/just-lsp/pull/736) by [terror](https://github.com/terror))
+- Move `Quickfixer` into the binary ([#748](https://github.com/terror/just-lsp/pull/748) by [terror](https://github.com/terror))
+- Remove `ParameterJson` type ([#747](https://github.com/terror/just-lsp/pull/747) by [terror](https://github.com/terror))
+- Make `ProjectLoader` crate-private ([#746](https://github.com/terror/just-lsp/pull/746) by [terror](https://github.com/terror))
+- Make `Group` and `GroupSet` crate-private ([#745](https://github.com/terror/just-lsp/pull/745) by [terror](https://github.com/terror))
+- Make `PointExt` crate-private ([#743](https://github.com/terror/just-lsp/pull/743) by [terror](https://github.com/terror))
+- Make `Rule`, `RuleContext`, and `Scope` crate-private ([#744](https://github.com/terror/just-lsp/pull/744) by [terror](https://github.com/terror))
+- Make `StrExt` crate-private ([#742](https://github.com/terror/just-lsp/pull/742) by [terror](https://github.com/terror))
+- Make `Count` crate-private ([#741](https://github.com/terror/just-lsp/pull/741) by [terror](https://github.com/terror))
+- Improve `Document` method documentation ([#740](https://github.com/terror/just-lsp/pull/740) by [terror](https://github.com/terror))
+- Move document-dependent node helpers to Document ([#735](https://github.com/terror/just-lsp/pull/735) by [terror](https://github.com/terror))
+- Optimize recipe dependency cycle analysis ([#734](https://github.com/terror/just-lsp/pull/734) by [terror](https://github.com/terror))
+- Improve mobile navigation ([#733](https://github.com/terror/just-lsp/pull/733) by [terror](https://github.com/terror))
+- Improve homepage resource links ([#732](https://github.com/terror/just-lsp/pull/732) by [terror](https://github.com/terror))
+
 ## [0.9.0](https://github.com/terror/just-lsp/releases/tag/0.9.0) - 2026-09-17
 
 ### Added
