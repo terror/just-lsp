@@ -306,6 +306,82 @@ fn analyze_accepts_shell_expanded_import() -> Result {
 }
 
 #[test]
+fn analyze_configuration_sets_severity() -> Result {
+  #[track_caller]
+  fn case(level: &str, label: &str, status: i32) -> Result {
+    Test::new()?
+      .file("justfile", "foo := 'bar'\n")
+      .file(
+        "just-lsp.toml",
+        &format!("[rules]\nunused-variable = {{ level = '{level}' }}\n"),
+      )
+      .argument("justfile")
+      .expected_status(status)
+      .expected_stdout(&formatdoc! {
+        "
+        {label}[unused-variable]: unused variable
+           ╭─[ justfile:1:1 ]
+           │
+         1 │ foo := 'bar'
+           │ ─┬─
+           │  ╰─── Variable `foo` appears unused
+        ───╯
+        "
+      })
+      .run()
+  }
+
+  case("error", "error", 1)?;
+  case("warning", "warning", 0)?;
+  case("info", "info", 0)?;
+  case("hint", "hint", 0)
+}
+
+#[test]
+fn analyze_errors_when_configuration_is_invalid() -> Result {
+  Test::new()?
+    .file("justfile", "foo:\n")
+    .file("just-lsp.toml", "foo")
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stderr(indoc! {
+      "
+      error: failed to parse configuration `[ROOT]/just-lsp.toml`
+
+      because:
+      - TOML parse error at line 1, column 4
+        |
+      1 | foo
+        |    ^
+      key with no value, expected `=`
+
+      "
+    })
+    .run()
+}
+
+#[test]
+fn analyze_errors_when_configuration_is_not_utf8() -> Result {
+  let test = Test::new()?;
+
+  fs::write(test.tempdir.path().join("just-lsp.toml"), [0xff])?;
+
+  test
+    .file("justfile", "foo:\n")
+    .argument("justfile")
+    .expected_status(1)
+    .expected_stderr(indoc! {
+      "
+      error: failed to read configuration `[ROOT]/just-lsp.toml`
+
+      because:
+      - stream did not contain valid UTF-8
+      "
+    })
+    .run()
+}
+
+#[test]
 fn analyze_errors_when_explicit_path_cannot_be_read() -> Result {
   Test::new()?
     .argument("missing.justfile")
@@ -380,6 +456,32 @@ fn analyze_finds_nearest_dot_justfile() -> Result {
     .file("foo/.justfile", "foo:\n")
     .directory("foo/bar")
     .run()
+}
+
+#[test]
+fn analyze_loads_nearest_configuration() -> Result {
+  #[track_caller]
+  fn case(config: &str, directory: &str, path: Option<&str>) -> Result {
+    let test = Test::new()?
+      .file(
+        "just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'error'\n",
+      )
+      .file(config, "[rules]\nunresolved-dependency = 'off'\n")
+      .file("foo/bar/justfile", "import '../../baz.just'\nfoo: bar\n")
+      .file("baz.just", "bar: baz\n")
+      .directory(directory);
+
+    if let Some(path) = path {
+      test.argument(path).run()
+    } else {
+      test.run()
+    }
+  }
+
+  case("foo/bar/just-lsp.toml", ".", Some("foo/bar/justfile"))?;
+  case("foo/just-lsp.toml", ".", Some("foo/bar/justfile"))?;
+  case("foo/just-lsp.toml", "foo/bar/baz", None)
 }
 
 #[test]

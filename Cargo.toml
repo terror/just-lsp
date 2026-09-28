@@ -55,6 +55,7 @@ shellexpand = { version = "3.1.0", default-features = false, features = ["base-0
 strsim = "0.11.1"
 tempfile = "3.27.0"
 thiserror = "2.0.20"
+toml = { version = "1.1.6", default-features = false, features = ["parse", "serde", "std"] }
 tower-lsp = { workspace = true }
 tracing = "0.1.44"
 tree-sitter = "0.27.0"

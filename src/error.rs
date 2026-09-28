@@ -2,6 +2,13 @@ use super::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+  #[error("failed to parse configuration `{}`", path.display())]
+  ConfigParse {
+    path: PathBuf,
+    source: toml::de::Error,
+  },
+  #[error("failed to read configuration `{}`", path.display())]
+  ConfigRead { path: PathBuf, source: io::Error },
   #[error("Import path is empty")]
   EmptyImportPath,
   #[error("{0}")]

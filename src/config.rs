@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 pub struct Config {
   #[serde(default)]
   pub formatting: FormattingConfig,
@@ -9,6 +9,40 @@ pub struct Config {
 }
 
 impl Config {
+  pub(crate) fn find(path: &Path) -> Result<Self> {
+    for directory in path.ancestors().skip(1) {
+      let path = directory.join("just-lsp.toml");
+
+      let content = match fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+        Err(source) => return Err(Error::ConfigRead { path, source }),
+      };
+
+      return toml::from_str(&content)
+        .map_err(|source| Error::ConfigParse { path, source });
+    }
+
+    Ok(Self::default())
+  }
+
+  pub(crate) fn merge(&self, config: &Self) -> Self {
+    let mut rules = self.rules.clone();
+
+    rules.extend(config.rules.clone());
+
+    Self {
+      formatting: FormattingConfig {
+        indentation: config
+          .formatting
+          .indentation
+          .clone()
+          .or_else(|| self.formatting.indentation.clone()),
+      },
+      rules,
+    }
+  }
+
   #[must_use]
   pub fn rule_config(&self, id: &str) -> RuleConfig {
     self.rules.get(id).cloned().unwrap_or_default()
@@ -42,7 +76,7 @@ impl From<RuleLevel> for lsp::DiagnosticSeverity {
   }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum RuleConfig {
   Level(RuleLevel),
@@ -96,6 +130,52 @@ mod tests {
     assert_eq!(
       config.rule_config("foo").level(),
       Some(RuleLevel::Information)
+    );
+  }
+
+  #[test]
+  fn merge() {
+    #[track_caller]
+    fn case(
+      config: serde_json::Value,
+      other: serde_json::Value,
+      expected: serde_json::Value,
+    ) {
+      assert_eq!(
+        serde_json::from_value::<Config>(config)
+          .unwrap()
+          .merge(&serde_json::from_value::<Config>(other).unwrap()),
+        serde_json::from_value::<Config>(expected).unwrap(),
+      );
+    }
+
+    case(json!({}), json!({}), json!({}));
+
+    case(
+      json!({
+        "formatting": { "indentation": "\t" },
+        "rules": { "foo": "error", "bar": "warning" },
+      }),
+      json!({ "rules": { "foo": "off", "baz": {} } }),
+      json!({
+        "formatting": { "indentation": "\t" },
+        "rules": { "foo": "off", "bar": "warning", "baz": {} },
+      }),
+    );
+
+    case(
+      json!({
+        "formatting": { "indentation": "\t" },
+        "rules": { "foo": "error" },
+      }),
+      json!({
+        "formatting": { "indentation": "  " },
+        "rules": { "foo": {} },
+      }),
+      json!({
+        "formatting": { "indentation": "  " },
+        "rules": { "foo": {} },
+      }),
     );
   }
 
