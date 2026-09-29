@@ -24,7 +24,7 @@ use {
     },
     env,
     fmt::{self, Debug, Display, Formatter},
-    fs,
+    fs, io,
     iter::{once, successors},
     mem,
     ops::{ControlFlow, Deref, RangeInclusive},

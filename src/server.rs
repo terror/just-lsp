@@ -154,11 +154,13 @@ impl Server {
     &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let changed = self.workspace.write().await.change(params)?;
+    let result = self.workspace.write().await.change(params);
 
-    if changed {
+    if !matches!(result, Ok(false)) {
       self.publish_diagnostics().await;
     }
+
+    result?;
 
     Ok(())
   }
@@ -167,9 +169,11 @@ impl Server {
     &self,
     params: lsp::DidOpenTextDocumentParams,
   ) -> Result {
-    self.workspace.write().await.open(params)?;
+    let result = self.workspace.write().await.open(params);
 
     self.publish_diagnostics().await;
+
+    result?;
 
     Ok(())
   }
@@ -369,28 +373,35 @@ impl LanguageServer for Server {
     if let Err(error) = self.try_did_change(params).await {
       self
         .client
-        .log_message(lsp::MessageType::ERROR, error)
+        .log_message(lsp::MessageType::ERROR, format!("{error:#}"))
         .await;
     }
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    match self.workspace.write().await.close(&params) {
-      Ok(false) => return,
-      Ok(true) => {}
-      Err(error) => {
-        warn!(%error, "failed to rebuild affected projects");
-      }
+    let result = self.workspace.write().await.close(&params);
+
+    if matches!(result, Ok(false)) {
+      return;
     }
 
     self.publish_diagnostics().await;
+
+    if let Err(error) = result {
+      let error = Error::from(error);
+
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, format!("{error:#}"))
+        .await;
+    }
   }
 
   async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
     if let Err(error) = self.try_did_open(params).await {
       self
         .client
-        .log_message(lsp::MessageType::ERROR, error)
+        .log_message(lsp::MessageType::ERROR, format!("{error:#}"))
         .await;
     }
   }
@@ -632,7 +643,19 @@ impl LanguageServer for Server {
 
     let content = document.content.to_string();
 
-    match document.format(&workspace.config().formatting) {
+    let Some(config) = workspace.document_config(&document.uri) else {
+      self
+        .client
+        .show_message(
+          lsp::MessageType::ERROR,
+          "Cannot format document with an invalid configuration",
+        )
+        .await;
+
+      return Ok(None);
+    };
+
+    match document.format(&config.formatting) {
       Ok(formatted) if formatted == content => Ok(Some(vec![])),
       Ok(formatted) => {
         let end = document
@@ -1315,30 +1338,81 @@ mod tests {
 
   #[tokio::test]
   async fn code_action_shared_import_requires_matching_quickfixes() -> Result {
-    let range = lsp::Range::at(0, 8, 0, 11);
+    async fn case(invalid: bool) -> Result {
+      let range = lsp::Range::at(0, 8, 0, 11);
 
-    let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "undefined-identifier".into(),
-      ..Diagnostic::error(
-        "Variable `bar` not found. Did you mean `baz`?",
-        range,
-      )
-    });
+      let diagnostic = lsp::Diagnostic::from(Diagnostic {
+        id: "undefined-identifier".into(),
+        ..Diagnostic::error(
+          "Variable `bar` not found. Did you mean `baz`?",
+          range,
+        )
+      });
 
-    Test::new()
-      .file("foo.just", "_foo := bar\n")
-      .ready()
-      .open("bar.just", "import 'foo.just'\nbar := 'foo'\n")
-      .diagnostics("bar.just", Some(1), [])
-      .diagnostics("foo.just", None, [])
-      .open("baz.just", "import 'foo.just'\nexport baz := 'foo'\n")
-      .diagnostics("baz.just", Some(1), [])
-      .diagnostics("foo.just", None, [diagnostic.clone()])
-      .open("foo.just", "_foo := bar\n")
-      .diagnostics("foo.just", Some(1), [diagnostic])
-      .code_actions("foo.just", range, [])
-      .run()
-      .await
+      let test = Test::new()
+        .file("bar/justfile", "")
+        .file("foo.just", "_foo := bar\n");
+
+      let test = if invalid {
+        test.file("bar/just-lsp.toml", "foo")
+      } else {
+        test
+      };
+
+      let test = test
+        .ready()
+        .open("bar/justfile", "import '../foo.just'\nbar := 'foo'\n");
+
+      let error = lsp::LogMessageParams {
+        typ: lsp::MessageType::ERROR,
+        message: format!(
+          "failed to parse configuration `{}`: {}",
+          test
+            .tempdir
+            .path()
+            .join("bar")
+            .join("just-lsp.toml")
+            .display(),
+          indoc! {
+            "
+            TOML parse error at line 1, column 4
+              |
+            1 | foo
+              |    ^
+            key with no value, expected `=`
+            "
+          },
+        ),
+      };
+
+      let test = if invalid {
+        test.client_notification::<notification::LogMessage>(error.clone())
+      } else {
+        test.diagnostics("bar/justfile", Some(1), []).diagnostics(
+          "foo.just",
+          None,
+          [],
+        )
+      };
+
+      let test = test
+        .open("baz.just", "import 'foo.just'\nexport baz := 'foo'\n")
+        .diagnostics("baz.just", Some(1), [])
+        .diagnostics("foo.just", None, [diagnostic.clone()])
+        .open("foo.just", "_foo := bar\n")
+        .diagnostics("foo.just", Some(1), [diagnostic]);
+
+      let test = if invalid {
+        test.client_notification::<notification::LogMessage>(error)
+      } else {
+        test
+      };
+
+      test.code_actions("foo.just", range, []).run().await
+    }
+
+    case(false).await?;
+    case(true).await
   }
 
   #[tokio::test]
@@ -1641,6 +1715,46 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn diagnostics_closing_root_promotes_closed_import() -> Result {
+    Test::new()
+      .file("just-lsp.toml", "[rules]\nunresolved-dependency = 'off'\n")
+      .file(
+        "foo/just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'warning'\n",
+      )
+      .file("foo/justfile", "import '../bar/justfile'\n")
+      .file("bar/just-lsp.toml", "bar")
+      .file("bar/justfile", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo/justfile'\n")
+      .diagnostics("bar/justfile", None, [])
+      .diagnostics("foo/justfile", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo/justfile", "import '../bar/justfile'\n")
+      .diagnostics("foo/justfile", Some(1), [])
+      .open("bar/justfile", "foo: bar\n")
+      .diagnostics("bar/justfile", Some(1), [])
+      .close("foo/justfile")
+      .diagnostics("foo/justfile", None, [])
+      .close("justfile")
+      .diagnostics("justfile", None, [])
+      .diagnostics(
+        "bar/justfile",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::warning(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn diagnostics_closing_root_removes_import() -> Result {
     Test::new()
       .file("foo.just", "foo: bar\n")
@@ -1805,6 +1919,40 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn diagnostics_ignore_import_configuration() -> Result {
+    let diagnostic = lsp::Diagnostic::from(Diagnostic {
+      id: "unresolved-dependency".into(),
+      ..Diagnostic::warning(
+        "Recipe `bar` not found",
+        lsp::Range::at(0, 5, 0, 8),
+      )
+    });
+
+    Test::new()
+      .file(
+        "just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'warning'\n",
+      )
+      .file("foo/just-lsp.toml", "foo")
+      .file("foo/justfile", "foo: bar\n")
+      .ready()
+      .open("justfile", "import 'foo/justfile'\n")
+      .diagnostics("foo/justfile", None, [diagnostic.clone()])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo/justfile", "foo: bar\n")
+      .diagnostics("foo/justfile", Some(1), [diagnostic.clone()])
+      .change("foo/justfile", 2, "foo:\n")
+      .diagnostics("foo/justfile", Some(2), [])
+      .close("foo/justfile")
+      .diagnostics("foo/justfile", None, [diagnostic])
+      .close("justfile")
+      .diagnostics("foo/justfile", None, [])
+      .diagnostics("justfile", None, [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn diagnostics_include_unopened_nested_imports() -> Result {
     Test::new()
       .file("foo.just", "import 'bar.just'\n")
@@ -1827,6 +1975,81 @@ mod tests {
       .diagnostics("justfile", Some(1), [])
       .run()
       .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_isolate_invalid_promoted_configuration() -> Result {
+    async fn case(close: bool) -> Result {
+      let diagnostic = lsp::Diagnostic::from(Diagnostic {
+        id: "unresolved-dependency".into(),
+        ..Diagnostic::warning(
+          "Recipe `bar` not found",
+          lsp::Range::at(0, 5, 0, 8),
+        )
+      });
+
+      let test = Test::new()
+        .file(
+          "just-lsp.toml",
+          "[rules]\nunresolved-dependency = 'warning'\n",
+        )
+        .file("justfile", "")
+        .file("foo/just-lsp.toml", "foo")
+        .file("foo/justfile", "foo: bar\n")
+        .ready()
+        .open("justfile", "import 'foo/justfile'\n")
+        .diagnostics("foo/justfile", None, [diagnostic.clone()])
+        .diagnostics("justfile", Some(1), [])
+        .open("foo/justfile", "foo: bar\n")
+        .diagnostics("foo/justfile", Some(1), [diagnostic.clone()]);
+
+      let error = lsp::LogMessageParams {
+        typ: lsp::MessageType::ERROR,
+        message: format!(
+          "failed to parse configuration `{}`: {}",
+          test
+            .tempdir
+            .path()
+            .join("foo")
+            .join("just-lsp.toml")
+            .display(),
+          indoc! {
+            "
+            TOML parse error at line 1, column 4
+              |
+            1 | foo
+              |    ^
+            key with no value, expected `=`
+            "
+          },
+        ),
+      };
+
+      let test = if close {
+        test
+          .close("justfile")
+          .diagnostics("foo/justfile", None, [])
+          .diagnostics("justfile", None, [])
+          .client_notification::<notification::LogMessage>(error)
+          .open("justfile", "foo: bar\n")
+          .diagnostics("justfile", Some(1), [diagnostic])
+      } else {
+        test
+          .change("justfile", 2, "foo: bar\n")
+          .diagnostics("foo/justfile", None, [])
+          .diagnostics("justfile", Some(2), [diagnostic])
+          .client_notification::<notification::LogMessage>(error)
+      };
+
+      test
+        .change("justfile", 3, "foo:\n")
+        .diagnostics("justfile", Some(3), [])
+        .run()
+        .await
+    }
+
+    case(false).await?;
+    case(true).await
   }
 
   #[tokio::test]
@@ -1949,6 +2172,62 @@ mod tests {
       .diagnostics("justfile", Some(2), [])
       .run()
       .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_reload_configuration_when_import_is_removed() -> Result {
+    async fn case(close: bool, on_disk: bool) -> Result {
+      let test = Test::new()
+        .file("just-lsp.toml", "[rules]\nunresolved-dependency = 'off'\n")
+        .file(
+          "foo/just-lsp.toml",
+          "[rules]\nunresolved-dependency = 'warning'\n",
+        )
+        .file("foo/justfile", "foo: bar\n");
+
+      let test = if on_disk {
+        test.file("justfile", "")
+      } else {
+        test
+      };
+
+      let test = test
+        .ready()
+        .open("justfile", "import 'foo/justfile'\n")
+        .diagnostics("foo/justfile", None, [])
+        .diagnostics("justfile", Some(1), [])
+        .open("foo/justfile", "foo: bar\n")
+        .diagnostics("foo/justfile", Some(1), []);
+
+      let test = if close {
+        test.close("justfile").diagnostics("justfile", None, [])
+      } else {
+        test.change("justfile", 2, "")
+      };
+
+      let test = test.diagnostics(
+        "foo/justfile",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::warning(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
+      );
+
+      if close {
+        test.run().await
+      } else {
+        test.diagnostics("justfile", Some(2), []).run().await
+      }
+    }
+
+    case(false, false).await?;
+    case(true, false).await?;
+    case(true, true).await
   }
 
   #[tokio::test]
@@ -2137,6 +2416,36 @@ mod tests {
           range: Some(lsp::Range::at(3, 5, 3, 8)),
         }),
       )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_open_reports_invalid_configuration() -> Result {
+    let test = Test::new();
+
+    let path = test.tempdir.path().join("just-lsp.toml");
+
+    test
+      .file("just-lsp.toml", "foo")
+      .ready()
+      .open("justfile", "foo:\n")
+      .client_notification::<notification::LogMessage>(lsp::LogMessageParams {
+        typ: lsp::MessageType::ERROR,
+        message: format!(
+          "failed to parse configuration `{}`: {}",
+          path.display(),
+          indoc! {
+            "
+              TOML parse error at line 1, column 4
+                |
+              1 | foo
+                |    ^
+              key with no value, expected `=`
+              "
+          },
+        ),
+      })
       .run()
       .await
   }
@@ -2567,6 +2876,52 @@ mod tests {
             ..Default::default()
           },
         ])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn formatting_rejects_invalid_configuration() -> Result {
+    let test = Test::new().file("just-lsp.toml", "foo");
+
+    let uri = test.uri("justfile");
+
+    let path = test.tempdir.path().join("just-lsp.toml");
+
+    test
+      .initialize()
+      .open("justfile", "foo:\n")
+      .client_notification::<notification::LogMessage>(lsp::LogMessageParams {
+        typ: lsp::MessageType::ERROR,
+        message: format!(
+          "failed to parse configuration `{}`: {}",
+          path.display(),
+          indoc! {
+            "
+              TOML parse error at line 1, column 4
+                |
+              1 | foo
+                |    ^
+              key with no value, expected `=`
+              "
+          },
+        ),
+      })
+      .request::<request::Formatting>(
+        lsp::DocumentFormattingParams {
+          text_document: lsp::TextDocumentIdentifier::new(uri),
+          options: lsp::FormattingOptions::default(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(None),
+      )
+      .client_notification::<notification::ShowMessage>(
+        lsp::ShowMessageParams {
+          typ: lsp::MessageType::ERROR,
+          message: "Cannot format document with an invalid configuration"
+            .into(),
+        },
       )
       .run()
       .await
@@ -3235,6 +3590,72 @@ mod tests {
       workspace.document_diagnostics(&uri),
       Vec::<Diagnostic>::new()
     );
+
+    Ok(())
+  }
+
+  #[tokio::test]
+  async fn initialize_merges_configuration_file() -> Result {
+    let tempdir = tempfile::tempdir()?;
+
+    fs::write(
+      tempdir.path().join("just-lsp.toml"),
+      indoc! {
+        "
+        [formatting]
+        indentation = '  '
+
+        [rules]
+        unresolved-dependency = 'off'
+        "
+      },
+    )?;
+
+    let (service, _) = LspService::new(Server::new);
+
+    let server = service.inner();
+
+    server
+      .initialize(lsp::InitializeParams {
+        initialization_options: Some(json!({
+          "formatting": { "indentation": "\t" },
+          "rules": {
+            "unresolved-dependency": "error",
+            "unused-variable": "off",
+          },
+        })),
+        ..Default::default()
+      })
+      .await?;
+
+    let uri =
+      lsp::Url::from_file_path(tempdir.path().join("foo.just")).unwrap();
+
+    server
+      .try_did_open(lsp::DidOpenTextDocumentParams {
+        text_document: lsp::TextDocumentItem::new(
+          uri.clone(),
+          "just".into(),
+          1,
+          "foo := 'bar'\nbar: baz\n".into(),
+        ),
+      })
+      .await?;
+
+    let workspace = server.workspace.read().await;
+
+    assert_eq!(
+      workspace.document_config(&uri),
+      Some(serde_json::from_value::<Config>(json!({
+        "formatting": { "indentation": "  " },
+        "rules": {
+          "unresolved-dependency": "off",
+          "unused-variable": "off",
+        },
+      }))?),
+    );
+
+    assert_eq!(workspace.diagnostics(), BTreeMap::from([(uri, Vec::new())]));
 
     Ok(())
   }
