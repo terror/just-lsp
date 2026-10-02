@@ -115,10 +115,7 @@ mod tests {
         project.add_dependency(
           &self.document.uri,
           ProjectDependency {
-            kind: ProjectDependencyKind::Import {
-              attributes: Vec::new(),
-              optional: false,
-            },
+            kind: ProjectDependencyKind::Import,
             location: lsp::Range::default(),
             target: ProjectDependencyTarget::Resolved(uri),
           },

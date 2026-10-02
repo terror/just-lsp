@@ -8,14 +8,11 @@ pub(crate) struct ProjectLoader<'a> {
 }
 
 impl<'a> ProjectLoader<'a> {
-  fn add_dependency(&mut self, source: &lsp::Url, import: Import) -> Result {
-    let target = self.resolve_dependency_target(source, &import)?;
+  fn add_dependency(&mut self, source: &lsp::Url, import: &Import) -> Result {
+    let target = self.resolve_dependency_target(source, import)?;
 
     let dependency = ProjectDependency {
-      kind: ProjectDependencyKind::Import {
-        attributes: import.attributes,
-        optional: import.optional,
-      },
+      kind: ProjectDependencyKind::Import,
       location: import.path.range,
       target,
     };
@@ -100,7 +97,7 @@ impl<'a> ProjectLoader<'a> {
     self.project.dependencies.entry(uri.clone()).or_default();
 
     for import in imports.into_iter().filter(Import::is_enabled) {
-      self.add_dependency(uri, import)?;
+      self.add_dependency(uri, &import)?;
     }
 
     self.active.remove(uri);
@@ -406,16 +403,6 @@ mod tests {
         ProjectDependencyTarget::Resolved(bar.clone()),
         ProjectDependencyTarget::Dynamic,
       ]
-    );
-
-    assert_eq!(
-      project.dependencies[&test.root]
-        .iter()
-        .map(|dependency| match &dependency.kind {
-          ProjectDependencyKind::Import { optional, .. } => *optional,
-        })
-        .collect::<Vec<_>>(),
-      [false, true, false, false, false]
     );
 
     assert_eq!(
