@@ -12,8 +12,6 @@ Reports `[extension]` on a recipe that does not run in script mode.
 
 Run the recipe as a script if it needs a script-file extension, or remove `[extension]`.
 
-## Examples
-
 ```just reported
 [extension: 'sh']
 foo:

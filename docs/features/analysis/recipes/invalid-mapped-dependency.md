@@ -13,8 +13,6 @@ Reports an invalid mapped dependency or a starred argument used outside a mapped
 
 Enable list and unstable features, prefix the invocation with `*`, and star exactly one argument to map over.
 
-## Examples
-
 A mapped dependency needs one starred argument.
 
 ```just reported

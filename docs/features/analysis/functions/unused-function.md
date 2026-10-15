@@ -13,8 +13,6 @@ Reports a user-defined function that is never called in the document or its impo
 
 Remove an obsolete function, call it where intended, or prefix its name with `_` when keeping an intentionally unused helper.
 
-## Examples
-
 ```just reported
 set unstable
 

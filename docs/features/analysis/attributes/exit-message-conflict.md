@@ -12,8 +12,6 @@ Reports a recipe that combines `[exit-message]` with `[no-exit-message]`.
 
 Keep the attribute that expresses whether this recipe should print an exit message.
 
-## Examples
-
 ```just reported
 [exit-message]
 [no-exit-message]

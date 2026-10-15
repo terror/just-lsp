@@ -12,8 +12,6 @@ Reports a recipe that combines `[script]` with `[shell]`.
 
 Keep `[script]` to execute the body as one script, or keep `[shell]` for ordinary shell recipe execution.
 
-## Examples
-
 ```just reported
 [script]
 [shell]

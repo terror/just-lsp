@@ -13,8 +13,6 @@ Reports variable assignments that reuse a name for overlapping platforms.
 
 Keep one assignment, rename a distinct variable, or explicitly allow duplicate variables when overriding a value is intentional.
 
-## Examples
-
 ```just reported
 foo := 'foo'
 foo := 'bar'
