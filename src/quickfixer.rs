@@ -136,7 +136,12 @@ mod tests {
 
       let diagnostics = Analyzer {
         config: Some(&self.config),
-        view: ProjectView::new(&self.document, &import_scope, &documents),
+        view: ProjectView::new(
+          &self.document,
+          &import_scope,
+          &project,
+          &documents,
+        ),
       }
       .analyze();
 
