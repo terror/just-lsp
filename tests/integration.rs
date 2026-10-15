@@ -184,11 +184,12 @@ impl<'a> Test<'a> {
       "unexpected exit status\nstderr: {stderr}"
     );
 
-    if self.expected_stderr.is_empty() && !stderr.is_empty() {
-      panic!("expected empty stderr: {stderr}");
-    } else {
-      assert_eq!(stderr, self.expected_stderr);
-    }
+    assert!(
+      !self.expected_stderr.is_empty() || stderr.is_empty(),
+      "expected empty stderr: {stderr}"
+    );
+
+    assert_eq!(stderr, self.expected_stderr);
 
     let stdout = self.normalize(str::from_utf8(&output.stdout)?)?;
 
