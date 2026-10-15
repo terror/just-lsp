@@ -12,8 +12,6 @@ Reports a known attribute attached to a declaration kind that the attribute does
 
 Move the attribute to a supported declaration or choose an attribute that supports the current target.
 
-## Examples
-
 ```just reported
 [group: 'bar']
 foo := 'foo'

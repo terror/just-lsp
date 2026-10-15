@@ -13,8 +13,6 @@ Reports recipes that participate in a circular dependency chain.
 
 Remove or redirect a dependency to break the cycle. If two recipes share setup work, move that work into a third recipe that neither depends back on.
 
-## Examples
-
 ```just reported
 foo: bar
   echo foo

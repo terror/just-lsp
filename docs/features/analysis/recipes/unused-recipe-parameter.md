@@ -14,8 +14,6 @@ Reports recipe parameters that are not referenced and are not available through 
 
 Use or remove the parameter. If the shell consumes it, export it with `$` or enable positional arguments and refer to the appropriate position.
 
-## Examples
-
 ```just reported
 foo bar:
   echo foo

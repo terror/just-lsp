@@ -13,8 +13,6 @@ Reports a setting assigned a value of the wrong kind.
 
 Use the value kind expected by the setting. Keep boolean values unquoted, quote string values, and use array syntax for interpreter commands.
 
-## Examples
-
 ```just reported
 set export := 'true'
 ```

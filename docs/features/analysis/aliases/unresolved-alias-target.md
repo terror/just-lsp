@@ -14,8 +14,6 @@ Correct the target name, define the missing recipe, or import the file that prov
 
 **Editor quick fix:** Replaces the target with the suggested recipe name when a close match is found.
 
-## Examples
-
 ```just reported
 alias foo := bar
 ```

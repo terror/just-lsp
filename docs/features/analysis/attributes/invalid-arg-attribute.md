@@ -21,8 +21,6 @@ by
 Use the exact parameter name, configure it once, and add `long` or `short` when
 using `value`.
 
-## Examples
-
 ```just reported
 [arg('bar', long='bar')]
 foo baz:

@@ -14,8 +14,6 @@ Correct the spelling or remove the unsupported attribute. Use a recognized attri
 
 **Editor quick fix:** Replaces the unknown name with the suggested builtin attribute.
 
-## Examples
-
 ```just reported
 [privat]
 foo:

@@ -13,8 +13,6 @@ Reports a dependency invocation with an argument count that does not match the t
 
 Supply the required arguments in a parenthesized dependency invocation, remove extra arguments, or adjust the target’s parameter list.
 
-## Examples
-
 ```just reported
 foo: bar
   echo foo

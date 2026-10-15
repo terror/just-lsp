@@ -13,8 +13,6 @@ Reports a recipe that repeats the same dependency with identical arguments in th
 
 Remove the repeated dependency. If you intended separate invocations, give them the arguments or dependency phases that express that intent.
 
-## Examples
-
 ```just reported
 foo: bar bar
   echo foo

@@ -13,8 +13,6 @@ Reports recipes that share a name and have overlapping platform constraints.
 
 Rename or remove the duplicate recipe. Use disjoint platform attributes for platform-specific implementations, or enable duplicate recipes when overriding is intentional.
 
-## Examples
-
 ```just reported
 foo:
   echo foo

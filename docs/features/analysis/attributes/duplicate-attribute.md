@@ -14,8 +14,6 @@ Reports repeated attributes that must be unique, repeated group values, or more 
 
 Remove repeated attributes or group values. Keep a single default recipe for each platform in the module.
 
-## Examples
-
 ```just reported
 [private]
 [private]

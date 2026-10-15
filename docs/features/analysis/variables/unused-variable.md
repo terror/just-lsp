@@ -13,8 +13,6 @@ Reports a non-exported global variable that is never referenced in the document 
 
 Remove the unused assignment, use the variable in an expression, export it if it belongs in the environment, or prefix its name with `_` when it is intentionally unused.
 
-## Examples
-
 ```just reported
 foo := 'bar'
 ```

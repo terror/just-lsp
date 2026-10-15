@@ -13,8 +13,6 @@ Reports conflicting working-directory and no-cd configuration.
 
 Choose one global working-directory behavior for each platform, and one explicit working-directory behavior per recipe.
 
-## Examples
-
 ```just reported
 set no-cd
 set working-directory := 'foo'

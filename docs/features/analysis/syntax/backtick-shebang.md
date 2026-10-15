@@ -12,8 +12,6 @@ Reports a backtick command whose contents begin with the reserved `#!` sequence.
 
 Remove the shebang from the backtick command and use the configured shell, invoke an interpreter explicitly, or move the commands into a script recipe.
 
-## Examples
-
 ```just reported
 foo := `#!/bin/sh`
 
