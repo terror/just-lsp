@@ -141,7 +141,7 @@ impl<'a> Resolver<'a> {
 
     match parent_kind {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        self.view.find_recipe(&name).map(Symbol::Recipe)
+        self.view.find_recipe(&name).cloned().map(Symbol::Recipe)
       }
       "assignment" => self.view.find_variable(&name).map(Symbol::Variable),
       "function_call" | "assert_expression" => {
