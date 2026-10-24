@@ -13,7 +13,7 @@ define_rule! {
 
       for recipe in context.document().recipes() {
         for dependency in &recipe.dependencies {
-          if !recipe_names.contains(&dependency.name.value) {
+          if context.view().find_recipe(&dependency.name.value).is_none() {
             let suggestion = dependency.name.value.find_suggestion(
               recipe_names.iter().map(String::as_str),
             );

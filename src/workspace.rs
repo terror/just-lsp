@@ -41,6 +41,7 @@ impl Workspace {
           view: ProjectView::new(
             document,
             &project.import_scope,
+            project,
             &self.documents,
           ),
         };
@@ -249,10 +250,7 @@ impl Workspace {
       });
 
       self.documents.retain_closed(|uri| {
-        self
-          .projects
-          .values()
-          .any(|project| project.import_scope.contains(uri))
+        self.projects.values().any(|project| project.contains(uri))
       });
     }
 
@@ -329,7 +327,12 @@ impl Workspace {
     Some(project.map_or_else(
       || ProjectView::from(document),
       |project| {
-        ProjectView::new(document, &project.import_scope, &self.documents)
+        ProjectView::new(
+          document,
+          &project.import_scope,
+          project,
+          &self.documents,
+        )
       },
     ))
   }
