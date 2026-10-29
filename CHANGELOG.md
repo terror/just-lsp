@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.11.0](https://github.com/terror/just-lsp/releases/tag/0.11.0) - 2026-10-28
+
+### Added
+
+- Support configuration via `just-lsp.toml` ([#799](https://github.com/terror/just-lsp/pull/799) by [terror](https://github.com/terror))
+
+### Misc
+
+- Bump tokio from 1.53.3 to 1.54.1 ([#818](https://github.com/terror/just-lsp/pull/818) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.8.0 to 1.10.0 ([#817](https://github.com/terror/just-lsp/pull/817) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tokio from 1.53.2 to 1.53.3 ([#813](https://github.com/terror/just-lsp/pull/813) by [app/dependabot](https://github.com/app/dependabot))
+- Bump toml from 1.1.6+spec-1.1.0 to 1.1.8+spec-1.1.0 ([#812](https://github.com/terror/just-lsp/pull/812) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.27.0 to 0.27.1 ([#814](https://github.com/terror/just-lsp/pull/814) by [app/dependabot](https://github.com/app/dependabot))
+- Bump inventory from 0.3.24 to 0.3.25 ([#811](https://github.com/terror/just-lsp/pull/811) by [app/dependabot](https://github.com/app/dependabot))
+- Show diagnostic examples as diffs ([#809](https://github.com/terror/just-lsp/pull/809) by [terror](https://github.com/terror))
+- Bump tree-sitter from 0.27.0 to 0.27.1 ([#804](https://github.com/terror/just-lsp/pull/804) by [app/dependabot](https://github.com/app/dependabot))
+- Bump serde_json from 1.0.151 to 1.0.154 ([#807](https://github.com/terror/just-lsp/pull/807) by [app/dependabot](https://github.com/app/dependabot))
+- Bump indoc from 2.0.7 to 2.0.8 ([#806](https://github.com/terror/just-lsp/pull/806) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.6.0 to 1.8.0 ([#805](https://github.com/terror/just-lsp/pull/805) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-language from 0.1.8 to 0.1.9 ([#808](https://github.com/terror/just-lsp/pull/808) by [app/dependabot](https://github.com/app/dependabot))
+- Fix redundant else lint in integration tests ([7769caf](https://github.com/terror/just-lsp/commit/7769cafe41174f3c778e8af725a03a4286a2c9e4) by [terror](https://github.com/terror))
+- Bump tokio from 1.53.1 to 1.53.2 ([#802](https://github.com/terror/just-lsp/pull/802) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.5.1 to 1.6.0 ([#803](https://github.com/terror/just-lsp/pull/803) by [app/dependabot](https://github.com/app/dependabot))
+- Remove unused import dependency metadata ([#797](https://github.com/terror/just-lsp/pull/797) by [warrenbhw](https://github.com/warrenbhw))
+- Bump cc from 1.4.7 to 1.5.1 ([#801](https://github.com/terror/just-lsp/pull/801) by [app/dependabot](https://github.com/app/dependabot))
+- Bump thiserror from 2.0.20 to 2.0.21 ([#800](https://github.com/terror/just-lsp/pull/800) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.10.0](https://github.com/terror/just-lsp/releases/tag/0.10.0) - 2026-09-28
 
 ### Added
