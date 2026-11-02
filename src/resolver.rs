@@ -6,6 +6,22 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
+  /// Returns whether `identifier` is the name at a declaration site: a recipe
+  /// header, the left-hand side of an assignment, a recipe parameter, a
+  /// function definition, or a function parameter.
+  fn is_declaration(identifier: &Node) -> bool {
+    identifier.parent().is_some_and(|parent| {
+      matches!(
+        parent.kind(),
+        "assignment"
+          | "function_definition"
+          | "function_parameters"
+          | "parameter"
+          | "recipe_header"
+      )
+    })
+  }
+
   /// Creates a new `Resolver` bound to the given `ProjectView`.
   #[must_use]
   pub fn new(view: impl Into<ProjectView<'a>>) -> Self {
@@ -77,7 +93,13 @@ impl<'a> Resolver<'a> {
   }
 
   /// Collects every location in the document that references the same symbol as
-  /// `identifier`. The identifier itself is always included.
+  /// `identifier`.
+  ///
+  /// When `include_declaration` is `false`, declaration sites (recipe names,
+  /// variable names, recipe parameter names, function names, and function
+  /// parameter names) are omitted, even if `identifier` is itself one of
+  /// them. Builtins have no in-document declaration, so their occurrences are
+  /// always retained.
   ///
   /// Scoping follows `just`'s semantics: parameters are local to their recipe,
   /// while variables are global but can be shadowed by a same-named parameter.
@@ -87,6 +109,7 @@ impl<'a> Resolver<'a> {
   pub fn resolve_identifier_references(
     &self,
     identifier: &Node,
+    include_declaration: bool,
   ) -> Vec<lsp::Location> {
     let Some(definition) = self.resolve_identifier_definition(identifier)
     else {
@@ -100,6 +123,9 @@ impl<'a> Resolver<'a> {
       .root_node()
       .find_all("identifier")
       .into_iter()
+      .filter(|candidate| {
+        include_declaration || !Self::is_declaration(candidate)
+      })
       .filter(|candidate| {
         self
           .resolve_identifier_definition(candidate)
@@ -351,6 +377,7 @@ mod tests {
           .root_node()
           .find("assignment > identifier")
           .unwrap(),
+        true,
       ),
       vec![
         lsp::Location {
@@ -587,6 +614,7 @@ mod tests {
         .root_node()
         .find("dependency_expression > expression > value > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -684,6 +712,7 @@ mod tests {
         .root_node()
         .find("dependency_expression > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -718,6 +747,7 @@ mod tests {
         .root_node()
         .find("dependency > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -938,6 +968,7 @@ mod tests {
         .root_node()
         .find("parameter > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1082,6 +1113,7 @@ mod tests {
         .root_node()
         .find("parameter > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1123,6 +1155,7 @@ mod tests {
         .root_node()
         .find("recipe_header > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1141,6 +1174,179 @@ mod tests {
           range: lsp::Range::at(6, 13, 6, 16),
         },
       ]
+    );
+  }
+
+  #[test]
+  fn resolve_references_without_declaration_builtin() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo {{arch()}}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("function_call > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(1, 9, 1, 13),
+      }]
+    );
+  }
+
+  #[test]
+  fn resolve_references_without_declaration_function() {
+    let document = Document::from(indoc! {
+      "
+      f(x) := x + x
+      g(x) := f(x)
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("function_definition > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(1, 8, 1, 9),
+      }]
+    );
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("function_parameters > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 8, 0, 9),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(0, 12, 0, 13),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_references_without_declaration_recipe() {
+    let document = Document::from(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar foo: foo
+        echo \"bar\"
+
+      alias baz := foo
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("recipe_header > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(3, 9, 3, 12),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(6, 13, 6, 16),
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_references_without_declaration_variable_and_parameter() {
+    let document = Document::from(indoc! {
+      "
+      a := 'x'
+      b := a
+      foo a=a:
+        echo {{a}}
+      bar:
+        echo {{a}}
+      "
+    });
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("assignment > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(1, 5, 1, 6),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(2, 6, 2, 7),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(5, 9, 5, 10),
+        },
+      ]
+    );
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("parameter > identifier")
+        .unwrap(),
+      false,
+    );
+
+    assert_eq!(
+      references,
+      vec![lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(3, 9, 3, 10),
+      }]
     );
   }
 
@@ -1276,6 +1482,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1425,6 +1632,7 @@ mod tests {
         .root_node()
         .find("function_parameters > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1464,6 +1672,7 @@ mod tests {
         .root_node()
         .find("function_definition > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1502,6 +1711,7 @@ mod tests {
         .root_node()
         .find("value > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1533,6 +1743,7 @@ mod tests {
         .root_node()
         .find("value > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1602,6 +1813,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1629,6 +1841,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1697,6 +1910,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1737,6 +1951,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1770,6 +1985,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1804,6 +2020,7 @@ mod tests {
         .root_node()
         .find("assignment > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
@@ -1870,6 +2087,7 @@ mod tests {
         .root_node()
         .find("variadic_parameter > parameter > identifier")
         .unwrap(),
+      true,
     );
 
     assert_eq!(
