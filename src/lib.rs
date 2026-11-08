@@ -53,7 +53,7 @@ pub use {
   attribute_argument::AttributeArgument,
   attribute_expression::AttributeExpression,
   attribute_expression_kind::AttributeExpressionKind,
-  attribute_keyword::AttributeKeyword,
+  attribute_keyword::{AttributeKeyword, AttributeKeywordValue},
   attribute_kind::AttributeKind,
   attribute_signature::AttributeSignature,
   attribute_target::AttributeTarget,

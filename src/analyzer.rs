@@ -850,7 +850,7 @@ mod tests {
       .run();
     }
 
-    case("flag", "`flag` arguments require `set lists`", 5, 9);
+    case("flag, long", "`flag` arguments require `set lists`", 5, 9);
 
     case(
       "foo='bar'",
@@ -1067,7 +1067,7 @@ mod tests {
       set unstable
       set lists
 
-      [arg('foo', flag)]
+      [arg('foo', flag, long)]
       bar foo:
         echo {{foo}}
       "
@@ -1079,7 +1079,7 @@ mod tests {
   fn arg_attribute_with_flag_requires_lists() {
     Test::new(indoc! {
       "
-      [arg('foo', flag)]
+      [arg('foo', flag, long)]
       bar foo:
         echo {{foo}}
       "

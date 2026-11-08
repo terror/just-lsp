@@ -50,15 +50,16 @@ define_rule! {
             continue;
           };
 
-          if value.is_none() && keyword.value_required {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "`[{attribute_name}]` keyword `{}` requires a value",
-                name.value
-              ),
-              *range,
-            ));
-          }
+          let message = match (value.is_some(), keyword.value) {
+            (false, AttributeKeywordValue::Required) => "requires a value",
+            (true, AttributeKeywordValue::Forbidden) => "takes no value",
+            _ => continue,
+          };
+
+          diagnostics.push(Diagnostic::error(
+            format!("`[{attribute_name}]` keyword `{}` {message}", name.value),
+            *range,
+          ));
         }
       }
 

@@ -24,6 +24,29 @@ define_rule! {
             value.range(),
           ));
         }
+
+        for keyword in ["flag", "multiple"] {
+          if let Some(argument) = attribute.keyword_argument(keyword)
+            && attribute.keyword_argument("long").is_none()
+            && attribute.keyword_argument("short").is_none()
+          {
+            diagnostics.push(Diagnostic::error(
+              format!("`[arg]` `{keyword}` requires `long` or `short`"),
+              argument.range(),
+            ));
+          }
+        }
+
+        if let Some(flag) = attribute.keyword_argument("flag") {
+          for keyword in ["value", "pattern"] {
+            if attribute.keyword_argument(keyword).is_some() {
+              diagnostics.push(Diagnostic::error(
+                format!("`[arg]` `flag` cannot be combined with `{keyword}`"),
+                flag.range(),
+              ));
+            }
+          }
+        }
       }
 
       for recipe in context.local_declarations(context.recipes()) {
@@ -51,7 +74,20 @@ define_rule! {
             continue;
           };
 
-          if !recipe.parameters.iter().any(|parameter| parameter.name == parameter_name) {
+          if let Some(parameter) = recipe
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == parameter_name)
+          {
+            if attribute.keyword_argument("flag").is_some()
+              && parameter.default_value.is_some()
+            {
+              diagnostics.push(Diagnostic::error(
+                format!("Flag parameter `{parameter_name}` may not have a default"),
+                parameter.range,
+              ));
+            }
+          } else {
             diagnostics.push(Diagnostic::error(
               format!("`[arg]` references unknown parameter `{parameter_name}`"),
               name.text.range,

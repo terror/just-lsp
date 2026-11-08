@@ -4,5 +4,12 @@ use super::*;
 pub struct AttributeKeyword<'a> {
   pub expression: AttributeExpressionKind,
   pub name: &'a str,
-  pub value_required: bool,
+  pub value: AttributeKeywordValue,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AttributeKeywordValue {
+  Forbidden,
+  Optional,
+  Required,
 }
