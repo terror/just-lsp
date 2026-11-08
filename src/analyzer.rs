@@ -5829,7 +5829,10 @@ mod tests {
     }
 
     case(r#""  ""#, true);
-    case(r#""\t""#, true);
+    case(r#""\t\t""#, true);
+    case(r#""\u{20}\u{20}""#, true);
+    case(r#"" \t""#, false);
+    case(r#""\t ""#, false);
     case(r#""\n""#, false);
     case(r#""\u{2003}""#, false);
     case("'  '", true);
