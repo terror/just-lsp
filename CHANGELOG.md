@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.1](https://github.com/terror/just-lsp/releases/tag/0.11.1) - 2026-11-07
+
+### Fixed
+
+- Require `lists` for `min`, `max`, and `multiple` argument keywords ([#828](https://github.com/terror/just-lsp/pull/828) by [terror](https://github.com/terror))
+- Validate attribute keyword ordering and duplicates ([#829](https://github.com/terror/just-lsp/pull/829) by [terror](https://github.com/terror))
+- Reject invalid indentation setting whitespace ([#830](https://github.com/terror/just-lsp/pull/830) by [terror](https://github.com/terror))
+- Allow empty attribute argument lists and trailing commas ([#826](https://github.com/terror/just-lsp/pull/826) by [terror](https://github.com/terror))
+- Allow short attribute keyword without a value ([#825](https://github.com/terror/just-lsp/pull/825) by [terror](https://github.com/terror))
+
+### Misc
+
+- Update rustix to 1.1.6 ([#824](https://github.com/terror/just-lsp/pull/824) by [hannesbraun](https://github.com/hannesbraun))
+- Bump pypa/gh-action-pypi-publish from 1.14.2 to 1.14.3 in /.github/workflows ([#821](https://github.com/terror/just-lsp/pull/821) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.11.0](https://github.com/terror/just-lsp/releases/tag/0.11.0) - 2026-10-28
 
 ### Added
