@@ -5820,7 +5820,7 @@ mod tests {
         test
       } else {
         test.error(
-          "Setting `indentation` must be a non-empty whitespace string literal",
+          "Setting `indentation` must be a non-empty string literal containing only spaces or only tabs",
           lsp::Range::at(0, 19, 0, 19 + u32::try_from(value.len()).unwrap()),
         )
       };
@@ -5830,8 +5830,8 @@ mod tests {
 
     case(r#""  ""#, true);
     case(r#""\t""#, true);
-    case(r#""\n""#, true);
-    case(r#""\u{2003}""#, true);
+    case(r#""\n""#, false);
+    case(r#""\u{2003}""#, false);
     case("'  '", true);
     case(r#""""#, false);
     case(r#""foo""#, false);
