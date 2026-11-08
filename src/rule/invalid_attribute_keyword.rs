@@ -16,11 +16,30 @@ define_rule! {
           continue;
         };
 
+        let mut keywords = HashSet::new();
+
         for argument in &attribute.arguments {
           let AttributeArgument::Keyword { name, value, range } = argument
           else {
+            if !keywords.is_empty() {
+              diagnostics.push(Diagnostic::error(
+                "Positional attribute arguments cannot follow keyword attribute arguments",
+                argument.range(),
+              ));
+            }
+
             continue;
           };
+
+          if !signature.keywords.is_empty() && !keywords.insert(&name.value) {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Duplicate `[{attribute_name}]` keyword `{}`",
+                name.value
+              ),
+              name.range,
+            ));
+          }
 
           let Some(keyword) = signature
             .keywords
