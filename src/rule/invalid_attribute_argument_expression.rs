@@ -6,6 +6,7 @@ define_rule! {
     message: "invalid attribute argument expression",
     run(context) {
       let mut diagnostics = Vec::new();
+      let mut expressions = ConstExpressions::new(context.view());
 
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
@@ -35,14 +36,15 @@ define_rule! {
             AttributeArgument::Keyword { value: None, .. } => continue,
           };
 
-          let expected = match (kind, expression.kind) {
-            (AttributeExpressionKind::Const, AttributeExpressionKind::Any) => {
+          let expected = match kind {
+            AttributeExpressionKind::Const
+              if expressions.is_non_const(&expression.text) => {
               "const expressions"
             }
-            (
-              AttributeExpressionKind::StringLiteral,
-              AttributeExpressionKind::Any | AttributeExpressionKind::Const,
-            ) => "string literals",
+            AttributeExpressionKind::StringLiteral
+              if expression.kind != AttributeExpressionKind::StringLiteral => {
+              "string literals"
+            }
             _ => continue,
           };
 

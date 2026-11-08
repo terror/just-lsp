@@ -61,13 +61,7 @@ impl<'a> ProjectView<'a> {
 
   #[must_use]
   pub fn find_variable(&self, name: &str) -> Option<Located<Variable>> {
-    self
-      .declarations(
-        Document::variables,
-        |variable| &variable.name.value,
-        |variable| variable.range.start,
-      )
-      .remove(name)
+    self.resolved_variables().remove(name)
   }
 
   #[must_use]
@@ -114,6 +108,16 @@ impl<'a> ProjectView<'a> {
       Document::recipes,
       |recipe| &recipe.name.value,
       |recipe| recipe.range.start,
+    )
+  }
+
+  pub(super) fn resolved_variables(
+    &self,
+  ) -> HashMap<String, Located<Variable>> {
+    self.declarations(
+      Document::variables,
+      |variable| &variable.name.value,
+      |variable| variable.range.start,
     )
   }
 }

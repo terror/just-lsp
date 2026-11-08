@@ -1,5 +1,6 @@
 use {
   conflict_tracker::ConflictTracker,
+  const_expressions::ConstExpressions,
   count::Count,
   document_entry::DocumentEntry,
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
@@ -112,6 +113,7 @@ mod builtin;
 mod builtins;
 mod config;
 mod conflict_tracker;
+mod const_expressions;
 mod count;
 mod dependency;
 mod dependency_argument;

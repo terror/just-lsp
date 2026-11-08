@@ -2496,6 +2496,235 @@ mod tests {
   }
 
   #[test]
+  fn const_attribute_arguments_resolve_variables() {
+    #[track_caller]
+    fn case(assignments: &str, non_const: bool) {
+      for imported in [false, true] {
+        let test = if imported {
+          Test::new("[doc(bar)]\nbaz:\n").imported_document(assignments)
+        } else {
+          Test::new(&format!("{assignments}[doc(bar)]\nbaz:\n"))
+        };
+
+        let line = if imported {
+          0
+        } else {
+          u32::try_from(assignments.lines().count()).unwrap()
+        };
+
+        let test = if non_const {
+          test.error(
+            "Attribute `doc` arguments must be const expressions",
+            lsp::Range::at(line, 5, line, 8),
+          )
+        } else {
+          test
+        };
+
+        test.run();
+      }
+    }
+
+    case("bar := arch()\n", true);
+    case("foo := `foo`\nbar := foo\n", true);
+    case("foo := 'foo'\nbar := foo\n", false);
+    case("bar := RED\n", false);
+    case("foo := bar\nbar := foo\n", false);
+    case("[linux]\nbar := arch()\n", false);
+    case(
+      "set allow-duplicate-variables\nbar := arch()\nbar := 'foo'\n",
+      false,
+    );
+    case(
+      "set allow-duplicate-variables\nbar := 'foo'\nbar := arch()\n",
+      true,
+    );
+
+    Test::new(
+      "set allow-duplicate-variables\nfoo := 'foo'\n[doc(bar)]\nbaz:\n",
+    )
+    .imported_document("foo := arch()\nbar := foo\n")
+    .run();
+  }
+
+  #[test]
+  fn const_attribute_branches() {
+    #[track_caller]
+    fn case(expression: &str, non_const: bool) {
+      let test = Test::new(&format!(
+        "set unstable\nset lists\n[doc({expression})]\nfoo:\n"
+      ));
+
+      let test = if non_const {
+        test.error(
+          "Attribute `doc` arguments must be const expressions",
+          lsp::Range::at(2, 5, 2, 5 + u32::try_from(expression.len()).unwrap()),
+        )
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    case("if 'foo' == 'foo' { 'bar' } else { arch() }", false);
+    case("if 'foo' != 'foo' { 'bar' } else { arch() }", true);
+    case("if arch() == 'foo' { 'bar' } else { 'baz' }", true);
+    case(
+      "if 'foo' == 'bar' { arch() } else if 'foo' == 'foo' { 'foo' } else { `foo` }",
+      false,
+    );
+    case("if 'foo' =~ 'foo' { 'foo' } else { arch() }", false);
+    case("if 'foo' =~ 'foo' { arch() } else { `foo` }", true);
+    case("if 'foo' != 'foo' { arch() }", false);
+    case("assert('foo' == 'foo', arch())", false);
+    case("assert('foo' != 'foo', arch())", true);
+    case("assert(arch() == 'foo', 'bar')", true);
+    case("[] && arch()", false);
+    case("'foo' && arch()", true);
+    case("arch() && 'foo'", true);
+    case("'' || arch()", false);
+    case("[] || arch()", true);
+    case("x'foo' || arch()", false);
+    case("![] || arch()", false);
+    case("!arch()", true);
+    case("f'{{arch()}}'", true);
+    case("'foo' + arch()", true);
+  }
+
+  #[test]
+  fn const_attribute_keywords_resolve_variables() {
+    #[track_caller]
+    fn case(keyword: &str) {
+      let start = 13 + u32::try_from(keyword.len()).unwrap();
+
+      Test::new(&format!(
+        "foo := arch()\nbar := foo\n[arg('qux', {keyword}=bar)]\nbaz qux:\n  echo {{{{qux}}}}\n"
+      ))
+      .error(
+        "Attribute `arg` arguments must be const expressions",
+        lsp::Range::at(2, start, 2, start + 3),
+      )
+      .run();
+    }
+
+    case("help");
+    case("pattern");
+  }
+
+  #[test]
+  fn const_setting_expressions() {
+    #[track_caller]
+    fn case(
+      name: &str,
+      assignments: &str,
+      expression: &str,
+      message: Option<&'static str>,
+    ) {
+      let line = u32::try_from(assignments.lines().count()).unwrap();
+      let start = 8 + u32::try_from(name.len()).unwrap();
+
+      let test =
+        Test::new(&format!("{assignments}set {name} := {expression}\nbaz:\n"));
+
+      let test = if name == "windows-shell" {
+        test.warning(
+          "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+          lsp::Range::at(line, 4, line, 17),
+        )
+      } else {
+        test
+      };
+
+      let test = if let Some(message) = message {
+        test.error(
+          message,
+          lsp::Range::at(
+            line,
+            start,
+            line,
+            start + u32::try_from(expression.len()).unwrap(),
+          ),
+        )
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    for (name, expression, message) in [
+      (
+        "dotenv-command",
+        "bar",
+        "Setting `dotenv-command` must be a const expression",
+      ),
+      (
+        "dotenv-filename",
+        "bar",
+        "Setting `dotenv-filename` must be a const expression",
+      ),
+      (
+        "dotenv-path",
+        "bar",
+        "Setting `dotenv-path` must be a const expression",
+      ),
+      (
+        "script-interpreter",
+        "[bar]",
+        "Setting `script-interpreter` must be a const expression",
+      ),
+      (
+        "shell",
+        "[bar]",
+        "Setting `shell` must be a const expression",
+      ),
+      (
+        "tempdir",
+        "bar",
+        "Setting `tempdir` must be a const expression",
+      ),
+      (
+        "windows-shell",
+        "[bar]",
+        "Setting `windows-shell` must be a const expression",
+      ),
+      (
+        "working-directory",
+        "bar",
+        "Setting `working-directory` must be a const expression",
+      ),
+    ] {
+      case(
+        name,
+        "foo := arch()\nbar := foo\n",
+        expression,
+        Some(message),
+      );
+    }
+
+    case(
+      "working-directory",
+      "",
+      "`foo`",
+      Some("Setting `working-directory` must be a const expression"),
+    );
+    case("working-directory", "foo := 'foo'\n", "foo", None);
+    case(
+      "working-directory",
+      "",
+      "if 'foo' == 'foo' { 'foo' } else { arch() }",
+      None,
+    );
+    case(
+      "working-directory",
+      "",
+      "'foo' + assert('foo' == 'foo', arch())",
+      None,
+    );
+  }
+
+  #[test]
   fn continue_attribute_accepts_multiple_arguments() {
     Test::new(indoc! {
       "
@@ -5591,6 +5820,10 @@ mod tests {
     .error(
       "Setting `shell` expects an array value",
       lsp::Range::at(2, 0, 3, 0),
+    )
+    .error(
+      "Setting `shell` must be a const expression",
+      lsp::Range::at(2, 13, 2, 26),
     )
     .run();
   }
