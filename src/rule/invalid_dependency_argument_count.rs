@@ -31,11 +31,19 @@ define_rule! {
                   return None;
                 }
 
-                StringLiteral::parse(&name.text.value)
-                  .ok()
-                  .flatten()
-                  .filter(|literal| !literal.shell_expanded)
-                  .map(|literal| literal.cooked)
+                let name = StringLiteral::parse(&name.text.value).ok()??;
+
+                Some(if name.shell_expanded {
+                  shellexpand::full_with_context(
+                    &name.cooked,
+                    || env::home_dir()?.into_os_string().into_string().ok(),
+                    |name| env::var(name).map(Some),
+                  )
+                  .ok()?
+                  .into_owned()
+                } else {
+                  name.cooked
+                })
               })
               .collect::<HashSet<_>>();
 

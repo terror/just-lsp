@@ -4950,6 +4950,7 @@ mod tests {
     case("'bar'", "long");
     case("'bar'", "short");
     case(r#""\u{62}ar""#, "long");
+    case("x'bar'", "long");
   }
 
   #[test]
