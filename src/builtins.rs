@@ -49,12 +49,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
         },
         AttributeKeyword {
           name: "max",
-          expression: AttributeExpressionKind::Any,
+          expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
         },
         AttributeKeyword {
           name: "min",
-          expression: AttributeExpressionKind::Any,
+          expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
         },
         AttributeKeyword {
