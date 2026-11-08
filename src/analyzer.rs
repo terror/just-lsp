@@ -1143,6 +1143,9 @@ mod tests {
   fn arg_min_max_kwargs_accepted() {
     Test::new(indoc! {
       "
+      set unstable
+      set lists
+
       [arg('FILES', min='2', max='4')]
       backup +FILES:
         scp {{FILES}} me@server.com:
@@ -1155,6 +1158,9 @@ mod tests {
   fn arg_multiple_kwarg_accepted() {
     Test::new(indoc! {
       "
+      set unstable
+      set lists
+
       [arg('foo', long, multiple)]
       bar foo:
         echo {{foo}}
