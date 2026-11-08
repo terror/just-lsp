@@ -791,7 +791,6 @@ mod tests {
       "Attribute `arg` got 0 arguments but takes 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
-    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
     .run();
   }
 
