@@ -70,7 +70,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
         AttributeKeyword {
           name: "short",
           expression: AttributeExpressionKind::StringLiteral,
-          value_required: true,
+          value_required: false,
         },
         AttributeKeyword {
           name: "value",
