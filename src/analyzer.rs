@@ -1141,14 +1141,108 @@ mod tests {
 
   #[test]
   fn arg_min_max_kwargs_accepted() {
-    Test::new(indoc! {
-      "
-      [arg('FILES', min='2', max='4')]
-      backup +FILES:
-        scp {{FILES}} me@server.com:
-      "
-    })
-    .run();
+    #[track_caller]
+    fn case(arguments: &str, parameter: &str) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        [arg('bar', {arguments})]
+        foo {parameter}:
+          echo {{{{bar}}}}
+        "
+      })
+      .run();
+    }
+
+    case("min='2', max='4'", "+bar");
+    case("min='0', max='0'", "*bar");
+    case(
+      "min='18446744073709551615', max='18446744073709551615'",
+      "*bar",
+    );
+    case("long, multiple, min='2', max='2'", "bar");
+    case(r#"min="\u{32}", max='2'"#, "*bar");
+    case("min=x'$FOO', max=x'$BAR'", "*bar");
+  }
+
+  #[test]
+  fn arg_min_max_kwargs_invalid() {
+    #[track_caller]
+    fn case(
+      arguments: &str,
+      parameter: &str,
+      message: &'static str,
+      start: u32,
+      end: u32,
+    ) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        [arg('bar', {arguments})]
+        foo {parameter}:
+          echo {{{{bar}}}}
+        "
+      })
+      .error(message, lsp::Range::at(3, start, 3, end))
+      .run();
+    }
+
+    case(
+      "min",
+      "*bar",
+      "`[arg]` keyword `min` requires a value",
+      12,
+      15,
+    );
+    case(
+      "min=('2')",
+      "*bar",
+      "Attribute `arg` arguments must be string literals",
+      16,
+      21,
+    );
+    case(
+      "max=arch()",
+      "*bar",
+      "Attribute `arg` arguments must be string literals",
+      16,
+      22,
+    );
+    case("min=''", "*bar", "Invalid `min` value ``", 16, 18);
+    case("min='foo'", "*bar", "Invalid `min` value `foo`", 16, 21);
+    case("max='01'", "*bar", "Invalid `max` value `01`", 16, 20);
+    case(
+      "max='18446744073709551616'",
+      "*bar",
+      "Invalid `max` value `18446744073709551616`: number too large to fit in target type",
+      16,
+      38,
+    );
+    case(
+      "min='3', max='2'",
+      "*bar",
+      "`[arg]` `min` `3` exceeds `max` `2`",
+      12,
+      15,
+    );
+    case(
+      "min='2'",
+      "bar",
+      "`[arg]` `min` requires `multiple` or a variadic parameter",
+      12,
+      15,
+    );
+    case(
+      "max='2', min='1'",
+      "bar",
+      "`[arg]` `max` requires `multiple` or a variadic parameter",
+      12,
+      15,
+    );
   }
 
   #[test]
