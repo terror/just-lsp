@@ -18,10 +18,40 @@ define_rule! {
           if let Some(recipe) = recipes.get(&dependency.name.value) {
             let parameters = &recipe.parameters;
 
+            let flags = recipe
+              .attributes
+              .iter()
+              .filter(|attribute| {
+                attribute.name.value == "arg" && attribute.keyword_argument("flag").is_some()
+              })
+              .filter_map(|attribute| {
+                let name = attribute.positional_arguments().next()?;
+
+                if name.kind != AttributeExpressionKind::StringLiteral {
+                  return None;
+                }
+
+                let name = StringLiteral::parse(&name.text.value).ok()??;
+
+                Some(if name.shell_expanded {
+                  shellexpand::full_with_context(
+                    &name.cooked,
+                    || env::home_dir()?.into_os_string().into_string().ok(),
+                    |name| env::var(name).map(Some),
+                  )
+                  .ok()?
+                  .into_owned()
+                } else {
+                  name.cooked
+                })
+              })
+              .collect::<HashSet<_>>();
+
             let required_parameters = parameters
               .iter()
               .filter(|parameter| {
                 parameter.default_value.is_none()
+                  && !flags.contains(&parameter.name)
                   && !matches!(
                     parameter.kind,
                     ParameterKind::Variadic(VariadicType::ZeroOrMore)
