@@ -1140,6 +1140,46 @@ mod tests {
   }
 
   #[test]
+  fn arg_keywords_require_lists() {
+    #[track_caller]
+    fn case(arguments: &str, parameter: &str, message: &'static str, end: u32) {
+      let content = formatdoc! {
+        "
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      };
+
+      let range = lsp::Range::at(0, 12, 0, end);
+
+      Test::new(&content).error(message, range).run();
+
+      Test::new(&format!("{content}\nset lists := false\n"))
+        .error(message, range)
+        .run();
+
+      Test::new(&content)
+        .imported_document("set lists := false\n")
+        .error(message, range)
+        .run();
+
+      Test::new(&content)
+        .imported_document("set unstable\nset lists\n")
+        .run();
+    }
+
+    case("max='2'", "+foo", "`[arg(max)]` requires `set lists`", 15);
+    case("min='1'", "+foo", "`[arg(min)]` requires `set lists`", 15);
+    case(
+      "multiple, long",
+      "foo",
+      "`[arg(multiple)]` requires `set lists`",
+      20,
+    );
+  }
+
+  #[test]
   fn arg_min_max_kwargs_accepted() {
     Test::new(indoc! {
       "
