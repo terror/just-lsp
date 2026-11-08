@@ -5341,6 +5341,27 @@ mod tests {
   }
 
   #[test]
+  fn recipe_parameters_options() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      Test::new(&formatdoc! {
+        "
+        [arg({attribute})]
+        foo bar='foo' baz:
+          echo {{{{bar}}}} {{{{baz}}}}
+        "
+      })
+      .run();
+    }
+
+    case("'baz', long");
+    case("'baz', short");
+    case("'bar', long");
+    case(r#""\u{62}az", long"#);
+    case("x'baz', long");
+  }
+
+  #[test]
   fn recipe_parameters_order() {
     Test::new(indoc! {
       "
@@ -5368,13 +5389,37 @@ mod tests {
 
   #[test]
   fn recipe_parameters_variadic() {
-    Test::new(indoc! {
-      "
-      recipe_with_variadic arg1=\"default\" +args:
-        echo \"{{arg1}} {{args}}\"
-      "
-    })
-    .run();
+    #[track_caller]
+    fn case(parameter: &str, arguments: &str, required: bool) {
+      let test = Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+        [arg('baz'{arguments})]
+        foo bar='foo' {parameter}:
+          echo {{{{bar}}}} {{{{show(baz)}}}}
+        "
+      });
+
+      let test = if required {
+        test.error(
+          "Required parameter `baz` follows a parameter with a default value",
+          lsp::Range::at(3, 14, 3, 18),
+        )
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    case("+baz", "", true);
+    case("*baz", "", false);
+    case("+baz='bar'", "", false);
+    case("*baz", ", min='1'", true);
+    case("*baz", ", min='0'", false);
+    case("*baz", r#", min="\u{31}""#, true);
+    case("*baz", ", min=x'1'", true);
   }
 
   #[test]
