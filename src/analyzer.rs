@@ -812,6 +812,105 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_flag_and_multiple() {
+    #[track_caller]
+    fn case(
+      arguments: &str,
+      parameter: &str,
+      error: Option<(&'static str, lsp::Range)>,
+    ) {
+      let test = Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      });
+
+      let test = if let Some((message, range)) = error {
+        test.error(message, range)
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    case(
+      "long, flag='bar'",
+      "foo",
+      Some((
+        "`[arg]` keyword `flag` takes no value",
+        lsp::Range::at(3, 18, 3, 28),
+      )),
+    );
+
+    case(
+      "long, multiple='bar'",
+      "foo",
+      Some((
+        "`[arg]` keyword `multiple` takes no value",
+        lsp::Range::at(3, 18, 3, 32),
+      )),
+    );
+
+    case(
+      "flag",
+      "foo",
+      Some((
+        "`[arg]` `flag` requires `long` or `short`",
+        lsp::Range::at(3, 12, 3, 16),
+      )),
+    );
+
+    case(
+      "multiple",
+      "foo",
+      Some((
+        "`[arg]` `multiple` requires `long` or `short`",
+        lsp::Range::at(3, 12, 3, 20),
+      )),
+    );
+
+    case(
+      "long, flag, value='bar'",
+      "foo",
+      Some((
+        "`[arg]` `flag` cannot be combined with `value`",
+        lsp::Range::at(3, 18, 3, 22),
+      )),
+    );
+
+    case(
+      "long, flag, pattern='bar'",
+      "foo",
+      Some((
+        "`[arg]` `flag` cannot be combined with `pattern`",
+        lsp::Range::at(3, 18, 3, 22),
+      )),
+    );
+
+    case(
+      "long, flag",
+      "foo='bar'",
+      Some((
+        "Flag parameter `foo` may not have a default",
+        lsp::Range::at(4, 4, 4, 13),
+      )),
+    );
+
+    case("short, flag", "foo", None);
+    case("long, multiple", "foo", None);
+    case("short, multiple", "foo", None);
+    case("long, multiple, flag", "foo", None);
+    case("long, multiple, value='bar'", "foo", None);
+    case("long, multiple", "foo='bar'", None);
+  }
+
+  #[test]
   fn arg_attribute_invalid_parameter_expression() {
     #[track_caller]
     fn case(attribute: &str, range: lsp::Range) {
