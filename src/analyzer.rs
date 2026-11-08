@@ -4931,6 +4931,67 @@ mod tests {
   }
 
   #[test]
+  fn recipe_invocation_flag_accepts_no_arguments() {
+    #[track_caller]
+    fn case(name: &str, option: &str) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+        [arg({name}, {option}, flag)]
+        foo bar:
+          echo {{{{bar}}}}
+        baz: foo
+        "
+      })
+      .run();
+    }
+
+    case("'bar'", "long");
+    case("'bar'", "short");
+    case(r#""\u{62}ar""#, "long");
+  }
+
+  #[test]
+  fn recipe_invocation_flag_argument_bounds() {
+    #[track_caller]
+    fn case(dependency: &str, message: Option<&'static str>) {
+      let test = Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+        [arg('bar', long, flag)]
+        foo baz bar:
+          echo {{{{baz}}}} {{{{bar}}}}
+        qux: {dependency}
+        "
+      });
+
+      let test = if let Some(message) = message {
+        test.error(
+          message,
+          lsp::Range::at(5, 5, 5, 5 + u32::try_from(dependency.len()).unwrap()),
+        )
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    case(
+      "foo",
+      Some("Dependency `foo` requires 1 argument, but 0 provided"),
+    );
+    case("(foo 'foo')", None);
+    case("(foo 'foo' 'bar')", None);
+    case(
+      "(foo 'foo' 'bar' 'baz')",
+      Some("Dependency `foo` accepts 2 arguments, but 3 provided"),
+    );
+  }
+
+  #[test]
   fn recipe_invocation_missing_args() {
     Test::new(indoc! {
       "
