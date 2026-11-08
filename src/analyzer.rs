@@ -1666,6 +1666,78 @@ mod tests {
   }
 
   #[test]
+  fn attributes_keyword_structure() {
+    #[track_caller]
+    fn case(content: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(Test::new(content), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(
+      "[arg('foo', long='bar', long='baz')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 24, 0, 28),
+      )],
+    );
+
+    case(
+      "[arg('foo', long, long)]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 18, 0, 22),
+      )],
+    );
+
+    case(
+      "[arg('foo', long, long='bar')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 18, 0, 22),
+      )],
+    );
+
+    case(
+      "set unstable\n[cache(inputs='foo', inputs='bar')]\n[script]\nfoo:\n  echo bar\n",
+      &[(
+        "Duplicate `[cache]` keyword `inputs`",
+        lsp::Range::at(1, 21, 1, 27),
+      )],
+    );
+
+    case(
+      "[arg(long, 'foo')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Positional attribute arguments cannot follow keyword attribute arguments",
+        lsp::Range::at(0, 11, 0, 16),
+      )],
+    );
+
+    case(
+      "set unstable\n[cache(inputs='foo', 'bar')]\n[script]\nfoo:\n  echo bar\n",
+      &[
+        (
+          "Attribute `cache` got 1 argument but takes 0 arguments",
+          lsp::Range::at(1, 0, 2, 0),
+        ),
+        (
+          "Positional attribute arguments cannot follow keyword attribute arguments",
+          lsp::Range::at(1, 21, 1, 26),
+        ),
+      ],
+    );
+
+    case(
+      "[arg('foo', long)]\n[arg('bar', long)]\nbaz foo bar:\n  echo {{foo}} {{bar}}\n",
+      &[],
+    );
+  }
+
+  #[test]
   fn attributes_metadata_multiple_arguments() {
     Test::new(indoc! {
       "
