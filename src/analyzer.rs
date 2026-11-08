@@ -791,7 +791,6 @@ mod tests {
       "Attribute `arg` got 0 arguments but takes 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
-    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
     .run();
   }
 
@@ -1176,6 +1175,59 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn attribute_arguments() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar:
+          echo {{{{bar}}}}
+        "
+      })
+      .run();
+    }
+
+    case("[private()]");
+    case("[doc()]");
+    case("[continue()]");
+    case("[doc('foo',)]");
+    case("[arg('bar', short,)]");
+  }
+
+  #[test]
+  fn attribute_arguments_malformed() {
+    #[track_caller]
+    fn case(attribute: &str, message: &'static str, range: lsp::Range) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar:
+          echo {{{{bar}}}}
+        "
+      })
+      .error(message, range)
+      .run();
+    }
+
+    case(
+      "[doc(,)]",
+      "Missing identifier in value",
+      lsp::Range::at(0, 5, 0, 5),
+    );
+    case(
+      "[arg('bar', short,,)]",
+      "Missing identifier in attribute named param",
+      lsp::Range::at(0, 18, 0, 18),
+    );
+    case(
+      "[private(),]",
+      "Syntax error near `,`",
+      lsp::Range::at(0, 10, 0, 11),
+    );
   }
 
   #[test]

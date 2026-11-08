@@ -311,9 +311,14 @@ module.exports = grammar({
             seq(
               $.identifier,
               "(",
-              field(
-                "argument",
-                comma_sep1(choice($.expression, $.attribute_named_param)),
+              optional(
+                seq(
+                  field(
+                    "argument",
+                    comma_sep1(choice($.expression, $.attribute_named_param)),
+                  ),
+                  optional(","),
+                ),
               ),
               ")",
             ),
