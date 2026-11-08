@@ -891,23 +891,29 @@ mod tests {
   #[test]
   fn arg_attribute_missing_keyword_value() {
     #[track_caller]
-    fn case(keyword: &str, message: &'static str) {
-      Test::new(&formatdoc! {
+    fn case(keyword: &str, message: Option<&'static str>) {
+      let test = Test::new(&formatdoc! {
         "
         [arg('foo', {keyword})]
         bar foo:
           echo {{{{foo}}}}
         "
-      })
-      .error(
-        message,
-        lsp::Range::at(0, 12, 0, 12 + u32::try_from(keyword.len()).unwrap()),
-      )
-      .run();
+      });
+
+      let test = if let Some(message) = message {
+        test.error(
+          message,
+          lsp::Range::at(0, 12, 0, 12 + u32::try_from(keyword.len()).unwrap()),
+        )
+      } else {
+        test
+      };
+
+      test.run();
     }
 
-    case("help", "`[arg]` keyword `help` requires a value");
-    case("short", "`[arg]` keyword `short` requires a value");
+    case("help", Some("`[arg]` keyword `help` requires a value"));
+    case("short", None);
   }
 
   #[test]
