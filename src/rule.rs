@@ -56,6 +56,7 @@ mod extension_without_script;
 mod inconsistent_indentation;
 mod ineffective_parallel_attribute;
 mod invalid_arg_attribute;
+mod invalid_arg_option;
 mod invalid_attribute_argument_count;
 mod invalid_attribute_argument_expression;
 mod invalid_attribute_keyword;

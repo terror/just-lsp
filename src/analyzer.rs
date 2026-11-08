@@ -1129,14 +1129,23 @@ mod tests {
 
   #[test]
   fn arg_attribute_with_short_option() {
-    Test::new(indoc! {
-      "
-      [arg('foo', short=\"f\")]
-      bar foo:
-        echo {{foo}}
-      "
-    })
-    .run();
+    #[track_caller]
+    fn case(option: &str) {
+      Test::new(&formatdoc! {
+        "
+        [arg('foo', {option})]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .run();
+    }
+
+    case("short=\"f\"");
+    case("short='é'");
+    case(r#"short="\u{1f600}""#);
+    case("short=x'$FOO'");
+    case("long, short");
   }
 
   #[test]
@@ -1158,6 +1167,138 @@ mod tests {
       [arg('foo', long, multiple)]
       bar foo:
         echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_option_names_duplicate() {
+    #[track_caller]
+    fn case(
+      first: &str,
+      second: &str,
+      message: &'static str,
+      start: u32,
+      end: u32,
+    ) {
+      Test::new(&formatdoc! {
+        "
+        [arg('bar', {first})]
+        [arg('baz', {second})]
+        foo bar baz:
+          echo {{{{bar}}}} {{{{baz}}}}
+        "
+      })
+      .error(message, lsp::Range::at(1, start, 1, end))
+      .run();
+    }
+
+    case(
+      "long='foo'",
+      "long='foo'",
+      "recipe `foo` defines option `--foo` multiple times",
+      17,
+      22,
+    );
+    case(
+      "long='baz'",
+      "long",
+      "recipe `foo` defines option `--baz` multiple times",
+      12,
+      16,
+    );
+    case(
+      "long",
+      "long='bar'",
+      "recipe `foo` defines option `--bar` multiple times",
+      17,
+      22,
+    );
+    case(
+      "short='é'",
+      "short='é'",
+      "recipe `foo` defines option `-é` multiple times",
+      18,
+      21,
+    );
+    case(
+      "short='b'",
+      "short",
+      "recipe `foo` defines option `-b` multiple times",
+      12,
+      17,
+    );
+    case(
+      "short",
+      "short='b'",
+      "recipe `foo` defines option `-b` multiple times",
+      18,
+      21,
+    );
+    case(
+      "short",
+      "short",
+      "recipe `foo` defines option `-b` multiple times",
+      12,
+      17,
+    );
+  }
+
+  #[test]
+  fn arg_option_names_invalid() {
+    #[track_caller]
+    fn case(keyword: &str, value: &str, message: &'static str) {
+      let start = u32::try_from(13 + keyword.len()).unwrap();
+      let end = start + u32::try_from(value.encode_utf16().count()).unwrap();
+
+      Test::new(&formatdoc! {
+        "
+        [arg('foo', {keyword}={value})]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(message, lsp::Range::at(0, start, 0, end))
+      .run();
+    }
+
+    for keyword in ["long", "short"] {
+      case(keyword, "''", "option name for parameter `foo` is empty");
+      case(
+        keyword,
+        "'-foo'",
+        "option name for parameter `foo` starts with dash",
+      );
+      case(
+        keyword,
+        "'f=oo'",
+        "option name for parameter `foo` contains equal sign",
+      );
+    }
+
+    for value in ["'foo'", "'e\u{301}'"] {
+      case(
+        "short",
+        value,
+        "short option name for parameter `foo` contains multiple characters",
+      );
+    }
+  }
+
+  #[test]
+  fn arg_option_names_scoped() {
+    Test::new(indoc! {
+      "
+      [arg('bar', long='b')]
+      [arg('baz', short='b')]
+      foo bar baz:
+        echo {{bar}} {{baz}}
+
+      [arg('bar', long='b')]
+      [arg('baz', short='b')]
+      bar bar baz:
+        echo {{bar}} {{baz}}
       "
     })
     .run();
