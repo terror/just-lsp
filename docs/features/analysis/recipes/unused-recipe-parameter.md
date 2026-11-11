@@ -8,6 +8,7 @@ Reports recipe parameters that are not referenced and are not available through 
 - References in the recipe’s expressions count as usage. Parameters prefixed with `$`, and parameters covered by `set export`, are exempt.
 - With `set positional-arguments` or `[positional-arguments]`, a reference such as `$1` or `${1}` marks the corresponding parameter as used.
 - With positional arguments enabled, `$@`, `$*`, `${@}`, or `${*}` mark all parameters as used. Script recipes in that mode also treat all parameters as available.
+- With positional arguments enabled, `${@:N}` and `${*:N}` mark every parameter from position `N` onwards as used, and `${@:N:M}` and `${*:N:M}` mark positions `N` through `N+M-1`. An offset of `0`, or an offset that is not a plain number (such as `${@:$n}` or `${@: -1}`), marks all parameters as used.
 - An underscore prefix alone does not exempt a recipe parameter; that convention is supported by `unused-function-parameter` and `unused-variable` instead.
 
 ## How to fix it
