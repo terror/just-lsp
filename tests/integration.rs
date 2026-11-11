@@ -633,6 +633,51 @@ fn analyze_reports_imported_recipe_parameters() -> Result {
 }
 
 #[test]
+fn analyze_accepts_variadic_used_through_positional_slice() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        [positional-arguments]
+        greet name="world" *args:
+          echo {{quote(name)}} "${@:2}"
+        "#
+      },
+    )
+    .argument("justfile")
+    .run()
+}
+
+#[test]
+fn analyze_reports_parameter_not_covered_by_positional_slice() -> Result {
+  Test::new()?
+    .file(
+      "justfile",
+      indoc! {
+        r#"
+        [positional-arguments]
+        greet name="world" *args:
+          echo "${@:2}"
+        "#
+      },
+    )
+    .argument("justfile")
+    .expected_stdout(indoc! {
+      r#"
+      warning[unused-recipe-parameter]: unused parameter
+         ╭─[ justfile:2:7 ]
+         │
+       2 │ greet name="world" *args:
+         │       ──────┬─────
+         │             ╰─────── Parameter `name` appears unused
+      ───╯
+      "#
+    })
+    .run()
+}
+
+#[test]
 fn analyze_reports_multiple_diagnostics_in_order_and_fails() -> Result {
   Test::new()?
     .file(
