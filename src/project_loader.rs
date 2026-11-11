@@ -8,8 +8,8 @@ pub(crate) struct ProjectLoader<'a> {
 }
 
 impl<'a> ProjectLoader<'a> {
-  fn add_dependency(&mut self, source: &lsp::Url, import: &Import) -> Result {
-    let target = self.resolve_dependency_target(source, import)?;
+  fn add_import(&mut self, source: &lsp::Url, import: &Import) -> Result {
+    let target = self.resolve_import_target(source, import)?;
 
     let dependency = ProjectDependency {
       kind: ProjectDependencyKind::Import,
@@ -18,6 +18,36 @@ impl<'a> ProjectLoader<'a> {
     };
 
     self.project.add_dependency(source, dependency);
+
+    Ok(())
+  }
+
+  fn add_module(&mut self, source: &lsp::Url, module: Module) -> Result {
+    let target = if module
+      .path
+      .as_ref()
+      .is_some_and(|path| path.value.starts_with('f'))
+    {
+      ProjectDependencyTarget::Dynamic
+    } else if let Some(path) = module.resolve(source) {
+      self.load_dependency(source, &path, module.optional)?
+    } else {
+      ProjectDependencyTarget::Missing
+    };
+
+    self.project.add_dependency(
+      source,
+      ProjectDependency {
+        location: module
+          .path
+          .as_ref()
+          .map_or(module.name.range, |path| path.range),
+        kind: ProjectDependencyKind::Module {
+          name: module.name.value,
+        },
+        target,
+      },
+    );
 
     Ok(())
   }
@@ -45,7 +75,40 @@ impl<'a> ProjectLoader<'a> {
     Ok(loader.project)
   }
 
-  fn resolve_dependency_target(
+  fn load_dependency(
+    &mut self,
+    source: &lsp::Url,
+    path: &Path,
+    optional: bool,
+  ) -> Result<ProjectDependencyTarget> {
+    let path = path.clean();
+
+    let Some(uri) = lsp::Url::from_path(&path) else {
+      return Ok(ProjectDependencyTarget::Missing);
+    };
+
+    self.project.add_dependent(&uri, source);
+
+    if self.active.contains(&uri) {
+      return Ok(ProjectDependencyTarget::Cycle);
+    }
+
+    if self.documents.load(&uri).is_err() {
+      if !optional {
+        warn!(path = %path.display(), "failed to read dependency");
+      }
+
+      return Ok(ProjectDependencyTarget::Missing);
+    }
+
+    if !self.expanded.contains(&uri) {
+      self.visit(&uri)?;
+    }
+
+    Ok(ProjectDependencyTarget::Resolved(uri))
+  }
+
+  fn resolve_import_target(
     &mut self,
     source: &lsp::Url,
     import: &Import,
@@ -62,31 +125,7 @@ impl<'a> ProjectLoader<'a> {
       Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
     };
 
-    let path = path.clean();
-
-    let Some(uri) = lsp::Url::from_path(&path) else {
-      return Ok(ProjectDependencyTarget::Missing);
-    };
-
-    self.project.add_dependent(&uri, source);
-
-    if self.active.contains(&uri) {
-      return Ok(ProjectDependencyTarget::Cycle);
-    }
-
-    if self.documents.load(&uri).is_err() {
-      if !import.optional {
-        warn!(path = %path.display(), "failed to read import");
-      }
-
-      return Ok(ProjectDependencyTarget::Missing);
-    }
-
-    if !self.expanded.contains(&uri) {
-      self.visit(&uri)?;
-    }
-
-    Ok(ProjectDependencyTarget::Resolved(uri))
+    self.load_dependency(source, &path, import.optional)
   }
 
   fn visit(&mut self, uri: &lsp::Url) -> Result {
@@ -97,7 +136,21 @@ impl<'a> ProjectLoader<'a> {
     self.project.dependencies.entry(uri.clone()).or_default();
 
     for import in imports.into_iter().filter(Import::is_enabled) {
-      self.add_dependency(uri, &import)?;
+      self.add_import(uri, &import)?;
+    }
+
+    for module in self.documents.load(uri)?.modules() {
+      if !module
+        .attributes
+        .iter()
+        .filter_map(Attribute::condition)
+        .reduce(|left, right| left || right)
+        .unwrap_or(true)
+      {
+        continue;
+      }
+
+      self.add_module(uri, module)?;
     }
 
     self.active.remove(uri);
@@ -444,6 +497,86 @@ mod tests {
 
     assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
     assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
+  }
+
+  #[test]
+  fn loads_module_graph() {
+    let mut test = Test::new(indoc! {
+      "
+      import 'shared.just'
+      mod child 'nested/child.just'
+      mod? missing 'missing.just'
+      mod? absent
+      mod dynamic f'dynamic.just'
+      mod cycle 'justfile'
+      "
+    })
+    .file("shared.just", "shared:\n")
+    .file(
+      "nested/child.just",
+      "import '../shared.just'\nmod leaf\nall:\n",
+    )
+    .file("nested/leaf.just", "leaf:\n");
+
+    let project = test.load();
+    let child = test.uri("nested/child.just");
+    let shared = test.uri("shared.just");
+    let leaf = test.uri("nested/leaf.just");
+
+    assert_eq!(
+      project.dependencies[&test.root]
+        .iter()
+        .map(|dependency| dependency.target.clone())
+        .collect::<Vec<_>>(),
+      [
+        ProjectDependencyTarget::Resolved(shared.clone()),
+        ProjectDependencyTarget::Resolved(child.clone()),
+        ProjectDependencyTarget::Missing,
+        ProjectDependencyTarget::Missing,
+        ProjectDependencyTarget::Dynamic,
+        ProjectDependencyTarget::Cycle,
+      ],
+    );
+    assert_eq!(
+      project
+        .import_scope
+        .documents()
+        .iter()
+        .map(|document| &document.uri)
+        .collect::<Vec<_>>(),
+      [&test.root, &shared],
+    );
+    assert_eq!(
+      ImportScope::for_root(&project, &child)
+        .documents()
+        .iter()
+        .map(|document| &document.uri)
+        .collect::<Vec<_>>(),
+      [&child, &shared],
+    );
+    assert_eq!(
+      project.dependents[&child],
+      HashSet::from([test.root.clone()])
+    );
+    assert_eq!(
+      project.dependents[&shared],
+      HashSet::from([test.root.clone(), child.clone()])
+    );
+    assert_eq!(project.dependents[&leaf], HashSet::from([child]));
+    assert!(project.contains(&test.uri("missing.just")));
+  }
+
+  #[test]
+  fn mixed_import_module_cycle() {
+    let mut test =
+      Test::new("mod child\n").file("child.just", "import 'justfile'\n");
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.uri("child.just")][0].target,
+      ProjectDependencyTarget::Cycle,
+    );
+    assert_eq!(project.import_scope.documents().len(), 1);
   }
 
   #[test]
