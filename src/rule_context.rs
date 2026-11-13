@@ -285,13 +285,9 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn recipe_names(&self) -> &HashSet<String> {
-    self.recipe_names.get_or_init(|| {
-      self
-        .recipes()
-        .iter()
-        .map(|recipe| recipe.name.value.clone())
-        .collect()
-    })
+    self
+      .recipe_names
+      .get_or_init(|| self.view.resolved_recipes().keys().cloned().collect())
   }
 
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
@@ -396,6 +392,7 @@ mod tests {
         .unwrap();
 
     let view = ProjectView {
+      recipes: OnceLock::new(),
       document: &document,
       documents: vec![
         ProjectViewDocument {
