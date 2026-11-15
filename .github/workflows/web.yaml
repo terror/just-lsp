@@ -91,11 +91,18 @@ jobs:
       run: npm install --global vercel@65.16.0
 
     - name: Pull Vercel configuration
-      run: >-
-        vercel pull --yes
-        --environment="$VERCEL_ENVIRONMENT"
-        --git-branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-        --token="${VERCEL_TOKEN:?Set the VERCEL_TOKEN repository secret}"
+      run: |
+        args=(
+          --yes
+          --environment="$VERCEL_ENVIRONMENT"
+          --token="${VERCEL_TOKEN:?Set the VERCEL_TOKEN repository secret}"
+        )
+
+        if [[ "$VERCEL_ENVIRONMENT" == preview ]]; then
+          args+=(--git-branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}")
+        fi
+
+        vercel pull "${args[@]}"
 
     - name: Build deployment
       run: vercel build --environment="$VERCEL_ENVIRONMENT" --token="$VERCEL_TOKEN"
