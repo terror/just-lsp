@@ -52,3 +52,56 @@ jobs:
     - name: Build
       working-directory: ./www
       run: bun run build
+
+  deploy:
+    if: >-
+      github.repository == 'terror/just-lsp' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'pull_request' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository))
+    needs: build
+    runs-on: ubuntu-latest
+
+    env:
+      VERCEL_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+      VERCEL_ORG_ID: team_04PzWPep1jOkiNGZfFZhAJht
+      VERCEL_PROJECT_ID: prj_ZyvWtlfg1hAkGDi3Z1xyFRyKRdUf
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    environment:
+      name: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.4.1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+
+    - name: Install Vercel CLI
+      run: npm install --global vercel@65.16.0
+
+    - name: Pull Vercel configuration
+      run: >-
+        vercel pull --yes
+        --environment="$VERCEL_ENVIRONMENT"
+        --git-branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+        --token="${VERCEL_TOKEN:?Set the VERCEL_TOKEN repository secret}"
+
+    - name: Build deployment
+      run: vercel build --environment="$VERCEL_ENVIRONMENT" --token="$VERCEL_TOKEN"
+
+    - name: Deploy
+      id: deploy
+      run: |
+        url=$(vercel deploy --prebuilt --environment="$VERCEL_ENVIRONMENT" --token="$VERCEL_TOKEN")
+        echo "url=$url" >> "$GITHUB_OUTPUT"
