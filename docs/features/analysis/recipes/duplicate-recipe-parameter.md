@@ -13,8 +13,6 @@ Reports duplicate recipe parameter names and invalid ordering of required, defau
 
 Give parameters distinct names, put required parameters before defaulted parameters, and place a single variadic parameter at the end.
 
-## Examples
-
 Parameter names must be distinct.
 
 ```just reported

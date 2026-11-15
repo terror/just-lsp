@@ -8,10 +8,12 @@ struct SettingValidation {
 
 const SETTING_VALIDATIONS: &[SettingValidation] = &[
   SettingValidation {
-    expected: "a non-empty whitespace string literal",
+    expected: "a non-empty string literal containing only spaces or only tabs",
     name: "indentation",
     validate: |value| {
-      !value.is_empty() && value.chars().all(char::is_whitespace)
+      value.bytes().next().is_some_and(|first| {
+        matches!(first, b' ' | b'\t') && value.bytes().all(|byte| byte == first)
+      })
     },
   },
   SettingValidation {

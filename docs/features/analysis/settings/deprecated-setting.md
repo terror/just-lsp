@@ -15,8 +15,6 @@ Migrate to the replacement named in the diagnostic. For `windows-shell`, use a p
 
 **Editor quick fix:** Renames a setting when it has a direct replacement, or rewrites `windows-shell` as `[windows]` followed by `set shell` when that replacement is not already configured.
 
-## Examples
-
 ```just reported
 set windows-shell := ['pwsh', '-c']
 ```

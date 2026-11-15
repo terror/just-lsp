@@ -13,8 +13,6 @@ Reports a recipe body line whose indentation width differs from the first nonbla
 
 Use the same leading whitespace for ordinary lines in a recipe. Keep indentation that belongs to a script inside a recipe that runs in script mode.
 
-## Examples
-
 The second command has four leading spaces; the first has two.
 
 ```just reported

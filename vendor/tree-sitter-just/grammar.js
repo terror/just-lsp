@@ -288,11 +288,14 @@ module.exports = grammar({
       ),
 
     function_call: ($) =>
-      seq(
-        field("name", $.identifier),
-        "(",
-        optional(field("arguments", $.sequence)),
-        ")",
+      prec(
+        1,
+        seq(
+          field("name", $.identifier),
+          "(",
+          optional(field("arguments", $.sequence)),
+          ")",
+        ),
       ),
 
     external_command: ($) =>
@@ -311,9 +314,14 @@ module.exports = grammar({
             seq(
               $.identifier,
               "(",
-              field(
-                "argument",
-                comma_sep1(choice($.expression, $.attribute_named_param)),
+              optional(
+                seq(
+                  field(
+                    "argument",
+                    comma_sep1(choice($.expression, $.attribute_named_param)),
+                  ),
+                  optional(","),
+                ),
               ),
               ")",
             ),

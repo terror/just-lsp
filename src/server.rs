@@ -424,7 +424,7 @@ impl LanguageServer for Server {
         .filter(|node| node.kind() == "identifier")
         .map(|identifier| {
           resolver
-            .resolve_identifier_references(&identifier)
+            .resolve_identifier_references(&identifier, true)
             .into_iter()
             .map(|location| lsp::DocumentHighlight {
               range: location.range,
@@ -813,6 +813,8 @@ impl LanguageServer for Server {
 
     let position = params.text_document_position.position;
 
+    let include_declaration = params.context.include_declaration;
+
     let workspace = self.workspace.read().await;
 
     Ok(workspace.open_document(&uri).and_then(|document| {
@@ -821,7 +823,10 @@ impl LanguageServer for Server {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .map(|identifier| resolver.resolve_identifier_references(&identifier))
+        .map(|identifier| {
+          resolver
+            .resolve_identifier_references(&identifier, include_declaration)
+        })
     }))
   }
 
@@ -849,7 +854,8 @@ impl LanguageServer for Server {
             .is_some_and(|symbol| symbol.is_renameable())
         })
         .map(|identifier| {
-          let references = resolver.resolve_identifier_references(&identifier);
+          let references =
+            resolver.resolve_identifier_references(&identifier, true);
 
           let text_edits = references
             .iter()
@@ -3856,6 +3862,95 @@ mod tests {
             range: lsp::Range::at(6, 13, 6, 16),
           },
         ])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn recipe_references_without_declaration() -> Result {
+    let params = |position| lsp::ReferenceParams {
+      text_document_position: lsp::TextDocumentPositionParams::new(
+        lsp::TextDocumentIdentifier::new("file:///test.just".parse().unwrap()),
+        position,
+      ),
+      context: lsp::ReferenceContext {
+        include_declaration: false,
+      },
+      work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+      partial_result_params: lsp::PartialResultParams::default(),
+    };
+
+    let expected = vec![
+      lsp::Location {
+        uri: "file:///test.just".parse().unwrap(),
+        range: lsp::Range::at(3, 5, 3, 8),
+      },
+      lsp::Location {
+        uri: "file:///test.just".parse().unwrap(),
+        range: lsp::Range::at(6, 13, 6, 16),
+      },
+    ];
+
+    Test::new()
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
+          "
+          foo:
+            echo \"foo\"
+
+          bar: foo
+            echo \"bar\"
+
+          alias baz := foo
+          "
+        },
+      )
+      .request::<request::References>(
+        params(lsp::Position::new(0, 1)),
+        Ok(Some(expected.clone())),
+      )
+      .request::<request::References>(
+        params(lsp::Position::new(3, 6)),
+        Ok(Some(expected)),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn references_without_declaration_builtin() -> Result {
+    Test::new()
+      .initialize()
+      .open(
+        "file:///test.just",
+        indoc! {
+          "
+          foo:
+            echo {{arch()}}
+          "
+        },
+      )
+      .request::<request::References>(
+        lsp::ReferenceParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(
+              "file:///test.just".parse().unwrap(),
+            ),
+            lsp::Position::new(1, 11),
+          ),
+          context: lsp::ReferenceContext {
+            include_declaration: false,
+          },
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::Location {
+          uri: "file:///test.just".parse().unwrap(),
+          range: lsp::Range::at(1, 9, 1, 13),
+        }])),
       )
       .run()
       .await

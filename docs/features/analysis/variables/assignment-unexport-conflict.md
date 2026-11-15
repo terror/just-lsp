@@ -13,8 +13,6 @@ Reports a name that is both assigned and unexported for overlapping platforms.
 
 Choose whether to assign the name or remove it from the environment. Remove the conflicting declaration, or use a different variable name for an unrelated value.
 
-## Examples
-
 ```just reported
 export FOO := 'bar'
 unexport FOO

@@ -791,7 +791,6 @@ mod tests {
       "Attribute `arg` got 0 arguments but takes 1 argument",
       lsp::Range::at(0, 0, 1, 0),
     )
-    .error("Missing identifier in value", lsp::Range::at(0, 5, 0, 5))
     .run();
   }
 
@@ -891,23 +890,29 @@ mod tests {
   #[test]
   fn arg_attribute_missing_keyword_value() {
     #[track_caller]
-    fn case(keyword: &str, message: &'static str) {
-      Test::new(&formatdoc! {
+    fn case(keyword: &str, message: Option<&'static str>) {
+      let test = Test::new(&formatdoc! {
         "
         [arg('foo', {keyword})]
         bar foo:
           echo {{{{foo}}}}
         "
-      })
-      .error(
-        message,
-        lsp::Range::at(0, 12, 0, 12 + u32::try_from(keyword.len()).unwrap()),
-      )
-      .run();
+      });
+
+      let test = if let Some(message) = message {
+        test.error(
+          message,
+          lsp::Range::at(0, 12, 0, 12 + u32::try_from(keyword.len()).unwrap()),
+        )
+      } else {
+        test
+      };
+
+      test.run();
     }
 
-    case("help", "`[arg]` keyword `help` requires a value");
-    case("short", "`[arg]` keyword `short` requires a value");
+    case("help", Some("`[arg]` keyword `help` requires a value"));
+    case("short", None);
   }
 
   #[test]
@@ -1134,9 +1139,52 @@ mod tests {
   }
 
   #[test]
+  fn arg_keywords_require_lists() {
+    #[track_caller]
+    fn case(arguments: &str, parameter: &str, message: &'static str, end: u32) {
+      let content = formatdoc! {
+        "
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      };
+
+      let range = lsp::Range::at(0, 12, 0, end);
+
+      Test::new(&content).error(message, range).run();
+
+      Test::new(&format!("{content}\nset lists := false\n"))
+        .error(message, range)
+        .run();
+
+      Test::new(&content)
+        .imported_document("set lists := false\n")
+        .error(message, range)
+        .run();
+
+      Test::new(&content)
+        .imported_document("set unstable\nset lists\n")
+        .run();
+    }
+
+    case("max='2'", "+foo", "`[arg(max)]` requires `set lists`", 15);
+    case("min='1'", "+foo", "`[arg(min)]` requires `set lists`", 15);
+    case(
+      "multiple, long",
+      "foo",
+      "`[arg(multiple)]` requires `set lists`",
+      20,
+    );
+  }
+
+  #[test]
   fn arg_min_max_kwargs_accepted() {
     Test::new(indoc! {
       "
+      set unstable
+      set lists
+
       [arg('FILES', min='2', max='4')]
       backup +FILES:
         scp {{FILES}} me@server.com:
@@ -1149,6 +1197,9 @@ mod tests {
   fn arg_multiple_kwarg_accepted() {
     Test::new(indoc! {
       "
+      set unstable
+      set lists
+
       [arg('foo', long, multiple)]
       bar foo:
         echo {{foo}}
@@ -1170,6 +1221,59 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn attribute_arguments() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar:
+          echo {{{{bar}}}}
+        "
+      })
+      .run();
+    }
+
+    case("[private()]");
+    case("[doc()]");
+    case("[continue()]");
+    case("[doc('foo',)]");
+    case("[arg('bar', short,)]");
+  }
+
+  #[test]
+  fn attribute_arguments_malformed() {
+    #[track_caller]
+    fn case(attribute: &str, message: &'static str, range: lsp::Range) {
+      Test::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar:
+          echo {{{{bar}}}}
+        "
+      })
+      .error(message, range)
+      .run();
+    }
+
+    case(
+      "[doc(,)]",
+      "Missing identifier in value",
+      lsp::Range::at(0, 5, 0, 5),
+    );
+    case(
+      "[arg('bar', short,,)]",
+      "Missing identifier in attribute named param",
+      lsp::Range::at(0, 18, 0, 18),
+    );
+    case(
+      "[private(),]",
+      "Syntax error near `,`",
+      lsp::Range::at(0, 10, 0, 11),
+    );
   }
 
   #[test]
@@ -1605,6 +1709,78 @@ mod tests {
     )
     .error("Syntax error near `[private]`", lsp::Range::at(0, 0, 1, 0))
     .run();
+  }
+
+  #[test]
+  fn attributes_keyword_structure() {
+    #[track_caller]
+    fn case(content: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(Test::new(content), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(
+      "[arg('foo', long='bar', long='baz')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 24, 0, 28),
+      )],
+    );
+
+    case(
+      "[arg('foo', long, long)]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 18, 0, 22),
+      )],
+    );
+
+    case(
+      "[arg('foo', long, long='bar')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Duplicate `[arg]` keyword `long`",
+        lsp::Range::at(0, 18, 0, 22),
+      )],
+    );
+
+    case(
+      "set unstable\n[cache(inputs='foo', inputs='bar')]\n[script]\nfoo:\n  echo bar\n",
+      &[(
+        "Duplicate `[cache]` keyword `inputs`",
+        lsp::Range::at(1, 21, 1, 27),
+      )],
+    );
+
+    case(
+      "[arg(long, 'foo')]\nbar foo:\n  echo {{foo}}\n",
+      &[(
+        "Positional attribute arguments cannot follow keyword attribute arguments",
+        lsp::Range::at(0, 11, 0, 16),
+      )],
+    );
+
+    case(
+      "set unstable\n[cache(inputs='foo', 'bar')]\n[script]\nfoo:\n  echo bar\n",
+      &[
+        (
+          "Attribute `cache` got 1 argument but takes 0 arguments",
+          lsp::Range::at(1, 0, 2, 0),
+        ),
+        (
+          "Positional attribute arguments cannot follow keyword attribute arguments",
+          lsp::Range::at(1, 21, 1, 26),
+        ),
+      ],
+    );
+
+    case(
+      "[arg('foo', long)]\n[arg('bar', long)]\nbaz foo bar:\n  echo {{foo}} {{bar}}\n",
+      &[],
+    );
   }
 
   #[test]
@@ -4925,6 +5101,68 @@ mod tests {
   }
 
   #[test]
+  fn recipe_invocation_flag_accepts_no_arguments() {
+    #[track_caller]
+    fn case(name: &str, option: &str) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+        [arg({name}, {option}, flag)]
+        foo bar:
+          echo {{{{bar}}}}
+        baz: foo
+        "
+      })
+      .run();
+    }
+
+    case("'bar'", "long");
+    case("'bar'", "short");
+    case(r#""\u{62}ar""#, "long");
+    case("x'bar'", "long");
+  }
+
+  #[test]
+  fn recipe_invocation_flag_argument_bounds() {
+    #[track_caller]
+    fn case(dependency: &str, message: Option<&'static str>) {
+      let test = Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+        [arg('bar', long, flag)]
+        foo baz bar:
+          echo {{{{baz}}}} {{{{bar}}}}
+        qux: {dependency}
+        "
+      });
+
+      let test = if let Some(message) = message {
+        test.error(
+          message,
+          lsp::Range::at(5, 5, 5, 5 + u32::try_from(dependency.len()).unwrap()),
+        )
+      } else {
+        test
+      };
+
+      test.run();
+    }
+
+    case(
+      "foo",
+      Some("Dependency `foo` requires 1 argument, but 0 provided"),
+    );
+    case("(foo 'foo')", None);
+    case("(foo 'foo' 'bar')", None);
+    case(
+      "(foo 'foo' 'bar' 'baz')",
+      Some("Dependency `foo` accepts 2 arguments, but 3 provided"),
+    );
+  }
+
+  #[test]
   fn recipe_invocation_missing_args() {
     Test::new(indoc! {
       "
@@ -5814,7 +6052,7 @@ mod tests {
         test
       } else {
         test.error(
-          "Setting `indentation` must be a non-empty whitespace string literal",
+          "Setting `indentation` must be a non-empty string literal containing only spaces or only tabs",
           lsp::Range::at(0, 19, 0, 19 + u32::try_from(value.len()).unwrap()),
         )
       };
@@ -5823,9 +6061,12 @@ mod tests {
     }
 
     case(r#""  ""#, true);
-    case(r#""\t""#, true);
-    case(r#""\n""#, true);
-    case(r#""\u{2003}""#, true);
+    case(r#""\t\t""#, true);
+    case(r#""\u{20}\u{20}""#, true);
+    case(r#"" \t""#, false);
+    case(r#""\t ""#, false);
+    case(r#""\n""#, false);
+    case(r#""\u{2003}""#, false);
     case("'  '", true);
     case(r#""""#, false);
     case(r#""foo""#, false);

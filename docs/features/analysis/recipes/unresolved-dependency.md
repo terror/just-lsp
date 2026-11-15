@@ -15,8 +15,6 @@ Correct the dependency name, define the recipe, or import the file that contains
 
 **Editor quick fix:** Replaces the dependency name with the suggested recipe name when a close match is found.
 
-## Examples
-
 ```just reported
 foo: bar
   echo foo

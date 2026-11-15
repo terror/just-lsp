@@ -13,8 +13,6 @@ Reports a value that violates the constraints of `indentation` or `minimum-versi
 
 Use whitespace for `indentation` and a three-component numeric version for `minimum-version`.
 
-## Examples
-
 ```just reported
 set indentation := 'foo'
 ```

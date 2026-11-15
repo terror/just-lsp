@@ -14,8 +14,6 @@ Correct the function name, define the function, or import its definition. Calls 
 
 **Editor quick fix:** Replaces the unknown name with a suggested builtin or user-defined function name.
 
-## Examples
-
 ```just reported
 foo:
   echo {{uppercas('foo')}}

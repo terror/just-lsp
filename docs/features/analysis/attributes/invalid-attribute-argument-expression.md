@@ -24,8 +24,6 @@ Use a literal string where required. For `[doc]` arguments and `[arg]` values
 for `help` or `pattern`, remove function calls and backtick commands from the
 expression.
 
-## Examples
-
 A concatenation is an expression even when both operands are literals.
 
 ```just reported

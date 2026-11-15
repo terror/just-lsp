@@ -13,8 +13,6 @@ Reports supported unstable features used without enabled `set unstable`.
 
 Add `set unstable` to opt into the feature, or rewrite the justfile without that feature.
 
-## Examples
-
 ```just reported
 set lists
 

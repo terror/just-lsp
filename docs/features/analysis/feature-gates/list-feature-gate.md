@@ -15,8 +15,6 @@ Reports syntax and builtin calls that require enabled `set lists`.
 
 Enable both list and unstable features, or replace the feature with syntax and builtins that work without list mode.
 
-## Examples
-
 ```just reported
 foo:
   echo {{join_list(['foo', 'bar'])}}
