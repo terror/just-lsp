@@ -12,8 +12,6 @@ Reports repeated parameter names within a user-defined function.
 
 Give every parameter a distinct name and update the function body to reference the intended parameters.
 
-## Examples
-
 ```just reported
 set unstable
 

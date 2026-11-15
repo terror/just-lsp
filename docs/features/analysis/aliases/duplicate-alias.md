@@ -12,8 +12,6 @@ Reports multiple aliases with the same name when their platform constraints over
 
 Keep one alias for each name, give the aliases distinct names, or use disjoint platform attributes when the targets are platform-specific.
 
-## Examples
-
 ```just reported
 foo:
   echo foo

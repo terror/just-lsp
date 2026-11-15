@@ -14,8 +14,6 @@ Correct the setting name or remove the unsupported setting.
 
 **Editor quick fix:** Replaces the setting name with the suggested builtin setting.
 
-## Examples
-
 ```just reported
 set dotenv-laod
 ```

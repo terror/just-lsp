@@ -1,6 +1,6 @@
 [package]
 name = "just-lsp"
-version = "0.10.0"
+version = "0.11.1"
 description = "A language server for just"
 authors = ["Liam <liam@scalzulli.com>"]
 license = "CC0-1.0"
@@ -33,7 +33,7 @@ unreachable_pub = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
-arbitrary-source-item-ordering = "deny"
+arbitrary_source_item_ordering = "deny"
 pedantic = { level = "deny", priority = -1 }
 too_many_lines = "allow"
 wildcard_imports = "allow"

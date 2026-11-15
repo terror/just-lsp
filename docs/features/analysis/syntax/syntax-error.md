@@ -12,8 +12,6 @@ Reports malformed justfile syntax, including unexpected text and missing syntax 
 
 Complete the declaration or expression at the reported location. Check recipe colons, assignment operators, matching quotes, brackets, and parentheses.
 
-## Examples
-
 A recipe header must end with a colon.
 
 ```just reported

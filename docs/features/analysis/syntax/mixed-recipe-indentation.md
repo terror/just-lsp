@@ -13,8 +13,6 @@ Reports a recipe body that mixes tabs and spaces in its leading whitespace.
 
 Indent all ordinary lines in a recipe with either spaces or tabs. Use your editor’s whitespace display to locate invisible differences.
 
-## Examples
-
 The first command begins with a tab; the second begins with two spaces.
 
 ```just reported

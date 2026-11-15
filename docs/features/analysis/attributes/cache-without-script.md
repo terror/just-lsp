@@ -13,8 +13,6 @@ Reports a recipe that uses `[cache]` without script mode.
 
 Enable script mode for the cached recipe, or remove `[cache]` if the recipe should run as ordinary shell lines.
 
-## Examples
-
 ```just reported
 set unstable
 

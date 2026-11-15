@@ -13,8 +13,6 @@ Reports a builtin or user-defined function call with an invalid argument count.
 
 Add required arguments or remove extra arguments to match the function’s signature.
 
-## Examples
-
 ```just reported
 foo:
   echo {{uppercase()}}

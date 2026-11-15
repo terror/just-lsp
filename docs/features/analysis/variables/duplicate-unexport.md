@@ -12,8 +12,6 @@ Reports an environment variable name unexported more than once for overlapping p
 
 Remove the repeated directive or use nonoverlapping platform attributes when separate declarations are needed.
 
-## Examples
-
 ```just reported
 unexport FOO
 unexport FOO

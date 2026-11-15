@@ -14,8 +14,6 @@ Remove `[parallel]` when it has no effect. Keep it for recipes with multiple dep
 
 **Editor quick fix:** Removes `[parallel]`, preserving other attributes in the same attribute list.
 
-## Examples
-
 ```just reported
 bar:
   echo bar

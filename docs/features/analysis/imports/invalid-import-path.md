@@ -13,8 +13,6 @@ Reports an import path that cannot be decoded or expanded, or a required import 
 
 Correct the path, string escapes, or environment variable used in the import. If a file is intentionally optional, use `import?`; required imports should point to an existing file.
 
-## Examples
-
 Assume foo.just does not exist and is intentionally optional.
 
 ```just reported

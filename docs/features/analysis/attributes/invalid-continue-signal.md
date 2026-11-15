@@ -12,8 +12,6 @@ Reports an unsupported signal name passed to `[continue]`.
 
 Use a supported signal name with its `SIG` prefix, or remove the unsupported argument.
 
-## Examples
-
 ```just reported
 [continue: 'SIGTERM']
 foo:

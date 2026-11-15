@@ -13,8 +13,6 @@ Reports `dotenv-command` combined with dotenv file-loading settings for overlapp
 
 Choose command output or file loading as the environment source. Remove or disable the conflicting file-loading settings when using `dotenv-command`.
 
-## Examples
-
 ```just reported
 set dotenv-command := 'echo FOO=bar'
 set dotenv-load

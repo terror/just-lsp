@@ -12,8 +12,6 @@ Reports a setting key declared more than once with overlapping platform constrai
 
 Keep a single declaration for each setting, or use disjoint platform attributes when values need to vary by platform.
 
-## Examples
-
 ```just reported
 set dotenv-load
 set dotenv-load := true

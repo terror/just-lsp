@@ -12,8 +12,6 @@ Reports user-defined functions that share a name and have overlapping platform c
 
 Keep a single definition, rename one function and its calls, or use disjoint platform attributes for platform-specific definitions.
 
-## Examples
-
 ```just reported
 set unstable
 

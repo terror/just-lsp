@@ -26,8 +26,6 @@ requires [unstable features](#unstable-feature-gate) and
 Use a supported keyword name and supply a value when required. Remove keyword
 arguments from attributes that do not accept them.
 
-## Examples
-
 Unknown keywords are rejected.
 
 ```just reported

@@ -12,8 +12,6 @@ Reports a known attribute that is not attached to a declaration that can take at
 
 Place the attribute immediately before the declaration it should modify, or remove the dangling attribute.
 
-## Examples
-
 ```just reported
 [private]
 

@@ -19,8 +19,6 @@ Reports an attribute invocation with too few or too many positional arguments.
 Add missing arguments or remove extra ones according to the attribute’s expected
 range.
 
-## Examples
-
 ```just reported
 [group]
 foo:

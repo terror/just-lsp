@@ -15,8 +15,6 @@ Use the replacement function named in the diagnostic, preserving the arguments.
 
 **Editor quick fix:** Renames the deprecated function to its replacement.
 
-## Examples
-
 ```just reported
 foo:
   echo {{env_var_or_default('FOO', 'bar')}}

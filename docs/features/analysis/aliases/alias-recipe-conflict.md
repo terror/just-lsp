@@ -12,8 +12,6 @@ Reports an alias and a recipe that share the same name.
 
 Rename the alias or recipe and update its references, or remove the redundant declaration.
 
-## Examples
-
 ```just reported
 bar:
   echo bar

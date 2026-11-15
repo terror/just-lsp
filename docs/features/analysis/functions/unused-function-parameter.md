@@ -12,8 +12,6 @@ Reports a user-defined function parameter that is never referenced in the functi
 
 Use the parameter in the body, remove it and update callers, or prefix its name with `_` to mark it intentionally unused.
 
-## Examples
-
 ```just reported
 set unstable
 

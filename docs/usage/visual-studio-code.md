@@ -21,5 +21,14 @@ Reload Visual Studio Code after changing the binary path.
 
 The extension's
 [language client](https://github.com/nefrob/vscode-just/blob/main/src/lsp.ts)
-currently does not expose custom `initializationOptions`, so `just-lsp` uses its
-default formatting and diagnostic rule configuration.
+currently does not expose custom `initializationOptions`. With `just-lsp` 0.11.0
+or later, configure [formatting and diagnostic rules](#configuration) using
+`just-lsp.toml` beside your root justfile. For example, to disable unused recipe
+parameter diagnostics:
+
+```toml
+[rules]
+unused-recipe-parameter = "off"
+```
+
+Reload Visual Studio Code after changing `just-lsp.toml`.
