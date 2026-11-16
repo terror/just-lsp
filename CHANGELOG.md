@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.2](https://github.com/terror/just-lsp/releases/tag/0.11.2) - 2026-11-16
+
+### Fixed
+
+- Fix function calls in dependency arguments ([#845](https://github.com/terror/just-lsp/pull/845) by [terror](https://github.com/terror))
+- Respect `includeDeclaration` in reference requests ([#822](https://github.com/terror/just-lsp/pull/822) by [zerone0x](https://github.com/zerone0x))
+- Fix dependency argument counts for flag parameters ([#827](https://github.com/terror/just-lsp/pull/827) by [terror](https://github.com/terror))
+
+### Misc
+
+- Fix production web deployment configuration ([#847](https://github.com/terror/just-lsp/pull/847) by [terror](https://github.com/terror))
+- Skip Vercel deployments for fork pull requests ([#846](https://github.com/terror/just-lsp/pull/846) by [terror](https://github.com/terror))
+- Bump toml from 1.1.8+spec-1.1.0 to 1.2.1+spec-1.1.0 ([#842](https://github.com/terror/just-lsp/pull/842) by [app/dependabot](https://github.com/app/dependabot))
+- Bump cc from 1.10.0 to 1.11.1 ([#841](https://github.com/terror/just-lsp/pull/841) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter-highlight from 0.27.1 to 0.27.2 ([#840](https://github.com/terror/just-lsp/pull/840) by [app/dependabot](https://github.com/app/dependabot))
+- Bump tree-sitter from 0.27.1 to 0.27.2 ([#839](https://github.com/terror/just-lsp/pull/839) by [app/dependabot](https://github.com/app/dependabot))
+- Document editor configuration with `just-lsp.toml` ([#838](https://github.com/terror/just-lsp/pull/838) by [terror](https://github.com/terror))
+- Fix deprecation warning for the source item ordering clippy option ([#837](https://github.com/terror/just-lsp/pull/837) by [fgimian](https://github.com/fgimian))
+
 ## [0.11.1](https://github.com/terror/just-lsp/releases/tag/0.11.1) - 2026-11-07
 
 ### Fixed
