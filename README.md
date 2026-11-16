@@ -1,11 +1,10 @@
 ## just-lsp
 
-[![release](https://img.shields.io/github/release/terror/just-lsp.svg?label=release&style=flat&labelColor=282c34&logo=github)](https://github.com/terror/just-lsp/releases/latest)
-[![crates.io](https://shields.io/crates/v/just-lsp.svg)](https://crates.io/crates/just-lsp)
-[![CI](https://github.com/terror/just-lsp/actions/workflows/ci.yaml/badge.svg)](https://github.com/terror/just-lsp/actions/workflows/ci.yaml)
-[![codecov](https://codecov.io/gh/terror/just-lsp/graph/badge.svg?token=7CH4XDXO7Z)](https://codecov.io/gh/terror/just-lsp)
-[![downloads](https://img.shields.io/github/downloads/terror/just-lsp/total.svg)](https://github.com/terror/just-lsp/releases)
-[![dependency status](https://deps.rs/repo/github/terror/just-lsp/status.svg)](https://deps.rs/repo/github/terror/just-lsp)
+[![release](https://img.shields.io/github/release/terror/just-lsp.svg?label=release&style=flat&labelColor=1d1d1d&color=424242&logo=github)](https://github.com/terror/just-lsp/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/just-lsp.svg?style=flat&labelColor=1d1d1d&color=424242&logo=rust)](https://crates.io/crates/just-lsp)
+[![build](https://img.shields.io/github/actions/workflow/status/terror/just-lsp/ci.yaml?branch=master&style=flat&labelColor=1d1d1d&color=424242&logo=GitHub%20Actions&logoColor=white&label=build)](https://github.com/terror/just-lsp/actions/workflows/ci.yaml)
+[![codecov](https://img.shields.io/codecov/c/gh/terror/just-lsp?style=flat&labelColor=1d1d1d&color=424242&logo=Codecov&logoColor=white)](https://codecov.io/gh/terror/just-lsp)
+[![downloads](https://img.shields.io/github/downloads/terror/just-lsp/total.svg?style=flat&labelColor=1d1d1d&color=424242)](https://github.com/terror/just-lsp/releases)
 
 `just-lsp` is a server implementation of the
 [language server protocol](https://microsoft.github.io/language-server-protocol/)
