@@ -721,7 +721,7 @@ impl Document {
       .find_all("import")
       .iter()
       .filter_map(|import_node| {
-        let path_node = import_node.find("string")?;
+        let path_node = import_node.find("^string")?;
 
         Some(Import {
           attributes: self.get_attributes(import_node),
@@ -2107,6 +2107,17 @@ mod tests {
           range: lsp::Range::at(5, 7, 6, 0),
         },
       ]
+    );
+  }
+
+  #[test]
+  fn import_path_ignores_attribute_strings() {
+    assert_eq!(
+      Document::from("[group('foo')]\nimport 'bar.just'").imports()[0].path,
+      TextNode {
+        value: "'bar.just'".into(),
+        range: lsp::Range::at(1, 7, 1, 17),
+      },
     );
   }
 
