@@ -801,7 +801,7 @@ impl Document {
   /// assert_eq!(modules[0].path, None);
   /// ```
   #[must_use]
-  pub fn modules(&self) -> Vec<Module> {
+  pub fn modules(&self) -> Vec<ModuleDeclaration> {
     self
       .tree
       .root_node()
@@ -815,7 +815,7 @@ impl Document {
           value: self.get_node_text(&path_node),
         });
 
-        Some(Module {
+        Some(ModuleDeclaration {
           attributes: self.get_attributes(module_node),
           name: TextNode {
             range: self.get_range(&name_node),
@@ -2545,7 +2545,7 @@ mod tests {
 
     assert_eq!(
       document.modules(),
-      vec![Module {
+      vec![ModuleDeclaration {
         attributes: vec![Attribute {
           arguments: vec![],
           name: TextNode {
@@ -2579,7 +2579,7 @@ mod tests {
 
     assert_eq!(
       document.modules(),
-      vec![Module {
+      vec![ModuleDeclaration {
         attributes: vec![],
         name: TextNode {
           value: "foo".into(),
@@ -2638,7 +2638,7 @@ mod tests {
     assert_eq!(
       document.modules(),
       vec![
-        Module {
+        ModuleDeclaration {
           attributes: vec![],
           name: TextNode {
             value: "foo".into(),
@@ -2648,7 +2648,7 @@ mod tests {
           path: None,
           range: lsp::Range::at(0, 0, 0, 7),
         },
-        Module {
+        ModuleDeclaration {
           attributes: vec![],
           name: TextNode {
             value: "bar".into(),

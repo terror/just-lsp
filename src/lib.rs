@@ -8,7 +8,6 @@ use {
   group::Group,
   group_set::GroupSet,
   import_scope::ImportScope,
-  import_scope_document::ImportScopeDocument,
   indoc::indoc,
   path_ext::PathExt,
   point_ext::PointExt,
@@ -17,12 +16,12 @@ use {
   project_dependency_kind::ProjectDependencyKind,
   project_dependency_target::ProjectDependencyTarget,
   project_loader::ProjectLoader,
-  project_view_document::ProjectViewDocument,
   recipe_line::{IndentKind, RecipeLine},
   ropey::Rope,
   rule::Rule,
   rule_context::RuleContext,
   scope::Scope,
+  scope_document::ScopeDocument,
   serde::Deserialize,
   std::{
     cmp::Reverse,
@@ -80,7 +79,7 @@ pub use {
   function_signature::FunctionSignature,
   import::Import,
   located::Located,
-  module::Module,
+  module_declaration::ModuleDeclaration,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterKind, VariadicType},
   project_view::ProjectView,
@@ -131,9 +130,8 @@ mod group;
 mod group_set;
 mod import;
 mod import_scope;
-mod import_scope_document;
 mod located;
-mod module;
+mod module_declaration;
 mod node_ext;
 mod parameter;
 mod path_ext;
@@ -144,7 +142,6 @@ mod project_dependency_kind;
 mod project_dependency_target;
 mod project_loader;
 mod project_view;
-mod project_view_document;
 mod quickfix;
 mod range_ext;
 mod recipe;
@@ -154,6 +151,7 @@ mod rope_ext;
 mod rule;
 mod rule_context;
 mod scope;
+mod scope_document;
 mod setting;
 mod setting_kind;
 mod str_ext;

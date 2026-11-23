@@ -2,9 +2,10 @@ use super::*;
 
 pub(crate) struct ProjectLoader<'a> {
   active: HashSet<lsp::Url>,
+  dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   documents: &'a mut DocumentStore,
   expanded: HashSet<lsp::Url>,
-  project: Project,
+  targets: HashSet<lsp::Url>,
 }
 
 impl<'a> ProjectLoader<'a> {
@@ -17,7 +18,11 @@ impl<'a> ProjectLoader<'a> {
       target,
     };
 
-    self.project.add_dependency(source, dependency);
+    self
+      .dependencies
+      .entry(source.clone())
+      .or_default()
+      .push(dependency);
 
     Ok(())
   }
@@ -33,16 +38,19 @@ impl<'a> ProjectLoader<'a> {
 
     let mut loader = Self {
       active: HashSet::new(),
+      dependencies: HashMap::new(),
       documents,
       expanded: HashSet::new(),
-      project: Project::new(root.clone()),
+      targets: HashSet::new(),
     };
 
     loader.visit(root)?;
 
-    loader.project.build_import_scope();
-
-    Ok(loader.project)
+    Ok(Project::new(
+      root.clone(),
+      loader.dependencies,
+      loader.targets,
+    ))
   }
 
   fn resolve_dependency_target(
@@ -68,7 +76,7 @@ impl<'a> ProjectLoader<'a> {
       return Ok(ProjectDependencyTarget::Missing);
     };
 
-    self.project.add_dependent(&uri, source);
+    self.targets.insert(uri.clone());
 
     if self.active.contains(&uri) {
       return Ok(ProjectDependencyTarget::Cycle);
@@ -94,7 +102,7 @@ impl<'a> ProjectLoader<'a> {
 
     let imports = self.documents.load(uri)?.imports();
 
-    self.project.dependencies.entry(uri.clone()).or_default();
+    self.dependencies.entry(uri.clone()).or_default();
 
     for import in imports.into_iter().filter(Import::is_enabled) {
       self.add_dependency(uri, &import)?;
@@ -175,9 +183,9 @@ mod tests {
 
     assert_eq!(
       project.import_scope.documents(),
-      [ImportScopeDocument {
+      [ScopeDocument {
         load_depth: 0,
-        uri: test.root.clone(),
+        document: test.root.clone(),
       }],
     );
 
@@ -186,7 +194,7 @@ mod tests {
       HashMap::from([(test.root.clone(), Vec::new())]),
     );
 
-    assert_eq!(project.dependents, HashMap::new());
+    assert_eq!(project.targets, HashSet::new());
     assert!(test.documents.get(&test.uri("foo.just")).is_none());
     assert!(test.documents.get(&test.uri("bar.just")).is_none());
   }
@@ -203,17 +211,17 @@ mod tests {
     assert_eq!(
       project.import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: test.root.clone(),
+          document: test.root.clone(),
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: test.uri("foo.just"),
+          document: test.uri("foo.just"),
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 2,
-          uri: test.uri("bar.just"),
+          document: test.uri("bar.just"),
         },
       ],
     );
@@ -234,13 +242,13 @@ mod tests {
     assert_eq!(
       project.import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: test.root.clone(),
+          document: test.root.clone(),
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: test.uri("foo.just"),
+          document: test.uri("foo.just"),
         },
       ],
     );
@@ -261,21 +269,21 @@ mod tests {
     assert_eq!(
       test.load().import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: root,
+          document: root,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: right,
+          document: right,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 2,
-          uri: shared,
+          document: shared,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: left,
+          document: left,
         },
       ]
     );
@@ -292,13 +300,13 @@ mod tests {
     assert_eq!(
       test.load().import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: root,
+          document: root,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: foo,
+          document: foo,
         },
       ]
     );
@@ -320,21 +328,21 @@ mod tests {
     assert_eq!(
       test.load().import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: root,
+          document: root,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: bar,
+          document: bar,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: foo,
+          document: foo,
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 2,
-          uri: baz,
+          document: baz,
         },
       ]
     );
@@ -350,7 +358,11 @@ mod tests {
 
     assert_eq!(
       project
-        .imported_documents(&test.documents)
+        .import_scope
+        .documents()
+        .iter()
+        .skip(1)
+        .filter_map(|document| test.documents.get(&document.document))
         .flat_map(Document::recipes)
         .map(|recipe| recipe.name.value)
         .collect::<Vec<_>>(),
@@ -419,31 +431,31 @@ mod tests {
     assert_eq!(
       project.import_scope.documents(),
       [
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 0,
-          uri: test.root.clone(),
+          document: test.root.clone(),
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 1,
-          uri: bar.clone(),
+          document: bar.clone(),
         },
-        ImportScopeDocument {
+        ScopeDocument {
           load_depth: 2,
-          uri: baz.clone(),
+          document: baz.clone(),
         },
       ]
     );
 
     assert_eq!(
-      project
-        .imported_documents(&test.documents)
-        .map(|document| document.uri.clone())
-        .collect::<Vec<_>>(),
-      [bar.clone(), baz]
+      project.targets,
+      HashSet::from([
+        bar,
+        baz,
+        test.root.clone(),
+        test.uri("missing.just"),
+        test.uri("required-missing.just"),
+      ]),
     );
-
-    assert_eq!(project.dependents[&bar], HashSet::from([test.root.clone()]));
-    assert_eq!(project.dependents[&test.root], HashSet::from([bar]));
   }
 
   #[test]
@@ -461,11 +473,17 @@ mod tests {
     );
 
     assert_eq!(
-      project
-        .imported_documents(&test.documents)
-        .map(|document| document.uri.clone())
-        .collect::<Vec<_>>(),
-      [imported],
+      project.import_scope.documents(),
+      [
+        ScopeDocument {
+          document: test.root.clone(),
+          load_depth: 0,
+        },
+        ScopeDocument {
+          document: imported,
+          load_depth: 1,
+        },
+      ],
     );
   }
 }

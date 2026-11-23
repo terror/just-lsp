@@ -2,67 +2,70 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct ImportScope {
-  documents: Vec<ImportScopeDocument>,
+  documents: Vec<ScopeDocument<lsp::Url>>,
 }
 
 impl ImportScope {
   pub(super) fn contains(&self, uri: &lsp::Url) -> bool {
-    self.documents.iter().any(|document| document.uri == *uri)
+    self
+      .documents
+      .iter()
+      .any(|document| document.document == *uri)
   }
 
   #[must_use]
-  pub(crate) fn documents(&self) -> &[ImportScopeDocument] {
+  pub(crate) fn documents(&self) -> &[ScopeDocument<lsp::Url>] {
     &self.documents
   }
 
-  pub(super) fn new(uri: lsp::Url) -> Self {
-    Self {
-      documents: vec![ImportScopeDocument { load_depth: 0, uri }],
-    }
-  }
-}
+  pub(super) fn new(
+    root: &lsp::Url,
+    dependencies: &HashMap<lsp::Url, Vec<ProjectDependency>>,
+  ) -> Self {
+    let targets = |source: &lsp::Url| {
+      dependencies
+        .get(source)
+        .into_iter()
+        .flatten()
+        .filter_map(|dependency| match &dependency.target {
+          ProjectDependencyTarget::Resolved(target) => Some(target.clone()),
+          _ => None,
+        })
+        .collect::<Vec<_>>()
+    };
 
-impl From<&Project> for ImportScope {
-  fn from(project: &Project) -> Self {
     let mut depths = HashMap::new();
 
-    let mut stack = vec![(0, project.root.clone())];
+    let mut stack = vec![(0, root.clone())];
 
     while let Some((depth, source)) = stack.pop() {
       if depths.contains_key(&source) {
         continue;
       }
 
-      depths.insert(source.clone(), depth);
-
-      for dependency in project.dependencies(&source) {
-        if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
-          stack.push((depth + 1, target.clone()));
-        }
+      for target in targets(&source) {
+        stack.push((depth + 1, target));
       }
+
+      depths.insert(source, depth);
     }
 
     let mut documents = Vec::new();
 
-    let mut seen = HashSet::from([project.root.clone()]);
-    let mut stack = vec![project.root.clone()];
+    let mut seen = HashSet::from([root.clone()]);
+    let mut stack = vec![root.clone()];
 
     while let Some(source) = stack.pop() {
-      documents.push(ImportScopeDocument {
-        load_depth: depths[&source],
-        uri: source.clone(),
-      });
-
-      for dependency in project.dependencies(&source) {
-        let ProjectDependencyTarget::Resolved(target) = &dependency.target
-        else {
-          continue;
-        };
-
+      for target in targets(&source) {
         if seen.insert(target.clone()) {
-          stack.push(target.clone());
+          stack.push(target);
         }
       }
+
+      documents.push(ScopeDocument {
+        load_depth: depths[&source],
+        document: source,
+      });
     }
 
     Self { documents }

@@ -398,11 +398,11 @@ mod tests {
     let view = ProjectView {
       document: &document,
       documents: vec![
-        ProjectViewDocument {
+        ScopeDocument {
           document: &root,
           load_depth: 0,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &document,
           load_depth: 1,
         },
