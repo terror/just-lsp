@@ -16,6 +16,39 @@ impl ModuleDeclaration {
     (".justfile", false),
   ];
 
+  pub(crate) fn candidates(&self, base_uri: &lsp::Url) -> Vec<PathBuf> {
+    let (file, directory) = if let Some(path_node) = &self.path {
+      let Ok(Some(path)) =
+        StringLiteral::resolve_path(&path_node.value, base_uri)
+      else {
+        return Vec::new();
+      };
+
+      (path.clone(), path)
+    } else {
+      let Some(base) = base_uri
+        .file_path()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+      else {
+        return Vec::new();
+      };
+
+      (
+        base.join(format!("{}.just", self.name.value)),
+        base.join(&self.name.value),
+      )
+    };
+
+    once(file)
+      .chain(
+        Self::DIRECTORY_CANDIDATES
+          .iter()
+          .map(|(name, _)| directory.join(name)),
+      )
+      .collect()
+  }
+
   fn find_file(
     directory: &Path,
     candidates: &[(&str, bool)],
@@ -46,6 +79,10 @@ impl ModuleDeclaration {
         }
       })
     })
+  }
+
+  pub(crate) fn is_enabled(&self) -> bool {
+    Attribute::is_enabled(&self.attributes)
   }
 
   #[must_use]
