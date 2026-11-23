@@ -9,6 +9,8 @@ use {
   group_set::GroupSet,
   import_scope::ImportScope,
   indoc::indoc,
+  module::Module,
+  module_context::ModuleContext,
   path_ext::PathExt,
   point_ext::PointExt,
   project::Project,
@@ -36,12 +38,13 @@ use {
     ops::{ControlFlow, Deref, RangeInclusive},
     path::{Component, Path, PathBuf},
     process,
-    sync::OnceLock,
+    sync::{Arc, OnceLock},
   },
   str_ext::StrExt,
   string_delimiter::StringDelimiter,
   string_kind::StringKind,
   string_literal::StringLiteral,
+  symbol_table::SymbolTable,
   tower_lsp::lsp_types as lsp,
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree},
@@ -80,9 +83,9 @@ pub use {
   import::Import,
   located::Located,
   module_declaration::ModuleDeclaration,
+  module_view::ModuleView,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterKind, VariadicType},
-  project_view::ProjectView,
   quickfix::Quickfix,
   range_ext::RangeExt,
   recipe::Recipe,
@@ -131,7 +134,10 @@ mod group_set;
 mod import;
 mod import_scope;
 mod located;
+mod module;
+mod module_context;
 mod module_declaration;
+mod module_view;
 mod node_ext;
 mod parameter;
 mod path_ext;
@@ -141,7 +147,6 @@ mod project_dependency;
 mod project_dependency_kind;
 mod project_dependency_target;
 mod project_loader;
-mod project_view;
 mod quickfix;
 mod range_ext;
 mod recipe;
@@ -159,6 +164,7 @@ mod string_delimiter;
 mod string_kind;
 mod string_literal;
 mod symbol;
+mod symbol_table;
 #[cfg(test)]
 mod test_project;
 mod text_node;

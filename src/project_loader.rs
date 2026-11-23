@@ -119,7 +119,7 @@ mod tests {
     let project = test.load();
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [ScopeDocument {
         load_depth: 0,
         document: test.root.clone(),
@@ -146,7 +146,7 @@ mod tests {
     let project = test.load();
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -177,7 +177,7 @@ mod tests {
     let project = test.load();
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -204,7 +204,7 @@ mod tests {
     let shared = test.uri("shared.just");
 
     assert_eq!(
-      test.load().import_scope.documents(),
+      test.load().module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -235,7 +235,7 @@ mod tests {
     let root = test.root.clone();
 
     assert_eq!(
-      test.load().import_scope.documents(),
+      test.load().module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -263,7 +263,7 @@ mod tests {
     let root = test.root.clone();
 
     assert_eq!(
-      test.load().import_scope.documents(),
+      test.load().module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -295,6 +295,7 @@ mod tests {
 
     assert_eq!(
       project
+        .module()
         .import_scope
         .documents()
         .iter()
@@ -366,7 +367,7 @@ mod tests {
     );
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [
         ScopeDocument {
           load_depth: 0,
@@ -422,11 +423,31 @@ mod tests {
     );
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [ScopeDocument {
         document: test.root.clone(),
         load_depth: 0,
       }],
+    );
+  }
+
+  #[test]
+  fn loads_shared_modules_once() {
+    let mut test =
+      Test::new("mod foo 'bar.just'\nmod baz 'bar.just'").file("bar.just", "");
+
+    let bar = test.uri("bar.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.modules.keys().collect::<HashSet<_>>(),
+      HashSet::from([&test.root, &bar]),
+    );
+
+    assert_eq!(
+      project.module().children,
+      BTreeMap::from([("baz".into(), bar.clone()), ("foo".into(), bar)]),
     );
   }
 
@@ -445,7 +466,7 @@ mod tests {
     );
 
     assert_eq!(
-      project.import_scope.documents(),
+      project.module().import_scope.documents(),
       [
         ScopeDocument {
           document: test.root.clone(),

@@ -299,8 +299,7 @@ impl LanguageServer for Server {
     if let Some(view) = workspace.view(&uri) {
       let mut completion_items = Vec::new();
 
-      let mut recipes =
-        view.resolved_recipes().into_values().collect::<Vec<_>>();
+      let mut recipes = view.resolved_recipes().cloned().collect::<Vec<_>>();
 
       recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
@@ -323,7 +322,7 @@ impl LanguageServer for Server {
       }
 
       let mut variables =
-        view.resolved_variables().into_values().collect::<Vec<_>>();
+        view.resolved_variables().cloned().collect::<Vec<_>>();
 
       variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
@@ -346,7 +345,7 @@ impl LanguageServer for Server {
       }
 
       let mut functions =
-        view.resolved_functions().into_values().collect::<Vec<_>>();
+        view.resolved_functions().cloned().collect::<Vec<_>>();
 
       functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 

@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
-  view: ProjectView<'a>,
+  view: ModuleView<'a>,
 }
 
 impl<'a> Resolver<'a> {
@@ -22,9 +22,9 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Creates a new `Resolver` bound to the given `ProjectView`.
+  /// Creates a new `Resolver` bound to the given `ModuleView`.
   #[must_use]
-  pub fn new(view: impl Into<ProjectView<'a>>) -> Self {
+  pub fn new(view: impl Into<ModuleView<'a>>) -> Self {
     Self { view: view.into() }
   }
 
@@ -176,13 +176,18 @@ impl<'a> Resolver<'a> {
 
     match parent_kind {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        self.view.find_recipe(&name).map(Symbol::Recipe)
+        self.view.find_recipe(&name).cloned().map(Symbol::Recipe)
       }
-      "assignment" => self.view.find_variable(&name).map(Symbol::Variable),
+      "assignment" => self
+        .view
+        .find_variable(&name)
+        .cloned()
+        .map(Symbol::Variable),
       "function_call" | "assert_expression" => {
         self
           .view
           .find_function(&name)
+          .cloned()
           .map(Symbol::Function)
           .or_else(|| {
             BUILTINS
@@ -195,9 +200,11 @@ impl<'a> Resolver<'a> {
             .map(Symbol::Builtin)
           })
       }
-      "function_definition" => {
-        self.view.find_function(&name).map(Symbol::Function)
-      }
+      "function_definition" => self
+        .view
+        .find_function(&name)
+        .cloned()
+        .map(Symbol::Function),
       "function_parameters" => self
         .view
         .document()
@@ -252,7 +259,13 @@ impl<'a> Resolver<'a> {
                 },
               )
             })
-            .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
+            .or_else(|| {
+              self
+                .view
+                .find_variable(&name)
+                .cloned()
+                .map(Symbol::Variable)
+            })
             .or_else(|| builtin_constant(&name)),
           Some(containing_parameter) => {
             let containing_parameter_name = self
@@ -275,7 +288,13 @@ impl<'a> Resolver<'a> {
                   .cloned()
                   .map(Symbol::Parameter)
               })
-              .or_else(|| self.view.find_variable(&name).map(Symbol::Variable))
+              .or_else(|| {
+                self
+                  .view
+                  .find_variable(&name)
+                  .cloned()
+                  .map(Symbol::Variable)
+              })
               .or_else(|| builtin_constant(&name))
           }
         }
