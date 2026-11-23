@@ -296,12 +296,17 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    if let Some(document) = workspace.open_document(&uri) {
+    if let Some(view) = workspace.view(&uri) {
       let mut completion_items = Vec::new();
 
-      let recipes = document.recipes();
+      let mut recipes =
+        view.resolved_recipes().into_values().collect::<Vec<_>>();
+
+      recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
       for recipe in recipes {
+        let recipe = recipe.into_inner();
+
         completion_items.push(lsp::CompletionItem {
           label: recipe.name.value.clone(),
           kind: Some(lsp::CompletionItemKind::FUNCTION),
@@ -317,9 +322,14 @@ impl LanguageServer for Server {
         });
       }
 
-      let variables = document.variables();
+      let mut variables =
+        view.resolved_variables().into_values().collect::<Vec<_>>();
+
+      variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
       for variable in variables {
+        let variable = variable.into_inner();
+
         completion_items.push(lsp::CompletionItem {
           label: variable.name.value.clone(),
           kind: Some(lsp::CompletionItemKind::VARIABLE),
@@ -335,7 +345,14 @@ impl LanguageServer for Server {
         });
       }
 
-      for function in document.functions() {
+      let mut functions =
+        view.resolved_functions().into_values().collect::<Vec<_>>();
+
+      functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
+
+      for function in functions {
+        let function = function.into_inner();
+
         let parameters = function
           .parameters
           .iter()
@@ -416,8 +433,10 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.open_document(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    Ok(workspace.view(&uri).and_then(|view| {
+      let document = view.document();
+
+      let resolver = Resolver::new(view);
 
       document
         .node_at_position(position)
@@ -426,6 +445,7 @@ impl LanguageServer for Server {
           resolver
             .resolve_identifier_references(&identifier, true)
             .into_iter()
+            .filter(|location| location.uri == uri)
             .map(|location| lsp::DocumentHighlight {
               range: location.range,
               kind: Some(lsp::DocumentHighlightKind::TEXT),
@@ -441,46 +461,7 @@ impl LanguageServer for Server {
   ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
     let uri = &params.text_document.uri;
 
-    let workspace = self.workspace.read().await;
-
-    let Some(document) = workspace.open_document(uri) else {
-      return Ok(None);
-    };
-
-    let mut links = Vec::new();
-
-    if let Some(project) = workspace.project(uri) {
-      for dependency in project.dependencies(uri) {
-        if let ProjectDependencyTarget::Resolved(target) = &dependency.target {
-          links.push(lsp::DocumentLink {
-            range: dependency.location,
-            target: Some(target.clone()),
-            tooltip: target
-              .to_file_path()
-              .ok()
-              .map(|path| path.display().to_string()),
-            data: None,
-          });
-        }
-      }
-    }
-
-    for module in document.modules() {
-      let range = module.path.as_ref().map_or(module.name.range, |p| p.range);
-
-      if let Some(path) = module.resolve(uri)
-        && let Ok(target) = lsp::Url::from_file_path(&path)
-      {
-        links.push(lsp::DocumentLink {
-          range,
-          target: Some(target),
-          tooltip: Some(path.display().to_string()),
-          data: None,
-        });
-      }
-    }
-
-    Ok(Some(links))
+    Ok(self.workspace.read().await.links(uri))
   }
 
   async fn document_symbol(
@@ -692,31 +673,14 @@ impl LanguageServer for Server {
 
     let position = params.text_document_position_params.position;
 
-    let workspace = self.workspace.read().await;
-
-    if let Some(target) = workspace
-      .project(&uri)
-      .and_then(|project| project.dependency_at(&uri, position))
-      .and_then(|dependency| match &dependency.target {
-        ProjectDependencyTarget::Resolved(target) => Some(target),
-        _ => None,
-      })
-    {
-      return Ok(Some(lsp::GotoDefinitionResponse::Scalar(
-        lsp::Location::new(target.clone(), lsp::Range::default()),
-      )));
-    }
-
-    Ok(workspace.project_view(&uri).and_then(|view| {
-      let identifier = view
-        .document()
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")?;
-
-      Resolver::new(view)
-        .resolve_identifier_definition(&identifier)
-        .map(lsp::GotoDefinitionResponse::Scalar)
-    }))
+    Ok(
+      self
+        .workspace
+        .read()
+        .await
+        .definition(&uri, position)
+        .map(lsp::GotoDefinitionResponse::Scalar),
+    )
   }
 
   async fn hover(
@@ -729,7 +693,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.project_view(&uri).and_then(|view| {
+    Ok(workspace.view(&uri).and_then(|view| {
       let identifier = view
         .document()
         .node_at_position(position)
@@ -785,8 +749,10 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.open_document(uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    Ok(workspace.view(uri).and_then(|view| {
+      let document = view.document();
+
+      let resolver = Resolver::new(view);
 
       document
         .node_at_position(params.position)
@@ -817,8 +783,10 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.open_document(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    Ok(workspace.view(&uri).and_then(|view| {
+      let document = view.document();
+
+      let resolver = Resolver::new(view);
 
       document
         .node_at_position(position)
@@ -842,8 +810,10 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.open_document(&uri).and_then(|document| {
-      let resolver = Resolver::new(document);
+    Ok(workspace.view(&uri).and_then(|view| {
+      let document = view.document();
+
+      let resolver = Resolver::new(view);
 
       document
         .node_at_position(position)
@@ -854,19 +824,22 @@ impl LanguageServer for Server {
             .is_some_and(|symbol| symbol.is_renameable())
         })
         .map(|identifier| {
-          let references =
-            resolver.resolve_identifier_references(&identifier, true);
+          let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
 
-          let text_edits = references
-            .iter()
-            .map(|location| lsp::TextEdit {
-              range: location.range,
-              new_text: new_name.clone(),
-            })
-            .collect::<Vec<lsp::TextEdit>>();
+          for location in
+            resolver.resolve_identifier_references(&identifier, true)
+          {
+            changes
+              .entry(location.uri)
+              .or_default()
+              .push(lsp::TextEdit {
+                range: location.range,
+                new_text: new_name.clone(),
+              });
+          }
 
           lsp::WorkspaceEdit {
-            changes: Some(HashMap::from([(uri.clone(), text_edits)])),
+            changes: Some(changes),
             ..Default::default()
           }
         })
@@ -1615,6 +1588,49 @@ mod tests {
             data: None,
           },
         ])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn completion_includes_imported_symbols() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let uri = test.uri("justfile");
+
+    test
+      .initialize()
+      .open("justfile", "import 'foo.just'\n\nfoo:\n")
+      .request::<request::Completion>(
+        lsp::CompletionParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(uri),
+            lsp::Position::new(0, 0),
+          ),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+          context: None,
+        },
+        Ok(Some(lsp::CompletionResponse::Array(
+          ["bar", "foo"]
+            .into_iter()
+            .map(|name| lsp::CompletionItem {
+              label: name.into(),
+              kind: Some(lsp::CompletionItemKind::FUNCTION),
+              documentation: Some(lsp::Documentation::MarkupContent(
+                lsp::MarkupContent {
+                  kind: lsp::MarkupKind::PlainText,
+                  value: format!("{name}:"),
+                },
+              )),
+              insert_text: Some(name.into()),
+              insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+              ..Default::default()
+            })
+            .chain(BUILTINS.iter().flat_map(Builtin::completion_items))
+            .collect(),
+        ))),
       )
       .run()
       .await
@@ -3541,6 +3557,90 @@ mod tests {
           }),
           range: Some(lsp::Range::at(2, 5, 2, 8)),
         }),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn imported_symbol_references() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let justfile = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    let position = lsp::TextDocumentPositionParams::new(
+      lsp::TextDocumentIdentifier::new(justfile.clone()),
+      lsp::Position::new(2, 6),
+    );
+
+    test
+      .initialize()
+      .open("justfile", "import 'foo.just'\n\nbaz: bar\n")
+      .request::<request::References>(
+        lsp::ReferenceParams {
+          text_document_position: position.clone(),
+          context: lsp::ReferenceContext {
+            include_declaration: true,
+          },
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::Location {
+            uri: justfile.clone(),
+            range: lsp::Range::at(2, 5, 2, 8),
+          },
+          lsp::Location {
+            uri: foo.clone(),
+            range: lsp::Range::at(0, 0, 0, 3),
+          },
+        ])),
+      )
+      .request::<request::DocumentHighlightRequest>(
+        lsp::DocumentHighlightParams {
+          text_document_position_params: position.clone(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::DocumentHighlight {
+          range: lsp::Range::at(2, 5, 2, 8),
+          kind: Some(lsp::DocumentHighlightKind::TEXT),
+        }])),
+      )
+      .request::<request::PrepareRenameRequest>(
+        position.clone(),
+        Ok(Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
+          range: lsp::Range::at(2, 5, 2, 8),
+          placeholder: "bar".into(),
+        })),
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: position,
+          new_name: "qux".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([
+            (
+              justfile,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(2, 5, 2, 8),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              foo,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "qux".into(),
+              }],
+            ),
+          ])),
+          ..Default::default()
+        })),
       )
       .run()
       .await

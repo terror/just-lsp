@@ -1,15 +1,15 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct Project {
-  pub dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
-  pub dependents: HashMap<lsp::Url, HashSet<lsp::Url>>,
-  pub import_scope: ImportScope,
-  pub root: lsp::Url,
+pub(crate) struct Project {
+  pub(crate) dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
+  pub(crate) dependents: HashMap<lsp::Url, HashSet<lsp::Url>>,
+  pub(crate) import_scope: ImportScope,
+  pub(crate) root: lsp::Url,
 }
 
 impl Project {
-  pub fn add_dependency(
+  pub(crate) fn add_dependency(
     &mut self,
     source: &lsp::Url,
     dependency: ProjectDependency,
@@ -38,11 +38,11 @@ impl Project {
   }
 
   #[must_use]
-  pub fn contains(&self, uri: &lsp::Url) -> bool {
+  pub(crate) fn contains(&self, uri: &lsp::Url) -> bool {
     self.root == *uri || self.dependents.contains_key(uri)
   }
 
-  pub fn dependencies(
+  pub(crate) fn dependencies(
     &self,
     source: &lsp::Url,
   ) -> impl Iterator<Item = &ProjectDependency> {
@@ -50,7 +50,7 @@ impl Project {
   }
 
   #[must_use]
-  pub fn dependency_at(
+  pub(crate) fn dependency_at(
     &self,
     source: &lsp::Url,
     position: lsp::Position,
@@ -62,7 +62,8 @@ impl Project {
     })
   }
 
-  pub fn imported_documents<'a>(
+  #[cfg(test)]
+  pub(crate) fn imported_documents<'a>(
     &'a self,
     documents: &'a DocumentStore,
   ) -> impl Iterator<Item = &'a Document> {
@@ -75,7 +76,7 @@ impl Project {
   }
 
   #[must_use]
-  pub fn new(root: lsp::Url) -> Self {
+  pub(crate) fn new(root: lsp::Url) -> Self {
     let import_scope = ImportScope::new(root.clone());
 
     Self {

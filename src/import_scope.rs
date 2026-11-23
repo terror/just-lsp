@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct ImportScope {
+pub(crate) struct ImportScope {
   documents: Vec<ImportScopeDocument>,
 }
 
@@ -11,7 +11,7 @@ impl ImportScope {
   }
 
   #[must_use]
-  pub fn documents(&self) -> &[ImportScopeDocument] {
+  pub(crate) fn documents(&self) -> &[ImportScopeDocument] {
     &self.documents
   }
 

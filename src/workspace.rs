@@ -161,6 +161,31 @@ impl Workspace {
   }
 
   #[must_use]
+  pub fn definition(
+    &self,
+    uri: &lsp::Url,
+    position: lsp::Position,
+  ) -> Option<lsp::Location> {
+    if let Some(ProjectDependencyTarget::Resolved(target)) = self
+      .projects
+      .get(uri)
+      .and_then(|project| project.dependency_at(uri, position))
+      .map(|dependency| &dependency.target)
+    {
+      return Some(lsp::Location::new(target.clone(), lsp::Range::default()));
+    }
+
+    let view = self.view(uri)?;
+
+    let identifier = view
+      .document()
+      .node_at_position(position)
+      .filter(|node| node.kind() == "identifier")?;
+
+    Resolver::new(view).resolve_identifier_definition(&identifier)
+  }
+
+  #[must_use]
   pub fn diagnostics(&self) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
     let projects = self.root_projects();
 
@@ -209,6 +234,44 @@ impl Workspace {
     self.documents.get(uri).map_or_else(Vec::new, |document| {
       self.analyze(document, &self.root_projects())
     })
+  }
+
+  #[must_use]
+  pub fn links(&self, uri: &lsp::Url) -> Option<Vec<lsp::DocumentLink>> {
+    let document = self.documents.get_open(uri)?;
+
+    let imports = self
+      .projects
+      .get(uri)
+      .into_iter()
+      .flat_map(|project| project.dependencies(uri))
+      .filter_map(|dependency| match &dependency.target {
+        ProjectDependencyTarget::Resolved(target) => Some(lsp::DocumentLink {
+          range: dependency.location,
+          target: Some(target.clone()),
+          tooltip: target
+            .file_path()
+            .ok()
+            .map(|path| path.display().to_string()),
+          data: None,
+        }),
+        _ => None,
+      });
+
+    let modules = document.modules().into_iter().filter_map(|module| {
+      let path = module.resolve(uri)?;
+
+      let target = lsp::Url::from_path(&path)?;
+
+      Some(lsp::DocumentLink {
+        range: module.path.as_ref().map_or(module.name.range, |p| p.range),
+        target: Some(target),
+        tooltip: Some(path.display().to_string()),
+        data: None,
+      })
+    });
+
+    Some(imports.chain(modules).collect())
   }
 
   /// # Errors
@@ -312,28 +375,6 @@ impl Workspace {
     self.documents.get_open(uri)
   }
 
-  #[must_use]
-  pub fn project(&self, uri: &lsp::Url) -> Option<&Project> {
-    self.projects.get(uri)
-  }
-
-  #[must_use]
-  pub fn project_view(&self, uri: &lsp::Url) -> Option<ProjectView<'_>> {
-    let document = self.documents.get_open(uri)?;
-
-    let project = self
-      .root_projects()
-      .into_iter()
-      .find(|project| project.import_scope.contains(uri));
-
-    Some(project.map_or_else(
-      || ProjectView::from(document),
-      |project| {
-        ProjectView::new(document, &project.import_scope, &self.documents)
-      },
-    ))
-  }
-
   fn root_projects(&self) -> Vec<&Project> {
     let mut projects = self
       .projects
@@ -355,6 +396,23 @@ impl Workspace {
 
   pub fn set_config(&mut self, config: Config) {
     self.config = config;
+  }
+
+  #[must_use]
+  pub fn view(&self, uri: &lsp::Url) -> Option<ProjectView<'_>> {
+    let document = self.documents.get_open(uri)?;
+
+    let project = self
+      .root_projects()
+      .into_iter()
+      .find(|project| project.import_scope.contains(uri));
+
+    Some(project.map_or_else(
+      || ProjectView::from(document),
+      |project| {
+        ProjectView::new(document, &project.import_scope, &self.documents)
+      },
+    ))
   }
 }
 

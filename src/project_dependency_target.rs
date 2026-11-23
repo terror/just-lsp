@@ -1,8 +1,7 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ProjectDependencyTarget {
-  Ambiguous(Vec<lsp::Url>),
+pub(crate) enum ProjectDependencyTarget {
   Cycle,
   Dynamic,
   Missing,

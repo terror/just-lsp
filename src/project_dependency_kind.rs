@@ -1,4 +1,4 @@
 #[derive(Clone, Debug, PartialEq)]
-pub enum ProjectDependencyKind {
+pub(crate) enum ProjectDependencyKind {
   Import,
 }

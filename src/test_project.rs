@@ -27,16 +27,6 @@ impl TestProject {
   }
 
   pub(super) fn view(&self) -> ProjectView<'_> {
-    ProjectView {
-      document: &self.document,
-      documents: once(&self.document)
-        .chain(&self.imported_documents)
-        .enumerate()
-        .map(|(index, document)| ProjectViewDocument {
-          document,
-          load_depth: usize::from(index > 0),
-        })
-        .collect(),
-    }
+    ProjectView::with_imports(&self.document, &self.imported_documents)
   }
 }
