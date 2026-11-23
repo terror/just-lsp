@@ -36,12 +36,10 @@ define_rule! {
           }),
       );
 
-      Self::validate_node(
-        context,
-        context.document(),
-        context.tree().root_node(),
-        &mut diagnostics,
-      );
+      let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
+        Self::validate_node(context, context.document(), node, &mut diagnostics);
+        ControlFlow::<(), bool>::Continue(true)
+      });
 
       diagnostics
     }
@@ -190,12 +188,6 @@ impl ListFeatureGateRule {
         }
       }
       _ => {}
-    }
-
-    for index in 0..node.child_count() {
-      if let Some(child) = node.child(index) {
-        Self::validate_node(context, document, child, diagnostics);
-      }
     }
   }
 }
