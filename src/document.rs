@@ -271,19 +271,19 @@ impl Document {
       .filter_map(|function_call_node| {
         let identifier_node = function_call_node.find("identifier")?;
 
-        let arguments = function_call_node
-          .find("sequence")
-          .map(|sequence| {
-            sequence
-              .find_all("^expression")
-              .into_iter()
-              .map(|argument_node| TextNode {
-                range: self.get_range(&argument_node),
-                value: self.get_node_text(&argument_node),
-              })
-              .collect::<Vec<_>>()
-          })
-          .unwrap_or_default();
+        let arguments =
+          function_call_node
+            .find("sequence")
+            .map_or_default(|sequence| {
+              sequence
+                .find_all("^expression")
+                .into_iter()
+                .map(|argument_node| TextNode {
+                  range: self.get_range(&argument_node),
+                  value: self.get_node_text(&argument_node),
+                })
+                .collect::<Vec<_>>()
+            });
 
         Some(FunctionCall {
           name: TextNode {
@@ -328,7 +328,7 @@ impl Document {
 
         let parameters = function_node
           .child_by_field_name("parameters")
-          .map(|params_node| {
+          .map_or_default(|params_node| {
             params_node
               .find_all("^identifier")
               .iter()
@@ -337,13 +337,11 @@ impl Document {
                 value: self.get_node_text(param_node),
               })
               .collect::<Vec<_>>()
-          })
-          .unwrap_or_default();
+          });
 
         let body = function_node
           .child_by_field_name("body")
-          .map(|body_node| self.get_node_text(&body_node))
-          .unwrap_or_default();
+          .map_or_default(|body_node| self.get_node_text(&body_node));
 
         Some(Function {
           attributes: self.get_attributes(function_node),
@@ -723,7 +721,7 @@ impl Document {
       .find_all("import")
       .iter()
       .filter_map(|import_node| {
-        let path_node = import_node.find("string")?;
+        let path_node = import_node.find("^string")?;
 
         Some(Import {
           attributes: self.get_attributes(import_node),
@@ -2109,6 +2107,17 @@ mod tests {
           range: lsp::Range::at(5, 7, 6, 0),
         },
       ]
+    );
+  }
+
+  #[test]
+  fn import_path_ignores_attribute_strings() {
+    assert_eq!(
+      Document::from("[group('foo')]\nimport 'bar.just'").imports()[0].path,
+      TextNode {
+        value: "'bar.just'".into(),
+        range: lsp::Range::at(1, 7, 1, 17),
+      },
     );
   }
 
