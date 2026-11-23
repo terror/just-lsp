@@ -7,11 +7,9 @@ pub(crate) struct RuleContext<'a> {
   builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
-  document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  scope: OnceLock<Scope<'a>>,
+  scope: OnceLock<Scope>,
   user_function_names: OnceLock<HashSet<String>>,
-  variable_and_builtin_names: OnceLock<HashSet<String>>,
   view: &'a ModuleView<'a>,
 }
 
@@ -171,16 +169,6 @@ impl<'a> RuleContext<'a> {
     self.view.document()
   }
 
-  pub(crate) fn document_variable_names(&self) -> &HashSet<String> {
-    self.document_variable_names.get_or_init(|| {
-      self
-        .variables()
-        .iter()
-        .map(|variable| variable.name.value.clone())
-        .collect()
-    })
-  }
-
   pub(super) fn duplicate_declarations<'b, T>(
     &self,
     declarations: &'b [Located<T>],
@@ -240,11 +228,9 @@ impl<'a> RuleContext<'a> {
       builtin_attribute_map: OnceLock::new(),
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
-      document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
       scope: OnceLock::new(),
       user_function_names: OnceLock::new(),
-      variable_and_builtin_names: OnceLock::new(),
       view,
     }
   }
@@ -253,7 +239,7 @@ impl<'a> RuleContext<'a> {
     self.view.recipes()
   }
 
-  pub(crate) fn scope(&self) -> &Scope<'_> {
+  pub(crate) fn scope(&self) -> &Scope {
     self.scope.get_or_init(|| Scope::analyze(self))
   }
 
@@ -333,19 +319,6 @@ impl<'a> RuleContext<'a> {
         .iter()
         .map(|function| function.name.value.clone())
         .collect()
-    })
-  }
-
-  pub(crate) fn variable_and_builtin_names(&self) -> &HashSet<String> {
-    self.variable_and_builtin_names.get_or_init(|| {
-      let mut names = self.document_variable_names().clone();
-
-      names.extend(BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some((*name).to_owned()),
-        _ => None,
-      }));
-
-      names
     })
   }
 

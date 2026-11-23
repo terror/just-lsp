@@ -1,4 +1,7 @@
 use {
+  binding::Binding,
+  bindings::Bindings,
+  bound_identifier::BoundIdentifier,
   conflict_tracker::ConflictTracker,
   count::Count,
   document_entry::DocumentEntry,
@@ -38,7 +41,7 @@ use {
     mem,
     ops::{ControlFlow, Deref, RangeInclusive},
     path::{Component, Path, PathBuf},
-    process,
+    process, ptr,
     sync::{Arc, OnceLock},
   },
   str_ext::StrExt,
@@ -112,6 +115,9 @@ mod attribute_keyword;
 mod attribute_kind;
 mod attribute_signature;
 mod attribute_target;
+mod binding;
+mod bindings;
+mod bound_identifier;
 mod builtin;
 mod builtins;
 mod config;
