@@ -8,11 +8,6 @@ pub struct Located<T> {
 
 impl<T> Located<T> {
   #[must_use]
-  pub fn as_ref(&self) -> Located<&T> {
-    Located::new(self.uri.clone(), &self.inner)
-  }
-
-  #[must_use]
   pub fn into_inner(self) -> T {
     self.inner
   }

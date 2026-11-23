@@ -198,7 +198,7 @@ impl Workspace {
           .is_some_and(Option::is_some)
       })
       .flat_map(|project| project.import_scope.documents())
-      .map(|document| &document.uri)
+      .map(|document| &document.document)
       .collect::<BTreeSet<_>>()
       .into_iter()
       .filter_map(|uri| self.documents.get(uri))
@@ -308,7 +308,7 @@ impl Workspace {
           .import_scope
           .documents()
           .iter()
-          .any(|document| self.documents.is_open(&document.uri))
+          .any(|document| self.documents.is_open(&document.document))
       });
 
       self.documents.retain_closed(|uri| {

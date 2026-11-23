@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, PartialEq)]
-pub struct Module {
+pub struct ModuleDeclaration {
   pub attributes: Vec<Attribute>,
   pub name: TextNode,
   pub optional: bool,
@@ -9,7 +9,7 @@ pub struct Module {
   pub range: lsp::Range,
 }
 
-impl Module {
+impl ModuleDeclaration {
   const DIRECTORY_CANDIDATES: [(&str, bool); 3] = [
     ("mod.just", true),
     ("justfile", false),
@@ -79,8 +79,8 @@ impl Module {
 mod tests {
   use {super::*, tempfile::Builder};
 
-  fn module(name: &str, path: Option<&str>) -> Module {
-    Module {
+  fn module(name: &str, path: Option<&str>) -> ModuleDeclaration {
+    ModuleDeclaration {
       attributes: Vec::new(),
       name: TextNode {
         value: name.to_owned(),

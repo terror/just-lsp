@@ -3,7 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub struct ProjectView<'a> {
   pub(super) document: &'a Document,
-  pub(super) documents: Vec<ProjectViewDocument<'a>>,
+  pub(super) documents: Vec<ScopeDocument<&'a Document>>,
 }
 
 impl<'a> ProjectView<'a> {
@@ -74,13 +74,13 @@ impl<'a> ProjectView<'a> {
       .documents()
       .iter()
       .filter_map(|scope_document| {
-        let scoped_document = if scope_document.uri == document.uri {
+        let scoped_document = if scope_document.document == document.uri {
           document
         } else {
-          documents.get(&scope_document.uri)?
+          documents.get(&scope_document.document)?
         };
 
-        Some(ProjectViewDocument {
+        Some(ScopeDocument {
           document: scoped_document,
           load_depth: scope_document.load_depth,
         })
@@ -137,7 +137,7 @@ impl<'a> ProjectView<'a> {
       documents: once(document)
         .chain(imports)
         .enumerate()
-        .map(|(index, document)| ProjectViewDocument {
+        .map(|(index, document)| ScopeDocument {
           document,
           load_depth: usize::from(index > 0),
         })
@@ -150,7 +150,7 @@ impl<'a> From<&'a Document> for ProjectView<'a> {
   fn from(document: &'a Document) -> Self {
     Self {
       document,
-      documents: vec![ProjectViewDocument {
+      documents: vec![ScopeDocument {
         document,
         load_depth: 0,
       }],
@@ -196,15 +196,15 @@ mod tests {
     let view = ProjectView {
       document: &root,
       documents: vec![
-        ProjectViewDocument {
+        ScopeDocument {
           document: &root,
           load_depth: 0,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &direct,
           load_depth: 1,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &nested,
           load_depth: 2,
         },
@@ -250,15 +250,15 @@ mod tests {
     let view = ProjectView {
       document: &root,
       documents: vec![
-        ProjectViewDocument {
+        ScopeDocument {
           document: &root,
           load_depth: 0,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &second,
           load_depth: 1,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &first,
           load_depth: 1,
         },
@@ -328,11 +328,11 @@ mod tests {
     let view = ProjectView {
       document: &root,
       documents: vec![
-        ProjectViewDocument {
+        ScopeDocument {
           document: &root,
           load_depth: 0,
         },
-        ProjectViewDocument {
+        ScopeDocument {
           document: &imported,
           load_depth: 1,
         },
