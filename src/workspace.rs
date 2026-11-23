@@ -26,7 +26,7 @@ impl Workspace {
   ) -> Vec<Diagnostic> {
     let analyses = projects
       .iter()
-      .filter(|project| project.import_scope.contains(&document.uri))
+      .filter(|project| project.module().import_scope.contains(&document.uri))
       .map(|project| {
         let Some(config) = self
           .project_configs
@@ -38,10 +38,13 @@ impl Workspace {
 
         let analyzer = Analyzer {
           config: Some(&self.config.merge(config)),
-          view: ProjectView::new(
+          view: ModuleView::new(
             document,
-            &project.import_scope,
-            &self.documents,
+            ModuleContext {
+              documents: &self.documents,
+              module: project.module(),
+              project,
+            },
           ),
         };
 
@@ -196,7 +199,7 @@ impl Workspace {
           .get(&project.root)
           .is_some_and(Option::is_some)
       })
-      .flat_map(|project| project.import_scope.documents())
+      .flat_map(|project| project.module().import_scope.documents())
       .map(|document| &document.document)
       .collect::<BTreeSet<_>>()
       .into_iter()
@@ -215,7 +218,7 @@ impl Workspace {
     self
       .root_projects()
       .into_iter()
-      .find(|project| project.import_scope.contains(uri))
+      .find(|project| project.module().import_scope.contains(uri))
       .map_or_else(
         || Some(self.config.clone()),
         |project| {
@@ -294,6 +297,7 @@ impl Workspace {
     if !retain_closed {
       self.projects.retain(|_, project| {
         project
+          .module()
           .import_scope
           .documents()
           .iter()
@@ -368,8 +372,8 @@ impl Workspace {
       .filter(|project| {
         !self.projects.values().any(|other| {
           other.root != project.root
-            && other.import_scope.contains(&project.root)
-            && (!project.import_scope.contains(&other.root)
+            && other.module().import_scope.contains(&project.root)
+            && (!project.module().import_scope.contains(&other.root)
               || other.root < project.root)
         })
       })
@@ -385,18 +389,25 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn view(&self, uri: &lsp::Url) -> Option<ProjectView<'_>> {
+  pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
     let document = self.documents.get_open(uri)?;
 
     let project = self
       .root_projects()
       .into_iter()
-      .find(|project| project.import_scope.contains(uri));
+      .find(|project| project.module().import_scope.contains(uri));
 
     Some(project.map_or_else(
-      || ProjectView::from(document),
+      || ModuleView::from(document),
       |project| {
-        ProjectView::new(document, &project.import_scope, &self.documents)
+        ModuleView::new(
+          document,
+          ModuleContext {
+            documents: &self.documents,
+            module: project.module(),
+            project,
+          },
+        )
       },
     ))
   }

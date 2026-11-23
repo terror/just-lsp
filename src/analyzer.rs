@@ -3,7 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub struct Analyzer<'a> {
   pub config: Option<&'a Config>,
-  pub view: ProjectView<'a>,
+  pub view: ModuleView<'a>,
 }
 
 impl Analyzer<'_> {

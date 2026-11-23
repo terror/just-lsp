@@ -9,12 +9,10 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      let functions = context.view().resolved_functions();
-
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if let Some(function) = functions.get(function_name) {
+        if let Some(function) = context.view().find_function(function_name) {
           let (argument_count, parameter_count) =
             (function_call.arguments.len(), function.parameters.len());
 

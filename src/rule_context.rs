@@ -3,31 +3,22 @@ use super::*;
 type BuiltinRef = &'static Builtin<'static>;
 
 pub(crate) struct RuleContext<'a> {
-  aliases: OnceLock<Vec<Located<Alias>>>,
   attributes: OnceLock<Vec<Attribute>>,
   builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  functions: OnceLock<Vec<Located<Function>>>,
   recipe_names: OnceLock<HashSet<String>>,
-  recipes: OnceLock<Vec<Located<Recipe>>>,
   scope: OnceLock<Scope<'a>>,
-  settings: OnceLock<Vec<Located<Setting>>>,
-  unexports: OnceLock<Vec<Located<Unexport>>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
-  variables: OnceLock<Vec<Located<Variable>>>,
-  view: &'a ProjectView<'a>,
+  view: &'a ModuleView<'a>,
 }
 
 impl<'a> RuleContext<'a> {
   pub(crate) fn aliases(&self) -> &[Located<Alias>] {
-    self
-      .aliases
-      .get_or_init(|| self.declarations(Document::aliases))
-      .as_slice()
+    self.view.aliases()
   }
 
   pub(crate) fn attributes(&self) -> &[Attribute] {
@@ -177,21 +168,6 @@ impl<'a> RuleContext<'a> {
     diagnostics
   }
 
-  fn declarations<T>(
-    &self,
-    declarations: impl Fn(&Document) -> Vec<T>,
-  ) -> Vec<Located<T>> {
-    self
-      .view
-      .documents()
-      .flat_map(|document| {
-        declarations(document)
-          .into_iter()
-          .map(|declaration| Located::new(document.uri.clone(), declaration))
-      })
-      .collect()
-  }
-
   pub(crate) fn document(&self) -> &'a Document {
     self.view.document()
   }
@@ -236,10 +212,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn functions(&self) -> &[Located<Function>] {
-    self
-      .functions
-      .get_or_init(|| self.declarations(Document::functions))
-      .as_slice()
+    self.view.functions()
   }
 
   pub(crate) fn imported_documents(
@@ -262,24 +235,18 @@ impl<'a> RuleContext<'a> {
   }
 
   #[must_use]
-  pub(crate) fn new(view: &'a ProjectView<'a>) -> Self {
+  pub(crate) fn new(view: &'a ModuleView<'a>) -> Self {
     Self {
-      aliases: OnceLock::new(),
       attributes: OnceLock::new(),
       builtin_attribute_map: OnceLock::new(),
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
-      functions: OnceLock::new(),
       recipe_names: OnceLock::new(),
-      recipes: OnceLock::new(),
       scope: OnceLock::new(),
-      settings: OnceLock::new(),
-      unexports: OnceLock::new(),
       user_function_names: OnceLock::new(),
       variable_and_builtin_names: OnceLock::new(),
-      variables: OnceLock::new(),
       view,
     }
   }
@@ -295,10 +262,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
-    self
-      .recipes
-      .get_or_init(|| self.declarations(Document::recipes))
-      .as_slice()
+    self.view.recipes()
   }
 
   pub(crate) fn scope(&self) -> &Scope<'_> {
@@ -313,10 +277,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn settings(&self) -> &[Located<Setting>] {
-    self
-      .settings
-      .get_or_init(|| self.declarations(Document::settings))
-      .as_slice()
+    self.view.settings()
   }
 
   pub(crate) fn tree(&self) -> &Tree {
@@ -324,10 +285,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn unexports(&self) -> &[Located<Unexport>] {
-    self
-      .unexports
-      .get_or_init(|| self.declarations(Document::unexports))
-      .as_slice()
+    self.view.unexports()
   }
 
   pub(crate) fn user_function_names(&self) -> &HashSet<String> {
@@ -354,13 +312,10 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn variables(&self) -> &[Located<Variable>] {
-    self
-      .variables
-      .get_or_init(|| self.declarations(Document::variables))
-      .as_slice()
+    self.view.variables()
   }
 
-  pub(crate) fn view(&self) -> &ProjectView<'a> {
+  pub(crate) fn view(&self) -> &ModuleView<'a> {
     self.view
   }
 }
@@ -378,10 +333,13 @@ mod tests {
 
     let project = ProjectLoader::load(&mut documents, &uri).unwrap();
 
-    test(&RuleContext::new(&ProjectView::new(
+    test(&RuleContext::new(&ModuleView::new(
       documents.get(&uri).unwrap(),
-      &project.import_scope,
-      &documents,
+      ModuleContext {
+        documents: &documents,
+        module: project.module(),
+        project: &project,
+      },
     )));
   }
 
@@ -395,9 +353,9 @@ mod tests {
       Document::new("foo:\n", lsp::Url::parse("file:///bar.just").unwrap())
         .unwrap();
 
-    let view = ProjectView {
-      document: &document,
-      documents: vec![
+    let view = ModuleView::from_scope(
+      &document,
+      vec![
         ScopeDocument {
           document: &root,
           load_depth: 0,
@@ -407,7 +365,7 @@ mod tests {
           load_depth: 1,
         },
       ],
-    };
+    );
 
     let context = RuleContext::new(&view);
 

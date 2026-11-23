@@ -26,7 +26,7 @@ impl TestProject {
     }
   }
 
-  pub(super) fn view(&self) -> ProjectView<'_> {
-    ProjectView::with_imports(&self.document, &self.imported_documents)
+  pub(super) fn view(&self) -> ModuleView<'_> {
+    ModuleView::with_imports(&self.document, &self.imported_documents)
   }
 }

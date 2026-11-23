@@ -11,14 +11,16 @@ define_rule! {
 
       let exported = context.setting_enabled("export");
 
-      let view = ProjectView::from(context.document());
-
       for (variable_name, is_used) in &context.scope().variable_usage {
         if variable_name.starts_with('_') || *is_used {
           continue;
         }
 
-        let Some(variable) = view.find_variable(variable_name) else {
+        let Some(variable) = context
+          .local_declarations(context.variables())
+          .filter(|variable| variable.name.value == *variable_name)
+          .last()
+        else {
           continue;
         };
 

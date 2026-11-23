@@ -4,7 +4,7 @@ use super::*;
 pub(crate) struct Project {
   candidates: Vec<lsp::Url>,
   pub(crate) dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
-  pub(crate) import_scope: ImportScope,
+  pub(crate) modules: BTreeMap<lsp::Url, Module>,
   pub(crate) root: lsp::Url,
   pub(crate) targets: HashSet<lsp::Url>,
 }
@@ -45,6 +45,10 @@ impl Project {
     self.dependencies.contains_key(uri)
   }
 
+  pub(crate) fn module(&self) -> &Module {
+    &self.modules[&self.root]
+  }
+
   #[must_use]
   pub(crate) fn new(
     root: lsp::Url,
@@ -68,10 +72,26 @@ impl Project {
       })
       .collect();
 
+    let mut modules = BTreeMap::new();
+
+    let mut stack = vec![root.clone()];
+
+    while let Some(uri) = stack.pop() {
+      if modules.contains_key(&uri) {
+        continue;
+      }
+
+      let module = Module::new(&uri, &dependencies);
+
+      stack.extend(module.children.values().cloned());
+
+      modules.insert(uri, module);
+    }
+
     Self {
       candidates,
-      import_scope: ImportScope::new(&root, &dependencies),
       dependencies,
+      modules,
       root,
       targets,
     }

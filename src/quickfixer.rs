@@ -119,7 +119,7 @@ mod tests {
 
       let diagnostics = Analyzer {
         config: Some(&self.config),
-        view: ProjectView::with_imports(&self.document, &imported_documents),
+        view: ModuleView::with_imports(&self.document, &imported_documents),
       }
       .analyze();
 

@@ -1,43 +1,31 @@
 use super::*;
 
-#[derive(Debug)]
-pub struct ProjectView<'a> {
-  pub(super) document: &'a Document,
-  pub(super) documents: Vec<ScopeDocument<&'a Document>>,
+#[derive(Clone, Debug)]
+pub struct ModuleView<'a> {
+  context: Option<ModuleContext<'a>>,
+  document: &'a Document,
+  documents: Vec<ScopeDocument<&'a Document>>,
+  symbols: Arc<SymbolTable>,
 }
 
-impl<'a> ProjectView<'a> {
-  fn declarations<T>(
-    &self,
-    declarations: impl Fn(&Document) -> Vec<T>,
-    declaration_name: impl Fn(&T) -> &str,
-    declaration_position: impl Fn(&T) -> lsp::Position,
-  ) -> HashMap<String, Located<T>> {
-    let mut candidates = Vec::new();
+impl<'a> ModuleView<'a> {
+  pub(crate) fn aliases(&self) -> &[Located<Alias>] {
+    &self.symbols.aliases
+  }
 
-    for (traversal_order, document) in self.documents.iter().enumerate() {
-      for declaration in declarations(document.document) {
-        candidates.push((traversal_order, document, declaration));
-      }
-    }
+  #[must_use]
+  pub fn child(&self, name: &str) -> Option<Self> {
+    let context = self.context?;
 
-    candidates.sort_by_key(|(traversal_order, document, declaration)| {
-      (
-        Reverse(document.load_depth),
-        *traversal_order,
-        declaration_position(declaration),
-      )
-    });
+    let root = context.module.children.get(name)?;
 
-    candidates
-      .into_iter()
-      .map(|(_, document, value)| {
-        (
-          declaration_name(&value).to_owned(),
-          Located::new(document.document.uri.clone(), value),
-        )
-      })
-      .collect()
+    Some(Self::new(
+      context.documents.get(root)?,
+      ModuleContext {
+        module: context.project.modules.get(root)?,
+        ..context
+      },
+    ))
   }
 
   #[must_use]
@@ -45,39 +33,68 @@ impl<'a> ProjectView<'a> {
     self.document
   }
 
-  pub(super) fn documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
+  pub(crate) fn documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
     self.documents.iter().map(|document| document.document)
   }
 
   #[must_use]
-  pub fn find_function(&self, name: &str) -> Option<Located<Function>> {
-    self.resolved_functions().remove(name)
+  pub fn find_function(&self, name: &str) -> Option<&Located<Function>> {
+    self
+      .symbols
+      .resolved_functions
+      .get(name)
+      .map(|index| &self.symbols.functions[*index])
   }
 
   #[must_use]
-  pub fn find_recipe(&self, name: &str) -> Option<Located<Recipe>> {
-    self.resolved_recipes().remove(name)
+  pub fn find_recipe(&self, name: &str) -> Option<&Located<Recipe>> {
+    self
+      .symbols
+      .resolved_recipes
+      .get(name)
+      .map(|index| &self.symbols.recipes[*index])
   }
 
   #[must_use]
-  pub fn find_variable(&self, name: &str) -> Option<Located<Variable>> {
-    self.resolved_variables().remove(name)
+  pub fn find_variable(&self, name: &str) -> Option<&Located<Variable>> {
+    self
+      .symbols
+      .resolved_variables
+      .get(name)
+      .map(|index| &self.symbols.variables[*index])
+  }
+
+  pub(crate) fn from_scope(
+    document: &'a Document,
+    documents: Vec<ScopeDocument<&'a Document>>,
+  ) -> Self {
+    Self {
+      context: None,
+      symbols: Arc::new(SymbolTable::new(&documents)),
+      document,
+      documents,
+    }
+  }
+
+  pub(crate) fn functions(&self) -> &[Located<Function>] {
+    &self.symbols.functions
   }
 
   #[must_use]
   pub(crate) fn new(
     document: &'a Document,
-    import_scope: &'a ImportScope,
-    documents: &'a DocumentStore,
+    context: ModuleContext<'a>,
   ) -> Self {
-    let documents = import_scope
+    let scope = context
+      .module
+      .import_scope
       .documents()
       .iter()
       .filter_map(|scope_document| {
         let scoped_document = if scope_document.document == document.uri {
           document
         } else {
-          documents.get(&scope_document.document)?
+          context.documents.get(&scope_document.document)?
         };
 
         Some(ScopeDocument {
@@ -85,45 +102,60 @@ impl<'a> ProjectView<'a> {
           load_depth: scope_document.load_depth,
         })
       })
-      .collect();
+      .collect::<Vec<_>>();
 
     Self {
+      context: Some(context),
+      symbols: context.module.symbols(&scope),
       document,
-      documents,
+      documents: scope,
     }
   }
 
-  #[must_use]
-  pub fn resolved_functions(&self) -> HashMap<String, Located<Function>> {
-    self.declarations(
-      Document::functions,
-      |function| &function.name.value,
-      |function| function.range.start,
-    )
+  pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
+    &self.symbols.recipes
   }
 
-  #[must_use]
-  pub fn resolved_recipes(&self) -> HashMap<String, Located<Recipe>> {
-    self.declarations(
-      Document::recipes,
-      |recipe| &recipe.name.value,
-      |recipe| recipe.range.start,
-    )
+  pub fn resolved_functions(&self) -> impl Iterator<Item = &Located<Function>> {
+    self
+      .symbols
+      .resolved_functions
+      .values()
+      .map(|index| &self.symbols.functions[*index])
   }
 
-  #[must_use]
-  pub fn resolved_variables(&self) -> HashMap<String, Located<Variable>> {
-    self.declarations(
-      Document::variables,
-      |variable| &variable.name.value,
-      |variable| variable.range.start,
-    )
+  pub fn resolved_recipes(&self) -> impl Iterator<Item = &Located<Recipe>> {
+    self
+      .symbols
+      .resolved_recipes
+      .values()
+      .map(|index| &self.symbols.recipes[*index])
+  }
+
+  pub fn resolved_variables(&self) -> impl Iterator<Item = &Located<Variable>> {
+    self
+      .symbols
+      .resolved_variables
+      .values()
+      .map(|index| &self.symbols.variables[*index])
+  }
+
+  pub(crate) fn settings(&self) -> &[Located<Setting>] {
+    &self.symbols.settings
+  }
+
+  pub(crate) fn unexports(&self) -> &[Located<Unexport>] {
+    &self.symbols.unexports
+  }
+
+  pub(crate) fn variables(&self) -> &[Located<Variable>] {
+    &self.symbols.variables
   }
 
   pub(super) fn with_document(&self, document: &'a Document) -> Self {
     Self {
       document,
-      documents: self.documents.clone(),
+      ..self.clone()
     }
   }
 
@@ -132,9 +164,9 @@ impl<'a> ProjectView<'a> {
     document: &'a Document,
     imports: impl IntoIterator<Item = &'a Document>,
   ) -> Self {
-    Self {
+    Self::from_scope(
       document,
-      documents: once(document)
+      once(document)
         .chain(imports)
         .enumerate()
         .map(|(index, document)| ScopeDocument {
@@ -142,25 +174,74 @@ impl<'a> ProjectView<'a> {
           load_depth: usize::from(index > 0),
         })
         .collect(),
-    }
+    )
   }
 }
 
-impl<'a> From<&'a Document> for ProjectView<'a> {
+impl<'a> From<&'a Document> for ModuleView<'a> {
   fn from(document: &'a Document) -> Self {
-    Self {
+    Self::from_scope(
       document,
-      documents: vec![ScopeDocument {
+      vec![ScopeDocument {
         document,
         load_depth: 0,
       }],
-    }
+    )
   }
 }
 
 #[cfg(test)]
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[track_caller]
+  fn load(
+    files: &[(&str, &str)],
+  ) -> (tempfile::TempDir, DocumentStore, Project) {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    for (path, content) in files {
+      fs::write(tempdir.path().join(path), content).unwrap();
+    }
+
+    let root =
+      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+    let mut documents = DocumentStore::default();
+
+    let project = ProjectLoader::load(&mut documents, &root).unwrap();
+
+    (tempdir, documents, project)
+  }
+
+  #[test]
+  fn child_views_module_scope() {
+    let (tempdir, documents, project) = load(&[
+      ("justfile", "mod foo"),
+      ("foo.just", "import 'bar.just'"),
+      ("bar.just", "baz:"),
+    ]);
+
+    let uri =
+      |path: &str| lsp::Url::from_file_path(tempdir.path().join(path)).unwrap();
+
+    let view = ModuleView::new(
+      documents.get(&project.root).unwrap(),
+      ModuleContext {
+        documents: &documents,
+        module: project.module(),
+        project: &project,
+      },
+    );
+
+    assert!(view.find_recipe("baz").is_none());
+    assert!(view.child("bar").is_none());
+
+    let child = view.child("foo").unwrap();
+
+    assert_eq!(child.document().uri, uri("foo.just"));
+    assert_eq!(child.find_recipe("baz").unwrap().uri, uri("bar.just"));
+  }
 
   #[test]
   fn direct_import_overrides_nested_import() {
@@ -193,9 +274,9 @@ mod tests {
     )
     .unwrap();
 
-    let view = ProjectView {
-      document: &root,
-      documents: vec![
+    let view = ModuleView::from_scope(
+      &root,
+      vec![
         ScopeDocument {
           document: &root,
           load_depth: 0,
@@ -209,7 +290,7 @@ mod tests {
           load_depth: 2,
         },
       ],
-    };
+    );
 
     assert_eq!(view.find_recipe("foo").unwrap().uri, direct.uri);
     assert_eq!(view.find_variable("foo").unwrap().uri, direct.uri);
@@ -247,9 +328,9 @@ mod tests {
     )
     .unwrap();
 
-    let view = ProjectView {
-      document: &root,
-      documents: vec![
+    let view = ModuleView::from_scope(
+      &root,
+      vec![
         ScopeDocument {
           document: &root,
           load_depth: 0,
@@ -263,7 +344,7 @@ mod tests {
           load_depth: 1,
         },
       ],
-    };
+    );
 
     assert_eq!(view.find_recipe("foo").unwrap().uri, first.uri);
     assert_eq!(view.find_variable("foo").unwrap().uri, first.uri);
@@ -290,7 +371,7 @@ mod tests {
     )
     .unwrap();
 
-    let view = ProjectView::from(&root);
+    let view = ModuleView::from(&root);
 
     assert_eq!(view.find_recipe("foo").unwrap().content, "foo:\n  echo bar",);
     assert_eq!(view.find_variable("foo").unwrap().content, "foo := 'bar'",);
@@ -325,9 +406,9 @@ mod tests {
     )
     .unwrap();
 
-    let view = ProjectView {
-      document: &root,
-      documents: vec![
+    let view = ModuleView::from_scope(
+      &root,
+      vec![
         ScopeDocument {
           document: &root,
           load_depth: 0,
@@ -337,7 +418,7 @@ mod tests {
           load_depth: 1,
         },
       ],
-    };
+    );
 
     assert_eq!(view.find_recipe("foo").unwrap().uri, root.uri);
     assert_eq!(view.find_variable("foo").unwrap().uri, root.uri);
