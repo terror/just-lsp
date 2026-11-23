@@ -250,7 +250,7 @@ impl Workspace {
           range: dependency.location,
           target: Some(target.clone()),
           tooltip: target
-            .to_file_path()
+            .file_path()
             .ok()
             .map(|path| path.display().to_string()),
           data: None,
@@ -261,7 +261,7 @@ impl Workspace {
     let modules = document.modules().into_iter().filter_map(|module| {
       let path = module.resolve(uri)?;
 
-      let target = lsp::Url::from_file_path(&path).ok()?;
+      let target = lsp::Url::from_path(&path)?;
 
       Some(lsp::DocumentLink {
         range: module.path.as_ref().map_or(module.name.range, |p| p.range),
