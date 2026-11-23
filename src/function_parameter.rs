@@ -21,9 +21,8 @@ impl FunctionParameter<'_> {
       ("", separator)
     };
 
-    let type_hint = type_hint
-      .map(|type_hint| format!(":{type_hint}"))
-      .unwrap_or_default();
+    let type_hint =
+      type_hint.map_or_default(|type_hint| format!(":{type_hint}"));
 
     let suffix = if matches!(self, Self::Variadic(..)) {
       "..."

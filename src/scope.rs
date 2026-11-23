@@ -310,8 +310,9 @@ mod tests {
         let mut actual_names = scope
           .recipe_identifier_usage
           .get(*recipe)
-          .map(|set| set.iter().map(String::as_str).collect::<Vec<_>>())
-          .unwrap_or_default();
+          .map_or_default(|set| {
+            set.iter().map(String::as_str).collect::<Vec<_>>()
+          });
 
         actual_names.sort_unstable();
 
