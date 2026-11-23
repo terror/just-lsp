@@ -492,7 +492,7 @@ impl LanguageServer for Server {
         #[allow(deprecated)]
         symbols.push(lsp::DocumentSymbol {
           name: alias.name.value,
-          detail: Some(format!("alias for {}", alias.value.value)),
+          detail: Some(format!("alias for {}", alias.value)),
           kind: lsp::SymbolKind::FUNCTION,
           tags: None,
           deprecated: None,

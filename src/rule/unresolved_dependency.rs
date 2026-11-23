@@ -7,37 +7,15 @@ define_rule! {
     id: "unresolved-dependency",
     message: "missing dependency",
     run(context) {
-      let mut diagnostics = Vec::new();
-
-      let recipe_names = context.recipe_names();
-
-      for recipe in context.document().recipes() {
-        for dependency in &recipe.dependencies {
-          if !recipe_names.contains(&dependency.name.value) {
-            let suggestion = dependency.name.value.find_suggestion(
-              recipe_names.iter().map(String::as_str),
-            );
-
-            let message = match &suggestion {
-              Some(suggestion) => format!(
-                "Recipe `{}` not found. Did you mean `{suggestion}`?",
-                dependency.name.value,
-              ),
-              None => format!("Recipe `{}` not found", dependency.name.value),
-            };
-
-            let quickfix = suggestion.map(|suggestion| {
-              Quickfix::replacement(&dependency.name, suggestion)
-            });
-
-            diagnostics.push(
-              Diagnostic::error(message, dependency.range).quickfix(quickfix),
-            );
-          }
-        }
-      }
-
-      diagnostics
+      context
+        .document()
+        .recipes()
+        .iter()
+        .flat_map(|recipe| &recipe.dependencies)
+        .filter_map(|dependency| {
+          context.unresolved_recipe(&dependency.name, dependency.range)
+        })
+        .collect()
     }
   }
 }

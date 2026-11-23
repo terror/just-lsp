@@ -11,6 +11,7 @@ use {
   indoc::indoc,
   module::Module,
   module_context::ModuleContext,
+  module_lookup::ModuleLookup,
   path_ext::PathExt,
   point_ext::PointExt,
   project::Project,
@@ -84,6 +85,7 @@ pub use {
   located::Located,
   module_declaration::ModuleDeclaration,
   module_view::ModuleView,
+  namepath::Namepath,
   node_ext::NodeExt,
   parameter::{Parameter, ParameterKind, VariadicType},
   quickfix::Quickfix,
@@ -137,7 +139,9 @@ mod located;
 mod module;
 mod module_context;
 mod module_declaration;
+mod module_lookup;
 mod module_view;
+mod namepath;
 mod node_ext;
 mod parameter;
 mod path_ext;

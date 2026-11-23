@@ -4,6 +4,7 @@ use super::*;
 pub(crate) struct SymbolTable {
   pub(crate) aliases: Vec<Located<Alias>>,
   pub(crate) functions: Vec<Located<Function>>,
+  pub(crate) modules: Vec<Located<ModuleDeclaration>>,
   pub(crate) recipes: Vec<Located<Recipe>>,
   pub(crate) resolved_functions: HashMap<String, usize>,
   pub(crate) resolved_recipes: HashMap<String, usize>,
@@ -56,6 +57,7 @@ impl SymbolTable {
         |variable| variable.range.start,
       ),
       functions,
+      modules: Self::declarations(documents, Document::modules),
       recipes,
       settings: Self::declarations(documents, Document::settings),
       unexports: Self::declarations(documents, Document::unexports),

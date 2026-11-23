@@ -24,7 +24,7 @@ impl Document {
   /// let aliases = document.aliases();
   ///
   /// assert_eq!(aliases[0].name.value, "foo");
-  /// assert_eq!(aliases[0].value.value, "bar");
+  /// assert_eq!(aliases[0].value.to_string(), "bar");
   /// ```
   #[must_use]
   pub fn aliases(&self) -> Vec<Alias> {
@@ -45,10 +45,7 @@ impl Document {
             range: self.get_range(&name_node),
             value: self.get_node_text(&name_node),
           },
-          value: TextNode {
-            range: self.get_range(&value_node),
-            value: self.get_node_text(&value_node),
-          },
+          value: Namepath::from_node(&value_node, self),
           range: self.get_range(alias_node),
         })
       })
@@ -991,7 +988,7 @@ impl Document {
   ///
   /// assert_eq!(recipes[0].name.value, "foo");
   /// assert_eq!(recipes[0].parameters[0].name, "bar");
-  /// assert_eq!(recipes[0].dependencies[0].name.value, "baz");
+  /// assert_eq!(recipes[0].dependencies[0].name.to_string(), "baz");
   /// assert_eq!(recipes[0].body[0].value, "  echo {{bar}}");
   /// ```
   #[must_use]
@@ -1463,7 +1460,8 @@ mod tests {
         value: TextNode {
           value: "bar".into(),
           range: lsp::Range::at(1, 13, 1, 16),
-        },
+        }
+        .into(),
       }]
     );
   }
@@ -1488,9 +1486,18 @@ mod tests {
           value: "a1".into(),
           range: lsp::Range::at(0, 6, 0, 8)
         },
-        value: TextNode {
-          value: "tools::build".into(),
-          range: lsp::Range::at(0, 12, 0, 24)
+        value: Namepath {
+          range: lsp::Range::at(0, 12, 0, 24),
+          segments: vec![
+            TextNode {
+              value: "tools".into(),
+              range: lsp::Range::at(0, 12, 0, 17),
+            },
+            TextNode {
+              value: "build".into(),
+              range: lsp::Range::at(0, 19, 0, 24),
+            },
+          ],
         },
         range: lsp::Range::at(0, 0, 0, 24)
       }]
@@ -1550,7 +1557,8 @@ mod tests {
         value: TextNode {
           value: "foo".into(),
           range: lsp::Range::at(0, 12, 0, 15)
-        },
+        }
+        .into(),
         range: lsp::Range::at(0, 0, 0, 15)
       }]
     );
@@ -1671,7 +1679,8 @@ mod tests {
           value: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(0, 19, 0, 22)
-          },
+          }
+          .into(),
           range: lsp::Range::at(0, 0, 0, 22)
         },
         Alias {
@@ -1683,7 +1692,8 @@ mod tests {
           value: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(1, 19, 1, 22)
-          },
+          }
+          .into(),
           range: lsp::Range::at(1, 0, 1, 22)
         }
       ]
@@ -1775,7 +1785,8 @@ mod tests {
           value: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(0, 12, 0, 15),
-          },
+          }
+          .into(),
           range: lsp::Range::at(0, 0, 0, 15),
         },
         Alias {
@@ -1787,7 +1798,8 @@ mod tests {
           value: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(1, 12, 1, 15),
-          },
+          }
+          .into(),
           range: lsp::Range::at(1, 0, 1, 15),
         }
       ]
@@ -3264,7 +3276,8 @@ mod tests {
           name: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(3, 5, 3, 8),
-          },
+          }
+          .into(),
           arguments: vec![],
           mapped: None,
           phase: DependencyPhase::Prior,
@@ -3306,7 +3319,8 @@ mod tests {
           name: TextNode {
             value: "foo".into(),
             range: lsp::Range::at(3, 6, 3, 9),
-          },
+          }
+          .into(),
           arguments: vec![
             DependencyArgument {
               value: "'value1'".into(),
@@ -3385,7 +3399,8 @@ mod tests {
           name: TextNode {
             value: "bar".into(),
             range: lsp::Range::at(3, 12, 3, 15),
-          },
+          }
+          .into(),
           arguments: vec![
             DependencyArgument {
               value: "args".into(),
@@ -3445,9 +3460,18 @@ mod tests {
         },
         attributes: vec![],
         dependencies: vec![Dependency {
-          name: TextNode {
-            value: "tools::foo".into(),
+          name: Namepath {
             range: lsp::Range::at(6, 5, 6, 15),
+            segments: vec![
+              TextNode {
+                value: "tools".into(),
+                range: lsp::Range::at(6, 5, 6, 10),
+              },
+              TextNode {
+                value: "foo".into(),
+                range: lsp::Range::at(6, 12, 6, 15),
+              },
+            ],
           },
           arguments: vec![],
           mapped: None,
@@ -3494,7 +3518,8 @@ mod tests {
             name: TextNode {
               value: "foo".into(),
               range: lsp::Range::at(6, 5, 6, 8),
-            },
+            }
+            .into(),
             arguments: vec![],
             mapped: None,
             phase: DependencyPhase::Prior,
@@ -3504,7 +3529,8 @@ mod tests {
             name: TextNode {
               value: "bar".into(),
               range: lsp::Range::at(6, 9, 6, 12),
-            },
+            }
+            .into(),
             arguments: vec![],
             mapped: None,
             phase: DependencyPhase::Prior,

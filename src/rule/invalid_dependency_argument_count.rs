@@ -13,7 +13,7 @@ define_rule! {
 
       for recipe in context.document().recipes() {
         for dependency in &recipe.dependencies {
-          if let Some(recipe) = context.view().find_recipe(&dependency.name.value) {
+          if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
             let parameters = &recipe.parameters;
 
             let flags = recipe
@@ -67,7 +67,7 @@ define_rule! {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
-                  dependency.name.value,
+                  dependency.name,
                   Count("argument", required_parameters)
                 ),
                 dependency.range,
@@ -76,7 +76,7 @@ define_rule! {
               diagnostics.push(Diagnostic::error(
                 format!(
                   "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
-                  dependency.name.value,
+                  dependency.name,
                   Count("argument", parameter_count)
                 ),
                 dependency.range,

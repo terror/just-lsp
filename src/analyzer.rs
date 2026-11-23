@@ -4151,6 +4151,72 @@ mod tests {
   }
 
   #[test]
+  fn module_paths() {
+    #[track_caller]
+    fn case(justfile: &str, expected: &[(&str, lsp::Range)]) {
+      let tempdir = tempfile::tempdir().unwrap();
+
+      fs::write(tempdir.path().join("justfile"), justfile).unwrap();
+      fs::write(tempdir.path().join("foo.just"), "bar baz:\n").unwrap();
+
+      let uri =
+        lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
+
+      let mut documents = DocumentStore::default();
+
+      let project = ProjectLoader::load(&mut documents, &uri).unwrap();
+
+      let analyzer = Analyzer {
+        config: None,
+        view: ModuleView::new(
+          documents.get(&uri).unwrap(),
+          ModuleContext {
+            documents: &documents,
+            module: project.module(),
+            project: &project,
+          },
+        ),
+      };
+
+      assert_eq!(
+        analyzer
+          .analyze()
+          .iter()
+          .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
+          .collect::<Vec<_>>(),
+        expected,
+      );
+    }
+
+    case("mod foo\n\nqux: (foo::bar 'a')\n", &[]);
+
+    case("mod foo\n\nalias qux := foo::bar\n", &[]);
+
+    case(
+      "mod foo\n\nqux: foo::bar\n",
+      &[(
+        "Dependency `foo::bar` requires 1 argument, but 0 provided",
+        lsp::Range::at(2, 5, 2, 13),
+      )],
+    );
+
+    case(
+      "mod foo\n\nqux: foo::baz\n",
+      &[(
+        "Recipe `foo::baz` not found. Did you mean `foo::bar`?",
+        lsp::Range::at(2, 5, 2, 13),
+      )],
+    );
+
+    case(
+      "mod foo\n\nalias qux := bob::bar\n",
+      &[("Module `bob` not found", lsp::Range::at(2, 13, 2, 16))],
+    );
+
+    case("mod? bob\n\nqux: bob::bar\n", &[]);
+  }
+
+  #[test]
   fn openbsd_macos_no_conflict() {
     Test::new(indoc! {
       "
