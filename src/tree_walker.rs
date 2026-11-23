@@ -80,7 +80,7 @@ impl<'a> TreeWalker<'a> {
     ControlFlow::Continue(())
   }
 
-  fn walk<B>(
+  pub(super) fn walk<B>(
     &self,
     mut visit: impl FnMut(Node<'a>, u32) -> ControlFlow<B, bool>,
   ) -> ControlFlow<B> {

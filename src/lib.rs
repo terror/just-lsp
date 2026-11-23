@@ -38,7 +38,7 @@ use {
   string_literal::StringLiteral,
   tower_lsp::lsp_types as lsp,
   tracing::warn,
-  tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree, TreeCursor},
+  tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree},
   tree_walker::TreeWalker,
   url_ext::UrlExt,
 };

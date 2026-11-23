@@ -2754,6 +2754,16 @@ mod tests {
   }
 
   #[test]
+  fn deeply_nested_expression() {
+    Test::new(&format!(
+      "_foo := {}'bar'{}",
+      "(".repeat(1000),
+      ")".repeat(1000)
+    ))
+    .run();
+  }
+
+  #[test]
   fn default_parameter_expression_functions() {
     Test::new(indoc! {
       "

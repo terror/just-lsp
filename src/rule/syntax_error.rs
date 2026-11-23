@@ -7,11 +7,27 @@ define_rule! {
     id: "syntax-error",
     message: "syntax errors",
     run(context) {
+      let document = context.document();
+
       let mut diagnostics = Vec::new();
 
-      let mut cursor = context.tree().root_node().walk();
+      let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
+        if node.is_error() {
+          diagnostics.push(Diagnostic::error(
+            SyntaxErrorRule::error_message(document, &node),
+            document.get_range(&node),
+          ));
+        }
 
-      SyntaxErrorRule::collect(context.document(), &mut cursor, &mut diagnostics);
+        if node.is_missing() {
+          diagnostics.push(Diagnostic::error(
+            SyntaxErrorRule::missing_message(&node),
+            document.get_range(&node),
+          ));
+        }
+
+        ControlFlow::<(), bool>::Continue(true)
+      });
 
       diagnostics
     }
@@ -19,40 +35,6 @@ define_rule! {
 }
 
 impl SyntaxErrorRule {
-  fn collect(
-    document: &Document,
-    cursor: &mut TreeCursor<'_>,
-    diagnostics: &mut Vec<Diagnostic>,
-  ) {
-    let node = cursor.node();
-
-    if node.is_error() {
-      diagnostics.push(Diagnostic::error(
-        SyntaxErrorRule::error_message(document, &node),
-        document.get_range(&node),
-      ));
-    }
-
-    if node.is_missing() {
-      diagnostics.push(Diagnostic::error(
-        SyntaxErrorRule::missing_message(&node),
-        document.get_range(&node),
-      ));
-    }
-
-    if cursor.goto_first_child() {
-      loop {
-        SyntaxErrorRule::collect(document, cursor, diagnostics);
-
-        if !cursor.goto_next_sibling() {
-          break;
-        }
-      }
-
-      cursor.goto_parent();
-    }
-  }
-
   fn describe_kind(kind: &str) -> String {
     if kind == "\n" {
       return "newline".to_string();
