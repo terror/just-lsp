@@ -24,81 +24,34 @@ impl Workspace {
     document: &Document,
     projects: &[&Project],
   ) -> Vec<Diagnostic> {
-    let analyses = projects
-      .iter()
-      .filter(|project| project.module().import_scope.contains(&document.uri))
-      .map(|project| {
-        let Some(config) = self
-          .project_configs
-          .get(&project.root)
-          .and_then(Option::as_ref)
-        else {
-          return Vec::new();
-        };
+    Diagnostic::merge(
+      Self::contexts(projects, &document.uri)
+        .into_iter()
+        .map(|(project, module)| {
+          let Some(config) = self
+            .project_configs
+            .get(&project.root)
+            .and_then(Option::as_ref)
+          else {
+            return Vec::new();
+          };
 
-        let analyzer = Analyzer {
-          config: Some(&self.config.merge(config)),
-          view: ModuleView::new(
-            document,
-            ModuleContext {
-              documents: &self.documents,
-              module: project.module(),
-              project,
-            },
-          ),
-        };
+          let analyzer = Analyzer {
+            config: Some(&self.config.merge(config)),
+            view: ModuleView::new(
+              document,
+              ModuleContext {
+                documents: &self.documents,
+                module,
+                project,
+              },
+            ),
+          };
 
-        analyzer.analyze()
-      })
-      .collect::<Vec<_>>();
-
-    let mut quickfixes = analyses
-      .first()
-      .into_iter()
-      .flatten()
-      .flat_map(|diagnostic| diagnostic.quickfixes.iter().cloned())
-      .collect::<Vec<_>>();
-
-    for diagnostics in analyses.iter().skip(1) {
-      quickfixes.retain(|quickfix| {
-        diagnostics
-          .iter()
-          .any(|diagnostic| diagnostic.quickfixes.contains(quickfix))
-      });
-    }
-
-    let mut diagnostics = Vec::<Diagnostic>::new();
-
-    for mut diagnostic in analyses.into_iter().flatten() {
-      diagnostic
-        .quickfixes
-        .retain(|quickfix| quickfixes.contains(quickfix));
-
-      if let Some(previous) = diagnostics.iter_mut().find(|previous| {
-        previous.id == diagnostic.id
-          && previous.message == diagnostic.message
-          && previous.range == diagnostic.range
-          && previous.severity == diagnostic.severity
-      }) {
-        for quickfix in diagnostic.quickfixes {
-          if !previous.quickfixes.contains(&quickfix) {
-            previous.quickfixes.push(quickfix);
-          }
-        }
-      } else {
-        diagnostics.push(diagnostic);
-      }
-    }
-
-    diagnostics.sort_by(|left, right| {
-      left
-        .range
-        .start
-        .cmp(&right.range.start)
-        .then_with(|| left.message.cmp(&right.message))
-    });
-
-    diagnostics
+          analyzer.analyze()
+        })
+        .collect(),
+    )
   }
 
   /// Applies changes to an open document and rebuilds affected projects.
@@ -163,6 +116,21 @@ impl Workspace {
     &self.config
   }
 
+  fn contexts<'a>(
+    projects: &[&'a Project],
+    uri: &lsp::Url,
+  ) -> Vec<(&'a Project, &'a Module)> {
+    projects
+      .iter()
+      .flat_map(|project| {
+        project
+          .modules_containing(uri)
+          .into_iter()
+          .map(move |module| (*project, module))
+      })
+      .collect()
+  }
+
   #[must_use]
   pub fn definition(
     &self,
@@ -199,7 +167,8 @@ impl Workspace {
           .get(&project.root)
           .is_some_and(Option::is_some)
       })
-      .flat_map(|project| project.module().import_scope.documents())
+      .flat_map(|project| project.modules.values())
+      .flat_map(|module| module.import_scope.documents())
       .map(|document| &document.document)
       .collect::<BTreeSet<_>>()
       .into_iter()
@@ -215,13 +184,11 @@ impl Workspace {
 
   #[must_use]
   pub fn document_config(&self, uri: &lsp::Url) -> Option<Config> {
-    self
-      .root_projects()
-      .into_iter()
-      .find(|project| project.module().import_scope.contains(uri))
+    Self::contexts(&self.root_projects(), uri)
+      .first()
       .map_or_else(
         || Some(self.config.clone()),
-        |project| {
+        |(project, _)| {
           self
             .project_configs
             .get(&project.root)
@@ -296,12 +263,13 @@ impl Workspace {
 
     if !retain_closed {
       self.projects.retain(|_, project| {
-        project
-          .module()
-          .import_scope
-          .documents()
-          .iter()
-          .any(|document| self.documents.is_open(&document.document))
+        project.modules.values().any(|module| {
+          module
+            .import_scope
+            .documents()
+            .iter()
+            .any(|document| self.documents.is_open(&document.document))
+        })
       });
 
       self.documents.retain_closed(|uri| {
@@ -372,8 +340,8 @@ impl Workspace {
       .filter(|project| {
         !self.projects.values().any(|other| {
           other.root != project.root
-            && other.module().import_scope.contains(&project.root)
-            && (!project.module().import_scope.contains(&other.root)
+            && !other.modules_containing(&project.root).is_empty()
+            && (project.modules_containing(&other.root).is_empty()
               || other.root < project.root)
         })
       })
@@ -392,24 +360,23 @@ impl Workspace {
   pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
     let document = self.documents.get_open(uri)?;
 
-    let project = self
-      .root_projects()
-      .into_iter()
-      .find(|project| project.module().import_scope.contains(uri));
-
-    Some(project.map_or_else(
-      || ModuleView::from(document),
-      |project| {
-        ModuleView::new(
-          document,
-          ModuleContext {
-            documents: &self.documents,
-            module: project.module(),
-            project,
+    Some(
+      Self::contexts(&self.root_projects(), uri)
+        .first()
+        .map_or_else(
+          || ModuleView::from(document),
+          |(project, module)| {
+            ModuleView::new(
+              document,
+              ModuleContext {
+                documents: &self.documents,
+                module,
+                project,
+              },
+            )
           },
-        )
-      },
-    ))
+        ),
+    )
   }
 }
 
@@ -795,6 +762,49 @@ mod tests {
         (bar, Vec::new()),
         (baz, vec![lsp::DiagnosticSeverity::WARNING]),
       ]),
+    );
+  }
+
+  #[test]
+  fn project_configuration_applies_to_modules() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    for (path, content) in [
+      (
+        "just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'warning'",
+      ),
+      (
+        "foo/just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'off'",
+      ),
+      ("justfile", "mod foo\n"),
+      ("foo/justfile", "foo: bar\n"),
+    ] {
+      let path = tempdir.path().join(path);
+
+      fs::create_dir_all(path.parent().unwrap()).unwrap();
+      fs::write(path, content).unwrap();
+    }
+
+    let uri =
+      |path| lsp::Url::from_file_path(tempdir.path().join(path)).unwrap();
+
+    let mut workspace = Workspace::default();
+
+    for uri in [uri("justfile"), uri("foo/justfile")] {
+      workspace.load_project(uri).unwrap();
+    }
+
+    assert_eq!(
+      workspace.document_config(&uri("foo/justfile")),
+      Some(Config {
+        formatting: FormattingConfig::default(),
+        rules: HashMap::from([(
+          "unresolved-dependency".into(),
+          RuleConfig::Level(RuleLevel::Warning),
+        )]),
+      }),
     );
   }
 

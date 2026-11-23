@@ -28,6 +28,56 @@ impl Diagnostic {
     }
   }
 
+  pub(crate) fn merge(analyses: Vec<Vec<Self>>) -> Vec<Self> {
+    let mut quickfixes = analyses
+      .first()
+      .into_iter()
+      .flatten()
+      .flat_map(|diagnostic| diagnostic.quickfixes.iter().cloned())
+      .collect::<Vec<_>>();
+
+    for diagnostics in analyses.iter().skip(1) {
+      quickfixes.retain(|quickfix| {
+        diagnostics
+          .iter()
+          .any(|diagnostic| diagnostic.quickfixes.contains(quickfix))
+      });
+    }
+
+    let mut diagnostics = Vec::<Self>::new();
+
+    for mut diagnostic in analyses.into_iter().flatten() {
+      diagnostic
+        .quickfixes
+        .retain(|quickfix| quickfixes.contains(quickfix));
+
+      if let Some(previous) = diagnostics.iter_mut().find(|previous| {
+        previous.id == diagnostic.id
+          && previous.message == diagnostic.message
+          && previous.range == diagnostic.range
+          && previous.severity == diagnostic.severity
+      }) {
+        for quickfix in diagnostic.quickfixes {
+          if !previous.quickfixes.contains(&quickfix) {
+            previous.quickfixes.push(quickfix);
+          }
+        }
+      } else {
+        diagnostics.push(diagnostic);
+      }
+    }
+
+    diagnostics.sort_by(|left, right| {
+      left
+        .range
+        .start
+        .cmp(&right.range.start)
+        .then_with(|| left.message.cmp(&right.message))
+    });
+
+    diagnostics
+  }
+
   #[must_use]
   pub fn quickfix(self, quickfix: impl Into<Option<Quickfix>>) -> Self {
     Self {

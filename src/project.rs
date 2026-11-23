@@ -45,8 +45,21 @@ impl Project {
     self.dependencies.contains_key(uri)
   }
 
+  #[cfg(test)]
   pub(crate) fn module(&self) -> &Module {
     &self.modules[&self.root]
+  }
+
+  pub(crate) fn modules_containing(&self, uri: &lsp::Url) -> Vec<&Module> {
+    let mut modules = self
+      .modules
+      .iter()
+      .filter(|(_, module)| module.import_scope.contains(uri))
+      .collect::<Vec<_>>();
+
+    modules.sort_by_key(|(root, _)| *root != &self.root);
+
+    modules.into_iter().map(|(_, module)| module).collect()
   }
 
   #[must_use]
