@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SettingKind {
   Array,
   Boolean(bool),
@@ -32,17 +32,5 @@ impl Display for SettingKind {
       SettingKind::String => write!(f, "string"),
       SettingKind::StringOrArray => write!(f, "string or array"),
     }
-  }
-}
-
-impl PartialEq for SettingKind {
-  fn eq(&self, other: &Self) -> bool {
-    matches!(
-      (self, other),
-      (SettingKind::Array, SettingKind::Array)
-        | (SettingKind::Boolean(_), SettingKind::Boolean(_))
-        | (SettingKind::String, SettingKind::String)
-        | (SettingKind::StringOrArray, SettingKind::StringOrArray)
-    )
   }
 }
