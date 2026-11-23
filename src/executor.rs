@@ -19,8 +19,7 @@ impl Executor {
   }
 
   async fn run_recipe(&self, recipe_name: &str, justfile: PathBuf) {
-    let directory =
-      justfile.parent().map(Path::to_path_buf).unwrap_or_default();
+    let directory = justfile.parent().map_or_default(Path::to_path_buf);
 
     let document_uri = lsp::Url::parse(&format!(
       "just-recipe:/{}/{}",
