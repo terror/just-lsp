@@ -116,24 +116,33 @@ impl<'a> Resolver<'a> {
       return Vec::new();
     };
 
+    let name = self.view.document().get_node_text(identifier);
+
     self
       .view
-      .document()
-      .tree
-      .root_node()
-      .find_all("identifier")
-      .into_iter()
-      .filter(|candidate| {
-        include_declaration || !Self::is_declaration(candidate)
-      })
-      .filter(|candidate| {
-        self
-          .resolve_identifier_definition(candidate)
-          .is_some_and(|resolved| resolved == definition)
-      })
-      .map(|found| lsp::Location {
-        uri: self.view.document().uri.clone(),
-        range: self.view.document().get_range(&found),
+      .documents()
+      .flat_map(|document| {
+        let resolver = Self::new(self.view.with_document(document));
+
+        document
+          .tree
+          .root_node()
+          .find_all("identifier")
+          .into_iter()
+          .filter(|candidate| document.get_node_text(candidate) == name)
+          .filter(|candidate| {
+            include_declaration || !Self::is_declaration(candidate)
+          })
+          .filter(|candidate| {
+            resolver
+              .resolve_identifier_definition(candidate)
+              .is_some_and(|resolved| resolved == definition)
+          })
+          .map(|found| lsp::Location {
+            uri: document.uri.clone(),
+            range: document.get_range(&found),
+          })
+          .collect::<Vec<_>>()
       })
       .collect()
   }

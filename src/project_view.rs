@@ -61,17 +61,11 @@ impl<'a> ProjectView<'a> {
 
   #[must_use]
   pub fn find_variable(&self, name: &str) -> Option<Located<Variable>> {
-    self
-      .declarations(
-        Document::variables,
-        |variable| &variable.name.value,
-        |variable| variable.range.start,
-      )
-      .remove(name)
+    self.resolved_variables().remove(name)
   }
 
   #[must_use]
-  pub fn new(
+  pub(crate) fn new(
     document: &'a Document,
     import_scope: &'a ImportScope,
     documents: &'a DocumentStore,
@@ -99,9 +93,8 @@ impl<'a> ProjectView<'a> {
     }
   }
 
-  pub(super) fn resolved_functions(
-    &self,
-  ) -> HashMap<String, Located<Function>> {
+  #[must_use]
+  pub fn resolved_functions(&self) -> HashMap<String, Located<Function>> {
     self.declarations(
       Document::functions,
       |function| &function.name.value,
@@ -109,12 +102,47 @@ impl<'a> ProjectView<'a> {
     )
   }
 
-  pub(super) fn resolved_recipes(&self) -> HashMap<String, Located<Recipe>> {
+  #[must_use]
+  pub fn resolved_recipes(&self) -> HashMap<String, Located<Recipe>> {
     self.declarations(
       Document::recipes,
       |recipe| &recipe.name.value,
       |recipe| recipe.range.start,
     )
+  }
+
+  #[must_use]
+  pub fn resolved_variables(&self) -> HashMap<String, Located<Variable>> {
+    self.declarations(
+      Document::variables,
+      |variable| &variable.name.value,
+      |variable| variable.range.start,
+    )
+  }
+
+  pub(super) fn with_document(&self, document: &'a Document) -> Self {
+    Self {
+      document,
+      documents: self.documents.clone(),
+    }
+  }
+
+  #[must_use]
+  pub fn with_imports(
+    document: &'a Document,
+    imports: impl IntoIterator<Item = &'a Document>,
+  ) -> Self {
+    Self {
+      document,
+      documents: once(document)
+        .chain(imports)
+        .enumerate()
+        .map(|(index, document)| ProjectViewDocument {
+          document,
+          load_depth: usize::from(index > 0),
+        })
+        .collect(),
+    }
   }
 }
 

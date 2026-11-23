@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, Default)]
-pub struct DocumentStore {
+pub(crate) struct DocumentStore {
   documents: HashMap<lsp::Url, DocumentEntry>,
 }
 
@@ -9,7 +9,10 @@ impl DocumentStore {
   /// # Errors
   ///
   /// Returns an [`Error`] if the changed document cannot be parsed.
-  pub fn change(&mut self, params: lsp::DidChangeTextDocumentParams) -> Result {
+  pub(crate) fn change(
+    &mut self,
+    params: lsp::DidChangeTextDocumentParams,
+  ) -> Result {
     let Some(entry) = self.documents.get_mut(&params.text_document.uri) else {
       return Ok(());
     };
@@ -23,7 +26,10 @@ impl DocumentStore {
     Ok(())
   }
 
-  pub fn close(&mut self, params: &lsp::DidCloseTextDocumentParams) -> bool {
+  pub(crate) fn close(
+    &mut self,
+    params: &lsp::DidCloseTextDocumentParams,
+  ) -> bool {
     let uri = &params.text_document.uri;
 
     if !self.is_open(uri) {
@@ -49,12 +55,12 @@ impl DocumentStore {
   }
 
   #[must_use]
-  pub fn get(&self, uri: &lsp::Url) -> Option<&Document> {
+  pub(crate) fn get(&self, uri: &lsp::Url) -> Option<&Document> {
     self.documents.get(uri).map(|entry| &entry.document)
   }
 
   #[must_use]
-  pub fn get_open(&self, uri: &lsp::Url) -> Option<&Document> {
+  pub(crate) fn get_open(&self, uri: &lsp::Url) -> Option<&Document> {
     self
       .documents
       .get(uri)
@@ -63,7 +69,7 @@ impl DocumentStore {
   }
 
   #[must_use]
-  pub fn is_open(&self, uri: &lsp::Url) -> bool {
+  pub(crate) fn is_open(&self, uri: &lsp::Url) -> bool {
     self.documents.get(uri).is_some_and(|entry| entry.open)
   }
 
@@ -71,7 +77,7 @@ impl DocumentStore {
   ///
   /// Returns an [`Error`] if the URI is not a file URI, the file cannot be
   /// read, or the document cannot be parsed.
-  pub fn load(&mut self, uri: &lsp::Url) -> Result<&Document> {
+  pub(crate) fn load(&mut self, uri: &lsp::Url) -> Result<&Document> {
     match self.documents.entry(uri.clone()) {
       Entry::Occupied(entry) => Ok(&entry.into_mut().document),
       Entry::Vacant(entry) => Ok(
@@ -88,7 +94,10 @@ impl DocumentStore {
   /// # Errors
   ///
   /// Returns an [`Error`] if the opened document cannot be parsed.
-  pub fn open(&mut self, params: lsp::DidOpenTextDocumentParams) -> Result {
+  pub(crate) fn open(
+    &mut self,
+    params: lsp::DidOpenTextDocumentParams,
+  ) -> Result {
     let document = Document::try_from(params)?;
 
     self.documents.insert(

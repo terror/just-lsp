@@ -94,35 +94,18 @@ mod tests {
 
     #[track_caller]
     fn run(self) {
-      let mut documents = DocumentStore::default();
-
-      let mut project = Project::new(self.document.uri.clone());
-
-      for (index, text) in self.imported_documents.into_iter().enumerate() {
-        let uri = lsp::Url::parse(&format!("file:///foo{index}.just")).unwrap();
-
-        documents
-          .open(lsp::DidOpenTextDocumentParams {
-            text_document: lsp::TextDocumentItem {
-              uri: uri.clone(),
-              language_id: "just".into(),
-              version: 1,
-              text,
-            },
-          })
-          .unwrap();
-
-        project.add_dependency(
-          &self.document.uri,
-          ProjectDependency {
-            kind: ProjectDependencyKind::Import,
-            location: lsp::Range::default(),
-            target: ProjectDependencyTarget::Resolved(uri),
-          },
-        );
-      }
-
-      let import_scope = ImportScope::from(&project);
+      let imported_documents = self
+        .imported_documents
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+          Document::new(
+            text,
+            lsp::Url::parse(&format!("file:///foo{index}.just")).unwrap(),
+          )
+          .unwrap()
+        })
+        .collect::<Vec<_>>();
 
       let parameters = lsp::CodeActionParams {
         text_document: lsp::TextDocumentIdentifier {
@@ -136,7 +119,7 @@ mod tests {
 
       let diagnostics = Analyzer {
         config: Some(&self.config),
-        view: ProjectView::new(&self.document, &import_scope, &documents),
+        view: ProjectView::with_imports(&self.document, &imported_documents),
       }
       .analyze();
 
