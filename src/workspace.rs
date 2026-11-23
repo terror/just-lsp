@@ -166,11 +166,10 @@ impl Workspace {
     uri: &lsp::Url,
     position: lsp::Position,
   ) -> Option<lsp::Location> {
-    if let Some(ProjectDependencyTarget::Resolved(target)) = self
+    if let Some(target) = self
       .projects
       .get(uri)
-      .and_then(|project| project.dependency_at(uri, position))
-      .map(|dependency| &dependency.target)
+      .and_then(|project| project.target(project.dependency_at(uri, position)?))
     {
       return Some(lsp::Location::new(target.clone(), lsp::Range::default()));
     }
@@ -238,40 +237,30 @@ impl Workspace {
 
   #[must_use]
   pub fn links(&self, uri: &lsp::Url) -> Option<Vec<lsp::DocumentLink>> {
-    let document = self.documents.get_open(uri)?;
+    self.documents.get_open(uri)?;
 
-    let imports = self
-      .projects
-      .get(uri)
-      .into_iter()
-      .flat_map(|project| project.dependencies(uri))
-      .filter_map(|dependency| match &dependency.target {
-        ProjectDependencyTarget::Resolved(target) => Some(lsp::DocumentLink {
-          range: dependency.location,
-          target: Some(target.clone()),
-          tooltip: target
-            .file_path()
-            .ok()
-            .map(|path| path.display().to_string()),
-          data: None,
-        }),
-        _ => None,
-      });
+    Some(
+      self
+        .projects
+        .get(uri)
+        .into_iter()
+        .flat_map(|project| {
+          project.dependencies(uri).filter_map(|dependency| {
+            let target = project.target(dependency)?;
 
-    let modules = document.modules().into_iter().filter_map(|module| {
-      let path = module.resolve(uri)?;
-
-      let target = lsp::Url::from_path(&path)?;
-
-      Some(lsp::DocumentLink {
-        range: module.path.as_ref().map_or(module.name.range, |p| p.range),
-        target: Some(target),
-        tooltip: Some(path.display().to_string()),
-        data: None,
-      })
-    });
-
-    Some(imports.chain(modules).collect())
+            Some(lsp::DocumentLink {
+              range: dependency.location,
+              target: Some(target.clone()),
+              tooltip: target
+                .file_path()
+                .ok()
+                .map(|path| path.display().to_string()),
+              data: None,
+            })
+          })
+        })
+        .collect(),
+    )
   }
 
   /// # Errors
@@ -312,10 +301,7 @@ impl Workspace {
       });
 
       self.documents.retain_closed(|uri| {
-        self
-          .projects
-          .values()
-          .any(|project| project.import_scope.contains(uri))
+        self.projects.values().any(|project| project.loads(uri))
       });
     }
 
@@ -676,6 +662,58 @@ mod tests {
       .unwrap();
 
     assert_eq!(workspace.document_config(&uri), Some(config));
+  }
+
+  #[test]
+  fn module_links_refresh_when_module_opens() {
+    #[track_caller]
+    fn case(justfile: &str, path: &str, range: lsp::Range) {
+      let tempdir = tempfile::tempdir().unwrap();
+
+      let uri = |path: &str| {
+        lsp::Url::from_file_path(tempdir.path().join(path)).unwrap()
+      };
+
+      let open = |uri: lsp::Url, text: &str| lsp::DidOpenTextDocumentParams {
+        text_document: lsp::TextDocumentItem::new(
+          uri,
+          "just".into(),
+          1,
+          text.into(),
+        ),
+      };
+
+      let mut workspace = Workspace::default();
+
+      workspace.open(open(uri("justfile"), justfile)).unwrap();
+
+      let file = tempdir.path().join(path);
+
+      fs::create_dir_all(file.parent().unwrap()).unwrap();
+      fs::write(file, "").unwrap();
+
+      workspace.open(open(uri(path), "")).unwrap();
+
+      assert_eq!(
+        workspace.links(&uri("justfile")).unwrap(),
+        [lsp::DocumentLink {
+          range,
+          target: Some(uri(path)),
+          tooltip: Some(
+            uri(path).to_file_path().unwrap().display().to_string()
+          ),
+          data: None,
+        }],
+      );
+    }
+
+    case("mod foo\n", "foo.just", lsp::Range::at(0, 4, 0, 7));
+    case("mod foo\n", "foo/Justfile", lsp::Range::at(0, 4, 0, 7));
+    case(
+      "mod foo 'bar'\n",
+      "bar/mod.just",
+      lsp::Range::at(0, 8, 0, 13),
+    );
   }
 
   #[test]

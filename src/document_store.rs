@@ -23,6 +23,9 @@ impl DocumentStore {
 
     entry.document.apply_change(params)?;
 
+    entry.imports = OnceLock::new();
+    entry.modules = OnceLock::new();
+
     Ok(())
   }
 
@@ -38,13 +41,9 @@ impl DocumentStore {
 
     match Self::read(uri) {
       Ok(document) => {
-        self.documents.insert(
-          uri.clone(),
-          DocumentEntry {
-            document,
-            open: false,
-          },
-        );
+        self
+          .documents
+          .insert(uri.clone(), DocumentEntry::new(document, false));
       }
       Err(_) => {
         self.documents.remove(uri);
@@ -52,6 +51,44 @@ impl DocumentStore {
     }
 
     true
+  }
+
+  pub(crate) fn dependencies(
+    &self,
+    uri: &lsp::Url,
+  ) -> Option<Vec<ProjectDependency>> {
+    let entry = self.documents.get(uri)?;
+
+    let imports = entry.imports.get_or_init(|| {
+      entry
+        .document
+        .imports()
+        .into_iter()
+        .filter(Import::is_enabled)
+        .map(|import| ProjectDependency::import(uri, &import))
+        .collect()
+    });
+
+    let modules = entry.modules.get_or_init(|| {
+      entry
+        .document
+        .modules()
+        .into_iter()
+        .filter(ModuleDeclaration::is_enabled)
+        .collect()
+    });
+
+    Some(
+      imports
+        .iter()
+        .cloned()
+        .chain(
+          modules
+            .iter()
+            .map(|module| ProjectDependency::module(uri, module)),
+        )
+        .collect(),
+    )
   }
 
   #[must_use]
@@ -82,10 +119,7 @@ impl DocumentStore {
       Entry::Occupied(entry) => Ok(&entry.into_mut().document),
       Entry::Vacant(entry) => Ok(
         &entry
-          .insert(DocumentEntry {
-            document: Self::read(uri)?,
-            open: false,
-          })
+          .insert(DocumentEntry::new(Self::read(uri)?, false))
           .document,
       ),
     }
@@ -100,13 +134,9 @@ impl DocumentStore {
   ) -> Result {
     let document = Document::try_from(params)?;
 
-    self.documents.insert(
-      document.uri.clone(),
-      DocumentEntry {
-        document,
-        open: true,
-      },
-    );
+    self
+      .documents
+      .insert(document.uri.clone(), DocumentEntry::new(document, true));
 
     Ok(())
   }
@@ -157,10 +187,7 @@ mod tests {
 
     (
       uri.clone(),
-      DocumentEntry {
-        document: Document::new("", uri).unwrap(),
-        open,
-      },
+      DocumentEntry::new(Document::new("", uri).unwrap(), open),
     )
   }
 
@@ -181,6 +208,35 @@ mod tests {
 
   fn uri(path: &Path) -> lsp::Url {
     lsp::Url::from_file_path(path).unwrap()
+  }
+
+  #[test]
+  fn change_clears_dependencies() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let foo = uri(&tempdir.path().join("foo.just"));
+
+    let mut store = DocumentStore::default();
+
+    store
+      .open(open(foo.clone(), 1, "import 'bar.just'"))
+      .unwrap();
+
+    assert_eq!(
+      store.dependencies(&foo).unwrap(),
+      [ProjectDependency {
+        kind: ProjectDependencyKind::Import,
+        location: lsp::Range::at(0, 7, 0, 17),
+        optional: false,
+        target: ProjectDependencyTarget::Resolved(uri(
+          &tempdir.path().join("bar.just")
+        )),
+      }],
+    );
+
+    store.change(change(foo.clone(), 2, "")).unwrap();
+
+    assert_eq!(store.dependencies(&foo).unwrap(), []);
   }
 
   #[test]
@@ -254,6 +310,43 @@ mod tests {
     assert_eq!(store.load(&uri).unwrap().content.to_string(), "bar:");
 
     assert!(store.is_open(&uri));
+  }
+
+  #[test]
+  fn module_dependencies_follow_filesystem() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let foo = uri(&tempdir.path().join("foo.just"));
+
+    let mut store = DocumentStore::default();
+
+    store.open(open(foo.clone(), 1, "mod bar")).unwrap();
+
+    let dependency = |target| ProjectDependency {
+      kind: ProjectDependencyKind::Module { name: "bar".into() },
+      location: lsp::Range::at(0, 4, 0, 7),
+      optional: false,
+      target,
+    };
+
+    assert_eq!(
+      store.dependencies(&foo).unwrap(),
+      [dependency(ProjectDependencyTarget::Candidates(
+        ["bar.just", "bar/mod.just", "bar/justfile", "bar/.justfile"]
+          .iter()
+          .map(|path| uri(&tempdir.path().join(path)))
+          .collect()
+      ))],
+    );
+
+    fs::write(tempdir.path().join("bar.just"), "").unwrap();
+
+    assert_eq!(
+      store.dependencies(&foo).unwrap(),
+      [dependency(ProjectDependencyTarget::Resolved(uri(
+        &tempdir.path().join("bar.just")
+      )))],
+    );
   }
 
   #[test]

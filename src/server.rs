@@ -2597,35 +2597,27 @@ mod tests {
 
   #[tokio::test]
   async fn document_link_module_with_path() -> Result {
-    let (justfile_uri, target_uri, tooltip) = if cfg!(windows) {
-      (
-        "file:///C:/foo/justfile",
-        "file:///C:/foo/baz.just",
-        "C:\\foo\\baz.just",
-      )
-    } else {
-      (
-        "file:///foo/justfile",
-        "file:///foo/baz.just",
-        "/foo/baz.just",
-      )
-    };
+    let test = Test::new().file("baz.just", "");
 
-    Test::new()
+    let justfile = test.uri("justfile");
+
+    let target = test.uri("baz.just");
+
+    let tooltip = target.to_file_path().unwrap().display().to_string();
+
+    test
       .initialize()
-      .open(justfile_uri, "mod bar x'baz.just'\n")
+      .open("justfile", "mod bar x'baz.just'\n")
       .request::<request::DocumentLinkRequest>(
         lsp::DocumentLinkParams {
-          text_document: lsp::TextDocumentIdentifier::new(
-            justfile_uri.parse().unwrap(),
-          ),
+          text_document: lsp::TextDocumentIdentifier::new(justfile),
           work_done_progress_params: lsp::WorkDoneProgressParams::default(),
           partial_result_params: lsp::PartialResultParams::default(),
         },
         Ok(Some(vec![lsp::DocumentLink {
           range: lsp::Range::at(0, 8, 0, 19),
-          target: Some(target_uri.parse().unwrap()),
-          tooltip: Some(tooltip.into()),
+          target: Some(target),
+          tooltip: Some(tooltip),
           data: None,
         }])),
       )
@@ -2960,6 +2952,26 @@ mod tests {
       .definition(
         "justfile",
         lsp::Position::new(0, 9),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
+          range: lsp::Range::at(0, 0, 0, 0),
+        })),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn goto_module_definition() -> Result {
+    let test = Test::new().file("foo.just", "foo:");
+    let target = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo")
+      .definition(
+        "justfile",
+        lsp::Position::new(0, 5),
         Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
           uri: target,
           range: lsp::Range::at(0, 0, 0, 0),

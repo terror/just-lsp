@@ -1,32 +1,11 @@
 use super::*;
 
 pub(crate) struct ProjectLoader<'a> {
-  active: HashSet<lsp::Url>,
   dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   documents: &'a mut DocumentStore,
-  expanded: HashSet<lsp::Url>,
-  targets: HashSet<lsp::Url>,
 }
 
 impl<'a> ProjectLoader<'a> {
-  fn add_dependency(&mut self, source: &lsp::Url, import: &Import) -> Result {
-    let target = self.resolve_dependency_target(source, import)?;
-
-    let dependency = ProjectDependency {
-      kind: ProjectDependencyKind::Import,
-      location: import.path.range,
-      target,
-    };
-
-    self
-      .dependencies
-      .entry(source.clone())
-      .or_default()
-      .push(dependency);
-
-    Ok(())
-  }
-
   /// # Errors
   ///
   /// Returns an [`Error`] if the root document cannot be loaded.
@@ -37,81 +16,39 @@ impl<'a> ProjectLoader<'a> {
     documents.load(root)?;
 
     let mut loader = Self {
-      active: HashSet::new(),
       dependencies: HashMap::new(),
       documents,
-      expanded: HashSet::new(),
-      targets: HashSet::new(),
     };
 
-    loader.visit(root)?;
+    loader.visit(root);
 
-    Ok(Project::new(
-      root.clone(),
-      loader.dependencies,
-      loader.targets,
-    ))
+    Ok(Project::new(root.clone(), loader.dependencies))
   }
 
-  fn resolve_dependency_target(
-    &mut self,
-    source: &lsp::Url,
-    import: &Import,
-  ) -> Result<ProjectDependencyTarget> {
-    if import.is_dynamic() {
-      return Ok(ProjectDependencyTarget::Dynamic);
-    }
+  fn visit(&mut self, uri: &lsp::Url) {
+    let dependencies = self.documents.dependencies(uri).unwrap_or_default();
 
-    let path = match import.resolve(source) {
-      Ok(Some(path)) => path,
-      Ok(None) | Err(Error::EmptyImportPath) => {
-        return Ok(ProjectDependencyTarget::Missing);
-      }
-      Err(_) => return Ok(ProjectDependencyTarget::Dynamic),
-    };
+    self.dependencies.insert(uri.clone(), dependencies.clone());
 
-    let path = path.clean();
+    for dependency in dependencies {
+      let ProjectDependencyTarget::Resolved(target) = &dependency.target else {
+        continue;
+      };
 
-    let Some(uri) = lsp::Url::from_path(&path) else {
-      return Ok(ProjectDependencyTarget::Missing);
-    };
-
-    self.targets.insert(uri.clone());
-
-    if self.active.contains(&uri) {
-      return Ok(ProjectDependencyTarget::Cycle);
-    }
-
-    if self.documents.load(&uri).is_err() {
-      if !import.optional {
-        warn!(path = %path.display(), "failed to read import");
+      if self.dependencies.contains_key(target) {
+        continue;
       }
 
-      return Ok(ProjectDependencyTarget::Missing);
+      if self.documents.load(target).is_err() {
+        if !dependency.optional {
+          warn!(%target, "failed to read dependency");
+        }
+
+        continue;
+      }
+
+      self.visit(target);
     }
-
-    if !self.expanded.contains(&uri) {
-      self.visit(&uri)?;
-    }
-
-    Ok(ProjectDependencyTarget::Resolved(uri))
-  }
-
-  fn visit(&mut self, uri: &lsp::Url) -> Result {
-    self.active.insert(uri.clone());
-
-    let imports = self.documents.load(uri)?.imports();
-
-    self.dependencies.entry(uri.clone()).or_default();
-
-    for import in imports.into_iter().filter(Import::is_enabled) {
-      self.add_dependency(uri, &import)?;
-    }
-
-    self.active.remove(uri);
-    self.expanded.insert(uri.clone());
-
-    Ok(())
   }
 }
 
@@ -410,8 +347,8 @@ mod tests {
         .collect::<Vec<_>>(),
       [
         ProjectDependencyTarget::Resolved(bar.clone()),
-        ProjectDependencyTarget::Missing,
-        ProjectDependencyTarget::Missing,
+        ProjectDependencyTarget::Resolved(test.uri("missing.just")),
+        ProjectDependencyTarget::Resolved(test.uri("required-missing.just")),
         ProjectDependencyTarget::Resolved(bar.clone()),
         ProjectDependencyTarget::Dynamic,
       ]
@@ -424,7 +361,7 @@ mod tests {
         .collect::<Vec<_>>(),
       [
         ProjectDependencyTarget::Resolved(baz.clone()),
-        ProjectDependencyTarget::Cycle,
+        ProjectDependencyTarget::Resolved(test.root.clone()),
       ]
     );
 
@@ -455,6 +392,41 @@ mod tests {
         test.uri("missing.just"),
         test.uri("required-missing.just"),
       ]),
+    );
+  }
+
+  #[test]
+  fn loads_modules() {
+    let mut test = Test::new("mod foo")
+      .file("foo.just", "import 'bar.just'")
+      .file("bar.just", "bar:");
+
+    let foo = test.uri("foo.just");
+    let bar = test.uri("bar.just");
+
+    let project = test.load();
+
+    assert_eq!(
+      project.dependencies[&test.root],
+      [ProjectDependency {
+        kind: ProjectDependencyKind::Module { name: "foo".into() },
+        location: lsp::Range::at(0, 4, 0, 7),
+        optional: false,
+        target: ProjectDependencyTarget::Resolved(foo.clone()),
+      }],
+    );
+
+    assert_eq!(
+      project.dependencies.keys().collect::<HashSet<_>>(),
+      HashSet::from([&test.root, &foo, &bar]),
+    );
+
+    assert_eq!(
+      project.import_scope.documents(),
+      [ScopeDocument {
+        document: test.root.clone(),
+        load_depth: 0,
+      }],
     );
   }
 

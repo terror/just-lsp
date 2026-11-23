@@ -27,8 +27,13 @@ impl ImportScope {
         .get(source)
         .into_iter()
         .flatten()
+        .filter(|dependency| dependency.kind == ProjectDependencyKind::Import)
         .filter_map(|dependency| match &dependency.target {
-          ProjectDependencyTarget::Resolved(target) => Some(target.clone()),
+          ProjectDependencyTarget::Resolved(target)
+            if dependencies.contains_key(target) =>
+          {
+            Some(target.clone())
+          }
           _ => None,
         })
         .collect::<Vec<_>>()

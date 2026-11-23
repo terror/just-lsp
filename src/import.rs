@@ -15,12 +15,7 @@ impl Import {
   }
 
   pub(crate) fn is_enabled(&self) -> bool {
-    self
-      .attributes
-      .iter()
-      .filter_map(Attribute::condition)
-      .reduce(|left, right| left || right)
-      .unwrap_or(true)
+    Attribute::is_enabled(&self.attributes)
   }
 
   /// # Errors

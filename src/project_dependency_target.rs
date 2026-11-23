@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ProjectDependencyTarget {
-  Cycle,
+  Candidates(Vec<lsp::Url>),
   Dynamic,
   Missing,
   Resolved(lsp::Url),

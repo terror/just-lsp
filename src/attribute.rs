@@ -18,6 +18,14 @@ impl Attribute {
     }
   }
 
+  pub(crate) fn is_enabled(attributes: &[Self]) -> bool {
+    attributes
+      .iter()
+      .filter_map(Self::condition)
+      .reduce(|left, right| left || right)
+      .unwrap_or(true)
+  }
+
   pub(crate) fn keyword_argument(
     &self,
     name: &str,
