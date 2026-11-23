@@ -6,26 +6,50 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-  /// Returns whether `identifier` is the name at a declaration site: a recipe
-  /// header, the left-hand side of an assignment, a recipe parameter, a
-  /// function definition, or a function parameter.
-  fn is_declaration(identifier: &Node) -> bool {
-    identifier.parent().is_some_and(|parent| {
-      matches!(
-        parent.kind(),
-        "assignment"
-          | "function_definition"
-          | "function_parameters"
-          | "parameter"
-          | "recipe_header"
-      )
-    })
+  fn definition(symbol: &Symbol) -> Option<lsp::Location> {
+    match symbol {
+      Symbol::Function(function) => {
+        Some(function.location(function.name.range))
+      }
+      Symbol::Recipe(recipe) => Some(recipe.location(recipe.range)),
+      Symbol::Variable(variable) => Some(variable.location(variable.range)),
+      Symbol::Builtin(_)
+      | Symbol::FunctionParameter(_)
+      | Symbol::Parameter(_) => None,
+    }
   }
 
   /// Creates a new `Resolver` bound to the given `ModuleView`.
   #[must_use]
   pub fn new(view: impl Into<ModuleView<'a>>) -> Self {
     Self { view: view.into() }
+  }
+
+  fn refers_to(
+    &self,
+    candidate: &Binding,
+    target: &Binding,
+    definition: Option<&lsp::Location>,
+  ) -> bool {
+    let same_name = match (candidate, target) {
+      (Binding::Recipe(candidate), Binding::Recipe(target)) => {
+        candidate.last() == target.last()
+      }
+      (Binding::Function(candidate), Binding::Function(target))
+      | (Binding::Variable(candidate), Binding::Variable(target)) => {
+        candidate == target
+      }
+      _ => return candidate == target,
+    };
+
+    same_name
+      && definition.is_some()
+      && self
+        .symbol(candidate)
+        .as_ref()
+        .and_then(Self::definition)
+        .as_ref()
+        == definition
   }
 
   /// Returns the definition site of the symbol that `identifier` refers to.
@@ -111,40 +135,54 @@ impl<'a> Resolver<'a> {
     identifier: &Node,
     include_declaration: bool,
   ) -> Vec<lsp::Location> {
-    let Some(definition) = self.resolve_identifier_definition(identifier)
+    let document = self.view.document();
+
+    let Some(target) = Bindings::new(&self.view, document)
+      .get(identifier)
+      .map(|bound| bound.binding.clone())
     else {
       return Vec::new();
     };
 
-    let name = self.view.document().get_node_text(identifier);
+    let Some(symbol) = self.symbol(&target) else {
+      return Vec::new();
+    };
 
-    self
-      .view
-      .documents()
-      .flat_map(|document| {
-        let resolver = Self::new(self.view.with_document(document));
+    let definition = Self::definition(&symbol);
 
-        document
-          .tree
-          .root_node()
-          .find_all("identifier")
-          .into_iter()
-          .filter(|candidate| document.get_node_text(candidate) == name)
-          .filter(|candidate| {
-            include_declaration || !Self::is_declaration(candidate)
+    let mut locations = Vec::<lsp::Location>::new();
+
+    for view in self.view.project_views() {
+      let resolver = Self { view };
+
+      for candidate in resolver.view.documents() {
+        if target.is_local() && candidate.uri != document.uri {
+          continue;
+        }
+
+        let mut found = Bindings::new(&resolver.view, candidate)
+          .identifiers()
+          .iter()
+          .filter(|bound| include_declaration || !bound.declaration)
+          .filter(|bound| {
+            resolver.refers_to(&bound.binding, &target, definition.as_ref())
           })
-          .filter(|candidate| {
-            resolver
-              .resolve_identifier_definition(candidate)
-              .is_some_and(|resolved| resolved == definition)
+          .map(|bound| {
+            lsp::Location::new(candidate.uri.clone(), bound.identifier.range)
           })
-          .map(|found| lsp::Location {
-            uri: document.uri.clone(),
-            range: document.get_range(&found),
-          })
-          .collect::<Vec<_>>()
-      })
-      .collect()
+          .collect::<Vec<_>>();
+
+        found.sort_by_key(|location| location.range.start);
+
+        for location in found {
+          if !locations.contains(&location) {
+            locations.push(location);
+          }
+        }
+      }
+    }
+
+    locations
   }
 
   /// Classifies `identifier` into the [`Symbol`] it refers to, following
@@ -156,162 +194,51 @@ impl<'a> Resolver<'a> {
   /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
   #[must_use]
   pub fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
-    if self.view.document().is_attribute_keyword(identifier) {
-      return None;
-    }
+    self.symbol(
+      &Bindings::new(&self.view, self.view.document())
+        .get(identifier)?
+        .binding,
+    )
+  }
 
-    let name = self.view.document().get_node_text(identifier);
+  fn symbol(&self, binding: &Binding) -> Option<Symbol> {
+    let document = self.view.document();
 
-    let parent_kind = identifier.parent()?.kind();
-
-    let builtin_constant = |name: &str| {
-      BUILTINS
-        .iter()
-        .find(|builtin| matches!(
-          builtin,
-          Builtin::Constant { name: builtin_name, .. } if name == *builtin_name
-        ))
-        .map(Symbol::Builtin)
-    };
-
-    match parent_kind {
-      "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        self.view.find_recipe(&name).cloned().map(Symbol::Recipe)
+    match binding {
+      Binding::Builtin(index) => Some(Symbol::Builtin(&BUILTINS[*index])),
+      Binding::Function(name) => {
+        self.view.find_function(name).cloned().map(Symbol::Function)
       }
-      "assignment" => self
-        .view
-        .find_variable(&name)
-        .cloned()
-        .map(Symbol::Variable),
-      "function_call" | "assert_expression" => {
+      Binding::FunctionParameter { function, name } => document
+        .functions()
+        .into_iter()
+        .find(|candidate| candidate.range == *function)?
+        .parameters
+        .into_iter()
+        .find(|parameter| parameter.value == *name)
+        .map(Symbol::FunctionParameter),
+      Binding::Parameter { name, recipe } => document
+        .recipes()
+        .into_iter()
+        .find(|candidate| candidate.range == *recipe)?
+        .parameters
+        .into_iter()
+        .find(|parameter| parameter.name == *name)
+        .map(Symbol::Parameter),
+      Binding::Recipe(path) => {
+        let (name, modules) = path.split_last()?;
+
         self
           .view
-          .find_function(&name)
+          .descend(modules)?
+          .find_recipe(name)
           .cloned()
-          .map(Symbol::Function)
-          .or_else(|| {
-            BUILTINS
-            .iter()
-            .find(|builtin| matches!(
-              builtin,
-              Builtin::Function { name: function_name, aliases, .. }
-                if name == *function_name || aliases.contains(&name.as_str())
-            ))
-            .map(Symbol::Builtin)
-          })
+          .map(Symbol::Recipe)
       }
-      "function_definition" => self
-        .view
-        .find_function(&name)
-        .cloned()
-        .map(Symbol::Function),
-      "function_parameters" => self
-        .view
-        .document()
-        .get_function(identifier)
-        .and_then(|function| {
-          function
-            .parameters
-            .iter()
-            .find(|parameter| parameter.value == name)
-            .cloned()
-            .map(Symbol::FunctionParameter)
-        }),
-      "parameter" | "variadic_parameter" => self
-        .view
-        .document()
-        .get_recipe(identifier)
-        .and_then(|recipe| {
-          recipe
-            .parameters
-            .iter()
-            .find(|parameter| parameter.name == name)
-            .cloned()
-            .map(Symbol::Parameter)
-        }),
-      "attribute_named_param" | "value" => {
-        let containing_parameter = identifier
-          .get_parent("parameter")
-          .or_else(|| identifier.get_parent("variadic_parameter"));
-
-        match containing_parameter {
-          None => self
-            .view
-            .document()
-            .get_recipe(identifier)
-            .and_then(|recipe| {
-              recipe
-                .parameters
-                .iter()
-                .find(|parameter| parameter.name == name)
-                .cloned()
-                .map(Symbol::Parameter)
-            })
-            .or_else(|| {
-              self.view.document().get_function(identifier).and_then(
-                |function| {
-                  function
-                    .parameters
-                    .iter()
-                    .find(|parameter| parameter.value == name)
-                    .cloned()
-                    .map(Symbol::FunctionParameter)
-                },
-              )
-            })
-            .or_else(|| {
-              self
-                .view
-                .find_variable(&name)
-                .cloned()
-                .map(Symbol::Variable)
-            })
-            .or_else(|| builtin_constant(&name)),
-          Some(containing_parameter) => {
-            let containing_parameter_name = self
-              .view
-              .document()
-              .get_node_text(&containing_parameter.find("identifier")?);
-
-            self
-              .view
-              .document()
-              .get_recipe(identifier)
-              .and_then(|recipe| {
-                recipe
-                  .parameters
-                  .iter()
-                  .take_while(|parameter| {
-                    parameter.name != containing_parameter_name
-                  })
-                  .find(|parameter| parameter.name == name)
-                  .cloned()
-                  .map(Symbol::Parameter)
-              })
-              .or_else(|| {
-                self
-                  .view
-                  .find_variable(&name)
-                  .cloned()
-                  .map(Symbol::Variable)
-              })
-              .or_else(|| builtin_constant(&name))
-          }
-        }
+      Binding::Unresolved { .. } => None,
+      Binding::Variable(name) => {
+        self.view.find_variable(name).cloned().map(Symbol::Variable)
       }
-      _ => BUILTINS
-        .iter()
-        .find(|builtin| match builtin {
-          Builtin::Attribute {
-            name: attribute_name,
-            ..
-          } => parent_kind == "attribute" && name == *attribute_name,
-          Builtin::Setting {
-            name: setting_name, ..
-          } => parent_kind == "setting" && name == *setting_name,
-          _ => false,
-        })
-        .map(Symbol::Builtin),
     }
   }
 }
@@ -569,6 +496,34 @@ mod tests {
         uri: document.uri.clone(),
         range: lsp::Range::at(1, 10, 1, 14),
       }
+    );
+  }
+
+  #[test]
+  fn resolve_builtin_references() {
+    let document = Document::from("foo:\n  echo {{ arch() }} {{ arch() }}\n");
+
+    let references = Resolver::new(&document).resolve_identifier_references(
+      &document
+        .tree
+        .root_node()
+        .find("function_call > identifier")
+        .unwrap(),
+      true,
+    );
+
+    assert_eq!(
+      references,
+      [
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(1, 10, 1, 14),
+        },
+        lsp::Location {
+          uri: document.uri.clone(),
+          range: lsp::Range::at(1, 23, 1, 27),
+        },
+      ]
     );
   }
 

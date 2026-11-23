@@ -2981,6 +2981,26 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn goto_module_recipe_definition() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+    let target = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo\n\nbaz: foo::bar\n")
+      .definition(
+        "justfile",
+        lsp::Position::new(2, 11),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
+          range: lsp::Range::at(0, 0, 1, 0),
+        })),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn goto_recipe_definition_from_dependency() -> Result {
     Test::new()
       .initialize()
@@ -4092,6 +4112,50 @@ mod tests {
           work_done_progress_params: lsp::WorkDoneProgressParams::default(),
         },
         Ok(None),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_module_recipe() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let justfile = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo\n\nbaz: foo::bar\n")
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(justfile.clone()),
+            lsp::Position::new(2, 11),
+          ),
+          new_name: "qux".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([
+            (
+              justfile,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(2, 10, 2, 13),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              foo,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "qux".into(),
+              }],
+            ),
+          ])),
+          ..Default::default()
+        })),
       )
       .run()
       .await

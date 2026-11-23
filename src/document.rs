@@ -481,37 +481,6 @@ impl Document {
       .collect()
   }
 
-  /// Returns the function definition enclosing `node`.
-  ///
-  /// Only ancestors are searched; `node` itself is not considered. Returns
-  /// `None` if there is no enclosing function or its definition cannot be
-  /// extracted by [`Document::functions`].
-  ///
-  /// `node` must belong to this document's current syntax tree.
-  ///
-  /// # Example
-  ///
-  /// ```
-  /// use just_lsp::{Document, NodeExt};
-  ///
-  /// let document = Document::from("foo(bar) := bar\n");
-  ///
-  /// let root = document.tree.root_node();
-  /// let name = root.find("identifier").unwrap();
-  ///
-  /// assert_eq!(document.get_function(&name), document.functions().pop());
-  /// assert_eq!(document.get_function(&root), None);
-  /// ```
-  #[must_use]
-  pub fn get_function(&self, node: &Node) -> Option<Function> {
-    let range = self.get_range(&node.get_parent("function_definition")?);
-
-    self
-      .functions()
-      .into_iter()
-      .find(|function| function.range == range)
-  }
-
   /// Returns a copy of the source text covered by `node`.
   ///
   /// Whitespace and delimiters within the node's range are preserved. `node`
@@ -580,37 +549,6 @@ impl Document {
       start: self.content.byte_to_lsp_position(node.start_byte()),
       end: self.content.byte_to_lsp_position(node.end_byte()),
     }
-  }
-
-  /// Returns the recipe enclosing `node`.
-  ///
-  /// Only ancestors are searched; `node` itself is not considered. Returns
-  /// `None` if there is no enclosing recipe or its declaration cannot be
-  /// extracted by [`Document::recipes`].
-  ///
-  /// `node` must belong to this document's current syntax tree.
-  ///
-  /// # Example
-  ///
-  /// ```
-  /// use just_lsp::{Document, NodeExt};
-  ///
-  /// let document = Document::from("foo:\n  bar\n");
-  ///
-  /// let root = document.tree.root_node();
-  /// let name = root.find("identifier").unwrap();
-  ///
-  /// assert_eq!(document.get_recipe(&name), document.recipes().pop());
-  /// assert_eq!(document.get_recipe(&root), None);
-  /// ```
-  #[must_use]
-  pub fn get_recipe(&self, node: &Node) -> Option<Recipe> {
-    let range = self.get_range(&node.get_parent("recipe")?);
-
-    self
-      .recipes()
-      .into_iter()
-      .find(|recipe| recipe.range == range)
   }
 
   /// Returns the nonblank body entries of `recipe` in source order.

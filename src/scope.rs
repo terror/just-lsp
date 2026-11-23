@@ -1,217 +1,55 @@
 use super::*;
 
-#[derive(Default)]
-struct LocalScope {
-  parameters: HashSet<String>,
-  recipe: Option<String>,
-}
-
-pub(crate) struct Scope<'a> {
-  document: &'a Document,
-  globals: HashSet<String>,
+pub(crate) struct Scope {
   pub(crate) recipe_identifier_usage: HashMap<String, HashSet<String>>,
-  root: bool,
   pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
   pub(crate) variable_usage: HashMap<String, bool>,
 }
 
-impl<'a> Scope<'a> {
-  pub(crate) fn analyze(context: &RuleContext<'a>) -> Self {
-    let mut scope = Self::new(context);
+impl Scope {
+  pub(crate) fn analyze(context: &RuleContext<'_>) -> Self {
+    let view = context.view();
 
-    scope.walk_document(context.document(), true);
+    let root = Bindings::new(view, context.document());
 
-    for document in context.imported_documents() {
-      scope.walk_document(document, false);
-    }
+    let imported = context
+      .imported_documents()
+      .map(|document| Bindings::new(view, document))
+      .collect::<Vec<_>>();
 
-    scope
-  }
+    let mut variable_usage = context
+      .variables()
+      .iter()
+      .map(|variable| (variable.name.value.clone(), false))
+      .collect::<HashMap<_, _>>();
 
-  fn new(context: &RuleContext<'a>) -> Self {
-    Self {
-      document: context.document(),
-      globals: context.variable_and_builtin_names().clone(),
-      recipe_identifier_usage: context
-        .document()
-        .recipes()
-        .iter()
-        .map(|recipe| (recipe.name.value.clone(), HashSet::new()))
-        .collect(),
-      root: true,
-      unresolved_identifiers: Vec::new(),
-      variable_usage: context
-        .variables()
-        .iter()
-        .map(|variable| (variable.name.value.clone(), false))
-        .collect(),
-    }
-  }
-
-  /// Resolve an identifier against the scope stack.
-  ///
-  /// Recipe identifier usage is recorded unconditionally before resolution, so
-  /// parameter self-references like `foo foo` still count as usage for the
-  /// `unused-recipe-parameter` rule. Unresolved identifiers are only recorded from
-  /// the analyzed document: usage in imported documents still counts, since
-  /// `just` imports are textual inclusions, but a range from an imported
-  /// document would not be valid in the analyzed document.
-  fn record(&mut self, identifier: Node<'_>, local: &LocalScope) {
-    if identifier.is_missing() {
-      return;
-    }
-
-    let name = self.document.get_node_text(&identifier);
-
-    if self.root
-      && let Some(recipe_name) = &local.recipe
+    for bound in once(&root)
+      .chain(&imported)
+      .flat_map(Bindings::identifiers)
+      .filter(|bound| bound.expression)
     {
-      self
-        .recipe_identifier_usage
-        .entry(recipe_name.clone())
-        .or_default()
-        .insert(name.clone());
-    }
-
-    if local.parameters.contains(&name) {
-      return;
-    }
-
-    if let Some(used) = self.variable_usage.get_mut(&name) {
-      *used = true;
-      return;
-    }
-
-    if self.globals.contains(&name) {
-      return;
-    }
-
-    if self.root {
-      let suggestion = name.find_suggestion(
-        local
-          .parameters
-          .iter()
-          .chain(&self.globals)
-          .map(String::as_str),
-      );
-
-      self.unresolved_identifiers.push((
-        TextNode {
-          value: name,
-          range: self.document.get_range(&identifier),
-        },
-        suggestion,
-      ));
-    }
-  }
-
-  /// Walk one document's tree, recording the usage of its recipes, functions,
-  /// and top-level expressions.
-  fn walk_document(&mut self, document: &'a Document, root: bool) {
-    self.document = document;
-    self.root = root;
-
-    let root_node = document.tree.root_node();
-
-    for node in root_node.find_all("recipe") {
-      self.walk_recipe(node);
-    }
-
-    for node in root_node.find_all("function_definition") {
-      self.walk_function(node);
-    }
-
-    let local = LocalScope::default();
-
-    for identifier in document.get_expression_identifiers(&root_node) {
-      if identifier.has_any_parent(&["function_definition", "recipe"]) {
-        continue;
-      }
-
-      self.record(identifier, &local);
-    }
-  }
-
-  /// Enter a function definition scope and record its body.
-  ///
-  /// Parameters are all defined before processing the body, since `just`
-  /// function parameters have no default values and cannot reference each
-  /// other.
-  fn walk_function(&mut self, function_node: Node<'_>) {
-    let local = LocalScope {
-      parameters: function_node
-        .child_by_field_name("parameters")
-        .iter()
-        .flat_map(|parameters| parameters.find_all("^identifier"))
-        .map(|parameter| self.document.get_node_text(&parameter))
-        .collect(),
-      recipe: None,
-    };
-
-    if let Some(body_node) = function_node.child_by_field_name("body") {
-      for identifier in self.document.get_expression_identifiers(&body_node) {
-        self.record(identifier, &local);
-      }
-    }
-  }
-
-  /// Enter a recipe scope and record its parameters and body.
-  ///
-  /// Parameters are defined one at a time: each default value is recorded
-  /// before defining that parameter, so `b=a` resolves `a` against earlier
-  /// parameters and globals but not `b` itself. Body identifiers inside
-  /// parameter defaults are skipped in the final expression walk to avoid
-  /// double-recording with the wrong scope.
-  fn walk_recipe(&mut self, recipe_node: Node<'_>) {
-    let Some(name_node) = recipe_node.find("recipe_header > identifier") else {
-      return;
-    };
-
-    let mut local = LocalScope {
-      parameters: HashSet::new(),
-      recipe: Some(self.document.get_node_text(&name_node)),
-    };
-
-    if let Some(parameters_node) =
-      recipe_node.find("recipe_header > parameters")
-    {
-      for parameter_node in
-        parameters_node.find_all("^parameter, ^variadic_parameter")
+      if let Binding::Variable(name) = &bound.binding
+        && let Some(used) = variable_usage.get_mut(name)
       {
-        let parameter_node = if parameter_node.kind() == "variadic_parameter" {
-          parameter_node.find("parameter")
-        } else {
-          Some(parameter_node)
-        };
-
-        let Some(parameter_node) = parameter_node else {
-          continue;
-        };
-
-        if let Some(default_node) =
-          parameter_node.child_by_field_name("default")
-        {
-          for identifier in
-            self.document.get_expression_identifiers(&default_node)
-          {
-            self.record(identifier, &local);
-          }
-        }
-
-        if let Some(name_node) = parameter_node.child_by_field_name("name") {
-          local
-            .parameters
-            .insert(self.document.get_node_text(&name_node));
-        }
+        *used = true;
       }
     }
 
-    for identifier in self.document.get_expression_identifiers(&recipe_node) {
-      if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
-        continue;
-      }
+    let unresolved_identifiers = root
+      .identifiers()
+      .iter()
+      .filter_map(|bound| match &bound.binding {
+        Binding::Unresolved { suggestion } => {
+          Some((bound.identifier.clone(), suggestion.clone()))
+        }
+        _ => None,
+      })
+      .collect();
 
-      self.record(identifier, &local);
+    Self {
+      recipe_identifier_usage: root.recipe_identifiers,
+      unresolved_identifiers,
+      variable_usage,
     }
   }
 }

@@ -28,6 +28,12 @@ impl<'a> ModuleView<'a> {
     ))
   }
 
+  pub(crate) fn descend(&self, modules: &[String]) -> Option<Self> {
+    modules
+      .iter()
+      .try_fold(self.clone(), |view, module| view.child(module))
+  }
+
   #[must_use]
   pub fn document(&self) -> &'a Document {
     self.document
@@ -137,6 +143,28 @@ impl<'a> ModuleView<'a> {
     }
   }
 
+  pub(crate) fn project_views(&self) -> Vec<Self> {
+    let Some(context) = self.context else {
+      return vec![self.clone()];
+    };
+
+    once(self.clone())
+      .chain(
+        context
+          .project
+          .modules
+          .iter()
+          .filter(|(_, module)| !ptr::eq(*module, context.module))
+          .filter_map(|(root, module)| {
+            Some(Self::new(
+              context.documents.get(root)?,
+              ModuleContext { module, ..context },
+            ))
+          }),
+      )
+      .collect()
+  }
+
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
     &self.symbols.recipes
   }
@@ -185,13 +213,6 @@ impl<'a> ModuleView<'a> {
 
   pub(crate) fn variables(&self) -> &[Located<Variable>] {
     &self.symbols.variables
-  }
-
-  pub(super) fn with_document(&self, document: &'a Document) -> Self {
-    Self {
-      document,
-      ..self.clone()
-    }
   }
 
   #[must_use]
