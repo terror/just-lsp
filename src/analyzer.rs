@@ -3744,6 +3744,41 @@ mod tests {
   }
 
   #[test]
+  fn import_paths_use_filesystem() {
+    #[track_caller]
+    fn case(files: &[(&str, &str)], expected: &[Diagnostic]) {
+      assert_eq!(
+        Analyzer {
+          config: None,
+          view: TestModule::new(files).view(),
+        }
+        .analyze(),
+        expected,
+      );
+    }
+
+    case(&[("justfile", "import 'foo.just'"), ("foo.just", "")], &[]);
+
+    let path = if cfg!(windows) {
+      "C:\\foo.just"
+    } else {
+      "/foo.just"
+    };
+
+    case(
+      &[("justfile", "import 'foo.just'")],
+      &[Diagnostic {
+        display: "invalid import path".into(),
+        id: "invalid-import-path".into(),
+        ..Diagnostic::error(
+          format!("Import path does not exist: `{path}`"),
+          lsp::Range::at(0, 7, 0, 17),
+        )
+      }],
+    );
+  }
+
+  #[test]
   fn import_invalid_string_escape() {
     #[track_caller]
     fn case(source: &str, range: lsp::Range) {
@@ -4154,28 +4189,12 @@ mod tests {
   fn module_paths() {
     #[track_caller]
     fn case(justfile: &str, expected: &[(&str, lsp::Range)]) {
-      let tempdir = tempfile::tempdir().unwrap();
-
-      fs::write(tempdir.path().join("justfile"), justfile).unwrap();
-      fs::write(tempdir.path().join("foo.just"), "bar baz:\n").unwrap();
-
-      let uri =
-        lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
-
-      let mut documents = DocumentStore::default();
-
-      let project = ProjectLoader::load(&mut documents, &uri).unwrap();
+      let module =
+        TestModule::new(&[("justfile", justfile), ("foo.just", "bar baz:\n")]);
 
       let analyzer = Analyzer {
         config: None,
-        view: ModuleView::new(
-          documents.get(&uri).unwrap(),
-          ModuleContext {
-            documents: &documents,
-            module: project.module(),
-            project: &project,
-          },
-        ),
+        view: module.view(),
       };
 
       assert_eq!(

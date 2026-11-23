@@ -7,13 +7,18 @@ define_rule! {
     run(context) {
       let document = context.document();
 
+      let filesystem = context.view().filesystem();
+
       document
         .imports()
         .into_iter()
         .filter_map(|import| {
           let message = match import.resolve(&document.uri) {
             Ok(Some(path))
-              if import.is_enabled() && !import.optional && !path.exists() =>
+              if import.is_enabled()
+                && !import.optional
+                && !filesystem.is_file(&path)
+                && !filesystem.is_dir(&path) =>
             {
               format!("Import path does not exist: `{}`", path.display())
             }

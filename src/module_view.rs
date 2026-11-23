@@ -43,6 +43,12 @@ impl<'a> ModuleView<'a> {
     self.documents.iter().map(|document| document.document)
   }
 
+  pub(crate) fn filesystem(&self) -> &'a dyn Filesystem {
+    self
+      .context
+      .map_or(&OsFilesystem, |context| context.documents.filesystem())
+  }
+
   #[must_use]
   pub fn find_function(&self, name: &str) -> Option<&Located<Function>> {
     self
@@ -250,53 +256,26 @@ impl<'a> From<&'a Document> for ModuleView<'a> {
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
-  #[track_caller]
-  fn load(
-    files: &[(&str, &str)],
-  ) -> (tempfile::TempDir, DocumentStore, Project) {
-    let tempdir = tempfile::tempdir().unwrap();
-
-    for (path, content) in files {
-      fs::write(tempdir.path().join(path), content).unwrap();
-    }
-
-    let root =
-      lsp::Url::from_file_path(tempdir.path().join("justfile")).unwrap();
-
-    let mut documents = DocumentStore::default();
-
-    let project = ProjectLoader::load(&mut documents, &root).unwrap();
-
-    (tempdir, documents, project)
-  }
-
   #[test]
   fn child_views_module_scope() {
-    let (tempdir, documents, project) = load(&[
+    let module = TestModule::new(&[
       ("justfile", "mod foo"),
       ("foo.just", "import 'bar.just'"),
       ("bar.just", "baz:"),
     ]);
 
-    let uri =
-      |path: &str| lsp::Url::from_file_path(tempdir.path().join(path)).unwrap();
-
-    let view = ModuleView::new(
-      documents.get(&project.root).unwrap(),
-      ModuleContext {
-        documents: &documents,
-        module: project.module(),
-        project: &project,
-      },
-    );
+    let view = module.view();
 
     assert!(view.find_recipe("baz").is_none());
     assert!(view.child("bar").is_none());
 
     let child = view.child("foo").unwrap();
 
-    assert_eq!(child.document().uri, uri("foo.just"));
-    assert_eq!(child.find_recipe("baz").unwrap().uri, uri("bar.just"));
+    assert_eq!(child.document().uri, module.uri("foo.just"));
+    assert_eq!(
+      child.find_recipe("baz").unwrap().uri,
+      module.uri("bar.just")
+    );
   }
 
   #[test]

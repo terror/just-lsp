@@ -50,21 +50,15 @@ impl ModuleDeclaration {
   }
 
   fn find_file(
+    filesystem: &dyn Filesystem,
     directory: &Path,
     candidates: &[(&str, bool)],
   ) -> Option<PathBuf> {
-    let entries = fs::read_dir(directory)
-      .ok()?
-      .filter_map(std::result::Result::ok)
-      .collect::<Vec<_>>();
+    let entries = filesystem.read_dir(directory).ok()?;
 
     candidates.iter().find_map(|(candidate, case_sensitive)| {
-      entries.iter().find_map(|entry| {
-        let path = entry.path();
-
-        let name = entry.file_name();
-
-        let name = name.to_str()?;
+      entries.iter().find_map(|path| {
+        let name = path.file_name()?.to_str()?;
 
         let matches = if *case_sensitive {
           name == *candidate
@@ -72,8 +66,8 @@ impl ModuleDeclaration {
           name.eq_ignore_ascii_case(candidate)
         };
 
-        if path.is_file() && matches {
-          Some(path)
+        if matches && filesystem.is_file(path) {
+          Some(path.clone())
         } else {
           None
         }
@@ -85,16 +79,19 @@ impl ModuleDeclaration {
     Attribute::is_enabled(&self.attributes)
   }
 
-  #[must_use]
-  pub fn resolve(&self, base_uri: &lsp::Url) -> Option<PathBuf> {
+  pub(crate) fn resolve(
+    &self,
+    base_uri: &lsp::Url,
+    filesystem: &dyn Filesystem,
+  ) -> Option<PathBuf> {
     let base_dir = base_uri.file_path().ok()?.parent()?.to_path_buf();
 
     if let Some(path_node) = &self.path {
       let path =
         StringLiteral::resolve_path(&path_node.value, base_uri).ok()??;
 
-      return if path.is_dir() {
-        Self::find_file(&path, &Self::DIRECTORY_CANDIDATES)
+      return if filesystem.is_dir(&path) {
+        Self::find_file(filesystem, &path, &Self::DIRECTORY_CANDIDATES)
       } else {
         Some(path)
       };
@@ -104,11 +101,17 @@ impl ModuleDeclaration {
 
     let name_just = format!("{name}.just");
 
-    if let Some(name_just) = Self::find_file(&base_dir, &[(&name_just, true)]) {
+    if let Some(name_just) =
+      Self::find_file(filesystem, &base_dir, &[(&name_just, true)])
+    {
       return Some(name_just);
     }
 
-    Self::find_file(&base_dir.join(name), &Self::DIRECTORY_CANDIDATES)
+    Self::find_file(
+      filesystem,
+      &base_dir.join(name),
+      &Self::DIRECTORY_CANDIDATES,
+    )
   }
 }
 
@@ -141,7 +144,10 @@ mod tests {
       let base =
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-      assert_eq!(module("foo", Some(source)).resolve(&base), None);
+      assert_eq!(
+        module("foo", Some(source)).resolve(&base, &OsFilesystem),
+        None
+      );
     }
 
     case("''");
@@ -163,7 +169,9 @@ mod tests {
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
       assert_eq!(
-        module("foo", Some(source)).resolve(&base).unwrap(),
+        module("foo", Some(source))
+          .resolve(&base, &OsFilesystem)
+          .unwrap(),
         directory.path().join("foo").join(file),
       );
     }
@@ -185,7 +193,7 @@ mod tests {
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
       assert_eq!(
-        module("foo", Some(source)).resolve(&base),
+        module("foo", Some(source)).resolve(&base, &OsFilesystem),
         Some(directory.path().join(expected)),
       );
     }
@@ -216,7 +224,9 @@ mod tests {
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
       assert_eq!(
-        module("foo", Some(source)).resolve(&base).unwrap(),
+        module("foo", Some(source))
+          .resolve(&base, &OsFilesystem)
+          .unwrap(),
         env::home_dir().unwrap().join("bar.just"),
       );
     }
@@ -234,7 +244,10 @@ mod tests {
       let base =
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-      assert_eq!(module("foo", Some(source)).resolve(&base), None);
+      assert_eq!(
+        module("foo", Some(source)).resolve(&base, &OsFilesystem),
+        None
+      );
     }
 
     case("");
@@ -256,7 +269,7 @@ mod tests {
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
       assert_eq!(
-        module("foo", None).resolve(&base).unwrap(),
+        module("foo", None).resolve(&base, &OsFilesystem).unwrap(),
         directory.path().join("foo").join(file),
       );
     }
@@ -276,7 +289,7 @@ mod tests {
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
-      module("foo", None).resolve(&base).unwrap(),
+      module("foo", None).resolve(&base, &OsFilesystem).unwrap(),
       directory.path().join("foo/.justfile"),
     );
   }
@@ -292,7 +305,7 @@ mod tests {
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(module("foo", None).resolve(&base), None);
+    assert_eq!(module("foo", None).resolve(&base, &OsFilesystem), None);
   }
 
   #[test]
@@ -306,7 +319,7 @@ mod tests {
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
-      module("foo", None).resolve(&base).unwrap(),
+      module("foo", None).resolve(&base, &OsFilesystem).unwrap(),
       directory.path().join("foo/justfile"),
     );
   }
@@ -322,7 +335,7 @@ mod tests {
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
-      module("foo", None).resolve(&base).unwrap(),
+      module("foo", None).resolve(&base, &OsFilesystem).unwrap(),
       directory.path().join("foo/mod.just"),
     );
   }
@@ -334,7 +347,7 @@ mod tests {
     let base =
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
-    assert_eq!(module("foo", None).resolve(&base), None);
+    assert_eq!(module("foo", None).resolve(&base, &OsFilesystem), None);
   }
 
   #[test]
@@ -350,7 +363,7 @@ mod tests {
       lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
     assert_eq!(
-      module("foo", None).resolve(&base).unwrap(),
+      module("foo", None).resolve(&base, &OsFilesystem).unwrap(),
       directory.path().join("foo.just"),
     );
   }
