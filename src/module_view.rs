@@ -80,6 +80,31 @@ impl<'a> ModuleView<'a> {
     &self.symbols.functions
   }
 
+  pub(crate) fn module(&self, path: &Namepath) -> ModuleLookup<'a> {
+    let mut view = self.clone();
+
+    for segment in path.modules() {
+      view = match view.child(&segment.value) {
+        Some(child) => child,
+        None
+          if view
+            .modules()
+            .iter()
+            .any(|module| module.name.value == segment.value) =>
+        {
+          return ModuleLookup::Unloaded;
+        }
+        None => return ModuleLookup::Undeclared(segment.clone()),
+      };
+    }
+
+    ModuleLookup::Found(view)
+  }
+
+  pub(crate) fn modules(&self) -> &[Located<ModuleDeclaration>] {
+    &self.symbols.modules
+  }
+
   #[must_use]
   pub(crate) fn new(
     document: &'a Document,
@@ -114,6 +139,16 @@ impl<'a> ModuleView<'a> {
 
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
     &self.symbols.recipes
+  }
+
+  #[must_use]
+  pub fn resolve_recipe(&self, path: &Namepath) -> Option<Located<Recipe>> {
+    match self.module(path) {
+      ModuleLookup::Found(view) => {
+        view.find_recipe(&path.name().value).cloned()
+      }
+      ModuleLookup::Undeclared(_) | ModuleLookup::Unloaded => None,
+    }
   }
 
   pub fn resolved_functions(&self) -> impl Iterator<Item = &Located<Function>> {

@@ -4,7 +4,7 @@ use super::*;
 pub struct Dependency {
   pub arguments: Vec<DependencyArgument>,
   pub mapped: Option<lsp::Range>,
-  pub name: TextNode,
+  pub name: Namepath,
   pub phase: DependencyPhase,
   pub range: lsp::Range,
 }
@@ -54,10 +54,7 @@ impl Dependency {
     Some(Self {
       arguments,
       mapped,
-      name: TextNode {
-        range: document.get_range(&name),
-        value: document.get_node_text(&name),
-      },
+      name: Namepath::from_node(&name, document),
       phase,
       range: document.get_range(node),
     })

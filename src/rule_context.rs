@@ -9,7 +9,6 @@ pub(crate) struct RuleContext<'a> {
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   document_variable_names: OnceLock<HashSet<String>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  recipe_names: OnceLock<HashSet<String>>,
   scope: OnceLock<Scope<'a>>,
   user_function_names: OnceLock<HashSet<String>>,
   variable_and_builtin_names: OnceLock<HashSet<String>>,
@@ -243,22 +242,11 @@ impl<'a> RuleContext<'a> {
       builtin_setting_map: OnceLock::new(),
       document_variable_names: OnceLock::new(),
       function_calls: OnceLock::new(),
-      recipe_names: OnceLock::new(),
       scope: OnceLock::new(),
       user_function_names: OnceLock::new(),
       variable_and_builtin_names: OnceLock::new(),
       view,
     }
-  }
-
-  pub(crate) fn recipe_names(&self) -> &HashSet<String> {
-    self.recipe_names.get_or_init(|| {
-      self
-        .recipes()
-        .iter()
-        .map(|recipe| recipe.name.value.clone())
-        .collect()
-    })
   }
 
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
@@ -286,6 +274,56 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn unexports(&self) -> &[Located<Unexport>] {
     self.view.unexports()
+  }
+
+  pub(crate) fn unresolved_recipe(
+    &self,
+    path: &Namepath,
+    range: lsp::Range,
+  ) -> Option<Diagnostic> {
+    let module = match self.view.module(path) {
+      ModuleLookup::Found(module) => module,
+      ModuleLookup::Undeclared(segment) => {
+        return Some(Diagnostic::error(
+          format!("Module `{}` not found", segment.value),
+          segment.range,
+        ));
+      }
+      ModuleLookup::Unloaded => return None,
+    };
+
+    let name = path.name();
+
+    if module.find_recipe(&name.value).is_some() {
+      return None;
+    }
+
+    let suggestion = name.value.find_suggestion(
+      module
+        .recipes()
+        .iter()
+        .map(|recipe| recipe.name.value.as_str()),
+    );
+
+    let message = match &suggestion {
+      Some(suggestion) => {
+        let suggestion = path
+          .modules()
+          .iter()
+          .map(|module| module.value.as_str())
+          .chain([suggestion.as_str()])
+          .collect::<Vec<_>>()
+          .join("::");
+
+        format!("Recipe `{path}` not found. Did you mean `{suggestion}`?")
+      }
+      None => format!("Recipe `{path}` not found"),
+    };
+
+    let quickfix =
+      suggestion.map(|suggestion| Quickfix::replacement(name, suggestion));
+
+    Some(Diagnostic::error(message, range).quickfix(quickfix))
   }
 
   pub(crate) fn user_function_names(&self) -> &HashSet<String> {

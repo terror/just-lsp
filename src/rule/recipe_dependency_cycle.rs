@@ -11,9 +11,13 @@ define_rule! {
         .view()
         .resolved_recipes()
         .flat_map(|recipe| {
-          recipe.dependencies.iter().map(move |dependency| {
-            (recipe.name.value.as_str(), dependency.name.value.as_str())
-          })
+          recipe
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.name.modules().is_empty())
+            .map(move |dependency| {
+              (recipe.name.value.as_str(), dependency.name.name().value.as_str())
+            })
         })
         .collect::<Graph>();
 
