@@ -37,6 +37,8 @@ impl<'a> TreeWalker<'a> {
       let selector = if union { selector.trim() } else { selector };
 
       if let Some(kind) = selector.strip_prefix('^') {
+        self.node.assert_kind(kind);
+
         for child in self.node.children(&mut self.node.walk()) {
           if child.kind() == kind {
             visit(child)?;
@@ -44,6 +46,10 @@ impl<'a> TreeWalker<'a> {
         }
 
         continue;
+      }
+
+      for kind in selector.split(" > ") {
+        self.node.assert_kind(kind);
       }
 
       let mut kinds = selector.split(" > ");
@@ -299,7 +305,7 @@ mod tests {
     );
 
     assert_eq!(
-      TreeWalker::new(root).find_all(" , recipe, foo, assignment, recipe, "),
+      TreeWalker::new(root).find_all("recipe, assignment, recipe"),
       [first, second, assignment, first, second],
     );
   }
@@ -337,35 +343,16 @@ mod tests {
   }
 
   #[test]
-  fn find_empty_child_selector() {
-    Test::new("foo:\n").find("recipe > ", None);
-  }
-
-  #[test]
-  fn find_empty_selector() {
-    Test::new("foo:\n").find("", None);
-  }
-
-  #[test]
-  fn find_leading_whitespace() {
-    Test::new("foo:\n").find(" recipe", None);
-  }
-
-  #[test]
-  fn find_trailing_whitespace() {
-    Test::new("foo:\n").find("recipe ", None);
-  }
-
-  #[test]
   fn find_union() {
     Test::new("foo := [[bar], baz]\n").find(
-      "qux, list_elements > expression > value > identifier, identifier",
+      "list_elements > expression > value > identifier, identifier",
       Some("baz"),
     );
   }
 
   #[test]
-  fn find_unsupported_marker_path() {
-    Test::new("foo:\n").find("^recipe > recipe_header", None);
+  #[should_panic(expected = "unknown node kind `foo`")]
+  fn find_unknown_kind() {
+    Test::new("foo:\n").find("recipe > foo", None);
   }
 }
