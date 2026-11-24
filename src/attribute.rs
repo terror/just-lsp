@@ -14,11 +14,7 @@ impl Attribute {
       return None;
     }
 
-    let name = self.positional_arguments().next()?;
-
-    StringLiteral::parse(&name.text.value)
-      .ok()?
-      .map(|literal| literal.cooked)
+    self.positional_arguments().next()?.string_value()
   }
 
   pub(crate) fn condition(&self) -> Option<bool> {

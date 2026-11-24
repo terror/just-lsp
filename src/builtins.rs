@@ -10,12 +10,13 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on Android.
+      Enable an item on Android.
 
       Part of the platform-gating family of attributes
       (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
-      the BSDs). When any platform attribute is present, the recipe is
-      only enabled when one of the active platforms matches.
+      the BSDs), which may be applied to any top-level item. When any
+      platform attribute is present, the item is only enabled when one
+      of the active platforms matches.
 
       ```just
       [android]
@@ -89,18 +90,26 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       - `help=\"HELP\"` sets the usage-message help string.
       - `long=\"LONG\"` requires the value to be passed with `--LONG`.
-      - `short=\"S\"` requires the value to be passed with `-S`.
+        If `LONG` is omitted, it defaults to the parameter name.
+      - `short=\"S\"` requires the value to be passed with `-S`. If
+        `S` is omitted, it defaults to the first character of the
+        parameter name.
       - `value=\"VALUE\"` makes the option a flag that substitutes
         `VALUE` when present. Combine with `long` and/or `short`.
+      - `flag` makes the option a flag that does not take a value.
+        The parameter is `\"true\"` when the flag is passed and `[]`
+        otherwise, and may not have a default. Combine with `long`
+        and/or `short`. Requires `set lists`.
       - `pattern=\"PATTERN\"` requires the value to match a regular
         expression. Patterns are full-match; `just` rejects the
         invocation if the supplied value does not match.
       - `multiple` allows an option or flag to be passed more than
         once, assigning the list of passed values to the parameter.
-      - `min=MIN` requires at least `MIN` values. Requires `multiple`
-        or a variadic parameter.
-      - `max=MAX` allows at most `MAX` values. Requires `multiple` or
-        a variadic parameter.
+        Requires `set lists`.
+      - `min=MIN` requires at least `MIN` values. Requires `set lists`
+        and `multiple` or a variadic parameter.
+      - `max=MAX` allows at most `MAX` values. Requires `set lists`
+        and `multiple` or a variadic parameter.
 
       Multiple keys may be combined in a single `[arg(...)]`.
 
@@ -108,13 +117,14 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       set unstable
       set lists
 
-      [arg(NAME, long=\"name\", short=\"n\", help=\"greeting target\")]
-      greet NAME:
-        @echo Hello, {{NAME}}
+      [arg('name', long, short='n', help='greeting target')]
+      [arg('loud', long, flag)]
+      greet name loud:
+        @echo Hello, {{ name }}{{ if loud { '!' } }}
 
-      [arg('FILES', min='2', max='4')]
-      backup +FILES:
-        scp {{FILES}} me@server.com:
+      [arg('files', min='2', max='4')]
+      backup +files:
+        scp {{ files }} me@server.com:
       ```
       "
     },
@@ -163,11 +173,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
 
       ```just
       set unstable
+      set lists
 
       [script]
-      [cache(environment=['PATH'], inputs='Cargo.lock', outputs='target', extra=arch())]
+      [cache(environment=['PATH'], inputs=['lib.c', 'main.c'], outputs='main', extra=arch())]
       build:
-        cargo build
+        cc lib.c main.c -o main
       ```
       "
     },
@@ -300,13 +311,14 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on DragonFly BSD.
+      Enable an item on DragonFly BSD.
 
       Part of the platform-gating family of attributes
       (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`,
-      `[freebsd]`, `[openbsd]`, `[netbsd]`, `[dragonfly]`). When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      `[freebsd]`, `[openbsd]`, `[netbsd]`, `[dragonfly]`), which may
+      be applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches.
 
       ```just
       [dragonfly]
@@ -394,11 +406,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on FreeBSD.
+      Enable an item on FreeBSD.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches.
 
       ```just
       [freebsd]
@@ -447,12 +460,13 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on Linux.
+      Enable an item on Linux.
 
       Part of the platform-gating family of attributes
       (`[android]`, `[linux]`, `[macos]`, `[unix]`, `[windows]`, and
-      the BSDs). When any platform attribute is present, the recipe is
-      only enabled when one of the active platforms matches. Useful for writing
+      the BSDs), which may be applied to any top-level item. When any
+      platform attribute is present, the item is only enabled when one
+      of the active platforms matches. Useful for writing
       cross-platform justfiles that dispatch on the host OS.
 
       ```just
@@ -477,13 +491,14 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on macOS.
+      Enable an item on macOS.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches.
 
-      Note that `[unix]` also enables the recipe on macOS.
+      Note that `[unix]` also enables the item on macOS.
 
       ```just
       [macos]
@@ -505,7 +520,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Attach arbitrary metadata `METADATA` to the recipe.
 
-      The attribute accepts any number of arguments. `just` does not
+      The attribute accepts one or more arguments. `just` does not
       interpret them; they are surfaced via `just --dump --dump-format
       json` and intended for consumption by external tooling.
 
@@ -527,11 +542,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on NetBSD.
+      Enable an item on NetBSD.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches.
       "
     },
     targets: AttributeTarget::ALL,
@@ -624,11 +640,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on OpenBSD.
+      Enable an item on OpenBSD.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches.
       "
     },
     targets: AttributeTarget::ALL,
@@ -817,12 +834,13 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable the recipe on Unix-like platforms, including macOS.
+      Enable an item on Unix-like platforms, including macOS.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches. `[unix]` matches Android,
-      Linux, macOS, and the BSDs.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches. `[unix]` matches Android, Linux, macOS, and
+      the BSDs.
 
       ```just
       [unix]
@@ -842,12 +860,13 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Enable a recipe or setting on Windows.
+      Enable an item on Windows.
 
-      Part of the platform-gating family of attributes. When any
-      platform attribute is present, the recipe is only enabled when
-      one of the active platforms matches. It can also specialize
-      `set shell` for Windows.
+      Part of the platform-gating family of attributes, which may be
+      applied to any top-level item. When any platform attribute is
+      present, the item is only enabled when one of the active
+      platforms matches. It can also specialize `set shell` for
+      Windows.
 
       ```just
       [windows]
@@ -1172,7 +1191,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "absolute_path",
     aliases: &[],
-    signature: FunctionSignature(&[Required("path", Some("string"))]),
+    signature: FunctionSignature(&[Required("path", None)]),
     description: indoc! {
       "
       Return the absolute form of `path`, resolved against the current
@@ -1193,7 +1212,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     aliases: &[],
     signature: FunctionSignature(&[
       Required("suffix", Some("string")),
-      Required("s", Some("string")),
+      Required("s", None),
     ]),
     description: indoc! {
       "
@@ -1496,8 +1515,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     name: "env",
     aliases: &[],
     signature: FunctionSignature(&[
-      Required("key", Some("string")),
-      Optional("default", Some("string")),
+      Required("key", None),
+      Optional("default", None),
     ]),
     description: indoc! {
       "
@@ -1512,12 +1531,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       `default` is returned or execution aborts if no default is
       provided.
 
-      A default can be substituted for an *empty* value (not just an
-      unset one) with the `||` operator, currently unstable:
+      `default` is not used when the variable is set to the empty
+      string. To also substitute a default for an empty value, compare
+      against `''`:
 
       ```just
-      set unstable
-      foo := env('FOO', '') || 'DEFAULT_VALUE'
+      foo := if env('FOO', '') == '' { 'DEFAULT' } else { env('FOO') }
       ```
       "
     },
@@ -1526,7 +1545,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "env_var",
     aliases: &[],
-    signature: FunctionSignature(&[Required("key", Some("string"))]),
+    signature: FunctionSignature(&[Required("key", None)]),
     description: indoc! {
       "
       **Deprecated**: use `env(key)` instead.
@@ -1541,8 +1560,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     name: "env_var_or_default",
     aliases: &[],
     signature: FunctionSignature(&[
-      Required("key", Some("string")),
-      Required("default", Some("string")),
+      Required("key", None),
+      Required("default", None),
     ]),
     description: indoc! {
       "
@@ -2013,7 +2032,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     aliases: &[],
     signature: FunctionSignature(&[
       Required("prefix", Some("string")),
-      Required("s", Some("string")),
+      Required("s", None),
     ]),
     description: indoc! {
       "
@@ -2032,7 +2051,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
   Builtin::Function {
     name: "quote",
     aliases: &[],
-    signature: FunctionSignature(&[Required("s", Some("string"))]),
+    signature: FunctionSignature(&[Required("s", None)]),
     description: indoc! {
       "
       Quote `s` for safe use as a single argument in a POSIX shell.
@@ -2337,26 +2356,44 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     name: "style",
     aliases: &[],
     signature: FunctionSignature(&[
-      Required("styles", Some("string")),
+      Required("styles", None),
       Optional("text", Some("string")),
     ]),
     description: indoc! {
       "
-      Return the terminal display attribute escape sequence used by
-      `just` itself for styled output. With `text`, return the styled
-      text followed by a reset sequence.
+      Return the terminal escape sequence for `styles`. With `text`,
+      return `text` styled with `styles` followed by a reset sequence.
 
-      Unlike the plain color constants, `style(styles)` produces the
-      exact sequence `just` uses, so recipe output can match `just`'s
-      own styling.
+      Supported styles:
 
-      The `'command'`, `'error'`, and `'warning'` styles match `just`'s
-      echoed recipe lines and messages.
+      - `command`, `error`, and `warning` match `just`'s own echoed
+        recipe lines, errors, and warnings.
+      - Named colors: `black`, `blue`, `cyan`, `green`, `magenta`,
+        `red`, `white`, and `yellow`.
+      - 256-color indexes, written as integers from `0` to `255`.
+      - 24-bit colors, written as `#RRGGBB` or `#RGB`.
+      - Display properties: `blink`, `bold`, `dim`, `hidden`,
+        `italic`, `reverse`, `strikethrough`, and `underline`.
+      - `stdout` and `stderr` gate the style on whether `just` would
+        color that stream, as determined by `--color`, `JUST_COLOR`,
+        and whether the stream is a terminal. If not, no escape
+        sequence is produced and `text` is returned unstyled.
+
+      Colors apply to the foreground by default. Prefix a color with
+      `fg:` or `bg:` to select the foreground or background, e.g.,
+      `bg:blue`, `fg:133`, or `bg:#FFF`.
+
+      With `set lists`, `styles` may be a list of styles, which are
+      combined into a single escape sequence.
 
       ```just
+      set unstable
+      set lists
+
       scary:
         @echo '{{ style(\"warning\", \"careful!\") }}'
         @echo '{{ style(\"error\") }}OH NO{{ NORMAL }}'
+        @echo '{{ style([\"stdout\", \"bold\", \"bg:#FFF\"], \"styled\") }}'
       ```
       "
     },
@@ -2562,6 +2599,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Requires `set lists`.
 
       ```just
+      set unstable
       set lists
 
       bosh := which(\"bosh\")
@@ -2752,8 +2790,13 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: SettingKind::StringOrArray,
     description: indoc! {
       "
-      Load a `.env` file from a specific path. Errors if the file is
-      not found. Overrides `dotenv-filename`.
+      Load a `.env` file from a specific path, which may be absolute
+      or relative to the working directory.
+
+      `dotenv-path` is tried first. If it is not found, `just` falls
+      back to searching for `dotenv-filename`, or `.env` if unset,
+      in the working directory and each of its ancestors. It is not an
+      error if no file is found unless `dotenv-required` is also set.
 
       Unlike `dotenv-filename`, which is searched for relative to the
       working directory and each ancestor, `dotenv-path` is checked
@@ -3015,8 +3058,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     description: indoc! {
       "
       Set the command used to invoke recipe lines and evaluate
-      backticks. Shebang recipes are unaffected. Defaults to `sh -cu`
-      on Unix; on Windows, use `windows-shell` to override.
+      backticks. Shebang recipes are unaffected. Defaults to `sh -cu`.
+      Use `[windows] set shell` to override the shell on Windows.
 
       `just` appends the line-to-run as an additional argument, so
       most shells need a `-c`-style flag to make them evaluate the
@@ -3052,10 +3095,15 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: SettingKind::Boolean(false),
     description: indoc! {
       "
-      Enable unstable features, such as the `||` operator for
-      fallback defaults and the `which()` function.
+      Enable unstable features: the `lists` setting, cached recipes
+      with the `[cache]` attribute, and user-defined functions.
+      Features which require `set lists`, such as the `&&` and `||`
+      operators and the `which()` function, are therefore also
+      unstable.
 
-      Unstable features may change or be removed without notice.
+      Unstable features may also be enabled with `--unstable` or the
+      `JUST_UNSTABLE` environment variable, and may change or be
+      removed without notice.
       "
     },
     deprecated: None,

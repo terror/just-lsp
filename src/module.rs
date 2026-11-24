@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub(crate) struct Module {
   bindings: HashMap<lsp::Url, OnceLock<Arc<Bindings>>>,
+  called_functions: OnceLock<Arc<HashSet<String>>>,
   pub(crate) children: BTreeMap<String, lsp::Url>,
   pub(crate) import_scope: ImportScope,
   symbols: OnceLock<Arc<SymbolTable>>,
@@ -21,6 +22,16 @@ impl Module {
         .get_or_init(|| Arc::new(Bindings::new(view, document)))
         .clone(),
     )
+  }
+
+  pub(crate) fn called_functions(
+    &self,
+    view: &ModuleView,
+  ) -> Arc<HashSet<String>> {
+    self
+      .called_functions
+      .get_or_init(|| Arc::new(view.find_called_functions()))
+      .clone()
   }
 
   pub(crate) fn new(
@@ -57,6 +68,7 @@ impl Module {
         .iter()
         .map(|document| (document.document.clone(), OnceLock::new()))
         .collect(),
+      called_functions: OnceLock::new(),
       children,
       import_scope,
       symbols: OnceLock::new(),

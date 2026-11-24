@@ -69,6 +69,7 @@ mod invalid_recipe_parameter_order;
 mod invalid_setting_type;
 mod invalid_setting_value;
 mod list_feature_gate;
+mod missing_module_file;
 mod mixed_indentation;
 mod recipe_dependency_cycle;
 mod script_shell_conflict;
@@ -85,6 +86,7 @@ mod unused_function;
 mod unused_function_parameter;
 mod unused_recipe_parameter;
 mod unused_variable;
+mod variable_dependency_cycle;
 mod working_directory_conflict;
 
 pub(crate) trait Rule: Sync {
