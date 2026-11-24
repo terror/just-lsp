@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub(crate) struct Project {
   candidates: Vec<lsp::Url>,
+  pub(crate) circular_dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   pub(crate) dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   pub(crate) modules: BTreeMap<lsp::Url, Module>,
   pub(crate) root: lsp::Url,
@@ -95,6 +96,7 @@ impl Project {
   pub(crate) fn new(
     root: lsp::Url,
     dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
+    circular_dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   ) -> Self {
     let targets = dependencies
       .values()
@@ -132,6 +134,7 @@ impl Project {
 
     Self {
       candidates,
+      circular_dependencies,
       dependencies,
       modules,
       root,

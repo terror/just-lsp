@@ -37,6 +37,7 @@ mod alias_recipe_conflict;
 mod assignment_unexport_conflict;
 mod backtick_shebang;
 mod cache_without_script;
+mod circular_import;
 mod deprecated_function;
 mod deprecated_setting;
 mod dotenv_command_conflict;
