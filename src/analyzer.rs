@@ -3731,6 +3731,49 @@ mod tests {
   }
 
   #[test]
+  fn guard_infallible_conflict() {
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?-bar
+        -@?bar \\
+        ?-baz
+        --?bar
+      "
+    })
+    .error(
+      "the guard `?` and infallible `-` sigils may not be used together",
+      lsp::Range::at(3, 2, 3, 4),
+    )
+    .error(
+      "the guard `?` and infallible `-` sigils may not be used together",
+      lsp::Range::at(4, 2, 4, 5),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      foo:
+        ?-bar
+      "
+    })
+    .run();
+
+    Test::new(indoc! {
+      "
+      set guards
+
+      foo:
+        #!/bin/sh
+        ?-bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn import_disabled_paths_are_ignored() {
     #[track_caller]
     fn case(path: &str) {
