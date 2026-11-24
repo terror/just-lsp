@@ -286,6 +286,8 @@ impl Bindings {
       }
     }
 
+    let attributes = document.get_attributes(&recipe_node);
+
     let comments = Self::comment_lines(view, document, &recipe_node);
 
     for identifier in document.get_expression_identifiers(&recipe_node) {
@@ -297,14 +299,29 @@ impl Bindings {
         continue;
       }
 
-      self.expression(
-        view,
-        document,
-        globals,
-        identifier,
-        Some(&name),
-        &locals,
-      );
+      let range = document.get_range(&identifier);
+
+      let (recipe, scope) = match attributes
+        .iter()
+        .find_map(|attribute| Some((attribute, attribute.scope(range)?)))
+      {
+        Some((_, AttributeScope::Globals)) => (None, [].as_slice()),
+        Some((attribute, AttributeScope::PrecedingParameters)) => {
+          let end = attribute
+            .arg_parameter()
+            .and_then(|parameter| {
+              locals.iter().position(|(local, _)| *local == parameter)
+            })
+            .unwrap_or_default();
+
+          (Some(name.as_str()), &locals[..end])
+        }
+        Some((_, AttributeScope::Parameters)) | None => {
+          (Some(name.as_str()), locals.as_slice())
+        }
+      };
+
+      self.expression(view, document, globals, identifier, recipe, scope);
     }
   }
 
