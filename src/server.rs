@@ -347,95 +347,14 @@ impl LanguageServer for Server {
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
     let uri = params.text_document_position.text_document.uri.normalize();
 
-    let workspace = self.workspace.read().await;
-
-    if let Some(view) = workspace.view(&uri) {
-      let mut completion_items = Vec::new();
-
-      let mut recipes = view.resolved_recipes().cloned().collect::<Vec<_>>();
-
-      recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-      for recipe in recipes {
-        let recipe = recipe.into_inner();
-
-        completion_items.push(lsp::CompletionItem {
-          label: recipe.name.value.clone(),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::PlainText,
-              value: recipe.content,
-            },
-          )),
-          insert_text: Some(recipe.name.value),
-          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-          ..Default::default()
-        });
-      }
-
-      let mut variables =
-        view.resolved_variables().cloned().collect::<Vec<_>>();
-
-      variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-      for variable in variables {
-        let variable = variable.into_inner();
-
-        completion_items.push(lsp::CompletionItem {
-          label: variable.name.value.clone(),
-          kind: Some(lsp::CompletionItemKind::VARIABLE),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::PlainText,
-              value: variable.content,
-            },
-          )),
-          insert_text: Some(variable.name.value),
-          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-          ..Default::default()
-        });
-      }
-
-      let mut functions =
-        view.resolved_functions().cloned().collect::<Vec<_>>();
-
-      functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-      for function in functions {
-        let function = function.into_inner();
-
-        let parameters = function
-          .parameters
-          .iter()
-          .map(|parameter| parameter.value.as_str())
-          .collect::<Vec<_>>()
-          .join(", ");
-
-        completion_items.push(lsp::CompletionItem {
-          label: format!("{}({})", function.name.value, parameters),
-          kind: Some(lsp::CompletionItemKind::FUNCTION),
-          documentation: Some(lsp::Documentation::MarkupContent(
-            lsp::MarkupContent {
-              kind: lsp::MarkupKind::PlainText,
-              value: function.content.clone(),
-            },
-          )),
-          filter_text: Some(function.name.value.clone()),
-          insert_text: Some(function.name.value),
-          insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-          ..Default::default()
-        });
-      }
-
-      for builtin in BUILTINS {
-        completion_items.extend(builtin.completion_items());
-      }
-
-      return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
-    }
-
-    Ok(None)
+    Ok(
+      self
+        .workspace
+        .read()
+        .await
+        .completions(&uri)
+        .map(lsp::CompletionResponse::Array),
+    )
   }
 
   async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
@@ -506,28 +425,7 @@ impl LanguageServer for Server {
 
     let position = params.text_document_position_params.position;
 
-    let workspace = self.workspace.read().await;
-
-    Ok(workspace.view(&uri).and_then(|view| {
-      let document = view.document();
-
-      let resolver = Resolver::new(view);
-
-      document
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          resolver
-            .resolve_identifier_references(&identifier, true)
-            .into_iter()
-            .filter(|location| location.uri == uri)
-            .map(|location| lsp::DocumentHighlight {
-              range: location.range,
-              kind: Some(lsp::DocumentHighlightKind::TEXT),
-            })
-            .collect()
-        })
-    }))
+    Ok(self.workspace.read().await.highlights(&uri, position))
   }
 
   async fn document_link(
@@ -545,94 +443,14 @@ impl LanguageServer for Server {
   ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri.normalize();
 
-    let workspace = self.workspace.read().await;
-
-    if let Some(document) = workspace.open_document(uri) {
-      let mut symbols = Vec::new();
-
-      for recipe in document.recipes() {
-        #[allow(deprecated)]
-        symbols.push(lsp::DocumentSymbol {
-          name: recipe.name.value,
-          detail: None,
-          kind: lsp::SymbolKind::FUNCTION,
-          tags: None,
-          deprecated: None,
-          range: recipe.range,
-          selection_range: recipe.name.range,
-          children: None,
-        });
-      }
-
-      for alias in document.aliases() {
-        #[allow(deprecated)]
-        symbols.push(lsp::DocumentSymbol {
-          name: alias.name.value,
-          detail: Some(format!("alias for {}", alias.value)),
-          kind: lsp::SymbolKind::FUNCTION,
-          tags: None,
-          deprecated: None,
-          range: alias.range,
-          selection_range: alias.name.range,
-          children: None,
-        });
-      }
-
-      for variable in document.variables() {
-        #[allow(deprecated)]
-        symbols.push(lsp::DocumentSymbol {
-          name: variable.name.value,
-          detail: None,
-          kind: lsp::SymbolKind::VARIABLE,
-          tags: None,
-          deprecated: None,
-          range: variable.range,
-          selection_range: variable.name.range,
-          children: None,
-        });
-      }
-
-      for function in document.functions() {
-        let parameters = function
-          .parameters
-          .iter()
-          .map(|parameter| parameter.value.as_str())
-          .collect::<Vec<_>>()
-          .join(", ");
-
-        #[allow(deprecated)]
-        symbols.push(lsp::DocumentSymbol {
-          name: function.name.value,
-          detail: Some(format!("({parameters})")),
-          kind: lsp::SymbolKind::FUNCTION,
-          tags: None,
-          deprecated: None,
-          range: function.range,
-          selection_range: function.name.range,
-          children: None,
-        });
-      }
-
-      for setting in document.settings() {
-        #[allow(deprecated)]
-        symbols.push(lsp::DocumentSymbol {
-          name: setting.name.value,
-          detail: Some(setting.kind.to_string()),
-          kind: lsp::SymbolKind::PROPERTY,
-          tags: None,
-          deprecated: None,
-          range: setting.range,
-          selection_range: setting.range,
-          children: None,
-        });
-      }
-
-      symbols.sort_by_key(|s| s.range.start);
-
-      return Ok(Some(lsp::DocumentSymbolResponse::Nested(symbols)));
-    }
-
-    Ok(None)
+    Ok(
+      self
+        .workspace
+        .read()
+        .await
+        .document_symbols(uri)
+        .map(lsp::DocumentSymbolResponse::Nested),
+    )
   }
 
   async fn execute_command(
@@ -650,40 +468,7 @@ impl LanguageServer for Server {
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
     let uri = &params.text_document.uri.normalize();
 
-    let workspace = self.workspace.read().await;
-
-    if let Some(document) = workspace.open_document(uri) {
-      let recipes = document.recipes();
-
-      let folding_ranges = recipes
-        .into_iter()
-        .map(|recipe| {
-          let start_line = recipe.range.start.line;
-
-          let end_line = recipe.range.end.line;
-
-          if end_line > start_line {
-            lsp::FoldingRange {
-              start_line,
-              end_line: end_line.saturating_sub(1),
-              kind: Some(lsp::FoldingRangeKind::Region),
-              ..Default::default()
-            }
-          } else {
-            lsp::FoldingRange {
-              start_line,
-              end_line: start_line,
-              kind: Some(lsp::FoldingRangeKind::Region),
-              ..Default::default()
-            }
-          }
-        })
-        .collect();
-
-      return Ok(Some(folding_ranges));
-    }
-
-    Ok(None)
+    Ok(self.workspace.read().await.folding_ranges(uri))
   }
 
   async fn formatting(
@@ -775,16 +560,7 @@ impl LanguageServer for Server {
 
     let position = params.text_document_position_params.position;
 
-    let workspace = self.workspace.read().await;
-
-    Ok(workspace.view(&uri).and_then(|view| {
-      let identifier = view
-        .document()
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")?;
-
-      Resolver::new(view).resolve_identifier_hover(&identifier)
-    }))
+    Ok(self.workspace.read().await.hover(&uri, position))
   }
 
   async fn initialize(
@@ -849,28 +625,13 @@ impl LanguageServer for Server {
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
     let uri = &params.text_document.uri.normalize();
 
-    let workspace = self.workspace.read().await;
-
-    Ok(workspace.view(uri).and_then(|view| {
-      let document = view.document();
-
-      let resolver = Resolver::new(view);
-
-      document
-        .node_at_position(params.position)
-        .filter(|node| node.kind() == "identifier")
-        .filter(|identifier| {
-          resolver
-            .resolve_symbol(identifier)
-            .is_some_and(|symbol| symbol.is_renameable())
-        })
-        .map(
-          |identifier| lsp::PrepareRenameResponse::RangeWithPlaceholder {
-            range: document.get_range(&identifier),
-            placeholder: document.get_node_text(&identifier),
-          },
-        )
-    }))
+    Ok(
+      self
+        .workspace
+        .read()
+        .await
+        .prepare_rename(uri, params.position),
+    )
   }
 
   async fn references(
@@ -896,44 +657,13 @@ impl LanguageServer for Server {
 
     let position = params.text_document_position.position;
 
-    let new_name = params.new_name;
-
-    let workspace = self.workspace.read().await;
-
-    let renameable = workspace.view(&uri).is_some_and(|view| {
-      let document = view.document();
-
-      let resolver = Resolver::new(view);
-
-      document
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .and_then(|identifier| resolver.resolve_symbol(&identifier))
-        .is_some_and(|symbol| symbol.is_renameable())
-    });
-
-    if !renameable {
-      return Ok(None);
-    }
-
-    Ok(workspace.references(&uri, position, true).map(|locations| {
-      let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
-
-      for location in locations {
-        changes
-          .entry(location.uri)
-          .or_default()
-          .push(lsp::TextEdit {
-            range: location.range,
-            new_text: new_name.clone(),
-          });
-      }
-
-      lsp::WorkspaceEdit {
-        changes: Some(changes),
-        ..Default::default()
-      }
-    }))
+    Ok(
+      self
+        .workspace
+        .read()
+        .await
+        .rename(&uri, position, &params.new_name),
+    )
   }
 
   async fn semantic_tokens_full(
