@@ -4636,6 +4636,24 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_chained_comparison() {
+    Test::new(indoc! {
+      "
+      set lists
+      set unstable
+
+      foo:
+        echo {{ if 'a' == 'b' != 'c' { 'd' } else { 'e' } }}
+      "
+    })
+    .error(
+      "Expected `&&`, `||`, `+`, `++`, or `/`, but found `!=`",
+      lsp::Range::at(4, 24, 4, 26),
+    )
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_double_braces_in_recipe() {
     Test::new(indoc! {
       r#"
@@ -4644,6 +4662,26 @@ mod tests {
       "#
     })
     .error("Syntax error near `{{`", lsp::Range::at(1, 8, 1, 10))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_if_expression_operand() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ if 'a' == 'b' { 'c' } else { 'd' } + 'e' }}
+        echo {{ 'a' + if 'a' == 'b' { 'c' } else { 'd' } / 'e' }}
+      "
+    })
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `+`",
+      lsp::Range::at(1, 45, 1, 46),
+    )
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `/`",
+      lsp::Range::at(2, 51, 2, 52),
+    )
     .run();
   }
 
