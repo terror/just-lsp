@@ -79,6 +79,7 @@ pub use {
   attribute_expression_kind::AttributeExpressionKind,
   attribute_keyword::AttributeKeyword,
   attribute_kind::AttributeKind,
+  attribute_scope::AttributeScope,
   attribute_signature::AttributeSignature,
   attribute_target::AttributeTarget,
   builtin::Builtin,
@@ -126,6 +127,7 @@ mod attribute_expression;
 mod attribute_expression_kind;
 mod attribute_keyword;
 mod attribute_kind;
+mod attribute_scope;
 mod attribute_signature;
 mod attribute_target;
 mod binding;

@@ -7,6 +7,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -37,48 +38,58 @@ pub const BUILTINS: &[Builtin<'_>] = &[
           name: "flag",
           expression: AttributeExpressionKind::Any,
           value_required: false,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "help",
           expression: AttributeExpressionKind::Const,
           value_required: true,
+          scope: AttributeScope::Globals,
         },
         AttributeKeyword {
           name: "long",
           expression: AttributeExpressionKind::StringLiteral,
           value_required: false,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "max",
           expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "min",
           expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "multiple",
           expression: AttributeExpressionKind::Any,
           value_required: false,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "pattern",
           expression: AttributeExpressionKind::Const,
           value_required: true,
+          scope: AttributeScope::Globals,
         },
         AttributeKeyword {
           name: "short",
           expression: AttributeExpressionKind::StringLiteral,
           value_required: false,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "value",
           expression: AttributeExpressionKind::Any,
           value_required: true,
+          scope: AttributeScope::PrecedingParameters,
         },
       ],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -140,23 +151,28 @@ pub const BUILTINS: &[Builtin<'_>] = &[
           name: "environment",
           expression: AttributeExpressionKind::Any,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "extra",
           expression: AttributeExpressionKind::Any,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "inputs",
           expression: AttributeExpressionKind::Any,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
         AttributeKeyword {
           name: "outputs",
           expression: AttributeExpressionKind::Any,
           value_required: true,
+          scope: AttributeScope::Parameters,
         },
       ],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -190,6 +206,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Optional,
       expression: AttributeExpressionKind::Any,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -225,6 +242,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Variadic,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -254,6 +272,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -278,6 +297,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Optional,
       expression: AttributeExpressionKind::Const,
       keywords: &[],
+      scope: AttributeScope::Globals,
     },
     description: indoc! {
       "
@@ -308,6 +328,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -335,6 +356,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Binary,
       expression: AttributeExpressionKind::Any,
       keywords: &[],
+      scope: AttributeScope::Globals,
     },
     description: indoc! {
       "
@@ -359,6 +381,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -377,6 +400,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Unary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -403,6 +427,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -428,6 +453,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Unary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -457,6 +483,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -488,6 +515,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -515,6 +543,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::UnaryPlus,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -539,6 +568,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -558,6 +588,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -585,6 +616,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -611,6 +643,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -637,6 +670,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -656,6 +690,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -680,6 +715,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -709,6 +745,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -739,6 +776,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Variadic,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -778,6 +816,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -803,6 +842,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Optional,
       expression: AttributeExpressionKind::Any,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -830,6 +870,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -856,6 +897,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Nullary,
       expression: AttributeExpressionKind::StringLiteral,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "
@@ -882,6 +924,7 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       positional: AttributeKind::Unary,
       expression: AttributeExpressionKind::Any,
       keywords: &[],
+      scope: AttributeScope::Parameters,
     },
     description: indoc! {
       "

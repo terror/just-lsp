@@ -236,6 +236,20 @@ mod tests {
   }
 
   #[test]
+  fn global_attribute_expressions_do_not_use_parameters() {
+    AnalyzerTest::new(indoc! {
+      "
+      [env('FOO', bar)]
+      foo bar:
+        echo
+      "
+    })
+    .error("Variable `bar` not found", lsp::Range::at(0, 12, 0, 15))
+    .warning("Parameter `bar` appears unused", lsp::Range::at(1, 4, 1, 7))
+    .run();
+  }
+
+  #[test]
   fn parse_positional_rejects_incomplete_braced() {
     assert_eq!(
       UnusedRecipeParameterRule::parse_positional(b"{56", true),

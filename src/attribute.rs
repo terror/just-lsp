@@ -51,4 +51,25 @@ impl Attribute {
       AttributeArgument::Keyword { .. } => None,
     })
   }
+
+  pub(crate) fn scope(&self, range: lsp::Range) -> Option<AttributeScope> {
+    let Some(Builtin::Attribute { signature, .. }) =
+      Builtin::attribute(&self.name.value)
+    else {
+      return None;
+    };
+
+    match self
+      .arguments
+      .iter()
+      .find(|argument| argument.range().overlaps(range))?
+    {
+      AttributeArgument::Keyword { name, .. } => signature
+        .keywords
+        .iter()
+        .find(|keyword| keyword.name == name.value)
+        .map(|keyword| keyword.scope),
+      AttributeArgument::Positional(_) => Some(signature.scope),
+    }
+  }
 }

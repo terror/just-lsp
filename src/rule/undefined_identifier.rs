@@ -34,7 +34,44 @@ define_rule! {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+  };
+
+  #[test]
+  fn attribute_expression_scope() {
+    #[track_caller]
+    fn case(attribute: &str, error: Option<(&'static str, lsp::Range)>) {
+      let test = AnalyzerTest::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar baz:
+          echo {{{{bar}}}} {{{{baz}}}}
+        "
+      });
+
+      match error {
+        Some((message, range)) => test.error(message, range),
+        None => test,
+      }
+      .run();
+    }
+
+    case(
+      "[doc(bar)]",
+      Some(("Variable `bar` not found", lsp::Range::at(0, 5, 0, 8))),
+    );
+
+    case("[arg('baz', long, value=bar)]", None);
+
+    case(
+      "[arg('bar', long, value=baz)]",
+      Some(("Variable `baz` not found", lsp::Range::at(0, 24, 0, 27))),
+    );
+
+    case("[working-directory(bar)]", None);
+  }
 
   #[test]
   fn default_parameter_expression_functions() {
