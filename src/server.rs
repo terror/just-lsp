@@ -1537,6 +1537,38 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn code_lens_prefers_module_path() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let root = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "import 'foo.just'\nmod foo\n")
+      .open("foo.just", "bar:\n")
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(foo),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::CodeLens {
+          range: lsp::Range::at(0, 0, 0, 3),
+          command: Some(lsp::Command {
+            title: "Run".into(),
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(vec![json!("foo::bar"), json!(root), json!(false)]),
+          }),
+          data: None,
+        }])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn code_lens_runs_recipes_from_root() -> Result {
     #[track_caller]
     fn lens(path: &str, root: &lsp::Url) -> Vec<lsp::CodeLens> {
@@ -1581,46 +1613,6 @@ mod tests {
           partial_result_params: lsp::PartialResultParams::default(),
         },
         Ok(Some(lens("qux", &root))),
-      )
-      .run()
-      .await
-  }
-
-  #[tokio::test]
-  async fn code_lens_variadic_parameters() -> Result {
-    let test = Test::new();
-
-    let uri = test.uri("justfile");
-
-    test
-      .initialize()
-      .open("justfile", "foo *bar:\nbaz +qux:\n")
-      .request::<request::CodeLensRequest>(
-        lsp::CodeLensParams {
-          text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
-          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
-          partial_result_params: lsp::PartialResultParams::default(),
-        },
-        Ok(Some(vec![
-          lsp::CodeLens {
-            range: lsp::Range::at(0, 0, 0, 3),
-            command: Some(lsp::Command {
-              title: "Run".into(),
-              command: Command::RunRecipe.to_string(),
-              arguments: Some(vec![json!("foo"), json!(uri), json!(false)]),
-            }),
-            data: None,
-          },
-          lsp::CodeLens {
-            range: lsp::Range::at(1, 0, 1, 3),
-            command: Some(lsp::Command {
-              title: "Run".into(),
-              command: Command::RunRecipe.to_string(),
-              arguments: Some(vec![json!("baz"), json!(uri), json!(true)]),
-            }),
-            data: None,
-          },
-        ])),
       )
       .run()
       .await

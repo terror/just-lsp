@@ -349,9 +349,18 @@ impl Workspace {
 
   #[must_use]
   pub fn run_context(&self, uri: &lsp::Url) -> (lsp::Url, Vec<String>) {
-    Self::contexts(&self.root_projects(), uri)
-      .into_iter()
-      .find_map(|(project, module)| {
+    let contexts = Self::contexts(&self.root_projects(), uri);
+
+    contexts
+      .iter()
+      .find(|(project, module)| {
+        project
+          .modules
+          .get(uri)
+          .is_some_and(|root| ptr::eq(root, *module))
+      })
+      .or(contexts.first())
+      .and_then(|(project, module)| {
         Some((project.root.clone(), project.module_path(module)?))
       })
       .unwrap_or_else(|| (uri.clone(), Vec::new()))
