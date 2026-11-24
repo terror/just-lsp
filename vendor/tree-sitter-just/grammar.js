@@ -54,7 +54,15 @@ module.exports = grammar({
   ],
   word: ($) => $.identifier,
 
-  conflicts: ($) => [[$.value, $.attribute_named_param], [$._name, $.unexport]],
+  conflicts: ($) => [
+    [$.value, $.attribute_named_param],
+    [$._name, $.alias],
+    [$._name, $.eager],
+    [$._name, $.export],
+    [$._name, $.module],
+    [$._name, $.setting],
+    [$._name, $.unexport],
+  ],
 
   rules: {
     // justfile      : item* EOF
@@ -79,7 +87,7 @@ module.exports = grammar({
         $.unexport,
         $.function_definition,
         $.import,
-        $.module,
+        seq($.module, $._newline),
         $.setting,
       ),
 
@@ -87,7 +95,7 @@ module.exports = grammar({
     function_definition: ($) =>
       seq(
         repeat($.attribute),
-        field("name", $.identifier),
+        field("name", $._name),
         "(",
         optional(field("parameters", $.function_parameters)),
         ")",
@@ -116,7 +124,17 @@ module.exports = grammar({
     // module_path   : NAME '::' NAME ('::' NAME)*
     module_path: ($) =>
       seq($.identifier, repeat1(seq("::", $.identifier))),
-    _name: ($) => choice($.identifier, alias("unexport", $.identifier)),
+    _name: ($) =>
+      choice(
+        $.identifier,
+        alias("alias", $.identifier),
+        alias("eager", $.identifier),
+        alias("export", $.identifier),
+        alias("import", $.identifier),
+        alias("mod", $.identifier),
+        alias("set", $.identifier),
+        alias("unexport", $.identifier),
+      ),
 
     // assignment    : attribute* NAME ':=' expression _eol
     assignment: ($) => seq(repeat($.attribute), $._assignment),
@@ -154,30 +172,36 @@ module.exports = grammar({
 
     // module        : attribute* 'mod' '?'? string?
     module: ($) =>
-      seq(
-        repeat($.attribute),
-        "mod",
-        optional("?"),
-        field("name", $.identifier),
-        optional($.string),
+      prec.dynamic(
+        1,
+        seq(
+          repeat($.attribute),
+          "mod",
+          optional("?"),
+          field("name", $.identifier),
+          optional($.string),
+        ),
       ),
 
     // setting       : 'set' identifier (':=' (boolean | string | expression))?
     setting: ($) =>
-      seq(
-        repeat($.attribute),
-        "set",
-        field("left", $.identifier),
-        field(
-          "right",
-          optional(
-            seq(
-              ":=",
-              choice($.boolean, $.string, $.expression),
+      prec.dynamic(
+        1,
+        seq(
+          repeat($.attribute),
+          "set",
+          field("left", $.identifier),
+          field(
+            "right",
+            optional(
+              seq(
+                ":=",
+                choice($.boolean, $.string, $.expression),
+              ),
             ),
           ),
+          $._newline,
         ),
-        $._newline,
       ),
 
     // boolean       : ':=' ('true' | 'false')
@@ -359,10 +383,7 @@ module.exports = grammar({
     recipe_header: ($) =>
       seq(
         optional("@"),
-        field(
-          "name",
-          choice($._name, alias("import", $.identifier)),
-        ),
+        field("name", $._name),
         optional($.parameters),
         ":",
         optional($.dependencies),
