@@ -247,7 +247,7 @@ mod tests {
         kind: ProjectDependencyKind::Import,
         location: lsp::Range::at(0, 7, 0, 17),
         optional: false,
-        target: ProjectDependencyTarget::Resolved(uri(
+        target: ProjectDependencyTarget::Path(uri(
           &tempdir.path().join("bar.just")
         )),
       }],
@@ -362,7 +362,7 @@ mod tests {
 
     assert_eq!(
       store.dependencies(&foo).unwrap(),
-      [dependency(ProjectDependencyTarget::Resolved(uri(
+      [dependency(ProjectDependencyTarget::Path(uri(
         &tempdir.path().join("bar.just")
       )))],
     );

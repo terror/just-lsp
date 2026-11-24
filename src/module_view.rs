@@ -114,6 +114,28 @@ impl<'a> ModuleView<'a> {
     ModuleLookup::Found(view)
   }
 
+  pub(crate) fn module_views(&self) -> Vec<Self> {
+    let Some(context) = self.context else {
+      return vec![self.clone()];
+    };
+
+    once(self.clone())
+      .chain(
+        context
+          .project
+          .modules
+          .iter()
+          .filter(|(_, module)| !ptr::eq(*module, context.module))
+          .filter_map(|(root, module)| {
+            Some(Self::new(
+              context.documents.get(root)?,
+              ModuleContext { module, ..context },
+            ))
+          }),
+      )
+      .collect()
+  }
+
   pub(crate) fn modules(&self) -> &[Located<ModuleDeclaration>] {
     &self.symbols.modules
   }
@@ -148,28 +170,6 @@ impl<'a> ModuleView<'a> {
       document,
       documents: scope,
     }
-  }
-
-  pub(crate) fn project_views(&self) -> Vec<Self> {
-    let Some(context) = self.context else {
-      return vec![self.clone()];
-    };
-
-    once(self.clone())
-      .chain(
-        context
-          .project
-          .modules
-          .iter()
-          .filter(|(_, module)| !ptr::eq(*module, context.module))
-          .filter_map(|(root, module)| {
-            Some(Self::new(
-              context.documents.get(root)?,
-              ModuleContext { module, ..context },
-            ))
-          }),
-      )
-      .collect()
   }
 
   pub(crate) fn recipes(&self) -> &[Located<Recipe>] {

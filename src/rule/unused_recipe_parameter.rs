@@ -19,7 +19,7 @@ define_rule! {
         .iter()
         .filter_map(|recipe| {
           context
-            .scope()
+            .references()
             .recipe_identifier_usage
             .get(&recipe.name.value)
             .map(|identifiers| (recipe, identifiers))
