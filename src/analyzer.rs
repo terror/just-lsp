@@ -5703,6 +5703,27 @@ mod tests {
   }
 
   #[test]
+  fn recipe_invocation_zero_or_more_variadic_with_min_requires_argument() {
+    Test::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [arg('bar', min='2')]
+      foo *bar:
+        echo {{bar}}
+
+      baz: foo
+      "
+    })
+    .error(
+      "Dependency `foo` requires 1 argument, but 0 provided",
+      lsp::Range::at(7, 5, 7, 8),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_line_continuations_allow_extra_indentation() {
     Test::new(indoc! {
       "
