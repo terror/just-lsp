@@ -347,6 +347,16 @@ impl Workspace {
     projects
   }
 
+  #[must_use]
+  pub fn run_context(&self, uri: &lsp::Url) -> (lsp::Url, Vec<String>) {
+    Self::contexts(&self.root_projects(), uri)
+      .into_iter()
+      .find_map(|(project, module)| {
+        Some((project.root.clone(), project.module_path(module)?))
+      })
+      .unwrap_or_else(|| (uri.clone(), Vec::new()))
+  }
+
   pub fn set_config(&mut self, config: Config) {
     self.config = config;
   }

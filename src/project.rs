@@ -50,6 +50,35 @@ impl Project {
     &self.modules[&self.root]
   }
 
+  pub(crate) fn module_path(&self, target: &Module) -> Option<Vec<String>> {
+    let mut queue = VecDeque::from([(&self.root, Vec::new())]);
+
+    let mut visited = HashSet::new();
+
+    while let Some((uri, path)) = queue.pop_front() {
+      if !visited.insert(uri) {
+        continue;
+      }
+
+      let Some(module) = self.modules.get(uri) else {
+        continue;
+      };
+
+      if ptr::eq(module, target) {
+        return Some(path);
+      }
+
+      for (name, child) in &module.children {
+        queue.push_back((
+          child,
+          path.iter().cloned().chain([name.clone()]).collect(),
+        ));
+      }
+    }
+
+    None
+  }
+
   pub(crate) fn modules_containing(&self, uri: &lsp::Url) -> Vec<&Module> {
     let mut modules = self
       .modules

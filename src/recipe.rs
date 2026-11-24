@@ -39,6 +39,14 @@ impl Recipe {
       .any(|attribute| attribute.name.value == name)
   }
 
+  #[must_use]
+  pub fn has_required_parameters(&self) -> bool {
+    self.parameters.iter().any(|parameter| {
+      parameter.default_value.is_none()
+        && parameter.kind != ParameterKind::Variadic(VariadicType::ZeroOrMore)
+    })
+  }
+
   pub(crate) fn is_option(&self, parameter: &str) -> bool {
     self
       .attributes
