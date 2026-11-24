@@ -1179,7 +1179,7 @@ mod tests {
 
       Test::new(&content).error(message, range).run();
 
-      Test::new(&format!("{content}\nset lists := false\n"))
+      Test::new(&format!("{content}\nset unstable\nset lists := false\n"))
         .error(message, range)
         .run();
 
@@ -7032,7 +7032,12 @@ mod tests {
 
   #[test]
   fn unstable_feature_gate_disabled_lists() {
-    Test::new("set lists := false\n").run();
+    Test::new("set lists := false\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
   }
 
   #[test]

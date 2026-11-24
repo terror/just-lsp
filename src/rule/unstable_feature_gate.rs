@@ -12,9 +12,7 @@ define_rule! {
       }
 
       for setting in context.local_declarations(context.settings()) {
-        if setting.name.value == "lists"
-          && matches!(setting.kind, SettingKind::Boolean(true))
-        {
+        if setting.name.value == "lists" {
           diagnostics.push(Diagnostic::warning(
             "`set lists` is unstable without `set unstable`",
             setting.name.range,
