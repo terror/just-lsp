@@ -39,6 +39,19 @@ impl Recipe {
       .any(|attribute| attribute.name.value == name)
   }
 
+  pub(crate) fn is_option(&self, parameter: &str) -> bool {
+    self
+      .attributes
+      .iter()
+      .filter(|attribute| {
+        attribute.arg_parameter().as_deref() == Some(parameter)
+      })
+      .any(|attribute| {
+        attribute.keyword_argument("long").is_some()
+          || attribute.keyword_argument("short").is_some()
+      })
+  }
+
   #[must_use]
   pub fn runs_as_script(&self, default_script: bool) -> bool {
     if self.has_attribute("shell") {

@@ -10,7 +10,11 @@ define_rule! {
       for recipe in context.local_declarations(context.recipes()) {
         let mut passed_default = false;
 
-        for param in &recipe.parameters {
+        for param in recipe
+          .parameters
+          .iter()
+          .filter(|param| !recipe.is_option(&param.name))
+        {
           let has_default = param.default_value.is_some();
 
           if passed_default
