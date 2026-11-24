@@ -188,10 +188,6 @@ impl Workspace {
       });
     }
 
-    for builtin in BUILTINS {
-      completion_items.extend(builtin.completion_items());
-    }
-
     completion_items
   }
 
@@ -200,7 +196,13 @@ impl Workspace {
     &self,
     uri: &lsp::Url,
   ) -> Option<Vec<lsp::CompletionItem>> {
-    Self::union(self.views(uri).iter().map(Self::completion_items))
+    let mut completion_items =
+      Self::union(self.views(uri).iter().map(Self::completion_items))?;
+
+    completion_items
+      .extend(BUILTINS.iter().flat_map(Builtin::completion_items));
+
+    Some(completion_items)
   }
 
   fn contexts<'a>(
@@ -232,11 +234,11 @@ impl Workspace {
       return Some(lsp::Location::new(target.clone(), lsp::Range::default()));
     }
 
-    self.identifiers(uri, position).into_iter().find_map(
-      |(resolver, identifier)| {
-        resolver.resolve_identifier_definition(&identifier)
-      },
-    )
+    let identifier = self.identifier(uri, position)?;
+
+    self
+      .resolvers(uri)
+      .find_map(|resolver| resolver.resolve_identifier_definition(&identifier))
   }
 
   #[must_use]
@@ -441,28 +443,23 @@ impl Workspace {
     uri: &lsp::Url,
     position: lsp::Position,
   ) -> Option<lsp::Hover> {
-    self.identifiers(uri, position).into_iter().find_map(
-      |(resolver, identifier)| resolver.resolve_identifier_hover(&identifier),
-    )
+    let identifier = self.identifier(uri, position)?;
+
+    self
+      .resolvers(uri)
+      .find_map(|resolver| resolver.resolve_identifier_hover(&identifier))
   }
 
-  fn identifiers(
+  fn identifier(
     &self,
     uri: &lsp::Url,
     position: lsp::Position,
-  ) -> Vec<(Resolver<'_>, Node<'_>)> {
+  ) -> Option<Node<'_>> {
     self
-      .views(uri)
-      .into_iter()
-      .filter_map(|view| {
-        let identifier = view
-          .document()
-          .node_at_position(position)
-          .filter(|node| node.kind() == "identifier")?;
-
-        Some((Resolver::new(view), identifier))
-      })
-      .collect()
+      .documents
+      .get_open(uri)?
+      .node_at_position(position)
+      .filter(|node| node.kind() == "identifier")
   }
 
   #[must_use]
@@ -631,20 +628,19 @@ impl Workspace {
   ) -> Option<lsp::PrepareRenameResponse> {
     let document = self.documents.get_open(uri)?;
 
+    let identifier = self.identifier(uri, position)?;
+
     self
-      .identifiers(uri, position)
-      .into_iter()
-      .find(|(resolver, identifier)| {
+      .resolvers(uri)
+      .any(|resolver| {
         resolver
-          .resolve_symbol(identifier)
+          .resolve_symbol(&identifier)
           .is_some_and(|symbol| symbol.is_renameable())
       })
-      .map(
-        |(_, identifier)| lsp::PrepareRenameResponse::RangeWithPlaceholder {
-          range: document.get_range(&identifier),
-          placeholder: document.get_node_text(&identifier),
-        },
-      )
+      .then(|| lsp::PrepareRenameResponse::RangeWithPlaceholder {
+        range: document.get_range(&identifier),
+        placeholder: document.get_node_text(&identifier),
+      })
   }
 
   #[must_use]
@@ -654,11 +650,11 @@ impl Workspace {
     position: lsp::Position,
     include_declaration: bool,
   ) -> Option<Vec<lsp::Location>> {
-    Self::union(self.identifiers(uri, position).into_iter().map(
-      |(resolver, identifier)| {
-        resolver.resolve_identifier_references(&identifier, include_declaration)
-      },
-    ))
+    let identifier = self.identifier(uri, position)?;
+
+    Self::union(self.resolvers(uri).map(|resolver| {
+      resolver.resolve_identifier_references(&identifier, include_declaration)
+    }))
   }
 
   /// # Errors
@@ -726,6 +722,10 @@ impl Workspace {
       changes: Some(changes),
       ..Default::default()
     })
+  }
+
+  fn resolvers(&self, uri: &lsp::Url) -> impl Iterator<Item = Resolver<'_>> {
+    self.views(uri).into_iter().map(Resolver::new)
   }
 
   fn root_projects(&self) -> Vec<&Project> {
