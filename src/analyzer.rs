@@ -1496,6 +1496,7 @@ mod tests {
       mod bar
       "
     })
+    .file("bar.just", "")
     .error(
       "Module attribute `group` with value `foo` is duplicated",
       lsp::Range::at(1, 0, 2, 0),
@@ -1553,6 +1554,7 @@ mod tests {
     #[track_caller]
     fn case(content: &'static str, message: &'static str) {
       Test::new(content)
+        .file("foo.just", "")
         .error(message, lsp::Range::at(1, 0, 2, 0))
         .run();
     }
@@ -2001,6 +2003,7 @@ mod tests {
       mod baz
       "
     })
+    .file("baz.just", "")
     .run();
   }
 
@@ -4341,6 +4344,7 @@ mod tests {
       mod foo
       "
     })
+    .file("foo.just", "")
     .run();
   }
 
