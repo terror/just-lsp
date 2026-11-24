@@ -983,18 +983,24 @@ mod tests {
 
   #[test]
   fn arg_attribute_unknown_parameter() {
-    Test::new(indoc! {
-      "
-      [arg('missing', help='nope')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .error(
-      "`[arg]` references unknown parameter `missing`",
-      lsp::Range::at(0, 5, 0, 14),
-    )
-    .run();
+    #[track_caller]
+    fn case(name: &str, end: u32) {
+      Test::new(&formatdoc! {
+        "
+        [arg({name}, help='bar')]
+        foo baz:
+          echo {{{{baz}}}}
+        "
+      })
+      .error(
+        "`[arg]` references unknown parameter `bar`",
+        lsp::Range::at(0, 5, 0, end),
+      )
+      .run();
+    }
+
+    case("'bar'", 10);
+    case("x'bar'", 11);
   }
 
   #[test]
