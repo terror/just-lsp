@@ -25,33 +25,6 @@ impl<'a> Resolver<'a> {
     Self { view: view.into() }
   }
 
-  fn refers_to(
-    &self,
-    candidate: &Binding,
-    target: &Binding,
-    definition: Option<&lsp::Location>,
-  ) -> bool {
-    let same_name = match (candidate, target) {
-      (Binding::Recipe(candidate), Binding::Recipe(target)) => {
-        candidate.name().value == target.name().value
-      }
-      (Binding::Function(candidate), Binding::Function(target))
-      | (Binding::Variable(candidate), Binding::Variable(target)) => {
-        candidate == target
-      }
-      _ => return candidate == target,
-    };
-
-    same_name
-      && definition.is_some()
-      && self
-        .symbol(candidate)
-        .as_ref()
-        .and_then(Self::definition)
-        .as_ref()
-        == definition
-  }
-
   /// Returns the definition site of the symbol that `identifier` refers to.
   /// Builtins have no in-document declaration, so the identifier's own range is
   /// returned instead, letting editors anchor inline documentation at the
@@ -169,7 +142,11 @@ impl<'a> Resolver<'a> {
           .iter()
           .filter(|bound| include_declaration || !bound.declaration)
           .filter(|bound| {
-            resolver.refers_to(&bound.binding, &target, definition.as_ref())
+            bound
+              .binding
+              .refers_to(&target, definition.as_ref(), |binding| {
+                resolver.symbol(binding).as_ref().and_then(Self::definition)
+              })
           })
           .map(|bound| {
             lsp::Location::new(candidate.uri.clone(), bound.identifier.range)
