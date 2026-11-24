@@ -39,25 +39,11 @@ impl Bindings {
   }
 
   fn comment_lines<'a>(
-    view: &ModuleView,
     document: &Document,
+    linewise: &BTreeSet<lsp::Position>,
     recipe_node: &'a Node,
   ) -> Vec<Node<'a>> {
-    if !view.setting_enabled("ignore-comments") {
-      return Vec::new();
-    }
-
-    let range = document.get_range(recipe_node);
-
-    let script = view
-      .recipes()
-      .iter()
-      .find(|recipe| recipe.uri == document.uri && recipe.range == range)
-      .is_none_or(|recipe| {
-        recipe.runs_as_script(view.setting_enabled("default-script"))
-      });
-
-    if script {
+    if !linewise.contains(&document.get_range(recipe_node).start) {
       return Vec::new();
     }
 
@@ -185,6 +171,26 @@ impl Bindings {
     })
   }
 
+  fn linewise_recipes(
+    view: &ModuleView,
+    document: &Document,
+  ) -> BTreeSet<lsp::Position> {
+    if !view.setting_enabled("ignore-comments") {
+      return BTreeSet::new();
+    }
+
+    let default_script = view.setting_enabled("default-script");
+
+    view
+      .recipes()
+      .iter()
+      .filter(|recipe| {
+        recipe.uri == document.uri && !recipe.runs_as_script(default_script)
+      })
+      .map(|recipe| recipe.range.start)
+      .collect()
+  }
+
   pub(crate) fn new(view: &ModuleView, document: &Document) -> Self {
     let globals = view
       .variables()
@@ -200,8 +206,10 @@ impl Bindings {
 
     let root = document.tree.root_node();
 
+    let linewise = Self::linewise_recipes(view, document);
+
     for recipe_node in root.find_all("recipe") {
-      bindings.recipe(view, document, &globals, recipe_node);
+      bindings.recipe(view, document, &globals, &linewise, recipe_node);
     }
 
     for function_node in root.find_all("function_definition") {
@@ -228,6 +236,7 @@ impl Bindings {
     view: &ModuleView,
     document: &Document,
     globals: &[String],
+    linewise: &BTreeSet<lsp::Position>,
     recipe_node: Node,
   ) {
     let Some(name_node) = recipe_node.find("recipe_header > identifier") else {
@@ -297,7 +306,7 @@ impl Bindings {
       }
     }
 
-    let comments = Self::comment_lines(view, document, &recipe_node);
+    let comments = Self::comment_lines(document, linewise, &recipe_node);
 
     for identifier in document.get_expression_identifiers(&recipe_node) {
       if identifier.has_any_parent(&["parameter", "variadic_parameter"])
