@@ -3827,6 +3827,38 @@ mod tests {
   }
 
   #[test]
+  fn keywords_are_valid_names() {
+    #[track_caller]
+    fn case(name: &str) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+
+        {name} := 'foo'
+
+        alias bar := {name}
+
+        {name}() := 'foo'
+
+        {name} baz:
+          echo {{{{baz}}}} {{{{{name}}}}} {{{{{name}()}}}}
+
+        bob: ({name} 'foo')
+        "
+      })
+      .run();
+    }
+
+    case("alias");
+    case("eager");
+    case("export");
+    case("import");
+    case("mod");
+    case("set");
+    case("unexport");
+  }
+
+  #[test]
   fn linux_openbsd_no_conflict() {
     Test::new(indoc! {
       "
