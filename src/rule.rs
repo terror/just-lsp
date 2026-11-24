@@ -55,6 +55,7 @@ mod duplicate_unexports;
 mod duplicate_variables;
 mod exit_message_conflict;
 mod extension_without_script;
+mod extraneous_attribute;
 mod inconsistent_indentation;
 mod ineffective_parallel_attribute;
 mod invalid_arg_attribute;

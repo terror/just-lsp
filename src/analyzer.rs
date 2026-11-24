@@ -3447,6 +3447,33 @@ mod tests {
   }
 
   #[test]
+  fn extraneous_attributes() {
+    Test::new(indoc! {
+      "
+      [private]
+
+      [no-cd]
+
+      foo:
+      "
+    })
+    .error("extraneous attribute", lsp::Range::at(0, 0, 1, 0))
+    .error("extraneous attribute", lsp::Range::at(2, 0, 3, 0))
+    .run();
+
+    Test::new(indoc! {
+      "
+      [private]
+      [no-cd]
+      # foo
+      foo:
+      "
+    })
+    .error("extraneous attributes", lsp::Range::at(0, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
   fn format_strings_mark_variables_as_used() {
     Test::new(indoc! {
       r#"
