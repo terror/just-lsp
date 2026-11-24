@@ -8,6 +8,17 @@ unresolved names, invalid settings and attributes, and unused variables,
 parameters, and functions. Name resolution and usage checks include imported
 definitions, using unsaved editor contents for files that are open.
 
+Files used as modules are analyzed in the context of the justfile that declares
+them, so settings, imports, and recipe paths such as `foo::bar` resolve the way
+`just` sees them. When you open a file that is imported or used as a module,
+the server searches its parent directories for a `justfile` or `.justfile` that
+loads it and analyzes the file as part of that project.
+
+Changes to closed files on disk are picked up as well. The server reloads
+projects when a file is saved, and, when the editor supports dynamic file
+watcher registration, watches justfiles, `*.just` files, and `just-lsp.toml`
+for changes, creations, and deletions.
+
 Analysis supports the Language Server Protocol's push diagnostics through
 [`textDocument/publishDiagnostics`][publish-diagnostics]. The server publishes
 results when you open or change a document and refreshes diagnostics in open

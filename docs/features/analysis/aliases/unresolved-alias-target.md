@@ -3,9 +3,10 @@ severity: error
 order: 10
 ---
 
-Reports an alias whose target cannot be resolved to a recipe.
+Reports an alias whose target cannot be resolved to a recipe or module.
 
-- Recipes in the document and its imports are considered. The target must be a recipe; another alias does not satisfy this lookup.
+- Recipes and modules in the document and its imports are considered. Another alias does not satisfy this lookup.
+- A module path such as `foo::bar` is resolved through the declared modules. An unknown module in the path is reported, while paths into optional modules whose file is missing are not.
 - When a similar recipe name exists, the diagnostic suggests that name.
 
 ## How to fix it

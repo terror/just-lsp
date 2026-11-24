@@ -6,6 +6,7 @@ order: 10
 Reports a recipe dependency whose name cannot be resolved to a recipe.
 
 - The lookup includes recipes from the document and its imports.
+- A module path such as `foo::bar` is resolved through the declared modules. Paths into optional modules whose file is missing are not reported.
 - Dependencies before and after `&&` are checked. Alias names do not substitute for recipe names in this lookup.
 - A close recipe name is suggested when available.
 

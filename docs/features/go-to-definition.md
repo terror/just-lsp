@@ -9,7 +9,8 @@ recipes, variables, recipe parameters, user-defined functions, and function
 parameters.
 
 Recipe dependencies and the recipe name on the right-hand side of an alias
-resolve to the recipe definition. Variables and parameters follow their scope,
+resolve to the recipe definition, including module paths such as `foo::bar`
+that refer to a recipe in a module file. Variables and parameters follow their scope,
 so a local parameter takes precedence over a global variable with the same name.
 
 ## Example
@@ -32,8 +33,8 @@ target of `quuz`, it jumps to the `baz` recipe.
 
 Definitions in imported justfiles can be opened even when those files are not
 already open in the editor. Resolution uses unsaved contents for open imported
-files. Invoking go to definition on a resolved import path opens the imported
-file at its start.
+files. Invoking go to definition on a resolved import path or module declaration
+opens the target file at its start.
 
 Builtin identifiers have no source declaration in the justfile, so their
 definition location is the identifier itself. Unresolved names have no

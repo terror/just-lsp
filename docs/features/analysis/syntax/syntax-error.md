@@ -6,6 +6,7 @@ order: 10
 Reports malformed justfile syntax, including unexpected text and missing syntax elements.
 
 - The diagnostic points to the part of the parse tree that contains an error or a missing element. Its message includes a short snippet or the expected syntax element.
+- Numeric literals such as `foo := 1` are not valid just expressions and are reported as an unknown start of token. Quote the number to use it as a string.
 - An incomplete declaration can also cause other rules to report problems. Correct the syntax first, then review the remaining diagnostics.
 
 ## How to fix it
