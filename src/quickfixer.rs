@@ -386,23 +386,35 @@ mod tests {
   #[test]
   fn replaces_windows_powershell_setting() {
     #[track_caller]
-    fn case(content: &str, range: lsp::Range) {
+    fn case<const N: usize>(content: &str, edits: [lsp::TextEdit; N]) {
       Test::new(content)
-        .range(range)
-        .quickfix(Quickfix::edit(
-          "Replace `windows-powershell` with `windows-shell`",
-          range,
-          r#"windows-shell := ["powershell.exe", "-NoLogo", "-Command"]"#,
+        .range(edits[0].range)
+        .quickfix(Quickfix::new(
+          "Replace `windows-powershell` with `[windows] set shell`",
+          edits,
         ))
         .run();
     }
 
+    let shell = |range| lsp::TextEdit {
+      range,
+      new_text: r#"shell := ["powershell.exe", "-NoLogo", "-Command"]"#.into(),
+    };
+
+    let windows = |line| lsp::TextEdit {
+      range: lsp::Range::at(line, 0, line, 0),
+      new_text: "[windows]\n".into(),
+    };
+
     case(
       "set windows-powershell := true\n",
-      lsp::Range::at(0, 4, 0, 30),
+      [shell(lsp::Range::at(0, 4, 0, 30)), windows(0)],
     );
 
-    case("set windows-powershell\n", lsp::Range::at(0, 4, 0, 22));
+    case(
+      "set windows-powershell\n",
+      [shell(lsp::Range::at(0, 4, 0, 22)), windows(0)],
+    );
 
     case(
       indoc! {
@@ -411,29 +423,18 @@ mod tests {
         set windows-powershell := true
         "
       },
-      lsp::Range::at(1, 4, 1, 30),
-    );
-
-    case(
-      indoc! {
-        "
-        set shell := ['foo']
-        set windows-powershell := true
-        "
-      },
-      lsp::Range::at(1, 4, 1, 30),
+      [shell(lsp::Range::at(1, 4, 1, 30))],
     );
 
     case(
       indoc! {
         "
         [unix]
-        set windows-shell := ['foo']
-        [windows]
+        set shell := ['foo']
         set windows-powershell := true
         "
       },
-      lsp::Range::at(3, 4, 3, 30),
+      [shell(lsp::Range::at(2, 4, 2, 30)), windows(2)],
     );
   }
 
@@ -535,7 +536,7 @@ mod tests {
   #[test]
   fn skips_windows_powershell_setting_when_imported_replacement_exists() {
     Test::new("set windows-powershell := true\nimport 'foo.just'\n")
-      .file("foo.just", "set windows-shell := ['foo']\n")
+      .file("foo.just", "set shell := ['foo']\n")
       .range(lsp::Range::at(0, 4, 0, 4))
       .run();
   }
@@ -550,7 +551,7 @@ mod tests {
     case(indoc! {
       "
       set windows-powershell := true
-      set windows-shell := ['foo']
+      set shell := ['foo']
       "
     });
 
@@ -558,21 +559,44 @@ mod tests {
       "
       set windows-powershell := true
       [windows]
-      set windows-shell := ['foo']
+      set shell := ['foo']
       "
     });
   }
 
   #[test]
-  fn skips_windows_shell_setting_when_replacement_exists() {
+  fn skips_windows_powershell_setting_with_non_windows_attribute() {
     Test::new(indoc! {
+      "
+      [unix]
+      set windows-powershell := true
+      "
+    })
+    .range(lsp::Range::at(1, 4, 1, 4))
+    .run();
+  }
+
+  #[test]
+  fn skips_windows_shell_setting_when_replacement_exists() {
+    #[track_caller]
+    fn case(content: &str) {
+      Test::new(content).range(lsp::Range::at(2, 4, 2, 4)).run();
+    }
+
+    case(indoc! {
       "
       [windows]
       set shell := [\"foo\"]
       set windows-shell := [\"bar\"]
       "
-    })
-    .range(lsp::Range::at(2, 4, 2, 4))
-    .run();
+    });
+
+    case(indoc! {
+      "
+      set shell := [\"foo\"]
+
+      set windows-shell := [\"bar\"]
+      "
+    });
   }
 }

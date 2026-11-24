@@ -6739,6 +6739,16 @@ mod tests {
   }
 
   #[test]
+  fn settings_windows_powershell_deprecated() {
+    Test::new("set windows-powershell\n")
+      .warning(
+        "`windows-powershell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        lsp::Range::at(0, 4, 0, 22),
+      )
+      .run();
+  }
+
+  #[test]
   fn settings_windows_shell_array_correct() {
     Test::new(indoc! {
       "

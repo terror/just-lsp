@@ -3113,15 +3113,21 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: SettingKind::Boolean(false),
     description: indoc! {
       "
-      **Deprecated**: use `windows-shell` instead.
+      **Deprecated**: use the `[windows]` attribute on `set shell`
+      instead.
 
-      Use the legacy `powershell.exe` binary on Windows as the
-      default shell for recipes and backticks. Prefer `windows-shell`
-      for a more flexible, version-agnostic alternative.
+      Use `powershell.exe` on Windows as the default shell for recipes
+      and backticks. Replace with:
+
+      ```just
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      ```
       "
     },
     deprecated: Some(Deprecation::BooleanSetting {
-      setting: "windows-shell",
+      attribute: "windows",
+      setting: "shell",
       value: "[\"powershell.exe\", \"-NoLogo\", \"-Command\"]",
     }),
   },
