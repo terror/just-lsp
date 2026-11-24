@@ -293,3 +293,409 @@ fn option(
     (name, None) => Some((parameter.to_owned(), name.range)),
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+  };
+
+  #[test]
+  fn arg_attribute_const_expression_kwargs() {
+    AnalyzerTest::new(indoc! {
+      "
+      help := 'help'
+      pattern := '[a-z]+'
+
+      [arg('bar', help=help, pattern=pattern)]
+      foo bar:
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_duplicate_option() {
+    #[track_caller]
+    fn case(
+      first: &str,
+      second: &str,
+      message: &'static str,
+      start: u32,
+      end: u32,
+    ) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        [arg('foo', {first})]
+        [arg('bar', {second})]
+        baz foo bar:
+          echo {{{{foo}}}} {{{{bar}}}}
+        "
+      })
+      .error(message, lsp::Range::at(1, start, 1, end))
+      .run();
+    }
+
+    case(
+      "long",
+      "long='foo'",
+      "Recipe `baz` defines option `--foo` multiple times",
+      17,
+      22,
+    );
+
+    case(
+      "short='b'",
+      "short",
+      "Recipe `baz` defines option `-b` multiple times",
+      12,
+      17,
+    );
+  }
+
+  #[test]
+  fn arg_attribute_duplicate_parameter() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('foo', help='bar')]
+      [arg('foo', long='foo')]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`[arg]` attribute for parameter `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_invalid_options() {
+    #[track_caller]
+    fn case(
+      arguments: &str,
+      parameter: &str,
+      message: &'static str,
+      range: lsp::Range,
+    ) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(message, range)
+      .run();
+    }
+
+    case(
+      "long='a=b'",
+      "foo",
+      "Option name for parameter `foo` contains equal sign",
+      lsp::Range::at(3, 17, 3, 22),
+    );
+
+    case(
+      "long='-a'",
+      "foo",
+      "Option name for parameter `foo` starts with dash",
+      lsp::Range::at(3, 17, 3, 21),
+    );
+
+    case(
+      "long=''",
+      "foo",
+      "Option name for parameter `foo` is empty",
+      lsp::Range::at(3, 17, 3, 19),
+    );
+
+    case(
+      "short='ab'",
+      "foo",
+      "Short option name for parameter `foo` contains multiple characters",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag='bar'",
+      "foo",
+      "`flag` attribute for argument `foo` takes no value",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "flag",
+      "foo",
+      "Argument attribute `flag` only valid with `long` or `short`",
+      lsp::Range::at(3, 12, 3, 16),
+    );
+
+    case(
+      "long, flag, value='bar'",
+      "foo",
+      "Argument `foo` may not have both `flag` and `value` attributes",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag, pattern='bar'",
+      "foo",
+      "Argument `foo` may not have both `flag` and `pattern` attributes",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag",
+      "foo='bar'",
+      "Flag parameter `foo` may not have a default",
+      lsp::Range::at(4, 4, 4, 13),
+    );
+
+    case(
+      "long, multiple='bar'",
+      "foo",
+      "Attribute key `multiple` takes no value",
+      lsp::Range::at(3, 18, 3, 26),
+    );
+
+    case(
+      "multiple",
+      "foo",
+      "Argument attribute `multiple` only valid with `long` or `short`",
+      lsp::Range::at(3, 12, 3, 20),
+    );
+
+    case(
+      "pattern='('",
+      "foo",
+      "Failed to parse argument pattern",
+      lsp::Range::at(3, 12, 3, 19),
+    );
+
+    case(
+      "pattern='(?x)#'",
+      "foo",
+      "Failed to parse argument pattern",
+      lsp::Range::at(3, 12, 3, 19),
+    );
+
+    case(
+      "min='01'",
+      "+foo",
+      "Invalid `min` value `01`",
+      lsp::Range::at(3, 16, 3, 20),
+    );
+
+    case(
+      "max='18446744073709551616'",
+      "+foo",
+      "Invalid `max` value `18446744073709551616`: number too large to fit in target type",
+      lsp::Range::at(3, 16, 3, 38),
+    );
+
+    case(
+      "min='1' + '2'",
+      "+foo",
+      "Attribute `arg` arguments must be string literals",
+      lsp::Range::at(3, 16, 3, 25),
+    );
+
+    case(
+      "min='2', max='1'",
+      "+foo",
+      "Argument attribute `min` `2` exceeds `max` `1`",
+      lsp::Range::at(3, 12, 3, 15),
+    );
+
+    case(
+      "min='1'",
+      "foo",
+      "Argument attribute `min` only valid with `multiple` or a variadic parameter",
+      lsp::Range::at(3, 12, 3, 15),
+    );
+  }
+
+  #[test]
+  fn arg_attribute_unknown_parameter() {
+    #[track_caller]
+    fn case(name: &str, end: u32) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        [arg({name}, help='bar')]
+        foo baz:
+          echo {{{{baz}}}}
+        "
+      })
+      .error(
+        "`[arg]` references unknown parameter `bar`",
+        lsp::Range::at(0, 5, 0, end),
+      )
+      .run();
+    }
+
+    case("'bar'", 10);
+    case("x'bar'", 11);
+  }
+
+  #[test]
+  fn arg_attribute_valid() {
+    #[track_caller]
+    fn case(name: &str) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        [arg({name}, help='bar')]
+        bar foo:
+          echo {{{{foo}}}}
+        "
+      })
+      .run();
+    }
+
+    case("'foo'");
+    case("'''foo'''");
+    case(r#""\u{66}oo""#);
+    case("x'foo'");
+  }
+
+  #[test]
+  fn arg_attribute_value_accepts_expression() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'foo'
+
+      [arg('bar', long='bar', value=foo / 'baz')]
+      bar bar:
+        echo {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_requires_long_or_short() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .error(
+      "Argument attribute `value` only valid with `long` or `short`",
+      lsp::Range::at(0, 13, 0, 18),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_value_with_long_ok() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('name', long='name', value='hi')]
+      foo name:
+        echo {{name}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [arg('foo', long, flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_long_option() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_multiple_options() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('foo', long=\"foo-opt\", short=\"f\", value=\"default\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_pattern() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('version', pattern=\"[0-9]+\\\\.[0-9]+\\\\.[0-9]+\")]
+      release version:
+        echo {{version}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_short_option() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('foo', short=\"f\")]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_min_max_kwargs_accepted() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [arg('FILES', min='2', max='4')]
+      backup +FILES:
+        scp {{FILES}} me@server.com:
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_multiple_kwarg_accepted() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [arg('foo', long, multiple)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+}

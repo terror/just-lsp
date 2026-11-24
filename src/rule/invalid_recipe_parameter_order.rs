@@ -40,3 +40,82 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn recipe_parameters_defaults_all() {
+    AnalyzerTest::new(indoc! {
+      "
+      recipe_with_defaults arg1=\"first\" arg2=\"second\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_order() {
+    AnalyzerTest::new(indoc! {
+      "
+      recipe_with_param_order arg1=\"default\" arg2:
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .error(
+      "Required parameter `arg2` follows a parameter with a default value",
+      lsp::Range::at(0, 39, 0, 43),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_order_options() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      AnalyzerTest::new(&format!(
+        "{attribute}\nfoo bar='bar' baz:\n  echo {{{{bar}}}} {{{{baz}}}}\n"
+      ))
+      .run();
+    }
+
+    case("[arg('bar', long)]");
+    case("[arg('baz', short='b')]");
+  }
+
+  #[test]
+  fn recipe_parameters_valid() {
+    AnalyzerTest::new(indoc! {
+      "
+      valid_recipe arg1 arg2=\"default\":
+        echo \"{{arg1}} {{arg2}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_parameters_variadic() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar='bar' +baz:
+        echo {{bar}} {{baz}}
+      "
+    })
+    .error(
+      "Required parameter `baz` follows a parameter with a default value",
+      lsp::Range::at(0, 14, 0, 18),
+    )
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar='bar' *baz:
+        echo {{bar}} {{baz}}
+      "
+    })
+    .run();
+  }
+}

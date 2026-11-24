@@ -123,3 +123,80 @@ impl IneffectiveParallelAttributeRule {
     ))
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn parallel_with_mapped_dependency() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [parallel]
+      foo *args: *(bar *args)
+        echo {{args}}
+
+      bar arg:
+        echo {{arg}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_in_each_group_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      [parallel]
+      foo: bar && baz
+
+      bar:
+
+      baz:
+      "
+    })
+    .warning(
+      "Recipe `foo` has only one dependency before and after `&&`, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      [parallel]
+      foo: bar
+        echo \"foo\"
+
+      bar:
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `foo` has only one dependency, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parallel_without_dependencies_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      [parallel]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "Recipe `foo` has no dependencies, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+}

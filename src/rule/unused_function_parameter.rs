@@ -37,3 +37,61 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn unused_function_parameter_ignores_imported_definitions() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo(bar) := 'baz'\n")
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_reports_multiple() {
+    AnalyzerTest::new("set unstable\n_foo(bar, baz, qux) := baz\n")
+      .warning(
+        "Function parameter `bar` appears unused",
+        lsp::Range::at(1, 5, 1, 8),
+      )
+      .warning(
+        "Function parameter `qux` appears unused",
+        lsp::Range::at(1, 15, 1, 18),
+      )
+      .run();
+  }
+
+  #[test]
+  fn unused_function_parameter_reports_unused() {
+    #[track_caller]
+    fn case(content: &str) {
+      AnalyzerTest::new(&format!("set unstable\n{content}\n"))
+        .warning(
+          "Function parameter `bar` appears unused",
+          lsp::Range::at(1, 5, 1, 8),
+        )
+        .run();
+    }
+
+    case("_foo(bar) := 'bar'");
+    case("_foo(bar) := bar_suffix\nbar_suffix := 'baz'");
+    case("_foo(bar) := bar()\nbar() := 'baz'");
+    case("_foo(bar) := 'baz'\n_baz(bar) := bar");
+  }
+
+  #[test]
+  fn unused_function_parameter_uses() {
+    #[track_caller]
+    fn case(content: &str) {
+      AnalyzerTest::new(&format!("set unstable\n{content}\n")).run();
+    }
+
+    case("_foo() := 'bar'");
+    case("_foo(bar) := bar");
+    case("_foo(bar) := f'{{bar}}'");
+    case("_foo(bar) := uppercase(bar)");
+    case("_foo(_bar, baz) := baz");
+  }
+}

@@ -119,3 +119,54 @@ impl DeprecatedSettingRule {
     ))
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn settings_windows_powershell_deprecated() {
+    AnalyzerTest::new("set windows-powershell\n")
+      .warning(
+        "`windows-powershell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        lsp::Range::at(0, 4, 0, 22),
+      )
+      .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_array_correct() {
+    AnalyzerTest::new(indoc! {
+      "
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+
+      foo:
+        echo \"foo\"
+      "
+    })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(0, 4, 0, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_windows_shell_replacement() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [windows]
+      set shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      set windows-shell := [\"powershell.exe\", \"-NoLogo\", \"-Command\"]
+      "
+    })
+    .warning(
+      "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+      lsp::Range::at(5, 4, 5, 17),
+    )
+    .run();
+  }
+}

@@ -115,3 +115,139 @@ impl InvalidSettingValueRule {
         })
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn analyzer_ignores_imported_invalid_setting_values() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "set indentation := 'foo'\n")
+      .run();
+  }
+
+  #[test]
+  fn settings_dry_run_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set dry-run := {value}\n");
+
+      let test = AnalyzerTest::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `dry-run` must be `all` or `recipes`",
+          lsp::Range::at(0, 15, 0, 15 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case("'all'", true);
+    case("'recipes'", true);
+    case("'foo'", false);
+    case("'all' + ''", false);
+  }
+
+  #[test]
+  fn settings_indentation_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set indentation := {value}\n");
+
+      let test = AnalyzerTest::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `indentation` must be a non-empty string literal containing only spaces or only tabs",
+          lsp::Range::at(0, 19, 0, 19 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""  ""#, true);
+    case(r#""\t\t""#, true);
+    case(r#""\u{20}\u{20}""#, true);
+    case(r#"" \t""#, false);
+    case(r#""\t ""#, false);
+    case(r#""\n""#, false);
+    case(r#""\u{2003}""#, false);
+    case("'  '", true);
+    case(r#""""#, false);
+    case(r#""foo""#, false);
+    case(r#"" " + " ""#, false);
+  }
+
+  #[test]
+  fn settings_interpreter_empty() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      let content = format!("set {setting} := []\n");
+
+      let start = 8 + u32::try_from(setting.len()).unwrap();
+
+      AnalyzerTest::new(&content)
+        .error(message, lsp::Range::at(0, start, 0, start + 2))
+        .run();
+    }
+
+    case(
+      "script-interpreter",
+      "Setting `script-interpreter` must be a non-empty array",
+    );
+    case("shell", "Setting `shell` must be a non-empty array");
+
+    AnalyzerTest::new("set windows-shell := []\n")
+      .warning(
+        "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        lsp::Range::at(0, 4, 0, 17),
+      )
+      .error(
+        "Setting `windows-shell` must be a non-empty array",
+        lsp::Range::at(0, 21, 0, 23),
+      )
+      .run();
+  }
+
+  #[test]
+  fn settings_minimum_version_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set minimum-version := {value}\n");
+
+      let test = AnalyzerTest::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `minimum-version` must be a valid `MAJOR.MINOR.PATCH` version",
+          lsp::Range::at(0, 23, 0, 23 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case(r#""0.0.0""#, true);
+    case(r#""1.55.0""#, true);
+    case(r#""999999999.0.0""#, true);
+    case("'1.2.3'", true);
+    case(r#""""#, false);
+    case(r#""01.2.3""#, false);
+    case(r#""1.2""#, false);
+    case(r#""1.2.3.4""#, false);
+    case(r#""1000000000.0.0""#, false);
+    case(r#""1.2.3-pre""#, false);
+    case(r#""1.2.3+build""#, false);
+    case(r#""1" + ".2.3""#, false);
+  }
+}

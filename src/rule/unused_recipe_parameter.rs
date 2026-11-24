@@ -172,7 +172,68 @@ impl UnusedRecipeParameterRule {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[test]
+  fn analyzer_imported_recipe_usage_does_not_hide_unused_parameters() {
+    AnalyzerTest::new(
+      "set allow-duplicate-recipes\nfoo bar:\nimport 'foo.just'\n",
+    )
+    .file("foo.just", "foo bar:\n  echo {{bar}}\n")
+    .warning("Parameter `bar` appears unused", lsp::Range::at(1, 4, 1, 7))
+    .run();
+  }
+
+  #[test]
+  fn analyzer_uses_imported_recipe_parameters() {
+    AnalyzerTest::new(indoc! {
+      "
+      import? 'foo.just'
+
+      bar: (use 'arg')
+      "
+    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        use arg:
+          echo {{arg}}
+        "
+      },
+    )
+    .run();
+  }
+
+  #[test]
+  fn duplicate_recipe_parameters_are_checked_at_their_declarations() {
+    AnalyzerTest::new(indoc! {
+      "
+      set allow-duplicate-recipes
+      [arg('bar')]
+      foo bar:
+      [arg('baz')]
+      foo baz:
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .warning("Parameter `baz` appears unused", lsp::Range::at(4, 4, 4, 7))
+    .run();
+  }
+
+  #[test]
+  fn exported_variadic_recipe_parameters_are_not_unused() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo +$args:
+        echo foo
+
+      bar *$args:
+        echo bar
+      "
+    })
+    .run();
+  }
 
   #[test]
   fn parse_positional_rejects_incomplete_braced() {
@@ -256,5 +317,205 @@ mod tests {
     case("  bar \"${@: -1}\"", &[], true);
     case("  bar \"${@: 2}\"", &[2, 3], false);
     case("  bar \"${@:2", &[], false);
+  }
+
+  #[test]
+  fn positional_arguments_attribute_marks_parameters_as_used() {
+    AnalyzerTest::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_attribute_scope_is_limited() {
+    AnalyzerTest::new(indoc! {
+      "
+      [positional-arguments]
+      graph log:
+        ./bin/graph $1
+
+      other data:
+        ./bin/graph $1
+      "
+    })
+    .warning(
+      "Parameter `data` appears unused",
+      lsp::Range::at(4, 6, 4, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_disabled_still_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .warning("Parameter `log` appears unused", lsp::Range::at(0, 6, 0, 9))
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_dollar_at_marks_all_as_used() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env bash
+        exec "$@"
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_ignore_attributes() {
+    AnalyzerTest::new(indoc! {
+      "
+      [positional-arguments]
+      [doc: '$@']
+      foo bar baz:
+        echo $2
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_ignore_parameter_defaults() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments
+      foo bar='$1' baz='qux':
+        echo $2
+      "
+    })
+    .warning(
+      "Parameter `bar` appears unused",
+      lsp::Range::at(1, 4, 1, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_only_mark_used_indices() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second:
+        ./bin/graph $2
+      "
+    })
+    .warning(
+      "Parameter `first` appears unused",
+      lsp::Range::at(2, 6, 2, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_handles_multiple_parameters() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_handles_multiple_parameters_unused() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph first second third fourth:
+        ./bin/graph $1 ${2} $3
+      "
+    })
+    .warning(
+      "Parameter `fourth` appears unused",
+      lsp::Range::at(2, 25, 2, 31),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_setting_marks_parameters_as_used() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments := true
+
+      graph log:
+        ./bin/graph $1
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_shebang_marks_all_as_used() {
+    AnalyzerTest::new(indoc! {
+      r"
+      [positional-arguments]
+      run *args:
+        #!/usr/bin/env -S deno run
+        console.log(Deno.args)
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn warn_for_unused_non_exported_recipe_parameters() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(0, 4, 0, 7))
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      foo $bar:
+        echo foo
+      "
+    })
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      set export := false
+
+      foo bar:
+        echo foo
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(2, 4, 2, 7))
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      set export
+
+      foo bar:
+        echo foo
+      "
+    })
+    .run();
   }
 }

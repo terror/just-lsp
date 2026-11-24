@@ -65,7 +65,10 @@ use {
 };
 
 #[cfg(test)]
-use {filesystem::MemoryFilesystem, test_module::TestModule};
+use {
+  analyzer_test::AnalyzerTest, filesystem::MemoryFilesystem,
+  test_module::TestModule,
+};
 
 pub use {
   alias::Alias,
@@ -115,6 +118,8 @@ pub use {
 
 mod alias;
 mod analyzer;
+#[cfg(test)]
+mod analyzer_test;
 mod attribute;
 mod attribute_argument;
 mod attribute_expression;

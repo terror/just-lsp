@@ -32,3 +32,49 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn import_invalid_string_escape() {
+    AnalyzerTest::new(r#"import "\u{D800}""#)
+      .error(
+        "unicode escape sequence value `D800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 8, 0, 16),
+      )
+      .run();
+  }
+
+  #[test]
+  fn invalid_unicode_escape() {
+    #[track_caller]
+    fn case(source: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(AnalyzerTest::new(source), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(r#"export foo := "\u{10FFFF}""#, &[]);
+
+    case(
+      r#"export foo := "\u{110000}""#,
+      &[(
+        "unicode escape sequence value `110000` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 25),
+      )],
+    );
+
+    case(
+      r#"export foo := "\u{d800}""#,
+      &[(
+        "unicode escape sequence value `d800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 23),
+      )],
+    );
+  }
+}

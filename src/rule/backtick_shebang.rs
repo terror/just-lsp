@@ -58,3 +58,58 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn backtick_shebangs_after_content_are_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := ` #!single`
+      bar := ```
+
+        #!indented
+      ```
+      baz := ```
+        echo foo
+        #!later
+      ```
+      qux := ```\u{a0}#!unicode-prefix```
+      quux := ```
+        #!unicode-indentation
+      \u{a0}
+      ```
+
+      recipe:
+        echo {{ foo }} {{ bar }} {{ baz }} {{ qux }} {{ quux }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn backticks_may_not_start_with_shebangs() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := `#!single`
+      bar := ```
+        #!indented
+      ```
+
+      recipe:
+        echo {{ foo }} {{ bar }}
+      "
+    })
+    .error(
+      "Backticks may not start with `#!`",
+      lsp::Range::at(0, 7, 0, 17),
+    )
+    .error(
+      "Backticks may not start with `#!`",
+      lsp::Range::at(1, 7, 3, 3),
+    )
+    .run();
+  }
+}

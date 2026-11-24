@@ -42,3 +42,52 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn attributes_invalid_inline() {
+    AnalyzerTest::new(indoc! {
+      "
+      [group: 'foo', foo]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown attribute `foo`. Did you mean `doc`?",
+      lsp::Range::at(0, 15, 0, 18),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_shell_recognized() {
+    AnalyzerTest::new(indoc! {
+      "
+      [shell]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_unknown() {
+    AnalyzerTest::new(indoc! {
+      "
+      [unknown_attribute]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Unknown attribute `unknown_attribute`",
+      lsp::Range::at(0, 1, 0, 18),
+    )
+    .run();
+  }
+}

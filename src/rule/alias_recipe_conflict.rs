@@ -118,3 +118,92 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn alias_recipe_conflict_alias_then_recipe() {
+    AnalyzerTest::new(indoc! {
+      "
+      alias t := other
+
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+      "
+    })
+    .error(
+      "Alias `t` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_recipe_then_alias() {
+    AnalyzerTest::new(indoc! {
+      "
+      other:
+        echo \"other\"
+
+      t:
+        echo \"recipe\"
+
+      alias t := other
+      "
+    })
+    .error(
+      "Recipe `t` is redefined as an alias",
+      lsp::Range::at(6, 6, 6, 7),
+    )
+    .run();
+  }
+
+  #[test]
+  fn alias_recipe_conflict_respects_os_attributes() {
+    AnalyzerTest::new("[windows]\nalias foo := bar\n[unix]\nfoo:\nbar:\n")
+      .run();
+
+    AnalyzerTest::new(
+      "[windows]\nalias foo := bar\n[unix]\nalias foo := bar\n[linux]\nfoo:\nbar:\n",
+    )
+    .error(
+      "Alias `foo` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 3),
+    )
+    .run();
+  }
+
+  #[test]
+  fn analyzer_ignores_imported_alias_recipe_conflicts() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo:\nalias foo := bar\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_alias_conflict_reports_local_recipe() {
+    AnalyzerTest::new("foo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nalias foo := bar\nbar:\n")
+      .error(
+        "Alias `foo` is redefined as a recipe",
+        lsp::Range::at(0, 0, 0, 3),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_recipe_conflict_reports_local_alias() {
+    AnalyzerTest::new("alias foo := bar\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nfoo:\nbar:\n")
+      .error(
+        "Recipe `foo` is redefined as an alias",
+        lsp::Range::at(0, 6, 0, 9),
+      )
+      .run();
+  }
+}
