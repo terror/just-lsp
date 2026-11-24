@@ -90,6 +90,12 @@ impl DocumentStore {
     )
   }
 
+  pub(crate) fn evict(&mut self, uri: &lsp::Url) {
+    if !self.is_open(uri) {
+      self.documents.remove(uri);
+    }
+  }
+
   pub(crate) fn filesystem(&self) -> &dyn Filesystem {
     &*self.filesystem
   }

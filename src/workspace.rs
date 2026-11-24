@@ -328,6 +328,46 @@ impl Workspace {
     self.documents.get_open(uri)
   }
 
+  /// # Errors
+  ///
+  /// Returns an [`Error`] if an affected project root cannot be loaded.
+  pub fn reload(&mut self, uris: &[lsp::Url]) -> Result<bool> {
+    let configs = uris.iter().any(|uri| {
+      uri
+        .file_path()
+        .is_ok_and(|path| path.ends_with("just-lsp.toml"))
+    });
+
+    let roots = uris
+      .iter()
+      .flat_map(|uri| self.affected_roots(uri))
+      .collect::<HashSet<_>>();
+
+    if !configs && roots.is_empty() {
+      return Ok(false);
+    }
+
+    if configs {
+      self.project_configs.clear();
+    }
+
+    for uri in uris {
+      self.documents.evict(uri);
+    }
+
+    let (roots, missing) = roots
+      .into_iter()
+      .partition::<HashSet<_>, _>(|root| self.documents.load(root).is_ok());
+
+    for root in missing {
+      self.projects.remove(&root);
+    }
+
+    self.load_projects(roots, false)?;
+
+    Ok(true)
+  }
+
   fn root_projects(&self) -> Vec<&Project> {
     let mut projects = self
       .projects
