@@ -49,8 +49,7 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
-    document: Document,
-    imported_documents: Vec<String>,
+    files: Vec<(&'static str, String)>,
     quickfixes: Vec<Quickfix>,
     range: lsp::Range,
   }
@@ -60,22 +59,15 @@ mod tests {
       Self { config, ..self }
     }
 
-    fn imported_document(self, content: &str) -> Self {
-      Self {
-        imported_documents: self
-          .imported_documents
-          .into_iter()
-          .chain([content.into()])
-          .collect(),
-        ..self
-      }
+    fn file(mut self, path: &'static str, content: &str) -> Self {
+      self.files.push((path, content.to_owned()));
+      self
     }
 
     fn new(content: &str) -> Self {
       Self {
         config: Config::default(),
-        document: Document::from(content),
-        imported_documents: Vec::new(),
+        files: vec![("justfile", content.to_owned())],
         quickfixes: Vec::new(),
         range: lsp::Range::at(0, 0, 0, 0),
       }
@@ -94,23 +86,39 @@ mod tests {
 
     #[track_caller]
     fn run(self) {
-      let imported_documents = self
-        .imported_documents
+      let directory = if cfg!(windows) {
+        PathBuf::from("C:\\")
+      } else {
+        PathBuf::from("/")
+      };
+
+      let uris = self
+        .files
         .iter()
-        .enumerate()
-        .map(|(index, text)| {
-          Document::new(
-            text,
-            lsp::Url::parse(&format!("file:///foo{index}.just")).unwrap(),
-          )
-          .unwrap()
+        .map(|(path, _)| {
+          lsp::Url::from_file_path(directory.join(path)).unwrap()
         })
         .collect::<Vec<_>>();
 
+      let mut workspace = Workspace::default();
+
+      for (uri, (_, text)) in uris.iter().zip(&self.files).rev() {
+        workspace
+          .open(lsp::DidOpenTextDocumentParams {
+            text_document: lsp::TextDocumentItem {
+              language_id: "just".into(),
+              text: text.clone(),
+              uri: uri.clone(),
+              version: 1,
+            },
+          })
+          .unwrap();
+      }
+
+      let root = &uris[0];
+
       let parameters = lsp::CodeActionParams {
-        text_document: lsp::TextDocumentIdentifier {
-          uri: self.document.uri.clone(),
-        },
+        text_document: lsp::TextDocumentIdentifier { uri: root.clone() },
         range: self.range,
         context: lsp::CodeActionContext::default(),
         work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -119,7 +127,7 @@ mod tests {
 
       let diagnostics = Analyzer {
         config: Some(&self.config),
-        view: ModuleView::with_imports(&self.document, &imported_documents),
+        view: workspace.view(root).unwrap(),
       }
       .analyze();
 
@@ -139,7 +147,7 @@ mod tests {
             diagnostics: None,
             edit: Some(lsp::WorkspaceEdit {
               changes: Some(HashMap::from([(
-                self.document.uri.clone(),
+                root.clone(),
                 quickfix.edits().to_vec(),
               )])),
               ..Default::default()
@@ -173,12 +181,15 @@ mod tests {
   #[test]
   fn ignores_imported_recipes() {
     Test::new("import 'dep.just'\n")
-      .imported_document(indoc! {
-        "
-        [parallel]
-        foo:
-        "
-      })
+      .file(
+        "dep.just",
+        indoc! {
+          "
+          [parallel]
+          foo:
+          "
+        },
+      )
       .run();
   }
 
@@ -321,7 +332,7 @@ mod tests {
       test target: (biuld target)
       "
     })
-    .imported_document("build target:\n")
+    .file("dep.just", "build target:\n")
     .range(lsp::Range::at(2, 14, 2, 14))
     .quickfix(Quickfix::edit(
       "Replace `biuld` with `build`",
@@ -523,8 +534,8 @@ mod tests {
 
   #[test]
   fn skips_windows_powershell_setting_when_imported_replacement_exists() {
-    Test::new("set windows-powershell := true\n")
-      .imported_document("set windows-shell := ['foo']\n")
+    Test::new("set windows-powershell := true\nimport 'foo.just'\n")
+      .file("foo.just", "set windows-shell := ['foo']\n")
       .range(lsp::Range::at(0, 4, 0, 4))
       .run();
   }

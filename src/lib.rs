@@ -63,10 +63,7 @@ use {
 };
 
 #[cfg(test)]
-use {
-  filesystem::MemoryFilesystem, test_module::TestModule,
-  test_project::TestProject,
-};
+use {filesystem::MemoryFilesystem, test_module::TestModule};
 
 pub use {
   alias::Alias,
@@ -189,8 +186,6 @@ mod symbol;
 mod symbol_table;
 #[cfg(test)]
 mod test_module;
-#[cfg(test)]
-mod test_project;
 mod text_node;
 mod tree_walker;
 mod unexport;

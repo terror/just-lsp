@@ -59,7 +59,7 @@ mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
 
   struct Test {
-    project: TestProject,
+    files: Vec<(&'static str, String)>,
     recipe_usage: Vec<(&'static str, Vec<&'static str>)>,
     unresolved: Vec<&'static str>,
     unused: Vec<&'static str>,
@@ -67,14 +67,14 @@ mod tests {
   }
 
   impl Test {
-    fn imported_document(mut self, content: &str) -> Self {
-      self.project.imported_document(content);
+    fn file(mut self, path: &'static str, content: &str) -> Self {
+      self.files.push((path, content.to_owned()));
       self
     }
 
     fn new(content: &str) -> Self {
       Self {
-        project: TestProject::new(Document::from(content)),
+        files: vec![("justfile", content.to_owned())],
         recipe_usage: Vec::new(),
         unresolved: Vec::new(),
         unused: Vec::new(),
@@ -93,7 +93,15 @@ mod tests {
 
     #[track_caller]
     fn run(self) {
-      let view = self.project.view();
+      let module = TestModule::new(
+        &self
+          .files
+          .iter()
+          .map(|(path, content)| (*path, content.as_str()))
+          .collect::<Vec<_>>(),
+      );
+
+      let view = module.view();
 
       let references = References::analyze(&RuleContext::new(&view));
 
@@ -272,13 +280,17 @@ mod tests {
     Test::new(indoc! {
       "
       lib_var := 'x'
+      import 'foo.just'
       "
     })
-    .imported_document(indoc! {
-      "
-      helper := lib_var
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        helper := lib_var
+        "
+      },
+    )
     .used(&["lib_var"])
     .unused(&["helper"])
     .run();
@@ -291,13 +303,17 @@ mod tests {
       set unstable
 
       lib_var := 'x'
+      import 'foo.just'
       "
     })
-    .imported_document(indoc! {
-      "
-      join(ext) := lib_var + ext
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        join(ext) := lib_var + ext
+        "
+      },
+    )
     .used(&["lib_var"])
     .run();
   }
@@ -313,12 +329,15 @@ mod tests {
       foo: use
       "
     })
-    .imported_document(indoc! {
-      "
-      use:
-        echo {{lib_var}}
-      "
-    })
+    .file(
+      "lib.just",
+      indoc! {
+        "
+        use:
+          echo {{lib_var}}
+        "
+      },
+    )
     .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
@@ -329,14 +348,18 @@ mod tests {
     Test::new(indoc! {
       "
       lib_var := 'x'
+      import 'foo.just'
       "
     })
-    .imported_document(indoc! {
-      "
-      use arg=lib_var:
-        echo {{arg}}
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        use arg=lib_var:
+          echo {{arg}}
+        "
+      },
+    )
     .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
@@ -351,12 +374,15 @@ mod tests {
       foo: use
       "
     })
-    .imported_document(indoc! {
-      "
-      use arg:
-        echo {{arg}}
-      "
-    })
+    .file(
+      "lib.just",
+      indoc! {
+        "
+        use arg:
+          echo {{arg}}
+        "
+      },
+    )
     .recipe_usage("use", &[])
     .run();
   }
@@ -505,8 +531,8 @@ mod tests {
         .unused(&["baz"])
         .run();
 
-      Test::new("bar := 'foo'\n")
-        .imported_document(&content)
+      Test::new("bar := 'foo'\nimport 'foo.just'\n")
+        .file("foo.just", &content)
         .recipe_usage("foo", &[])
         .used(&["bar"])
         .unused(&["baz"])
@@ -596,13 +622,16 @@ mod tests {
         echo {{param}}
       "
     })
-    .imported_document(indoc! {
-      "
-      param := 'x'
+    .file(
+      "lib.just",
+      indoc! {
+        "
+        param := 'x'
 
-      helper := param
-      "
-    })
+        helper := param
+        "
+      },
+    )
     .used(&["param"])
     .unused(&["helper"])
     .run();
@@ -649,14 +678,18 @@ mod tests {
       "
       foo:
         echo {{missing}}
+      import 'foo.just'
       "
     })
-    .imported_document(indoc! {
-      "
-      use:
-        echo {{absent}}
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        use:
+          echo {{absent}}
+        "
+      },
+    )
     .unresolved(&["missing"])
     .run();
   }
