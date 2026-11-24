@@ -202,7 +202,7 @@ impl Bindings {
     self.bind(
       document,
       &name_node,
-      Binding::Recipe(vec![name.clone()]),
+      Binding::Recipe(Namepath::from_node(&name_node, document)),
       false,
     );
 
@@ -295,7 +295,7 @@ impl Bindings {
 
     let binding = match parent.kind() {
       "alias" | "dependency" | "dependency_expression" | "recipe_header" => {
-        Some(Binding::Recipe(vec![name]))
+        Some(Binding::Recipe(Namepath::from_node(&identifier, document)))
       }
       "assignment" => Some(Binding::Variable(name)),
       "attribute" => Self::builtin(
@@ -318,14 +318,8 @@ impl Bindings {
       "module_path" => {
         let segments = parent.find_all("^identifier");
 
-        (segments.last() == Some(&identifier)).then(|| {
-          Binding::Recipe(
-            segments
-              .iter()
-              .map(|segment| document.get_node_text(segment))
-              .collect(),
-          )
-        })
+        (segments.last() == Some(&identifier))
+          .then(|| Binding::Recipe(Namepath::from_node(&parent, document)))
       }
       "setting" => Self::builtin(
         |builtin| matches!(builtin, Builtin::Setting { name: setting, .. } if *setting == name),

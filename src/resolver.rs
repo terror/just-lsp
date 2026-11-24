@@ -33,7 +33,7 @@ impl<'a> Resolver<'a> {
   ) -> bool {
     let same_name = match (candidate, target) {
       (Binding::Recipe(candidate), Binding::Recipe(target)) => {
-        candidate.last() == target.last()
+        candidate.name().value == target.name().value
       }
       (Binding::Function(candidate), Binding::Function(target))
       | (Binding::Variable(candidate), Binding::Variable(target)) => {
@@ -232,14 +232,7 @@ impl<'a> Resolver<'a> {
         .find(|parameter| parameter.name == *name)
         .map(Symbol::Parameter),
       Binding::Recipe(path) => {
-        let (name, modules) = path.split_last()?;
-
-        self
-          .view
-          .descend(modules)?
-          .find_recipe(name)
-          .cloned()
-          .map(Symbol::Recipe)
+        self.view.resolve_recipe(path).map(Symbol::Recipe)
       }
       Binding::Unresolved { .. } => None,
       Binding::Variable(name) => {

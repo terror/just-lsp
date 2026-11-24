@@ -6,7 +6,7 @@ pub(crate) enum Binding {
   Function(String),
   FunctionParameter { function: lsp::Range, name: String },
   Parameter { name: String, recipe: lsp::Range },
-  Recipe(Vec<String>),
+  Recipe(Namepath),
   Unresolved { suggestion: Option<String> },
   Variable(String),
 }
