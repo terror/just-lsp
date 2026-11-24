@@ -111,11 +111,6 @@ impl Workspace {
     Ok(true)
   }
 
-  #[must_use]
-  pub fn config(&self) -> &Config {
-    &self.config
-  }
-
   fn contexts<'a>(
     projects: &[&'a Project],
     uri: &lsp::Url,
