@@ -13,6 +13,7 @@ pub(crate) struct RecipeLine<'a> {
   pub indent: &'a str,
   pub kind: IndentKind,
   pub number: u32,
+  pub text: &'a str,
 }
 
 impl<'a> RecipeLine<'a> {
@@ -28,8 +29,9 @@ impl<'a> RecipeLine<'a> {
       return None;
     }
 
-    let indent =
-      &content[..content.len() - content.trim_start_matches([' ', '\t']).len()];
+    let text = content.trim_start_matches([' ', '\t']);
+
+    let indent = &content[..content.len() - text.len()];
 
     let kind = match (indent.contains(' '), indent.contains('\t')) {
       (true, true) => IndentKind::Mixed,
@@ -43,6 +45,7 @@ impl<'a> RecipeLine<'a> {
       indent,
       kind,
       number: line.range.start.line,
+      text,
     })
   }
 
