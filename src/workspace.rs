@@ -151,10 +151,9 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn diagnostics(&self) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
-    let projects = self.root_projects();
-
-    projects
+  pub fn diagnostic_documents(&self) -> Vec<lsp::Url> {
+    self
+      .root_projects()
       .iter()
       .filter(|project| {
         self
@@ -167,8 +166,21 @@ impl Workspace {
       .map(|document| &document.document)
       .collect::<BTreeSet<_>>()
       .into_iter()
-      .filter_map(|uri| self.documents.get(uri))
-      .map(|document| (document.uri.clone(), self.analyze(document, &projects)))
+      .filter(|uri| self.documents.get(uri).is_some())
+      .cloned()
+      .collect()
+  }
+
+  #[must_use]
+  pub fn diagnostics(&self) -> BTreeMap<lsp::Url, Vec<Diagnostic>> {
+    self
+      .diagnostic_documents()
+      .into_iter()
+      .map(|uri| {
+        let diagnostics = self.document_diagnostics(&uri);
+
+        (uri, diagnostics)
+      })
       .collect()
   }
 

@@ -6,6 +6,7 @@ use {
   command::Command,
   executor::Executor,
   just_lsp::*,
+  publisher::Publisher,
   quickfixer::Quickfixer,
   ropey::Rope,
   serde_json::Value,
@@ -20,10 +21,10 @@ use {
     path::{Path, PathBuf},
     process::{self, Stdio},
     sync::{
-      LazyLock,
-      atomic::{AtomicBool, Ordering},
+      Arc, LazyLock,
+      atomic::{AtomicBool, AtomicU64, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
   },
   subcommand::Subcommand,
   tokenizer::Tokenizer,
@@ -31,7 +32,8 @@ use {
     io::{AsyncBufReadExt, BufReader},
     process::Command as AsyncCommand,
     select,
-    sync::{Mutex, RwLock},
+    sync::{Mutex, RwLock, RwLockReadGuard},
+    time::sleep,
   },
   tower_lsp::{Client, LanguageServer, LspService, jsonrpc, lsp_types as lsp},
   tracing::{Level, info, warn},
@@ -43,6 +45,7 @@ use {
 mod arguments;
 mod command;
 mod executor;
+mod publisher;
 mod quickfixer;
 mod server;
 mod subcommand;

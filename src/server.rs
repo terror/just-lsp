@@ -2,10 +2,10 @@ use super::*;
 
 pub(crate) struct Server {
   client: Client,
-  diagnostics: Mutex<BTreeMap<lsp::Url, lsp::PublishDiagnosticsParams>>,
   executor: Executor,
   initialized: AtomicBool,
-  workspace: RwLock<Workspace>,
+  publisher: Publisher,
+  workspace: Arc<RwLock<Workspace>>,
 }
 
 impl Server {
@@ -69,79 +69,29 @@ impl Server {
     }
   }
 
-  pub(crate) fn new(client: Client) -> Self {
-    let executor = Executor::new(client.clone());
+  pub(crate) fn new(client: Client, delay: Duration) -> Self {
+    let workspace = Arc::new(RwLock::new(Workspace::default()));
 
     Self {
-      client,
-      diagnostics: Mutex::new(BTreeMap::new()),
-      executor,
+      executor: Executor::new(client.clone()),
       initialized: AtomicBool::new(false),
-      workspace: RwLock::new(Workspace::default()),
+      publisher: Publisher::new(client.clone(), delay, workspace.clone()),
+      client,
+      workspace,
     }
   }
 
-  async fn publish_diagnostics(&self) {
-    if !self.initialized.load(Ordering::Relaxed) {
-      return;
+  async fn publish_diagnostics(&self, generation: u64) {
+    if self.initialized.load(Ordering::Relaxed) {
+      self.publisher.publish(generation).await;
     }
-
-    let mut previous = self.diagnostics.lock().await;
-
-    let diagnostics = {
-      let workspace = self.workspace.read().await;
-
-      workspace
-        .diagnostics()
-        .into_iter()
-        .map(|(uri, diagnostics)| {
-          let version = workspace
-            .open_document(&uri)
-            .map(|document| document.version);
-
-          let params = lsp::PublishDiagnosticsParams {
-            uri: uri.clone(),
-            diagnostics: diagnostics
-              .into_iter()
-              .map(lsp::Diagnostic::from)
-              .collect(),
-            version,
-          };
-
-          (uri, params)
-        })
-        .collect::<BTreeMap<_, _>>()
-    };
-
-    for uri in previous.keys() {
-      if !diagnostics.contains_key(uri) {
-        self
-          .client
-          .publish_diagnostics(uri.clone(), Vec::new(), None)
-          .await;
-      }
-    }
-
-    for (uri, params) in &diagnostics {
-      if previous.get(uri) != Some(params) {
-        self
-          .client
-          .publish_diagnostics(
-            uri.clone(),
-            params.diagnostics.clone(),
-            params.version,
-          )
-          .await;
-      }
-    }
-
-    *previous = diagnostics;
   }
 
   pub(crate) async fn run() -> Result {
     let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
-    let (service, socket) = LspService::new(Server::new);
+    let (service, socket) =
+      LspService::new(|client| Server::new(client, Publisher::DELAY));
 
     tower_lsp::Server::new(stdin, stdout, socket)
       .serve(service)
@@ -150,14 +100,21 @@ impl Server {
     Ok(())
   }
 
+  async fn schedule_diagnostics(&self, generation: u64) {
+    if self.initialized.load(Ordering::Relaxed) {
+      self.publisher.schedule(generation).await;
+    }
+  }
+
   async fn try_did_change(
     &self,
     params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
-    let result = self.workspace.write().await.change(params);
+    let (result, generation) =
+      self.update(|workspace| workspace.change(params)).await;
 
     if !matches!(result, Ok(false)) {
-      self.publish_diagnostics().await;
+      self.schedule_diagnostics(generation).await;
     }
 
     result?;
@@ -169,13 +126,25 @@ impl Server {
     &self,
     params: lsp::DidOpenTextDocumentParams,
   ) -> Result {
-    let result = self.workspace.write().await.open(params);
+    let (result, generation) =
+      self.update(|workspace| workspace.open(params)).await;
 
-    self.publish_diagnostics().await;
+    self.publish_diagnostics(generation).await;
 
     result?;
 
     Ok(())
+  }
+
+  async fn update<T>(
+    &self,
+    update: impl FnOnce(&mut Workspace) -> T,
+  ) -> (T, u64) {
+    let mut workspace = self.workspace.write().await;
+
+    let value = update(&mut workspace);
+
+    (value, self.publisher.invalidate())
   }
 }
 
@@ -230,8 +199,10 @@ impl LanguageServer for Server {
     }
 
     if requested(&lsp::CodeActionKind::QUICKFIX) {
-      let diagnostics = workspace
-        .document_diagnostics(uri)
+      let diagnostics = self
+        .publisher
+        .document_diagnostics(&workspace, uri)
+        .await
         .into_iter()
         .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
         .collect::<Vec<_>>();
@@ -385,13 +356,14 @@ impl LanguageServer for Server {
   }
 
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
-    let result = self.workspace.write().await.close(&params);
+    let (result, generation) =
+      self.update(|workspace| workspace.close(&params)).await;
 
     if matches!(result, Ok(false)) {
       return;
     }
 
-    self.publish_diagnostics().await;
+    self.publish_diagnostics(generation).await;
 
     if let Err(error) = result {
       let error = Error::from(error);
@@ -902,6 +874,7 @@ mod tests {
     expected: Option<jsonrpc::Response>,
     notifications: Vec<jsonrpc::Request>,
     request: jsonrpc::Request,
+    wait: Duration,
   }
 
   impl Test {
@@ -1072,14 +1045,7 @@ mod tests {
     }
 
     fn new() -> Self {
-      let (service, socket) = LspService::new(Server::new);
-
-      Self {
-        messages: Vec::new(),
-        service: Spawn::new(service),
-        socket,
-        tempdir: tempfile::tempdir().unwrap(),
-      }
+      Self::with_delay(Duration::ZERO)
     }
 
     fn notification<N: notification::Notification>(
@@ -1090,6 +1056,7 @@ mod tests {
         expected: None,
         notifications: Vec::new(),
         request: Self::message(N::METHOD, params).finish(),
+        wait: Duration::ZERO,
       });
 
       self
@@ -1162,6 +1129,7 @@ mod tests {
         )),
         notifications: Vec::new(),
         request: Self::message(R::METHOD, params).id(id).finish(),
+        wait: Duration::ZERO,
       });
 
       self
@@ -1172,6 +1140,7 @@ mod tests {
         expected,
         notifications,
         request,
+        wait,
       } in self.messages
       {
         let method = request.method().to_owned();
@@ -1189,6 +1158,18 @@ mod tests {
             response = &mut response => break response,
           }
         };
+
+        let wait = sleep(wait);
+
+        tokio::pin!(wait);
+
+        loop {
+          select! {
+            biased;
+            Some(notification) = self.socket.next() => actual.push(notification),
+            () = &mut wait => break,
+          }
+        }
 
         loop {
           select! {
@@ -1210,6 +1191,24 @@ mod tests {
       path.parse().unwrap_or_else(|_| {
         lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
       })
+    }
+
+    fn wait(mut self, duration: Duration) -> Self {
+      self.messages.last_mut().unwrap().wait = duration;
+
+      self
+    }
+
+    fn with_delay(delay: Duration) -> Self {
+      let (service, socket) =
+        LspService::new(|client| Server::new(client, delay));
+
+      Self {
+        messages: Vec::new(),
+        service: Spawn::new(service),
+        socket,
+        tempdir: tempfile::tempdir().unwrap(),
+      }
     }
   }
 
@@ -1756,6 +1755,20 @@ mod tests {
       .open("foo.just", "foo:")
       .diagnostics("foo.just", Some(1), [])
       .diagnostics("justfile", Some(1), [])
+      .run()
+      .await
+  }
+
+  #[tokio::test(start_paused = true)]
+  async fn diagnostics_are_debounced() -> Result {
+    Test::with_delay(Publisher::DELAY)
+      .ready()
+      .open("justfile", "foo:")
+      .diagnostics("justfile", Some(1), [])
+      .change("justfile", 2, "bar:")
+      .change("justfile", 3, "baz:")
+      .wait(Publisher::DELAY * 2)
+      .diagnostics("justfile", Some(3), [])
       .run()
       .await
   }
@@ -3899,7 +3912,8 @@ mod tests {
 
   #[tokio::test]
   async fn initialize_configures_workspace() -> Result {
-    let (service, _) = LspService::new(Server::new);
+    let (service, _) =
+      LspService::new(|client| Server::new(client, Duration::ZERO));
 
     let server = service.inner();
 
@@ -3963,7 +3977,8 @@ mod tests {
       },
     )?;
 
-    let (service, _) = LspService::new(Server::new);
+    let (service, _) =
+      LspService::new(|client| Server::new(client, Duration::ZERO));
 
     let server = service.inner();
 
