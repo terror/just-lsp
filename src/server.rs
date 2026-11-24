@@ -2819,10 +2819,22 @@ mod tests {
     Test::new()
       .ready()
       .open("justfile", "mod foo")
-      .diagnostics("justfile", Some(1), [])
+      .diagnostics(
+        "justfile",
+        Some(1),
+        [Diagnostic {
+          id: "missing-module-file".into(),
+          ..Diagnostic::error(
+            "Could not find source file for module `foo`",
+            lsp::Range::at(0, 4, 0, 7),
+          )
+        }
+        .into()],
+      )
       .write_file("foo.just", "")
       .watched_file("foo.just", lsp::FileChangeType::CREATED)
       .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
       .run()
       .await
   }
