@@ -54,3 +54,51 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn guard_infallible_conflict() {
+    AnalyzerTest::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?-bar
+        -@?bar \\
+        ?-baz
+        --?bar
+      "
+    })
+    .error(
+      "the guard `?` and infallible `-` sigils may not be used together",
+      lsp::Range::at(3, 2, 3, 4),
+    )
+    .error(
+      "the guard `?` and infallible `-` sigils may not be used together",
+      lsp::Range::at(4, 2, 4, 5),
+    )
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        ?-bar
+      "
+    })
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      set guards
+
+      foo:
+        #!/bin/sh
+        ?-bar
+      "
+    })
+    .run();
+  }
+}

@@ -30,3 +30,64 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn continue_attribute_accepts_multiple_arguments() {
+    AnalyzerTest::new(indoc! {
+      "
+      [continue(\"SIGHUP\", \"SIGINT\", \"SIGQUIT\")]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_accepts_one_argument() {
+    AnalyzerTest::new(indoc! {
+      "
+      [continue(\"SIGINT\")]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_accepts_zero_arguments() {
+    AnalyzerTest::new(indoc! {
+      "
+      [continue]
+      foo:
+        echo foo
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn continue_attribute_rejects_unknown_signals() {
+    AnalyzerTest::new(indoc! {
+      "
+      [continue(\"SIGTERM\", \"sigint\")]
+      foo:
+        echo foo
+      "
+    })
+    .error(
+      "Invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 10, 0, 19),
+    )
+    .error(
+      "Invalid signal `sigint`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`",
+      lsp::Range::at(0, 21, 0, 29),
+    )
+    .run();
+  }
+}

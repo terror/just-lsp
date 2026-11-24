@@ -122,3 +122,352 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_imported_duplicate_default_reports_local_attribute() {
+    AnalyzerTest::new("[default]\nfoo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\n[default]\nbar:\n")
+      .error(
+        "Recipe `foo` has duplicate `[default]` attribute, which may only appear once per module",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_between_recipes() {
+    AnalyzerTest::new(indoc! {
+      "
+      [default]
+      check:
+        echo \"check\"
+
+      [default]
+      ci:
+        echo \"ci\"
+      "
+    })
+    .error(
+      "Recipe `ci` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(4, 0, 5, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_default_on_same_recipe() {
+    AnalyzerTest::new(indoc! {
+      "
+      [default]
+      [default]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe `build` has duplicate `[default]` attribute, which may only appear once per module", lsp::Range::at(1, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_attribute() {
+    #[track_caller]
+    fn case(first: &str, second: &str) {
+      AnalyzerTest::new(&format!(
+        "[group({first})]\n[group({second})]\nfoo:\n"
+      ))
+      .error(
+        "Recipe attribute `group` with value `foo` is duplicated",
+        lsp::Range::at(1, 0, 2, 0),
+      )
+      .run();
+    }
+
+    case("'foo'", "\"foo\"");
+    case("'foo'", r#""\u{66}oo""#);
+    case("'foo'", "'''  foo'''");
+    case("x'foo'", "x\"foo\"");
+  }
+
+  #[test]
+  fn attributes_duplicate_group_inline() {
+    AnalyzerTest::new(indoc! {
+      "
+      [group: 'foo', no-cd, group('foo')]
+      bar:
+      "
+    })
+    .error(
+      "Recipe attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_module() {
+    AnalyzerTest::new(indoc! {
+      "
+      [group('foo')]
+      [group: 'foo']
+      mod bar
+      "
+    })
+    .file("bar.just", "")
+    .error(
+      "Module attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_group_without_argument() {
+    AnalyzerTest::new(indoc! {
+      "
+      [group('foo')]
+      [group, group('foo')]
+      bar:
+      "
+    })
+    .error(
+      "Attribute `group` got 0 arguments but takes 1 argument",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .error(
+      "Recipe attribute `group` with value `foo` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_non_repeatable_outside_recipes() {
+    #[track_caller]
+    fn case(content: &'static str, message: &'static str) {
+      AnalyzerTest::new(content)
+        .file("foo.just", "")
+        .error(message, lsp::Range::at(1, 0, 2, 0))
+        .run();
+    }
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        alias f := foo
+
+        foo:
+        "
+      },
+      "Alias attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [private]
+        [private]
+        foo := 'bar'
+
+        bar:
+          echo {{foo}}
+        "
+      },
+      "Assignment attribute `private` is duplicated",
+    );
+
+    case(
+      indoc! {
+        "
+        [doc('foo')]
+        [doc('bar')]
+        mod foo
+        "
+      },
+      "Module attribute `doc` is duplicated",
+    );
+  }
+
+  #[test]
+  fn attributes_duplicate_recipe_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [script]
+      [script]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `script` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_shell_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [shell]
+      [shell]
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `shell` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_duplicate_working_directory_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [working-directory: 'foo']
+      [working-directory: 'bar']
+      build:
+        echo \"build\"
+      "
+    })
+    .error(
+      "Recipe attribute `working-directory` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn attributes_multiple_group_attributes_allowed() {
+    #[track_caller]
+    fn case(first: &str, second: &str) {
+      AnalyzerTest::new(&format!(
+        "[group({first})]\n[group({second})]\nfoo:\n"
+      ))
+      .run();
+    }
+
+    case("'foo'", "'bar'");
+    case("'$FOO'", "x'$FOO'");
+    case(r"'\t'", r#""\t""#);
+  }
+
+  #[test]
+  fn attributes_multiple_metadata_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      [metadata('foo', 'bar')]
+      [metadata('baz', 'qux')]
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_platform_specific_defaults() {
+    AnalyzerTest::new(indoc! {
+      "
+      [unix]
+      [default]
+      foo:
+        echo \"foo\"
+
+      [windows]
+      [default]
+      bar:
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn attributes_same_group_on_multiple_targets_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      [group('foo')]
+      foo:
+
+      [group('foo')]
+      bar:
+
+      [group('foo')]
+      mod baz
+      "
+    })
+    .file("baz.just", "")
+    .run();
+  }
+
+  #[test]
+  fn duplicate_dragonfly_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [dragonfly]
+      [dragonfly]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe attribute `dragonfly` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn duplicate_freebsd_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [freebsd]
+      [freebsd]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe attribute `freebsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn duplicate_netbsd_attribute() {
+    AnalyzerTest::new(indoc! {
+      "
+      [netbsd]
+      [netbsd]
+      build:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe attribute `netbsd` is duplicated",
+      lsp::Range::at(1, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn env_attribute_duplicate_var_name_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      [env('FOO', 'bar')]
+      [env('FOO', 'baz')]
+      foo:
+        echo \"$FOO\"
+      "
+    })
+    .run();
+  }
+}

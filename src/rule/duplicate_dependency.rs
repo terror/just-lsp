@@ -65,3 +65,111 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_dependencies() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo: bar bar\n")
+      .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_subsequents_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 16, 3, 19))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo foo
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 9, 3, 12))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_duplicate_with_arguments_warns() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `a`)
+        echo \"bar\"
+      "
+    })
+    .warning(
+      "Recipe `bar` lists dependency `foo` with the same arguments more than once; just only runs it once, so it's redundant",
+    lsp::Range::at(3, 15, 3, 24))
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_mapped_and_unmapped_not_duplicate() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo arg:
+        echo {{arg}}
+
+      bar *args: (foo args) *(foo *args)
+        echo {{args}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_prior_and_subsequent_not_duplicate() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+
+      bar: foo && foo
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_with_different_arguments_no_warning() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo arg1:
+        echo \"{{arg1}}\"
+
+      bar: (foo `a`) (foo `b`)
+        echo \"bar\"
+      "
+    })
+    .run();
+  }
+}

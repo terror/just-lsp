@@ -26,3 +26,27 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_recipe_parameters() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo bar bar:\n")
+      .run();
+  }
+
+  #[test]
+  fn recipe_parameters_duplicate() {
+    AnalyzerTest::new(indoc! {
+      "
+      recipe_with_duplicate_param arg1 arg1:
+        echo \"{{arg1}}\"
+      "
+    })
+    .error("Duplicate parameter `arg1`", lsp::Range::at(0, 33, 0, 37))
+    .run();
+  }
+}

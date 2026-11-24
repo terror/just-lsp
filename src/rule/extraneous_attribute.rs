@@ -48,3 +48,35 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn extraneous_attributes() {
+    AnalyzerTest::new(indoc! {
+      "
+      [private]
+
+      [no-cd]
+
+      foo:
+      "
+    })
+    .error("extraneous attribute", lsp::Range::at(0, 0, 1, 0))
+    .error("extraneous attribute", lsp::Range::at(2, 0, 3, 0))
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      [private]
+      [no-cd]
+      # foo
+      foo:
+      "
+    })
+    .error("extraneous attributes", lsp::Range::at(0, 0, 2, 0))
+    .run();
+  }
+}

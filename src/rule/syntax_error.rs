@@ -224,7 +224,43 @@ impl SyntaxErrorRule {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
+
+  #[test]
+  fn attribute_arguments_malformed() {
+    #[track_caller]
+    fn case(attribute: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        {attribute}
+        foo bar:
+          echo {{{{bar}}}}
+        "
+      })
+      .error(message, range)
+      .run();
+    }
+
+    case(
+      "[doc(,)]",
+      "Missing identifier in value",
+      lsp::Range::at(0, 5, 0, 5),
+    );
+    case(
+      "[arg('bar', short,,)]",
+      "Missing identifier in attribute named param",
+      lsp::Range::at(0, 18, 0, 18),
+    );
+    case(
+      "[private(),]",
+      "Syntax error near `,`",
+      lsp::Range::at(0, 10, 0, 11),
+    );
+  }
 
   #[test]
   fn describe_kind_formats_identifier_like_kinds() {
@@ -237,6 +273,341 @@ mod tests {
   #[test]
   fn describe_kind_handles_newline_kind() {
     assert_eq!(SyntaxErrorRule::describe_kind("\n"), "newline");
+  }
+
+  #[test]
+  fn escaped_braces_are_treated_as_literal_text() {
+    AnalyzerTest::new(indoc! {
+      "
+      test:
+        echo \"{{{{hello}}\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn missing_newline_between_items() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'bar' baz := 'bob'
+      "
+    })
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .error(
+      "Missing newline in assignment",
+      lsp::Range::at(0, 12, 0, 12),
+    )
+    .warning(
+      "Variable `baz` appears unused",
+      lsp::Range::at(0, 13, 0, 16),
+    )
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      [private] foo:
+      "
+    })
+    .error("Missing newline in attribute", lsp::Range::at(0, 9, 0, 9))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Syntax error near `foo echo \"foo\"`",
+      lsp::Range::at(0, 0, 2, 0),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_attribute_on_wrapped_assignment() {
+    AnalyzerTest::new(indoc! {
+      "
+      export [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `export`", lsp::Range::at(0, 0, 0, 6))
+    .run();
+
+    AnalyzerTest::new(indoc! {
+      "
+      eager [private]
+      foo := 'bar'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `eager`", lsp::Range::at(0, 0, 0, 5))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_chained_comparison() {
+    AnalyzerTest::new(indoc! {
+      "
+      set lists
+      set unstable
+
+      foo:
+        echo {{ if 'a' == 'b' != 'c' { 'd' } else { 'e' } }}
+      "
+    })
+    .error(
+      "Expected `&&`, `||`, `+`, `++`, or `/`, but found `!=`",
+      lsp::Range::at(4, 24, 4, 26),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_double_braces_in_recipe() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      foo:
+        echo "{{.Foo}}"
+      "#
+    })
+    .error("Syntax error near `{{`", lsp::Range::at(1, 8, 1, 10))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_if_expression_operand() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ if 'a' == 'b' { 'c' } else { 'd' } + 'e' }}
+        echo {{ 'a' + if 'a' == 'b' { 'c' } else { 'd' } / 'e' }}
+      "
+    })
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `+`",
+      lsp::Range::at(1, 45, 1, 46),
+    )
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `/`",
+      lsp::Range::at(2, 51, 2, 52),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_numeric_literal() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar=1:
+        echo {{bar}}
+      "
+    })
+    .error("Unknown start of token `1`", lsp::Range::at(0, 8, 0, 9))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_bare_carriage_returns() {
+    AnalyzerTest::new("foo := 'bar\rbaz' + qux\r\nbar := '🧪\rqux' + foo\n")
+      .error("Variable `qux` not found", lsp::Range::at(1, 7, 1, 10))
+      .warning("Variable `bar` appears unused", lsp::Range::at(2, 0, 2, 3))
+      .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_double_braces_in_backticks() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      foo := `echo "{{.Foo}}"`
+
+      bar baz=`echo "{{.Baz}}"` qux=```echo "{{.Qux}}"```:
+        echo {{ foo }} {{ baz }} {{ qux }}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_escaped_braces_in_format_strings() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      name := "world"
+      foo := f'{{{{'
+      bar := f"{{{{ {{name}}"
+      baz := f'''{{{{'''
+      qux := f"""{{{{ {{name}}"""
+
+      recipe:
+        echo {{ foo }} {{ bar }} {{ baz }} {{ qux }}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_guard_prefixes() {
+    AnalyzerTest::new(indoc! {
+      "
+      set guards
+
+      foo:
+        ?guard
+        @?quiet_guard
+        ?@guard_quiet
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_list_expressions() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo := ['foo'] ++ ['bar']
+      bar := 'foo' == 'foo'
+      baz := 'foo' =~ '^f'
+
+      qux:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_multiline_recipe_interpolations() {
+    #[track_caller]
+    fn case(expression: &str) {
+      for prefix in ["bar ", "{{'bar'}}", "{{{{ "] {
+        AnalyzerTest::new(&format!(
+          "foo:\n  {prefix}{{{{{expression}}}}} qux\n  quux\n"
+        ))
+        .run();
+      }
+    }
+
+    case("'\nbaz\n'");
+    case("\"\nbaz\n\"");
+    case("`\nbaz\n`");
+  }
+
+  #[test]
+  fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      foo bar="baz" qux="quux":
+        #!/usr/bin/env bash
+        cat <<'JSON'
+        {
+          "foo": "bar",
+          "{{ bar }}": "{{ qux }}"
+        }
+        JSON
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_shebang_interpolation() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar:
+        #!/usr/bin/env {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_shebang_operands() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        #!cmd /c
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_shell_expanded_strings() {
+    AnalyzerTest::new(indoc! {
+      r#"
+      import? x'~/.config/just/common.just'
+
+      greeting := x"~/$USER/${GREETING:-hello}"
+
+      foo:
+        echo {{greeting}}
+      "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_slash_prefixed_operands() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'bar' + / 'baz'
+
+      bar:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_repeated_subsequent_marker() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo: && bar && baz && qux
+
+      bar:
+
+      baz:
+
+      qux:
+      "
+    })
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 12, 0, 14),
+    )
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 19, 0, 21),
+    )
+    .run();
   }
 
   #[test]

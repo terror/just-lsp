@@ -63,3 +63,266 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+  };
+
+  #[test]
+  fn function_calls_correct() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ arch() }}
+        echo {{ join('a', 'b') }}
+        echo {{ shell('echo foo') }}
+        echo {{ shell('echo $@', 'foo', 'bar', 'baz') }}
+        echo {{ join(\"a\", \"b\", \"c\") }}
+        echo {{ uppercase(\"foo\",) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_accepts_optional_separator() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_join_list_rejects_extra_arguments() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo:
+        echo {{ join_list(['foo', 'bar'], ',', ';') }}
+      "
+    })
+    .error(
+      "Function `join_list` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(4, 10, 4, 45),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_len() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo:
+        echo {{ len(['foo', 'bar']) }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_nested() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ replace(parent_directory('~/.config/nvim/init.lua'), '.', 'dot-') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split() {
+    #[track_caller]
+    fn case(expression: &str) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        foo := {expression}
+
+        bar:
+          echo {{{{ foo }}}}
+        "
+      })
+      .run();
+    }
+
+    case("split(\"foo bar\")");
+    case("split(\"foo,bar\", \",\")");
+  }
+
+  #[test]
+  fn function_calls_split_rejects_missing_argument() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo := split()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(3, 7, 3, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_split_too_many_args() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo := split(\"foo,bar\", \",\", \"bar\")
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "Function `split` accepts at most 2 arguments, but 3 provided",
+      lsp::Range::at(3, 7, 3, 35),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_style_accepts_optional_text() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ style('error') }}
+        echo {{ style('warning', 'careful') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_few_args() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ replace() }}
+      "
+    })
+    .error(
+      "Function `replace` requires at least 3 arguments, but 0 provided",
+      lsp::Range::at(1, 10, 1, 19),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_few_variadic_arguments() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ join() }}
+        echo {{ join('a') }}
+        echo {{ shell() }}
+      "
+    })
+    .error(
+      "Function `join` requires at least 2 arguments, but 0 provided",
+      lsp::Range::at(1, 10, 1, 16),
+    )
+    .error(
+      "Function `join` requires at least 2 arguments, but 1 provided",
+      lsp::Range::at(2, 10, 2, 19),
+    )
+    .error(
+      "Function `shell` requires at least 1 argument, but 0 provided",
+      lsp::Range::at(3, 10, 3, 17),
+    )
+    .run();
+  }
+
+  #[test]
+  fn function_calls_too_many_args() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ uppercase(\"hello\", \"extra\") }}
+      "
+    })
+    .error(
+      "Function `uppercase` accepts 1 argument, but 2 provided",
+      lsp::Range::at(1, 10, 1, 37),
+    )
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_no_params() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      foo() := \"bar\"
+
+      baz:
+        echo {{ foo() }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_too_few_args() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      foo(a, b) := a + b
+
+      bar:
+        echo {{ foo(\"a\") }}
+      "
+    })
+    .error(
+      "Function `foo` accepts 2 arguments, but 1 provided",
+      lsp::Range::at(5, 10, 5, 18),
+    )
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_wrong_arity() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"a\", \"b\") }}
+      "
+    })
+    .error(
+      "Function `foo` accepts 1 argument, but 2 provided",
+      lsp::Range::at(5, 10, 5, 23),
+    )
+    .run();
+  }
+}

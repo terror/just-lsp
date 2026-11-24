@@ -191,3 +191,436 @@ impl ListFeatureGateRule {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+  };
+
+  #[test]
+  fn accepts_logical_operators_with_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo := '' || 'bar'
+      bar := 'foo' && 'bar'
+
+      baz:
+        echo {{ foo }}
+        echo {{ bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn accepts_unary_negation_with_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn arg_attribute_with_flag_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      [arg('foo', long, flag)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error(
+      "`flag` arguments require `set lists`",
+      lsp::Range::at(0, 18, 0, 22),
+    )
+    .run();
+  }
+
+  #[test]
+  fn arg_keywords_require_lists() {
+    #[track_caller]
+    fn case(arguments: &str, parameter: &str, message: &'static str, end: u32) {
+      let content = formatdoc! {
+        "
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      };
+
+      let range = lsp::Range::at(0, 12, 0, end);
+
+      AnalyzerTest::new(&content).error(message, range).run();
+
+      AnalyzerTest::new(&format!(
+        "{content}\nset unstable\nset lists := false\n"
+      ))
+      .error(message, range)
+      .run();
+
+      AnalyzerTest::new(&format!("{content}import 'foo.just'\n"))
+        .file("foo.just", "set lists := false\n")
+        .error(message, range)
+        .run();
+
+      AnalyzerTest::new(&format!("{content}import 'foo.just'\n"))
+        .file("foo.just", "set unstable\nset lists\n")
+        .run();
+    }
+
+    case("max='2'", "+foo", "`[arg(max)]` requires `set lists`", 15);
+    case("min='1'", "+foo", "`[arg(min)]` requires `set lists`", 15);
+    case(
+      "multiple, long",
+      "foo",
+      "`[arg(multiple)]` requires `set lists`",
+      20,
+    );
+  }
+
+  #[test]
+  fn assert_accepts_condition_operators() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo name:
+        {{ assert(name == \"bar\") }}
+        {{ assert(name == \"bar\", \"msg\") }}
+        {{ assert(name != \"bar\", \"msg\") }}
+        {{ assert(name =~ \"^[a-z]+$\", \"msg\") }}
+        {{ assert(name !~ \"^[a-z]+$\", \"msg\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_allow_shadowed_functions_without_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      bool(value) := value
+      join_list(value) := value
+      len(value) := value
+      num_jobs() := 'qux'
+      show(value) := value
+      split(value) := value
+      which(value) := value
+
+      foo := bool('foo')
+      bar := join_list('bar')
+      baz := len('baz')
+      qux := num_jobs()
+      quux := show('quux')
+      corge := split('corge')
+      grault := which('grault')
+
+      recipe:
+        echo {{ foo }}
+        echo {{ bar }}
+        echo {{ baz }}
+        echo {{ qux }}
+        echo {{ quux }}
+        echo {{ corge }}
+        echo {{ grault }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_bool_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := bool('true')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `bool()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_comparison_as_value_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'a' == 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "comparison operators require `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_if_without_else_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := if 'a' == 'b' { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` without `else` requires `set lists`",
+      lsp::Range::at(0, 7, 0, 9),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_join_list_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := join_list('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `join_list()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 16),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_len_function_accepts_scalar_without_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := len('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_list_concatenation_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'a' ++ 'b'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list concatenation operator `++` requires `set lists`",
+      lsp::Range::at(0, 11, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_list_literals_require_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := ['bar']
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "list literals require `set lists`",
+      lsp::Range::at(0, 7, 0, 14),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_logical_and_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'foo' && 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 13, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_logical_or_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := '' || 'bar'
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "logical operators require `set lists`",
+      lsp::Range::at(0, 10, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_negation_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo bar:
+        echo {{ !bar }}
+      "
+    })
+    .error(
+      "negation operator requires `set lists`",
+      lsp::Range::at(1, 10, 1, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_non_comparison_assert_condition_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar') }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(1, 17, 1, 22),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_non_comparison_if_condition_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := if 'a' { 'b' } else { 'c' }
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "`if` and `assert` conditions other than comparisons require `set lists`",
+      lsp::Range::at(0, 10, 0, 13),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_num_jobs_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := num_jobs()
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `num_jobs()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 15),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_show_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := show('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `show()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_split_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := split('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `split()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn list_feature_gate_which_function_requires_lists() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := which('bar')
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .error(
+      "the `which()` function requires `set lists`",
+      lsp::Range::at(0, 7, 0, 12),
+    )
+    .run();
+  }
+
+  #[test]
+  fn settings_dotenv_lists_require_lists() {
+    #[track_caller]
+    fn case(setting: &str, range: lsp::Range) {
+      AnalyzerTest::new(&formatdoc! {
+        r#"
+        set {setting} := ["foo", "bar"]
+
+        foo:
+          echo "foo"
+        "#
+      })
+      .error("list literals require `set lists`", range)
+      .run();
+    }
+
+    case("dotenv-filename", lsp::Range::at(0, 23, 0, 37));
+    case("dotenv-path", lsp::Range::at(0, 19, 0, 33));
+    case("dotenv-command", lsp::Range::at(0, 22, 0, 36));
+  }
+}

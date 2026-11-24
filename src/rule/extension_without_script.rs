@@ -33,3 +33,57 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_extension_without_script() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "[extension: 'foo']\nfoo:\n")
+      .run();
+  }
+
+  #[test]
+  fn extension_with_script_is_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      [script]
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_with_shebang_is_allowed() {
+    AnalyzerTest::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        #!/usr/bin/env bash
+        echo \"foo\"
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn extension_without_script_or_shebang() {
+    AnalyzerTest::new(indoc! {
+      "
+      [extension: '.sh']
+      foo:
+        echo \"foo\"
+      "
+    })
+    .error(
+      "Recipe `foo` uses `[extension]` without `[script]` or a shebang",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+}

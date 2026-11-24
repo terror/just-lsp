@@ -50,3 +50,87 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn dir_aliases_recognized() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ home_dir() }}
+        echo {{ cache_dir() }}
+        echo {{ config_dir() }}
+        echo {{ config_local_dir() }}
+        echo {{ data_dir() }}
+        echo {{ data_local_dir() }}
+        echo {{ executable_dir() }}
+        echo {{ invocation_dir() }}
+        echo {{ invocation_dir_native() }}
+        echo {{ justfile_dir() }}
+        echo {{ source_dir() }}
+        echo {{ parent_dir('~/.config') }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_recipe_name_recognized() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ recipe_name() }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn function_calls_unknown() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ unknown_function() }}
+      "
+    })
+    .error(
+      "Unknown function `unknown_function`",
+      lsp::Range::at(1, 10, 1, 26),
+    )
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_not_flagged_as_unknown() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      foo(x) := x + \"!\"
+
+      bar:
+        echo {{ foo(\"baz\") }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn user_defined_function_shadows_builtin() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      env_var() := 'ok'
+      x := env_var()
+
+      foo:
+        echo {{x}}
+      "
+    })
+    .run();
+  }
+}

@@ -49,3 +49,65 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_export_unexport_conflicts() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "export foo := 'bar'\nunexport foo\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_unexport_conflict_reports_local_variable() {
+    AnalyzerTest::new("export foo := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nunexport foo\n")
+      .error(
+        "Variable foo is both exported and unexported",
+        lsp::Range::at(0, 7, 0, 10),
+      )
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_variable_conflict_reports_local_unexport() {
+    AnalyzerTest::new("unexport foo\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nexport foo := 'bar'\n")
+      .error(
+        "Variable foo is both exported and unexported",
+        lsp::Range::at(0, 9, 0, 12),
+      )
+      .run();
+  }
+
+  #[test]
+  fn export_unexport_conflict_is_rejected() {
+    AnalyzerTest::new(indoc! {
+      "
+      unexport FOO
+      export FOO := \"bar\"
+      "
+    })
+    .error(
+      "Variable FOO is both exported and unexported",
+      lsp::Range::at(1, 7, 1, 10),
+    )
+    .run();
+  }
+
+  #[test]
+  fn export_unexport_do_not_conflict_across_platforms() {
+    AnalyzerTest::new(indoc! {
+      "
+      [linux]
+      unexport FOO
+      [windows]
+      export FOO := \"bar\"
+      "
+    })
+    .run();
+  }
+}

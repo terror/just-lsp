@@ -30,3 +30,71 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_duplicate_variables() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo := 'bar'\nfoo := 'baz'\n")
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_variable_reports_local_declaration() {
+    AnalyzerTest::new("export foo := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nexport foo := 'baz'\n")
+      .error("Duplicate variable `foo`", lsp::Range::at(0, 7, 1, 0))
+      .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
+    .error("Duplicate variable `foo`", lsp::Range::at(1, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_allowed_via_setting() {
+    AnalyzerTest::new(indoc! {
+      "
+      set allow-duplicate-variables := true
+
+      foo := \"one\"
+      foo := \"two\"
+
+      recipe:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn duplicate_variable_assignments_platform_specific() {
+    AnalyzerTest::new(indoc! {
+      "
+      [unix]
+      foo := \"foo\"
+
+      [windows]
+      foo := \"bar\"
+
+      bar:
+        echo {{ foo }}
+      "
+    })
+    .run();
+  }
+}

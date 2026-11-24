@@ -26,3 +26,31 @@ define_rule! {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use {super::*, indoc::indoc};
+
+  #[test]
+  fn analyzer_ignores_imported_function_parameters() {
+    AnalyzerTest::new("import 'foo.just'\n")
+      .file("foo.just", "foo(bar, bar) := bar\n")
+      .run();
+  }
+
+  #[test]
+  fn user_defined_function_duplicate_parameters() {
+    AnalyzerTest::new(indoc! {
+      "
+      set unstable
+
+      foo(bar, bar) := bar
+
+      bar:
+        echo {{foo('bar', 'baz')}}
+      "
+    })
+    .error("Duplicate parameter `bar`", lsp::Range::at(2, 9, 2, 12))
+    .run();
+  }
+}
