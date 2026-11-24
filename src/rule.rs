@@ -114,6 +114,8 @@ pub(crate) trait Rule: Sync {
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
 
+  /// Whether diagnostics are only kept when every context analyzing the
+  /// document reports them.
   fn unanimous(&self) -> bool {
     false
   }
