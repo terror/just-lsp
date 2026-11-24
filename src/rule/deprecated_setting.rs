@@ -37,7 +37,7 @@ define_rule! {
               SettingKind::Boolean(true) => diagnostic.quickfix(
                 Self::attribute_quickfix(
                   context,
-                  &setting,
+                  setting,
                   attribute,
                   replacement,
                   lsp::TextEdit {
@@ -60,7 +60,7 @@ define_rule! {
             } => diagnostic.quickfix(
               Self::attribute_quickfix(
                 context,
-                &setting,
+                setting,
                 attribute,
                 replacement,
                 lsp::TextEdit {
