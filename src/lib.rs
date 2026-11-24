@@ -6,6 +6,7 @@ use {
   count::Count,
   document_entry::DocumentEntry,
   document_store::DocumentStore,
+  filesystem::Filesystem,
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
   graph::Graph,
   group::Group,
@@ -15,6 +16,7 @@ use {
   module::Module,
   module_context::ModuleContext,
   module_lookup::ModuleLookup,
+  os_filesystem::OsFilesystem,
   path_ext::PathExt,
   point_ext::PointExt,
   project::Project,
@@ -57,7 +59,10 @@ use {
 };
 
 #[cfg(test)]
-use test_project::TestProject;
+use {
+  memory_filesystem::MemoryFilesystem, test_module::TestModule,
+  test_project::TestProject,
+};
 
 pub use {
   alias::Alias,
@@ -132,6 +137,7 @@ mod document;
 mod document_entry;
 mod document_store;
 mod error;
+mod filesystem;
 mod function;
 mod function_call;
 mod function_parameter;
@@ -142,6 +148,8 @@ mod group_set;
 mod import;
 mod import_scope;
 mod located;
+#[cfg(test)]
+mod memory_filesystem;
 mod module;
 mod module_context;
 mod module_declaration;
@@ -149,6 +157,7 @@ mod module_lookup;
 mod module_view;
 mod namepath;
 mod node_ext;
+mod os_filesystem;
 mod parameter;
 mod path_ext;
 mod point_ext;
@@ -175,6 +184,8 @@ mod string_kind;
 mod string_literal;
 mod symbol;
 mod symbol_table;
+#[cfg(test)]
+mod test_module;
 #[cfg(test)]
 mod test_project;
 mod text_node;

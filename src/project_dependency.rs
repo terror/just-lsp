@@ -30,7 +30,11 @@ impl ProjectDependency {
     }
   }
 
-  pub(crate) fn module(source: &lsp::Url, module: &ModuleDeclaration) -> Self {
+  pub(crate) fn module(
+    source: &lsp::Url,
+    module: &ModuleDeclaration,
+    filesystem: &dyn Filesystem,
+  ) -> Self {
     Self {
       kind: ProjectDependencyKind::Module {
         name: module.name.value.clone(),
@@ -41,8 +45,8 @@ impl ProjectDependency {
         .map_or(module.name.range, |path| path.range),
       optional: module.optional,
       target: module
-        .resolve(source)
-        .filter(|path| path.is_file())
+        .resolve(source, filesystem)
+        .filter(|path| filesystem.is_file(path))
         .map_or_else(
           || {
             ProjectDependencyTarget::Candidates(

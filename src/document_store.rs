@@ -1,8 +1,9 @@
 use super::*;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct DocumentStore {
   documents: HashMap<lsp::Url, DocumentEntry>,
+  filesystem: Arc<dyn Filesystem>,
 }
 
 impl DocumentStore {
@@ -39,7 +40,7 @@ impl DocumentStore {
       return false;
     }
 
-    match Self::read(uri) {
+    match Self::read(&*self.filesystem, uri) {
       Ok(document) => {
         self
           .documents
@@ -82,13 +83,15 @@ impl DocumentStore {
       imports
         .iter()
         .cloned()
-        .chain(
-          modules
-            .iter()
-            .map(|module| ProjectDependency::module(uri, module)),
-        )
+        .chain(modules.iter().map(|module| {
+          ProjectDependency::module(uri, module, &*self.filesystem)
+        }))
         .collect(),
     )
+  }
+
+  pub(crate) fn filesystem(&self) -> &dyn Filesystem {
+    &*self.filesystem
   }
 
   #[must_use]
@@ -119,9 +122,19 @@ impl DocumentStore {
       Entry::Occupied(entry) => Ok(&entry.into_mut().document),
       Entry::Vacant(entry) => Ok(
         &entry
-          .insert(DocumentEntry::new(Self::read(uri)?, false))
+          .insert(DocumentEntry::new(
+            Self::read(&*self.filesystem, uri)?,
+            false,
+          ))
           .document,
       ),
+    }
+  }
+
+  pub(crate) fn new(filesystem: Arc<dyn Filesystem>) -> Self {
+    Self {
+      documents: HashMap::new(),
+      filesystem,
     }
   }
 
@@ -141,10 +154,10 @@ impl DocumentStore {
     Ok(())
   }
 
-  fn read(uri: &lsp::Url) -> Result<Document> {
+  fn read(filesystem: &dyn Filesystem, uri: &lsp::Url) -> Result<Document> {
     let path = uri.file_path()?;
 
-    Document::new(&fs::read_to_string(path)?, uri.clone())
+    Document::new(&filesystem.read_to_string(&path)?, uri.clone())
   }
 
   pub(super) fn retain_closed(
@@ -154,6 +167,12 @@ impl DocumentStore {
     self
       .documents
       .retain(|uri, entry| entry.open || retain(uri));
+  }
+}
+
+impl Default for DocumentStore {
+  fn default() -> Self {
+    Self::new(Arc::new(OsFilesystem))
   }
 }
 
@@ -357,6 +376,7 @@ mod tests {
         entry("bar", false),
         entry("baz", true),
       ]),
+      ..DocumentStore::default()
     };
 
     store.retain_closed(|uri| uri.as_str() == "file:///foo");
