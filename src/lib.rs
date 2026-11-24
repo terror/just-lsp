@@ -61,7 +61,6 @@ use {
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree},
   tree_walker::TreeWalker,
-  url_ext::UrlExt,
 };
 
 #[cfg(test)]
@@ -113,6 +112,7 @@ pub use {
   symbol::Symbol,
   text_node::TextNode,
   unexport::Unexport,
+  url_ext::UrlExt,
   variable::Variable,
   workspace::Workspace,
 };
