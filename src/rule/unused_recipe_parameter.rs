@@ -32,10 +32,11 @@ define_rule! {
           recipe.parameters.iter().enumerate().filter_map(move |(index, parameter)| {
             let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
-            let is_unused = !used_parameters.contains(&Binding::Parameter {
-              name: parameter.name.clone(),
-              recipe: recipe.range,
-            })
+            let used = recipe.parameters.iter().any(|candidate| {
+              candidate.name == parameter.name && used_parameters.contains(candidate)
+            });
+
+            let is_unused = !used
               && !parameter.export
               && !exported
               && !used_via_position;

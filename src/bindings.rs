@@ -115,8 +115,6 @@ impl Bindings {
     globals: &[String],
     function_node: Node,
   ) {
-    let function = document.get_range(&function_node);
-
     let mut locals = Vec::new();
 
     for parameter_node in function_node
@@ -124,16 +122,16 @@ impl Bindings {
       .iter()
       .flat_map(|parameters| parameters.find_all("^identifier"))
     {
-      let name = document.get_node_text(&parameter_node);
-
-      let binding = Binding::FunctionParameter {
-        function,
-        name: name.clone(),
+      let parameter = TextNode {
+        range: document.get_range(&parameter_node),
+        value: document.get_node_text(&parameter_node),
       };
+
+      let binding = Binding::FunctionParameter(parameter.clone());
 
       self.bind(document, &parameter_node, binding.clone(), false);
 
-      locals.push((name, binding));
+      locals.push((parameter.value, binding));
     }
 
     if let Some(body_node) = function_node.child_by_field_name("body") {
@@ -220,20 +218,16 @@ impl Bindings {
       false,
     );
 
-    let recipe = document.get_range(&recipe_node);
-
     let mut locals = Vec::new();
 
     if let Some(parameters_node) =
       recipe_node.find("recipe_header > parameters")
     {
-      for parameter_node in
-        parameters_node.find_all("^parameter, ^variadic_parameter")
-      {
-        let parameter_node = if parameter_node.kind() == "variadic_parameter" {
-          parameter_node.find("parameter")
+      for node in parameters_node.find_all("^parameter, ^variadic_parameter") {
+        let parameter_node = if node.kind() == "variadic_parameter" {
+          node.find("parameter")
         } else {
-          Some(parameter_node)
+          Some(node)
         };
 
         let Some(parameter_node) = parameter_node else {
@@ -248,19 +242,16 @@ impl Bindings {
           }
         }
 
-        if let Some(parameter_name_node) =
-          parameter_node.child_by_field_name("name")
+        if let Some(name_node) = parameter_node.child_by_field_name("name")
+          && let Some(parameter) = Parameter::from_node(&node, document)
         {
-          let parameter = document.get_node_text(&parameter_name_node);
+          let name = parameter.name.clone();
 
-          let binding = Binding::Parameter {
-            name: parameter.clone(),
-            recipe,
-          };
+          let binding = Binding::Parameter(parameter);
 
-          self.bind(document, &parameter_name_node, binding.clone(), false);
+          self.bind(document, &name_node, binding.clone(), false);
 
-          locals.push((parameter, binding));
+          locals.push((name, binding));
         }
       }
     }
