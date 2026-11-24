@@ -12,17 +12,43 @@ define_rule! {
         .filter_map(|recipe| {
           let attribute = recipe.find_attribute("parallel")?;
 
-          let diagnostic = match recipe.dependencies.len() {
-            0 => Diagnostic::warning(
+          if recipe
+            .dependencies
+            .iter()
+            .any(|dependency| dependency.mapped.is_some())
+          {
+            return None;
+          }
+
+          let count = |phase| {
+            recipe
+              .dependencies
+              .iter()
+              .filter(|dependency| dependency.phase == phase)
+              .count()
+          };
+
+          let diagnostic = match (
+            count(DependencyPhase::Prior),
+            count(DependencyPhase::Subsequent),
+          ) {
+            (0, 0) => Diagnostic::warning(
               format!(
                 "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
                 recipe.name.value
               ),
               attribute.range,
             ),
-            1 => Diagnostic::warning(
+            (1, 0) | (0, 1) => Diagnostic::warning(
               format!(
                 "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
+                recipe.name.value
+              ),
+              attribute.range,
+            ),
+            (1, 1) => Diagnostic::warning(
+              format!(
+                "Recipe `{}` has only one dependency before and after `&&`, so `[parallel]` has no effect",
                 recipe.name.value
               ),
               attribute.range,
