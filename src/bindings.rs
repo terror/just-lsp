@@ -38,6 +38,45 @@ impl Bindings {
     BUILTINS.iter().position(matches).map(Binding::Builtin)
   }
 
+  fn comment_lines<'a>(
+    view: &ModuleView,
+    document: &Document,
+    recipe_node: &'a Node,
+  ) -> Vec<Node<'a>> {
+    if !view.setting_enabled("ignore-comments") {
+      return Vec::new();
+    }
+
+    let range = document.get_range(recipe_node);
+
+    let script = view
+      .recipes()
+      .iter()
+      .find(|recipe| recipe.uri == document.uri && recipe.range == range)
+      .is_none_or(|recipe| {
+        recipe.runs_as_script(view.setting_enabled("default-script"))
+      });
+
+    if script {
+      return Vec::new();
+    }
+
+    recipe_node
+      .find_all("recipe_body > recipe_line")
+      .into_iter()
+      .scan(false, |continued, line| {
+        let text = document.get_node_text(&line);
+
+        let comment = !*continued && text.starts_with('#');
+
+        *continued = !comment && text.ends_with('\\');
+
+        Some(comment.then_some(line))
+      })
+      .flatten()
+      .collect()
+  }
+
   fn expression(
     &mut self,
     view: &ModuleView,
@@ -258,8 +297,14 @@ impl Bindings {
       }
     }
 
+    let comments = Self::comment_lines(view, document, &recipe_node);
+
     for identifier in document.get_expression_identifiers(&recipe_node) {
-      if identifier.has_any_parent(&["parameter", "variadic_parameter"]) {
+      if identifier.has_any_parent(&["parameter", "variadic_parameter"])
+        || comments.iter().any(|comment| {
+          comment.byte_range().contains(&identifier.start_byte())
+        })
+      {
         continue;
       }
 

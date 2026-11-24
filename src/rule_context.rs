@@ -254,10 +254,7 @@ impl<'a> RuleContext<'a> {
   }
 
   pub(crate) fn setting_enabled(&self, name: &str) -> bool {
-    self.settings().iter().any(|setting| {
-      setting.name.value == name
-        && matches!(setting.kind, SettingKind::Boolean(true))
-    })
+    self.view.setting_enabled(name)
   }
 
   pub(crate) fn settings(&self) -> &[Located<Setting>] {
