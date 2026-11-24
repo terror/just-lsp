@@ -211,7 +211,7 @@ impl<'a> Resolver<'a> {
     let document = self.view.document();
 
     match binding {
-      Binding::Builtin(index) => Some(Symbol::Builtin(&BUILTINS[*index])),
+      Binding::Builtin(builtin) => Some(Symbol::Builtin(builtin)),
       Binding::Function(name) => {
         self.view.find_function(name).cloned().map(Symbol::Function)
       }

@@ -11,7 +11,7 @@ define_rule! {
         let attribute_name = &attribute.name.value;
 
         let Some(Builtin::Attribute { signature, .. }) =
-          context.builtin_attribute(attribute_name)
+          Builtin::attribute(attribute_name)
         else {
           continue;
         };

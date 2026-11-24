@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Builtin<'a> {
   Attribute {
     name: &'a str,
@@ -27,7 +27,73 @@ pub enum Builtin<'a> {
   },
 }
 
-impl Builtin<'_> {
+impl Builtin<'static> {
+  #[must_use]
+  pub fn attribute(name: &str) -> Option<&'static Self> {
+    static INDEX: LazyLock<HashMap<&str, &Builtin>> =
+      LazyLock::new(|| Builtin::index(Builtin::attributes()));
+
+    INDEX.get(name).copied()
+  }
+
+  pub fn attributes() -> impl Iterator<Item = &'static Self> {
+    BUILTINS
+      .iter()
+      .filter(|builtin| matches!(builtin, Self::Attribute { .. }))
+  }
+
+  #[must_use]
+  pub fn constant(name: &str) -> Option<&'static Self> {
+    static INDEX: LazyLock<HashMap<&str, &Builtin>> =
+      LazyLock::new(|| Builtin::index(Builtin::constants()));
+
+    INDEX.get(name).copied()
+  }
+
+  pub fn constants() -> impl Iterator<Item = &'static Self> {
+    BUILTINS
+      .iter()
+      .filter(|builtin| matches!(builtin, Self::Constant { .. }))
+  }
+
+  #[must_use]
+  pub fn function(name: &str) -> Option<&'static Self> {
+    static INDEX: LazyLock<HashMap<&str, &Builtin>> =
+      LazyLock::new(|| Builtin::index(Builtin::functions()));
+
+    INDEX.get(name).copied()
+  }
+
+  pub fn functions() -> impl Iterator<Item = &'static Self> {
+    BUILTINS
+      .iter()
+      .filter(|builtin| matches!(builtin, Self::Function { .. }))
+  }
+
+  fn index(
+    builtins: impl Iterator<Item = &'static Self>,
+  ) -> HashMap<&'static str, &'static Self> {
+    builtins
+      .flat_map(|builtin| builtin.names().map(move |name| (name, builtin)))
+      .collect()
+  }
+
+  #[must_use]
+  pub fn setting(name: &str) -> Option<&'static Self> {
+    static INDEX: LazyLock<HashMap<&str, &Builtin>> =
+      LazyLock::new(|| Builtin::index(Builtin::settings()));
+
+    INDEX.get(name).copied()
+  }
+
+  pub fn settings() -> impl Iterator<Item = &'static Self> {
+    BUILTINS
+      .iter()
+      .filter(|builtin| matches!(builtin, Self::Setting { .. }))
+  }
+}
+
+impl<'a> Builtin<'a> {
   #[must_use]
   pub fn completion_items(&self) -> Vec<lsp::CompletionItem> {
     match self {
@@ -118,6 +184,28 @@ impl Builtin<'_> {
       tags: deprecated.then(|| vec![lsp::CompletionItemTag::DEPRECATED]),
       ..Default::default()
     }
+  }
+
+  #[must_use]
+  pub fn name(&self) -> &'a str {
+    match self {
+      Self::Attribute { name, .. }
+      | Self::Constant { name, .. }
+      | Self::Function { name, .. }
+      | Self::Setting { name, .. } => name,
+    }
+  }
+
+  pub fn names<'b>(&self) -> impl Iterator<Item = &'b str>
+  where
+    'a: 'b,
+  {
+    let aliases = match self {
+      Self::Function { aliases, .. } => aliases,
+      _ => [].as_slice(),
+    };
+
+    once(self.name()).chain(aliases.iter().copied())
   }
 }
 

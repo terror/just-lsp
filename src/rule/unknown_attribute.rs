@@ -12,12 +12,9 @@ define_rule! {
       for attribute in context.attributes() {
         let attribute_name = &attribute.name.value;
 
-        if context.builtin_attribute(attribute_name).is_none() {
+        if Builtin::attribute(attribute_name).is_none() {
           let suggestion = attribute_name.find_suggestion(
-            BUILTINS.iter().filter_map(|builtin| match builtin {
-              Builtin::Attribute { name, .. } => Some(*name),
-              _ => None,
-            }),
+            Builtin::attributes().map(Builtin::name),
           );
 
           let message = match &suggestion {
