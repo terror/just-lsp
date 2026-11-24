@@ -16,6 +16,11 @@ pub(crate) struct RecipeLine<'a> {
 }
 
 impl<'a> RecipeLine<'a> {
+  pub(crate) fn mixed_prefix(&self, len: usize) -> bool {
+    let prefix = &self.indent[..self.indent.len().min(len)];
+    prefix.contains(' ') && prefix.contains('\t')
+  }
+
   pub(crate) fn parse(line: &'a TextNode) -> Option<Self> {
     let content = line.value.as_str();
 
