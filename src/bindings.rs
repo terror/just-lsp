@@ -4,7 +4,6 @@ use super::*;
 pub(crate) struct Bindings {
   identifiers: Vec<BoundIdentifier>,
   index: HashMap<(usize, usize), usize>,
-  pub(crate) recipe_identifiers: HashMap<String, HashSet<String>>,
 }
 
 impl Bindings {
@@ -79,7 +78,6 @@ impl Bindings {
     document: &Document,
     globals: &[String],
     identifier: Node,
-    recipe: Option<&str>,
     locals: &[(String, Binding)],
   ) {
     if identifier.is_missing() {
@@ -87,14 +85,6 @@ impl Bindings {
     }
 
     let name = document.get_node_text(&identifier);
-
-    if let Some(recipe) = recipe {
-      self
-        .recipe_identifiers
-        .entry(recipe.to_owned())
-        .or_default()
-        .insert(name.clone());
-    }
 
     let binding = locals
       .iter()
@@ -148,7 +138,7 @@ impl Bindings {
 
     if let Some(body_node) = function_node.child_by_field_name("body") {
       for identifier in document.get_expression_identifiers(&body_node) {
-        self.expression(view, document, globals, identifier, None, &locals);
+        self.expression(view, document, globals, identifier, &locals);
       }
     }
   }
@@ -202,7 +192,7 @@ impl Bindings {
         continue;
       }
 
-      bindings.expression(view, document, &globals, identifier, None, &[]);
+      bindings.expression(view, document, &globals, identifier, &[]);
     }
 
     for identifier in root.find_all("identifier") {
@@ -222,10 +212,6 @@ impl Bindings {
     let Some(name_node) = recipe_node.find("recipe_header > identifier") else {
       return;
     };
-
-    let name = document.get_node_text(&name_node);
-
-    self.recipe_identifiers.entry(name.clone()).or_default();
 
     self.bind(
       document,
@@ -258,14 +244,7 @@ impl Bindings {
           parameter_node.child_by_field_name("default")
         {
           for identifier in document.get_expression_identifiers(&default_node) {
-            self.expression(
-              view,
-              document,
-              globals,
-              identifier,
-              Some(&name),
-              &locals,
-            );
+            self.expression(view, document, globals, identifier, &locals);
           }
         }
 
@@ -301,11 +280,11 @@ impl Bindings {
 
       let range = document.get_range(&identifier);
 
-      let (recipe, scope) = match attributes
+      let scope = match attributes
         .iter()
         .find_map(|attribute| Some((attribute, attribute.scope(range)?)))
       {
-        Some((_, AttributeScope::Globals)) => (None, [].as_slice()),
+        Some((_, AttributeScope::Globals)) => [].as_slice(),
         Some((attribute, AttributeScope::PrecedingParameters)) => {
           let end = attribute
             .arg_parameter()
@@ -314,14 +293,12 @@ impl Bindings {
             })
             .unwrap_or_default();
 
-          (Some(name.as_str()), &locals[..end])
+          &locals[..end]
         }
-        Some((_, AttributeScope::Parameters)) | None => {
-          (Some(name.as_str()), locals.as_slice())
-        }
+        Some((_, AttributeScope::Parameters)) | None => locals.as_slice(),
       };
 
-      self.expression(view, document, globals, identifier, recipe, scope);
+      self.expression(view, document, globals, identifier, scope);
     }
   }
 

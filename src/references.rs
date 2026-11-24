@@ -1,8 +1,8 @@
 use super::*;
 
 pub(crate) struct References {
-  pub(crate) recipe_identifier_usage: HashMap<String, HashSet<String>>,
   pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
+  pub(crate) used_parameters: Vec<Binding>,
   pub(crate) variable_usage: HashMap<String, bool>,
 }
 
@@ -46,9 +46,18 @@ impl References {
       })
       .collect();
 
+    let used_parameters = root
+      .identifiers()
+      .iter()
+      .filter(|bound| {
+        bound.expression && matches!(bound.binding, Binding::Parameter { .. })
+      })
+      .map(|bound| bound.binding.clone())
+      .collect();
+
     Self {
-      recipe_identifier_usage: root.recipe_identifiers.clone(),
       unresolved_identifiers,
+      used_parameters,
       variable_usage,
     }
   }
@@ -60,10 +69,10 @@ mod tests {
 
   struct Test {
     files: Vec<(&'static str, String)>,
-    recipe_usage: Vec<(&'static str, Vec<&'static str>)>,
     unresolved: Vec<&'static str>,
     unused: Vec<&'static str>,
     used: Vec<&'static str>,
+    used_parameters: Option<Vec<&'static str>>,
   }
 
   impl Test {
@@ -75,20 +84,11 @@ mod tests {
     fn new(content: &str) -> Self {
       Self {
         files: vec![("justfile", content.to_owned())],
-        recipe_usage: Vec::new(),
         unresolved: Vec::new(),
         unused: Vec::new(),
         used: Vec::new(),
+        used_parameters: None,
       }
-    }
-
-    fn recipe_usage(
-      mut self,
-      recipe: &'static str,
-      names: &[&'static str],
-    ) -> Self {
-      self.recipe_usage.push((recipe, names.to_vec()));
-      self
     }
 
     #[track_caller]
@@ -152,21 +152,24 @@ mod tests {
 
       assert_eq!(actual_unused, expected_unused, "unused variables mismatch");
 
-      for (recipe, expected_names) in &self.recipe_usage {
-        let mut actual_names = references
-          .recipe_identifier_usage
-          .get(*recipe)
-          .map_or_default(|set| {
-            set.iter().map(String::as_str).collect::<Vec<_>>()
-          });
+      if let Some(mut expected_used_parameters) = self.used_parameters {
+        let mut actual_used_parameters = references
+          .used_parameters
+          .iter()
+          .filter_map(|binding| match binding {
+            Binding::Parameter { name, .. } => Some(name.as_str()),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
 
-        actual_names.sort_unstable();
+        actual_used_parameters.sort_unstable();
 
-        let mut expected = expected_names.clone();
+        expected_used_parameters.sort_unstable();
 
-        expected.sort_unstable();
-
-        assert_eq!(actual_names, expected, "recipe `{recipe}` usage mismatch");
+        assert_eq!(
+          actual_used_parameters, expected_used_parameters,
+          "used parameters mismatch"
+        );
       }
     }
 
@@ -187,6 +190,13 @@ mod tests {
     fn used(self, names: &[&'static str]) -> Self {
       Self {
         used: names.to_vec(),
+        ..self
+      }
+    }
+
+    fn used_parameters(self, names: &[&'static str]) -> Self {
+      Self {
+        used_parameters: Some(names.to_vec()),
         ..self
       }
     }
@@ -338,7 +348,6 @@ mod tests {
         "
       },
     )
-    .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
   }
@@ -360,7 +369,6 @@ mod tests {
         "
       },
     )
-    .recipe_usage("use", &[])
     .used(&["lib_var"])
     .run();
   }
@@ -383,7 +391,6 @@ mod tests {
         "
       },
     )
-    .recipe_usage("use", &[])
     .run();
   }
 
@@ -407,7 +414,7 @@ mod tests {
         echo {{a}} {{b}} {{c}}
       "
     })
-    .recipe_usage("foo", &["a", "b", "c"])
+    .used_parameters(&["a", "b", "c"])
     .run();
   }
 
@@ -422,8 +429,7 @@ mod tests {
         echo {{b}}
       "
     })
-    .recipe_usage("foo", &["a"])
-    .recipe_usage("bar", &["b"])
+    .used_parameters(&["a", "b"])
     .run();
   }
 
@@ -520,47 +526,7 @@ mod tests {
   }
 
   #[test]
-  fn parameters_do_not_shadow_globals_in_assignments() {
-    #[track_caller]
-    fn case(definition: &str) {
-      let content = format!("{definition}\nbaz := bar\n");
-
-      Test::new(&format!("bar := 'foo'\n{content}"))
-        .recipe_usage("foo", &[])
-        .used(&["bar"])
-        .unused(&["baz"])
-        .run();
-
-      Test::new("bar := 'foo'\nimport 'foo.just'\n")
-        .file("foo.just", &content)
-        .recipe_usage("foo", &[])
-        .used(&["bar"])
-        .unused(&["baz"])
-        .run();
-    }
-
-    case("foo bar:");
-    case("foo(bar) := bar");
-  }
-
-  #[test]
-  fn recipe_identifier_usage_parameter_default_self_reference() {
-    Test::new(indoc! {
-      "
-      x := 'bar'
-
-      foo a=a:
-        echo {{a}}
-      "
-    })
-    .unresolved(&["a"])
-    .recipe_usage("foo", &["a"])
-    .unused(&["x"])
-    .run();
-  }
-
-  #[test]
-  fn recipe_identifier_usage_tracks_body() {
+  fn parameter_usage_ignores_variables() {
     Test::new(indoc! {
       "
       x := 'foo'
@@ -570,20 +536,58 @@ mod tests {
       "
     })
     .used(&["x"])
-    .recipe_usage("bar", &["x"])
+    .used_parameters(&[])
     .run();
   }
 
   #[test]
-  fn recipe_identifier_usage_tracks_parameters() {
+  fn parameter_usage_self_referencing_default() {
+    Test::new(indoc! {
+      "
+      x := 'bar'
+
+      foo a=a:
+        echo {{a}}
+      "
+    })
+    .unresolved(&["a"])
+    .used_parameters(&["a"])
+    .unused(&["x"])
+    .run();
+  }
+
+  #[test]
+  fn parameter_usage_tracks_body() {
     Test::new(indoc! {
       "
       foo bar:
         echo {{bar}}
       "
     })
-    .recipe_usage("foo", &["bar"])
+    .used_parameters(&["bar"])
     .run();
+  }
+
+  #[test]
+  fn parameters_do_not_shadow_globals_in_assignments() {
+    #[track_caller]
+    fn case(definition: &str) {
+      let content = format!("{definition}\nbaz := bar\n");
+
+      Test::new(&format!("bar := 'foo'\n{content}"))
+        .used(&["bar"])
+        .unused(&["baz"])
+        .run();
+
+      Test::new("bar := 'foo'\nimport 'foo.just'\n")
+        .file("foo.just", &content)
+        .used(&["bar"])
+        .unused(&["baz"])
+        .run();
+    }
+
+    case("foo bar:");
+    case("foo(bar) := bar");
   }
 
   #[test]
@@ -644,7 +648,6 @@ mod tests {
       foo:
       "
     })
-    .recipe_usage("foo", &[])
     .run();
   }
 
@@ -748,8 +751,6 @@ mod tests {
       "
     })
     .used(&["x"])
-    .recipe_usage("a", &["x"])
-    .recipe_usage("b", &["x"])
     .run();
   }
 

@@ -13,16 +13,11 @@ define_rule! {
 
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
+      let used_parameters = &context.references().used_parameters;
+
       context
         .local_declarations(context.recipes())
-        .filter_map(|recipe| {
-          context
-            .references()
-            .recipe_identifier_usage
-            .get(&recipe.name.value)
-            .map(|identifiers| (recipe, identifiers))
-        })
-        .flat_map(|(recipe, identifiers)| {
+        .flat_map(|recipe| {
           let recipe_enables_positional_arguments =
             positional_arguments_enabled || recipe.has_attribute("positional-arguments");
 
@@ -37,7 +32,10 @@ define_rule! {
           recipe.parameters.iter().enumerate().filter_map(move |(index, parameter)| {
             let used_via_position = uses_all || positional_usage.contains(&(index + 1));
 
-            let is_unused = !identifiers.contains(&parameter.name)
+            let is_unused = !used_parameters.contains(&Binding::Parameter {
+              name: parameter.name.clone(),
+              recipe: recipe.range,
+            })
               && !parameter.export
               && !exported
               && !used_via_position;
@@ -489,6 +487,23 @@ mod tests {
         console.log(Deno.args)
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn same_name_recipes_track_parameter_usage_separately() {
+    AnalyzerTest::new(indoc! {
+      "
+      set allow-duplicate-recipes
+
+      foo bar:
+        echo {{bar}}
+
+      foo bar:
+        echo
+      "
+    })
+    .warning("Parameter `bar` appears unused", lsp::Range::at(5, 4, 5, 7))
     .run();
   }
 
