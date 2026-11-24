@@ -53,14 +53,42 @@ jobs:
       working-directory: ./www
       run: bun run build
 
+  changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      www: ${{ steps.www.outputs.changed }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Check for website changes
+      id: www
+      env:
+        BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]] \
+          || [[ ! "$BASE" =~ [1-9a-f] ]] \
+          || ! git diff --quiet "$BASE" HEAD -- www vercel.json; then
+          echo changed=true >> "$GITHUB_OUTPUT"
+        else
+          echo changed=false >> "$GITHUB_OUTPUT"
+        fi
+
   deploy:
     if: >-
       github.repository == 'terror/just-lsp' &&
+      needs.changes.outputs.www == 'true' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/master') ||
       (github.event_name == 'pull_request' &&
       github.actor != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository))
-    needs: build
+    needs:
+    - build
+    - changes
     runs-on: ubuntu-latest
 
     env:
