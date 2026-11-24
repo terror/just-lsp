@@ -39,6 +39,13 @@ impl Recipe {
       .any(|attribute| attribute.name.value == name)
   }
 
+  fn has_required_parameters(&self) -> bool {
+    self
+      .parameters
+      .iter()
+      .any(|parameter| self.is_required(parameter))
+  }
+
   pub(crate) fn is_option(&self, parameter: &str) -> bool {
     self
       .attributes
@@ -50,6 +57,47 @@ impl Recipe {
         attribute.keyword_argument("long").is_some()
           || attribute.keyword_argument("short").is_some()
       })
+  }
+
+  fn is_required(&self, parameter: &Parameter) -> bool {
+    let attribute = self.attributes.iter().find(|attribute| {
+      attribute.arg_parameter().as_deref() == Some(parameter.name.as_str())
+    });
+
+    let keyword =
+      |name| attribute.and_then(|attribute| attribute.keyword_argument(name));
+
+    let min = keyword("min")
+      .and_then(AttributeArgument::literal)
+      .and_then(|min| min.parse::<usize>().ok())
+      .unwrap_or_default();
+
+    let optional_variadic =
+      parameter.kind == ParameterKind::Variadic(VariadicType::ZeroOrMore);
+
+    parameter.default_value.is_none()
+      && keyword("flag").is_none()
+      && (!optional_variadic || min > 0)
+  }
+
+  #[must_use]
+  pub fn run_arguments(
+    &self,
+    justfile: &lsp::Url,
+    modules: &[String],
+  ) -> Vec<Value> {
+    let path = modules
+      .iter()
+      .map(String::as_str)
+      .chain([self.name.value.as_str()])
+      .collect::<Vec<_>>()
+      .join("::");
+
+    vec![
+      Value::String(path),
+      Value::String(justfile.to_string()),
+      Value::Bool(self.has_required_parameters()),
+    ]
   }
 
   #[must_use]
@@ -216,6 +264,24 @@ mod tests {
     assert!(recipe.has_attribute("foo"));
     assert!(recipe.has_attribute("bar"));
     assert!(!recipe.has_attribute("baz"));
+  }
+
+  #[test]
+  fn has_required_parameters() {
+    #[track_caller]
+    fn case(source: &str, expected: bool) {
+      assert_eq!(
+        Document::from(source).recipes()[0].has_required_parameters(),
+        expected,
+      );
+    }
+
+    case("foo bar:", true);
+    case("foo bar='baz':", false);
+    case("foo +bar:", true);
+    case("foo *bar:", false);
+    case("[arg('bar', long, flag)]\nfoo bar:", false);
+    case("[arg('bar', long, min='1')]\nfoo *bar:", true);
   }
 
   #[test]

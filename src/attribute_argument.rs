@@ -68,6 +68,15 @@ impl AttributeArgument {
     }
   }
 
+  pub(crate) fn literal(&self) -> Option<String> {
+    match self {
+      Self::Keyword {
+        value: Some(value), ..
+      } => value.text.value.literal(),
+      Self::Keyword { value: None, .. } | Self::Positional(_) => None,
+    }
+  }
+
   pub(crate) fn range(&self) -> lsp::Range {
     match self {
       Self::Keyword { range, .. } => *range,

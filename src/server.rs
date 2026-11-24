@@ -191,55 +191,58 @@ impl LanguageServer for Server {
     &self,
     params: lsp::CodeActionParams,
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
-    fn json<T: Serialize>(value: T) -> Result<Value, jsonrpc::Error> {
-      serde_json::to_value(value).map_err(|_| jsonrpc::Error::parse_error())
-    }
-
     let workspace = self.workspace.read().await;
 
-    let Some(document) = workspace.open_document(&params.text_document.uri)
-    else {
+    let uri = &params.text_document.uri;
+
+    let Some(document) = workspace.open_document(uri) else {
       return Ok(None);
+    };
+
+    let requested = |kind: &lsp::CodeActionKind| {
+      params.context.only.as_ref().is_none_or(|only| {
+        only.iter().any(|only| {
+          kind.as_str() == only.as_str()
+            || kind.as_str().starts_with(&format!("{}.", only.as_str()))
+        })
+      })
     };
 
     let mut actions = Vec::new();
 
-    for recipe in document.recipes() {
-      let title = recipe.name.value.clone();
+    if requested(&lsp::CodeActionKind::SOURCE) {
+      let (justfile, modules) = workspace.run_context(uri);
 
-      let has_required_parameters = recipe
-        .parameters
-        .iter()
-        .any(|parameter| parameter.default_value.is_none());
+      for recipe in document.recipes() {
+        let title = recipe.name.value.clone();
 
-      actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-        title: title.clone(),
-        kind: Some(lsp::CodeActionKind::SOURCE),
-        command: Some(lsp::Command {
-          title,
-          command: Command::RunRecipe.to_string(),
-          arguments: Some(vec![
-            json(&recipe.name.value)?,
-            json(&params.text_document.uri)?,
-            Value::Bool(has_required_parameters),
-          ]),
-        }),
-        ..Default::default()
-      }));
+        actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+          title: title.clone(),
+          kind: Some(lsp::CodeActionKind::SOURCE),
+          command: Some(lsp::Command {
+            title,
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(recipe.run_arguments(&justfile, &modules)),
+          }),
+          ..Default::default()
+        }));
+      }
     }
 
-    let diagnostics = workspace
-      .document_diagnostics(&params.text_document.uri)
-      .into_iter()
-      .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
-      .collect::<Vec<_>>();
+    if requested(&lsp::CodeActionKind::QUICKFIX) {
+      let diagnostics = workspace
+        .document_diagnostics(uri)
+        .into_iter()
+        .filter(|diagnostic| !diagnostic.quickfixes.is_empty())
+        .collect::<Vec<_>>();
 
-    let quickfixer = Quickfixer {
-      diagnostics: &diagnostics,
-      parameters: &params,
-    };
+      let quickfixer = Quickfixer {
+        diagnostics: &diagnostics,
+        parameters: &params,
+      };
 
-    actions.extend(quickfixer.collect());
+      actions.extend(quickfixer.collect());
+    }
 
     Ok(Some(actions))
   }
@@ -253,30 +256,17 @@ impl LanguageServer for Server {
     let workspace = self.workspace.read().await;
 
     if let Some(document) = workspace.open_document(uri) {
+      let (justfile, modules) = workspace.run_context(uri);
+
       let mut lenses = Vec::new();
 
       for recipe in document.recipes() {
-        let has_required_parameters = recipe
-          .parameters
-          .iter()
-          .any(|parameter| parameter.default_value.is_none());
-
-        let recipe_name = serde_json::to_value(&recipe.name.value)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
-
-        let uri = serde_json::to_value(uri)
-          .map_err(|_| jsonrpc::Error::parse_error())?;
-
         lenses.push(lsp::CodeLens {
           range: recipe.name.range,
           command: Some(lsp::Command {
             title: "Run".into(),
             command: Command::RunRecipe.to_string(),
-            arguments: Some(vec![
-              recipe_name,
-              uri,
-              Value::Bool(has_required_parameters),
-            ]),
+            arguments: Some(recipe.run_arguments(&justfile, &modules)),
           }),
           data: None,
         });
@@ -892,6 +882,7 @@ mod tests {
     indoc::indoc,
     lsp::{notification, request},
     pretty_assertions::assert_eq,
+    serde::Serialize,
     serde_json::json,
     tokio_stream::StreamExt,
     tower_lsp::ClientSocket,
@@ -1315,6 +1306,32 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn code_action_only_requested_kinds() -> Result {
+    let test = Test::new();
+
+    let uri = test.uri("justfile");
+
+    test
+      .initialize()
+      .open("justfile", "foo:\n")
+      .request::<request::CodeActionRequest>(
+        lsp::CodeActionParams {
+          text_document: lsp::TextDocumentIdentifier::new(uri),
+          range: lsp::Range::at(0, 0, 0, 0),
+          context: lsp::CodeActionContext {
+            only: Some(vec![lsp::CodeActionKind::QUICKFIX]),
+            ..Default::default()
+          },
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(Vec::new())),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn code_action_shared_import_requires_matching_quickfixes() -> Result {
     async fn case(invalid: bool) -> Result {
       let range = lsp::Range::at(0, 8, 0, 11);
@@ -1514,6 +1531,88 @@ mod tests {
           partial_result_params: lsp::PartialResultParams::default(),
         },
         Ok(Some(vec![])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_prefers_module_path() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let root = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "import 'foo.just'\nmod foo\n")
+      .open("foo.just", "bar:\n")
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(foo),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::CodeLens {
+          range: lsp::Range::at(0, 0, 0, 3),
+          command: Some(lsp::Command {
+            title: "Run".into(),
+            command: Command::RunRecipe.to_string(),
+            arguments: Some(vec![json!("foo::bar"), json!(root), json!(false)]),
+          }),
+          data: None,
+        }])),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn code_lens_runs_recipes_from_root() -> Result {
+    #[track_caller]
+    fn lens(path: &str, root: &lsp::Url) -> Vec<lsp::CodeLens> {
+      vec![lsp::CodeLens {
+        range: lsp::Range::at(0, 0, 0, 3),
+        command: Some(lsp::Command {
+          title: "Run".into(),
+          command: Command::RunRecipe.to_string(),
+          arguments: Some(vec![json!(path), json!(root), json!(false)]),
+        }),
+        data: None,
+      }]
+    }
+
+    let test = Test::new()
+      .file("foo.just", "bar:\n")
+      .file("baz.just", "qux:\n");
+
+    let root = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    let baz = test.uri("baz.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo\nimport 'baz.just'\n")
+      .open("foo.just", "bar:\n")
+      .open("baz.just", "qux:\n")
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(foo),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lens("foo::bar", &root))),
+      )
+      .request::<request::CodeLensRequest>(
+        lsp::CodeLensParams {
+          text_document: lsp::TextDocumentIdentifier::new(baz),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(lens("qux", &root))),
       )
       .run()
       .await

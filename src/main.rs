@@ -8,7 +8,6 @@ use {
   just_lsp::*,
   quickfixer::Quickfixer,
   ropey::Rope,
-  serde::Serialize,
   serde_json::Value,
   server::Server,
   std::{
