@@ -6,6 +6,7 @@ use {
   count::Count,
   document_entry::DocumentEntry,
   document_store::DocumentStore,
+  enclosure::Enclosure,
   filesystem::{Filesystem, OsFilesystem},
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
   graph::Graph,
@@ -13,6 +14,7 @@ use {
   group_set::GroupSet,
   import_scope::ImportScope,
   indoc::indoc,
+  list::List,
   module::Module,
   module_context::ModuleContext,
   module_lookup::ModuleLookup,
@@ -138,6 +140,7 @@ mod diagnostic;
 mod document;
 mod document_entry;
 mod document_store;
+mod enclosure;
 mod error;
 mod filesystem;
 mod function;
@@ -149,6 +152,7 @@ mod group;
 mod group_set;
 mod import;
 mod import_scope;
+mod list;
 mod located;
 mod module;
 mod module_context;

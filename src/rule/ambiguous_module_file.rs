@@ -1,20 +1,5 @@
 use super::*;
 
-fn ticked_list(items: &[String]) -> String {
-  let ticked = items
-    .iter()
-    .map(|item| format!("`{item}`"))
-    .collect::<Vec<_>>();
-
-  match ticked.as_slice() {
-    [first, second] => format!("{first} and {second}"),
-    [rest @ .., last] if !rest.is_empty() => {
-      format!("{}, and {last}", rest.join(", "))
-    }
-    _ => ticked.join(""),
-  }
-}
-
 define_rule! {
   AmbiguousModuleFileRule {
     id: "ambiguous-module-file",
@@ -53,7 +38,7 @@ define_rule! {
             format!(
               "Found multiple source files for module `{}`: {}",
               module.name.value,
-              ticked_list(&files),
+              List::and_ticked(&files),
             ),
             module.location(),
           ))
