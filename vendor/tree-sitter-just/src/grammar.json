@@ -375,32 +375,36 @@
       ]
     },
     "unexport": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "REPEAT",
-          "content": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "REPEAT",
+            "content": {
+              "type": "SYMBOL",
+              "name": "attribute"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "unexport"
+          },
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_name"
+            }
+          },
+          {
             "type": "SYMBOL",
-            "name": "attribute"
+            "name": "_newline"
           }
-        },
-        {
-          "type": "STRING",
-          "value": "unexport"
-        },
-        {
-          "type": "FIELD",
-          "name": "name",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_name"
-          }
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_newline"
-        }
-      ]
+        ]
+      }
     },
     "import": {
       "type": "SEQ",
@@ -2628,8 +2632,14 @@
     }
   ],
   "conflicts": [
-    ["value", "attribute_named_param"],
-    ["_name", "unexport"]
+    [
+      "value",
+      "attribute_named_param"
+    ],
+    [
+      "_name",
+      "unexport"
+    ]
   ],
   "precedences": [],
   "externals": [

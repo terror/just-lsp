@@ -139,7 +139,15 @@ module.exports = grammar({
 
     // unexport      : 'unexport' NAME _eol
     unexport: ($) =>
-      seq(repeat($.attribute), "unexport", field("name", $._name), $._newline),
+      prec.dynamic(
+        1,
+        seq(
+          repeat($.attribute),
+          "unexport",
+          field("name", $._name),
+          $._newline,
+        ),
+      ),
 
     // import        : 'import' '?'? string?
     import: ($) => seq(repeat($.attribute), "import", optional("?"), $.string),
