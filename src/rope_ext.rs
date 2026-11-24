@@ -56,9 +56,7 @@ pub trait RopeExt {
 
   fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position;
 
-  fn lsp_position_to_char(&self, position: lsp::Position) -> usize {
-    self.lsp_position_to_position(position).char
-  }
+  fn lsp_position_to_char(&self, position: lsp::Position) -> usize;
 
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
 }
