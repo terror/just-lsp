@@ -21,6 +21,14 @@
   "else"
 ] @keyword.conditional
 
+; Namespaces
+
+(module
+  name: (identifier) @module)
+
+(module_path
+  (identifier) @module)
+
 ; Variables
 
 (value
@@ -28,6 +36,13 @@
 
 (alias
   left: (identifier) @variable)
+
+(alias
+  right: (identifier) @function.call)
+
+(alias
+  right: (module_path
+    (identifier) @function.call .))
 
 (assignment
   left: (identifier) @variable)
@@ -46,7 +61,18 @@
 (dependency
   name: (identifier) @function.call)
 
+(dependency
+  name: (module_path
+    (identifier) @function.call .))
+
 (dependency_expression
+  name: (identifier) @function.call)
+
+(dependency_expression
+  name: (module_path
+    (identifier) @function.call .))
+
+(assert_expression
   name: (identifier) @function.call)
 
 (function_call
@@ -56,11 +82,6 @@
 
 (parameter
   name: (identifier) @variable.parameter)
-
-; Namespaces
-
-(module
-  name: (identifier) @module)
 
 ; Operators
 
@@ -197,6 +218,7 @@
     "private"
     "script"
     "shell"
+    "timestamp"
     "unix"
     "windows"
     "working-directory"))
