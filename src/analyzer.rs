@@ -5465,6 +5465,30 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_repeated_subsequent_marker() {
+    Test::new(indoc! {
+      "
+      foo: && bar && baz && qux
+
+      bar:
+
+      baz:
+
+      qux:
+      "
+    })
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 12, 0, 14),
+    )
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 19, 0, 21),
+    )
+    .run();
+  }
+
+  #[test]
   fn recipe_dependencies_starred_arguments_require_mapped_dependency() {
     Test::new(indoc! {
       "
