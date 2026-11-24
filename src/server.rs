@@ -3784,14 +3784,14 @@ mod tests {
 
     let mut workspace = server.workspace.write().await;
 
+    let uri = lsp::Url::parse("file:///foo.just")?;
+
     assert_eq!(
-      workspace.config().formatting,
+      workspace.document_config(&uri).unwrap().formatting,
       FormattingConfig {
         indentation: Some("\t".into()),
       },
     );
-
-    let uri = lsp::Url::parse("file:///foo.just")?;
 
     workspace.open(lsp::DidOpenTextDocumentParams {
       text_document: lsp::TextDocumentItem::new(
