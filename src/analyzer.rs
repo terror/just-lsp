@@ -587,6 +587,17 @@ mod tests {
   }
 
   #[test]
+  fn analyzer_imported_duplicate_default_reports_local_attribute() {
+    Test::new("[default]\nfoo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\n[default]\nbar:\n")
+      .error(
+        "Recipe `foo` has duplicate `[default]` attribute, which may only appear once per module",
+        lsp::Range::at(0, 0, 1, 0),
+      )
+      .run();
+  }
+
+  #[test]
   fn analyzer_imported_duplicate_function_reports_local_declaration() {
     Test::new("set unstable\n_foo() := 'bar'\nimport 'foo.just'\n")
       .file("foo.just", "\n\n_foo() := 'baz'\n")
