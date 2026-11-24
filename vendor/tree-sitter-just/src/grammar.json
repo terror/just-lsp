@@ -2205,8 +2205,25 @@
       ]
     },
     "_opaque_shebang": {
-      "type": "PATTERN",
-      "value": "[^/\\n]+"
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "[^/\\n]+"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "PATTERN",
+              "value": "\\/.*"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
     },
     "string": {
       "type": "CHOICE",
