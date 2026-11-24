@@ -182,23 +182,18 @@ impl<'a> RuleContext<'a> {
   pub(super) fn duplicate_declarations<'b, T>(
     &self,
     declarations: &'b [Located<T>],
-    name: impl Fn(&T) -> &TextNode,
-    attributes: impl Fn(&T) -> &[Attribute],
+    duplicates: &[usize],
   ) -> Vec<&'b T> {
-    let mut conflicts = ConflictTracker::default();
-
-    for declaration in declarations {
-      if declaration.uri != self.document().uri {
-        conflicts.record(name(declaration), attributes(declaration));
-      }
-    }
-
-    self
-      .local_declarations(declarations)
-      .filter(|declaration| {
-        conflicts.record(name(declaration), attributes(declaration))
-      })
+    duplicates
+      .iter()
+      .map(|index| &declarations[*index])
+      .filter(|declaration| declaration.uri == self.document().uri)
+      .map(Deref::deref)
       .collect()
+  }
+
+  pub(super) fn duplicates(&self) -> &Duplicates {
+    self.view.duplicates()
   }
 
   pub(crate) fn function_calls(&self) -> &[FunctionCall] {

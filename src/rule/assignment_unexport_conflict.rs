@@ -25,6 +25,14 @@ define_rule! {
         }
       }
 
+      let local_unexports = context
+        .local_declarations(context.unexports())
+        .collect::<Vec<_>>();
+
+      if local_unexports.is_empty() {
+        return diagnostics;
+      }
+
       let mut variables = ConflictTracker::default();
 
       for variable in context.variables() {
@@ -33,7 +41,7 @@ define_rule! {
         }
       }
 
-      for unexport in context.local_declarations(context.unexports()) {
+      for unexport in local_unexports {
         if variables.conflicts_with(&unexport.name, &unexport.attributes) {
           diagnostics.push(Diagnostic::error(
             format!(

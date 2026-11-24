@@ -60,6 +60,10 @@ impl<'a> ModuleView<'a> {
     self.documents.iter().map(|document| document.document)
   }
 
+  pub(crate) fn duplicates(&self) -> &Duplicates {
+    self.symbols.duplicates()
+  }
+
   pub(crate) fn filesystem(&self) -> &'a dyn Filesystem {
     self
       .context

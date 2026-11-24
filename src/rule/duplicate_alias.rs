@@ -10,8 +10,7 @@ define_rule! {
 
       for alias in context.duplicate_declarations(
         context.aliases(),
-        |alias| &alias.name,
-        |alias| &alias.attributes,
+        &context.duplicates().aliases,
       ) {
         diagnostics.push(Diagnostic::error(
           format!("Duplicate alias `{}`", alias.name.value),

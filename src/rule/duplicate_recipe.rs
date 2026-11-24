@@ -17,8 +17,7 @@ define_rule! {
 
       for recipe in context.duplicate_declarations(
         context.recipes(),
-        |recipe| &recipe.name,
-        |recipe| &recipe.attributes,
+        &context.duplicates().recipes,
       ) {
         diagnostics.push(Diagnostic::error(
           format!("Duplicate recipe name `{}`", recipe.name.value),

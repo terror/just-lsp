@@ -6,6 +6,7 @@ use {
   count::Count,
   document_entry::DocumentEntry,
   document_store::DocumentStore,
+  duplicates::Duplicates,
   filesystem::{Filesystem, OsFilesystem},
   function_parameter::FunctionParameter::{Optional, Required, Variadic},
   graph::Graph,
@@ -138,6 +139,7 @@ mod diagnostic;
 mod document;
 mod document_entry;
 mod document_store;
+mod duplicates;
 mod error;
 mod filesystem;
 mod function;

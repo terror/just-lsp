@@ -17,8 +17,7 @@ define_rule! {
 
       for variable in context.duplicate_declarations(
         context.variables(),
-        |variable| &variable.name,
-        |variable| &variable.attributes,
+        &context.duplicates().variables,
       ) {
         diagnostics.push(Diagnostic::error(
           format!("Duplicate variable `{}`", variable.name.value),

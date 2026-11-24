@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug)]
 pub(crate) struct SymbolTable {
   pub(crate) aliases: Vec<Located<Alias>>,
+  duplicates: OnceLock<Duplicates>,
   pub(crate) functions: Vec<Located<Function>>,
   pub(crate) modules: Vec<Located<ModuleDeclaration>>,
   pub(crate) recipes: Vec<Located<Recipe>>,
@@ -31,6 +32,10 @@ impl SymbolTable {
       .collect()
   }
 
+  pub(crate) fn duplicates(&self) -> &Duplicates {
+    self.duplicates.get_or_init(|| Duplicates::new(self))
+  }
+
   pub(crate) fn new(documents: &[ScopeDocument<&Document>]) -> Self {
     let functions = Self::declarations(documents, Document::functions);
     let recipes = Self::declarations(documents, Document::recipes);
@@ -38,6 +43,7 @@ impl SymbolTable {
 
     Self {
       aliases: Self::declarations(documents, Document::aliases),
+      duplicates: OnceLock::new(),
       resolved_functions: Self::resolve(
         documents,
         &functions,

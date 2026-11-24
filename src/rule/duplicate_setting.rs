@@ -10,8 +10,7 @@ define_rule! {
 
       for setting in context.duplicate_declarations(
         context.settings(),
-        |setting| &setting.name,
-        |setting| &setting.attributes,
+        &context.duplicates().settings,
       ) {
         diagnostics.push(Diagnostic::error(
           format!("Duplicate setting `{}`", setting.name.value),

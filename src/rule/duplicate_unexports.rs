@@ -9,8 +9,7 @@ define_rule! {
 
       for unexport in context.duplicate_declarations(
         context.unexports(),
-        |unexport| &unexport.name,
-        |unexport| &unexport.attributes,
+        &context.duplicates().unexports,
       ) {
         diagnostics.push(Diagnostic::error(
           format!(

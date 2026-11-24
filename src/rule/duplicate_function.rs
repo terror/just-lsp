@@ -9,8 +9,7 @@ define_rule! {
       context
         .duplicate_declarations(
           context.functions(),
-          |function| &function.name,
-          |function| &function.attributes,
+          &context.duplicates().functions,
         )
         .into_iter()
         .map(|function| {
