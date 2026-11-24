@@ -5803,8 +5803,20 @@ mod tests {
   fn recipe_parameters_variadic() {
     Test::new(indoc! {
       "
-      recipe_with_variadic arg1=\"default\" +args:
-        echo \"{{arg1}} {{args}}\"
+      foo bar='bar' +baz:
+        echo {{bar}} {{baz}}
+      "
+    })
+    .error(
+      "Required parameter `baz` follows a parameter with a default value",
+      lsp::Range::at(0, 14, 0, 18),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      foo bar='bar' *baz:
+        echo {{bar}} {{baz}}
       "
     })
     .run();
