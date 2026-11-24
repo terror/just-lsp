@@ -76,52 +76,29 @@ impl UnusedRecipeParameterRule {
     str::from_utf8(inner).ok()?.parse().ok().filter(|&n| n > 0)
   }
 
-  /// Resolves a `${@:N}`, `${*:N}`, `${@:N:M}` or `${*:N:M}` slice, given the
-  /// text following the `@` or `*`. Slices that can't be resolved statically
-  /// are treated as using every parameter.
   fn parse_slice(rest: &[u8], parameters: usize) -> Slice {
-    let Some(end) = rest.iter().position(|&b| b == b'}') else {
-      return Slice::Malformed;
-    };
-
-    let Some(inner) = str::from_utf8(&rest[..end])
-      .ok()
+    let Some(inner) = rest
+      .iter()
+      .position(|&b| b == b'}')
+      .and_then(|end| str::from_utf8(&rest[..end]).ok())
       .and_then(|text| text.strip_prefix(':'))
     else {
       return Slice::Malformed;
     };
 
-    let mut parts = inner.splitn(2, ':');
-
-    let offset = parts.next().unwrap_or_default();
-
-    let length = parts.next();
-
-    let literal = |text: &str| {
-      let text = text.trim();
-
-      (!text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
-        .then(|| text.parse::<usize>().ok())
-        .flatten()
+    let (offset, length) = match inner.split_once(':') {
+      Some((offset, length)) => (offset, Some(length)),
+      None => (inner, None),
     };
 
-    let Some(offset) = literal(offset) else {
+    let Some(offset) = Self::slice_number(offset) else {
       return Slice::All;
     };
 
-    let upper = match length {
-      None => {
-        if offset == 0 {
-          return Slice::All;
-        }
-
-        parameters
-      }
-      Some(length) => match literal(length) {
-        Some(length) => offset.saturating_add(length).saturating_sub(1),
-        None if offset == 0 => return Slice::All,
-        None => parameters,
-      },
+    let upper = match length.and_then(Self::slice_number) {
+      Some(length) => offset.saturating_add(length).saturating_sub(1),
+      None if offset == 0 => return Slice::All,
+      None => parameters,
     };
 
     Slice::Positions((offset.max(1)..=upper.min(parameters)).collect())
@@ -177,6 +154,16 @@ impl UnusedRecipeParameterRule {
 
         (indices, uses_all)
       })
+  }
+
+  fn slice_number(text: &str) -> Option<usize> {
+    let text = text.trim();
+
+    if text.bytes().all(|b| b.is_ascii_digit()) {
+      text.parse().ok()
+    } else {
+      None
+    }
   }
 }
 
