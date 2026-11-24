@@ -51,18 +51,47 @@ impl ModuleDeclaration {
       .collect()
   }
 
-  fn find_file(
+  pub(crate) fn files(
+    &self,
+    base_uri: &lsp::Url,
+    filesystem: &dyn Filesystem,
+  ) -> Vec<PathBuf> {
+    let mut candidates = self.candidates(base_uri).into_iter();
+
+    if self.path.is_some() {
+      let Some((path, _)) = candidates.next() else {
+        return Vec::new();
+      };
+
+      if filesystem.is_file(&path) {
+        return vec![path];
+      }
+    }
+
+    candidates
+      .flat_map(|(candidate, case_sensitive)| {
+        Self::find_files(filesystem, &candidate, case_sensitive)
+      })
+      .collect()
+  }
+
+  fn find_files(
     filesystem: &dyn Filesystem,
     candidate: &Path,
     case_sensitive: bool,
-  ) -> Option<PathBuf> {
-    let candidate_name = candidate.file_name()?.to_str()?;
+  ) -> Vec<PathBuf> {
+    let (Some(directory), Some(candidate_name)) = (
+      candidate.parent(),
+      candidate.file_name().and_then(|name| name.to_str()),
+    ) else {
+      return Vec::new();
+    };
 
     filesystem
-      .read_dir(candidate.parent()?)
-      .ok()?
+      .read_dir(directory)
+      .unwrap_or_default()
       .into_iter()
-      .find(|path| {
+      .filter(|path| {
         let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
           return false;
         };
@@ -75,10 +104,18 @@ impl ModuleDeclaration {
 
         matches && filesystem.is_file(path)
       })
+      .collect()
   }
 
   pub(crate) fn is_enabled(&self) -> bool {
     Attribute::is_enabled(&self.attributes)
+  }
+
+  pub(crate) fn location(&self) -> lsp::Range {
+    self
+      .path
+      .as_ref()
+      .map_or(self.name.range, |path| path.range)
   }
 
   pub(crate) fn resolve(
@@ -86,19 +123,7 @@ impl ModuleDeclaration {
     base_uri: &lsp::Url,
     filesystem: &dyn Filesystem,
   ) -> Option<PathBuf> {
-    let mut candidates = self.candidates(base_uri).into_iter();
-
-    if self.path.is_some() {
-      let (path, _) = candidates.next()?;
-
-      if filesystem.is_file(&path) {
-        return Some(path);
-      }
-    }
-
-    candidates.find_map(|(candidate, case_sensitive)| {
-      Self::find_file(filesystem, &candidate, case_sensitive)
-    })
+    self.files(base_uri, filesystem).into_iter().next()
   }
 }
 

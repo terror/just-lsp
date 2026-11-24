@@ -49,10 +49,7 @@ impl ProjectDependency {
       kind: ProjectDependencyKind::Module {
         name: module.name.value.clone(),
       },
-      location: module
-        .path
-        .as_ref()
-        .map_or(module.name.range, |path| path.range),
+      location: module.location(),
       optional: module.optional,
       target: module.resolve(source, filesystem).map_or_else(
         || {
