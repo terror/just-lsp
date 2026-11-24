@@ -5403,9 +5403,45 @@ mod tests {
       foo:
         bar
           baz
+        \tbaz
       \tqux
       "
     })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠` but found line with `⇥`",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_script_attribute_mixed() {
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+        bar
+       \tbaz
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(3, 0, 3, 2),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+       \tbar
+        baz
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 2),
+    )
     .run();
   }
 

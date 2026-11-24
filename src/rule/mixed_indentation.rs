@@ -11,14 +11,24 @@ define_rule! {
 
       context
         .local_declarations(context.recipes())
-        .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(|recipe| {
+          let script = recipe.runs_as_script(default_script);
+
           recipe
             .body_lines()
-            .try_fold(None, |expected_kind: Option<IndentKind>, line| {
-              if line.kind == IndentKind::Mixed
-                || expected_kind.is_some_and(|expected| expected != line.kind)
-              {
+            .try_fold(None, |expected: Option<RecipeLine>, line| {
+              let mixed = match &expected {
+                None => line.kind == IndentKind::Mixed,
+                Some(expected) if script => {
+                  !line.indent.starts_with(expected.indent)
+                    && line.mixed_prefix(expected.indent.len())
+                }
+                Some(expected) => {
+                  line.kind == IndentKind::Mixed || expected.kind != line.kind
+                }
+              };
+
+              if mixed {
                 ControlFlow::Break(Diagnostic::error(
                   format!(
                     "Recipe `{}` mixes tabs and spaces for indentation",
@@ -27,7 +37,7 @@ define_rule! {
                   line.range(),
                 ))
               } else {
-                ControlFlow::Continue(Some(line.kind))
+                ControlFlow::Continue(Some(expected.unwrap_or(line)))
               }
             })
             .break_value()
