@@ -31,7 +31,8 @@ Hovering over `foo` in `baz` shows `foo='qux'`. Hovering over `foo` in `quux`
 shows the global assignment `foo := 'bar'`. The result follows the identifier's
 scope, including references in parameter defaults and function bodies.
 
-Hover also resolves recipes, variables, and user-defined functions from imports.
+Hover also resolves recipes, variables, and user-defined functions from imports,
+and recipes referenced by module paths such as `foo::bar`.
 Open imported files use their unsaved editor contents; closed files use their
 contents on disk. Unresolved names have no hover result.
 

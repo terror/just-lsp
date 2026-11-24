@@ -6,7 +6,7 @@ order: 10
 Reports recipes that participate in a circular dependency chain.
 
 - A recipe depending on itself is a cycle. Longer cycles include chains such as `foo -> bar -> foo`.
-- The check follows resolved recipes, including imported recipes and declaration precedence. It reports cycle members in the document being analyzed.
+- The check follows resolved recipes, including imported recipes, module paths such as `foo::bar`, and declaration precedence. It reports cycle members in the document being analyzed.
 - A recipe that merely depends on a cycle is not itself reported as a cycle member.
 
 ## How to fix it

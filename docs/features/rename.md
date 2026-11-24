@@ -5,7 +5,8 @@ order: 60
 
 Invoke your editor's rename command on a recipe, variable, recipe parameter,
 user-defined function, or function parameter to update its declaration and all
-matching identifier references in the current justfile.
+matching identifier references across the project, including imported files
+and modules.
 
 Renaming follows symbol scope. A recipe parameter can be renamed without
 changing a global variable with the same name, and a user-defined function can
@@ -32,8 +33,9 @@ Renaming a recipe also updates dependency names and alias targets that refer to
 it. Alias names themselves cannot be renamed as independent symbols. Literal
 strings and shell text are not rewritten.
 
-Edits are limited to the current document; references in other files are not
-updated. Builtins and unresolved identifiers cannot be renamed. The server
+Renaming a recipe in a module also updates module paths such as `foo::bar` in
+the files that refer to it. Parameter renames are limited to the current
+document. Builtins and unresolved identifiers cannot be renamed. The server
 prepares a valid target before renaming, but does not validate the replacement
 name for syntax or conflicts with other declarations.
 

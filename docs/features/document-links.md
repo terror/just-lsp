@@ -13,8 +13,8 @@ chooses how to display and activate the link.
 import 'foo.just'
 ```
 
-The import path links to the file resolved by the project's import loader.
-Unresolved imports do not receive links, including missing optional imports.
+The import path links to the file loaded by the project. Unresolved imports do
+not receive links, including missing optional imports.
 
 ## Modules
 
@@ -32,7 +32,7 @@ matched without regard to case. An explicit module path can also point to a
 directory, which is searched for `mod.just`, `justfile`, or `.justfile`.
 
 Relative module paths are resolved from the directory containing the current
-justfile, and paths beginning with `~/` expand to the home directory. Explicit
-file paths may produce links even when the target file does not exist yet.
+justfile, and paths beginning with `~/` expand to the home directory. Modules
+whose file cannot be found do not receive links.
 
 LSP request: `textDocument/documentLink`.

@@ -6,6 +6,7 @@ order: 10
 Reports an import path that cannot be decoded or expanded, or a required import whose path is empty or does not exist.
 
 - Relative paths are resolved from the importing document’s directory. Shell-expanded strings are checked after environment and home-directory expansion.
+- A path is valid when the project loaded it as a justfile, so imports of open files that have not been saved yet are accepted, and paths that name a directory are reported.
 - Missing or empty paths are allowed for optional imports and imports disabled for the current platform. Invalid escapes or failed expansion can still be reported.
 - Dynamic format-string paths are not resolved by this rule.
 

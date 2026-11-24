@@ -4,8 +4,9 @@ order: 50
 ---
 
 Use your editor's find-references command on a recipe, variable, parameter, or
-user-defined function to find the identifiers that refer to it in the current
-document. Results include the declaration as well as its uses.
+user-defined function to find the identifiers that refer to it across the
+project, including imported files and modules. Results include the declaration
+when the editor requests it.
 
 References follow symbol scope. A parameter and a global variable with the same
 name have separate reference lists. Recipe names and function names also remain
@@ -30,8 +31,10 @@ Variable references include just expressions such as `{{foo}}`, parameter
 defaults, and function bodies when they resolve to that variable. Literal text
 in strings and shell commands is not included.
 
-Reference searches currently resolve and search within the requested document;
-they do not search imported files or the rest of the workspace. Alias targets
-are recipe references, but alias names are not resolved as separate symbols.
+Recipes, variables, and functions are found in every file of the project that
+can refer to them, such as a dependency on `foo::bar` in the root justfile that
+refers to a recipe in module `foo`. Parameters are searched only within their
+document. Builtins return every use of the builtin. Alias targets are recipe
+references, but alias names are not resolved as separate symbols.
 
 LSP request: `textDocument/references`.
