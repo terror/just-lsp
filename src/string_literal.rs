@@ -86,6 +86,19 @@ impl StringLiteral {
     }
   }
 
+  pub(crate) fn expand(self) -> Result<String> {
+    Ok(if self.shell_expanded {
+      shellexpand::full_with_context(
+        &self.cooked,
+        || env::home_dir()?.into_os_string().into_string().ok(),
+        |name| env::var(name).map(Some),
+      )?
+      .into_owned()
+    } else {
+      self.cooked
+    })
+  }
+
   pub(crate) fn parse(source: &str) -> Result<Option<Self>> {
     let (shell_expanded, source) = source
       .strip_prefix('x')
@@ -126,24 +139,11 @@ impl StringLiteral {
     source: &str,
     base_uri: &lsp::Url,
   ) -> Result<Option<PathBuf>> {
-    let Some(Self {
-      cooked,
-      shell_expanded,
-    }) = Self::parse(source)?
-    else {
+    let Some(literal) = Self::parse(source)? else {
       return Ok(None);
     };
 
-    let raw = if shell_expanded {
-      shellexpand::full_with_context(
-        &cooked,
-        || env::home_dir()?.into_os_string().into_string().ok(),
-        |name| env::var(name).map(Some),
-      )?
-      .into_owned()
-    } else {
-      cooked
-    };
+    let raw = literal.expand()?;
 
     if raw.is_empty() {
       return Err(Error::EmptyImportPath);
