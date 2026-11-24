@@ -7263,6 +7263,41 @@ mod tests {
   }
 
   #[test]
+  fn variable_dependency_cycle() {
+    #[track_caller]
+    fn case(content: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(Test::new(content), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(
+      "a := b\nb := a\n",
+      &[
+        (
+          "Variable `a` depends on its own value: `a -> b -> a`",
+          lsp::Range::at(0, 0, 0, 1),
+        ),
+        (
+          "Variable `b` depends on its own value: `b -> a -> b`",
+          lsp::Range::at(1, 0, 1, 1),
+        ),
+      ],
+    );
+
+    case(
+      "set unstable\na := f()\nf() := a\n",
+      &[(
+        "Variable `a` is defined in terms of itself",
+        lsp::Range::at(1, 0, 1, 1),
+      )],
+    );
+  }
+
+  #[test]
   fn variables_and_parameters_same_name() {
     Test::new(indoc! {
       "

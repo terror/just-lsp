@@ -86,6 +86,7 @@ mod unused_function;
 mod unused_function_parameter;
 mod unused_recipe_parameter;
 mod unused_variable;
+mod variable_dependency_cycle;
 mod working_directory_conflict;
 
 pub(crate) trait Rule: Sync {
