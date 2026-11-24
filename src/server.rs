@@ -1959,15 +1959,35 @@ mod tests {
 
   #[tokio::test]
   async fn diagnostics_handle_import_cycles() -> Result {
-    Test::new()
+    let test = Test::new()
       .file("foo.just", "import 'bar.just'\nfoo: bar\n")
-      .file("bar.just", "import 'foo.just'\nbar:\n")
+      .file("bar.just", "import 'foo.just'\nbar:\n");
+
+    let diagnostic = |source: &str, target: &str| {
+      lsp::Diagnostic::from(Diagnostic {
+        id: "circular-import".into(),
+        ..Diagnostic::error(
+          format!(
+            "Import `{}` in `{}` is circular",
+            test.tempdir.path().join(target).display(),
+            test.tempdir.path().join(source).display(),
+          ),
+          lsp::Range::at(0, 7, 0, 17),
+        )
+      })
+    };
+
+    let bar = diagnostic("bar.just", "foo.just");
+    let foo = diagnostic("foo.just", "bar.just");
+
+    test
       .ready()
       .open("foo.just", "import 'bar.just'\nfoo: bar\n")
-      .diagnostics("bar.just", None, [])
+      .diagnostics("bar.just", None, [bar])
       .diagnostics("foo.just", Some(1), [])
       .open("bar.just", "import 'foo.just'\nbar:\n")
       .diagnostics("bar.just", Some(1), [])
+      .diagnostics("foo.just", Some(1), [foo])
       .run()
       .await
   }

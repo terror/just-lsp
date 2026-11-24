@@ -1,6 +1,8 @@
 use super::*;
 
 pub(crate) struct ProjectLoader<'a> {
+  ancestors: Vec<lsp::Url>,
+  circular_dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   dependencies: HashMap<lsp::Url, Vec<ProjectDependency>>,
   documents: &'a mut DocumentStore,
 }
@@ -16,13 +18,19 @@ impl<'a> ProjectLoader<'a> {
     documents.load(root)?;
 
     let mut loader = Self {
+      ancestors: Vec::new(),
+      circular_dependencies: HashMap::new(),
       dependencies: HashMap::new(),
       documents,
     };
 
     loader.visit(root);
 
-    Ok(Project::new(root.clone(), loader.dependencies))
+    Ok(Project::new(
+      root.clone(),
+      loader.dependencies,
+      loader.circular_dependencies,
+    ))
   }
 
   fn visit(&mut self, uri: &lsp::Url) {
@@ -30,10 +38,22 @@ impl<'a> ProjectLoader<'a> {
 
     self.dependencies.insert(uri.clone(), dependencies.clone());
 
+    self.ancestors.push(uri.clone());
+
     for dependency in dependencies {
       let ProjectDependencyTarget::Path(target) = &dependency.target else {
         continue;
       };
+
+      if self.ancestors.contains(target) {
+        self
+          .circular_dependencies
+          .entry(uri.clone())
+          .or_default()
+          .push(dependency);
+
+        continue;
+      }
 
       if self.dependencies.contains_key(target) {
         continue;
@@ -49,6 +69,8 @@ impl<'a> ProjectLoader<'a> {
 
       self.visit(target);
     }
+
+    self.ancestors.pop();
   }
 }
 

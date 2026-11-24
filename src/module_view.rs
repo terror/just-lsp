@@ -42,6 +42,18 @@ impl<'a> ModuleView<'a> {
     ))
   }
 
+  pub(crate) fn circular_dependencies(&self) -> &'a [ProjectDependency] {
+    self
+      .context
+      .and_then(|context| {
+        context
+          .project
+          .circular_dependencies
+          .get(&self.document.uri)
+      })
+      .map_or(&[], Vec::as_slice)
+  }
+
   pub(crate) fn dependencies(
     &self,
   ) -> impl Iterator<Item = &'a ProjectDependency> + '_ {
