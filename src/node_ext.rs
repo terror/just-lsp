@@ -1,6 +1,7 @@
 use super::*;
 
 pub trait NodeExt {
+  fn assert_kind(&self, kind: &str);
   fn find(&self, selector: &str) -> Option<Node<'_>>;
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
@@ -9,6 +10,15 @@ pub trait NodeExt {
 }
 
 impl NodeExt for Node<'_> {
+  fn assert_kind(&self, kind: &str) {
+    debug_assert!(
+      [true, false]
+        .into_iter()
+        .any(|named| self.language().id_for_node_kind(kind, named) != 0),
+      "unknown node kind `{kind}`",
+    );
+  }
+
   fn find(&self, selector: &str) -> Option<Node<'_>> {
     TreeWalker::new(*self).find(selector)
   }
@@ -18,7 +28,7 @@ impl NodeExt for Node<'_> {
   }
 
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
-    debug_assert!(TreeWalker::is_kind(kind), "unknown node kind `{kind}`");
+    self.assert_kind(kind);
 
     let mut current = *self;
 

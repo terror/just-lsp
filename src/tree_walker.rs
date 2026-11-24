@@ -22,31 +22,8 @@ impl<'a> TreeWalker<'a> {
     nodes
   }
 
-  pub(super) fn is_kind(kind: &str) -> bool {
-    let language = unsafe { tree_sitter_just() };
-
-    language.id_for_node_kind(kind, true) != 0
-      || language.id_for_node_kind(kind, false) != 0
-  }
-
   pub(super) fn new(node: Node<'a>) -> Self {
     Self { node }
-  }
-
-  fn unknown_kind(selector: &str) -> Option<&str> {
-    let union = selector.contains(',');
-
-    selector
-      .split(',')
-      .flat_map(|selector| {
-        let selector = if union { selector.trim() } else { selector };
-
-        match selector.strip_prefix('^') {
-          Some(kind) => vec![kind],
-          None => selector.split(" > ").collect(),
-        }
-      })
-      .find(|kind| !Self::is_kind(kind))
   }
 
   fn visit_matches<B>(
@@ -54,18 +31,14 @@ impl<'a> TreeWalker<'a> {
     selector: &str,
     mut visit: impl FnMut(Node<'a>) -> ControlFlow<B>,
   ) -> ControlFlow<B> {
-    if cfg!(debug_assertions)
-      && let Some(kind) = Self::unknown_kind(selector)
-    {
-      panic!("unknown node kind `{kind}` in selector `{selector}`");
-    }
-
     let union = selector.contains(',');
 
     for selector in selector.split(',') {
       let selector = if union { selector.trim() } else { selector };
 
       if let Some(kind) = selector.strip_prefix('^') {
+        self.node.assert_kind(kind);
+
         for child in self.node.children(&mut self.node.walk()) {
           if child.kind() == kind {
             visit(child)?;
@@ -73,6 +46,10 @@ impl<'a> TreeWalker<'a> {
         }
 
         continue;
+      }
+
+      for kind in selector.split(" > ") {
+        self.node.assert_kind(kind);
       }
 
       let mut kinds = selector.split(" > ");
@@ -374,31 +351,8 @@ mod tests {
   }
 
   #[test]
-  #[should_panic(
-    expected = "unknown node kind `foo` in selector `recipe > foo`"
-  )]
+  #[should_panic(expected = "unknown node kind `foo`")]
   fn find_unknown_kind() {
     Test::new("foo:\n").find("recipe > foo", None);
-  }
-
-  #[test]
-  fn unknown_kind() {
-    #[track_caller]
-    fn case(selector: &str, expected: Option<&str>) {
-      assert_eq!(TreeWalker::unknown_kind(selector), expected);
-    }
-
-    case("recipe", None);
-    case(":", None);
-    case("^&&", None);
-    case("recipe_header > identifier", None);
-    case("^parameter, ^variadic_parameter", None);
-    case("", Some(""));
-    case("foo", Some("foo"));
-    case(" recipe", Some(" recipe"));
-    case("recipe ", Some("recipe "));
-    case("recipe > ", Some(""));
-    case("recipe, , assignment", Some(""));
-    case("^recipe > recipe_header", Some("recipe > recipe_header"));
   }
 }
