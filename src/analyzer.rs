@@ -6537,6 +6537,37 @@ mod tests {
   }
 
   #[test]
+  fn settings_interpreter_empty() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      let content = format!("set {setting} := []\n");
+
+      let start = 8 + u32::try_from(setting.len()).unwrap();
+
+      Test::new(&content)
+        .error(message, lsp::Range::at(0, start, 0, start + 2))
+        .run();
+    }
+
+    case(
+      "script-interpreter",
+      "Setting `script-interpreter` must be a non-empty array",
+    );
+    case("shell", "Setting `shell` must be a non-empty array");
+
+    Test::new("set windows-shell := []\n")
+      .warning(
+        "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        lsp::Range::at(0, 4, 0, 17),
+      )
+      .error(
+        "Setting `windows-shell` must be a non-empty array",
+        lsp::Range::at(0, 21, 0, 23),
+      )
+      .run();
+  }
+
+  #[test]
   fn settings_lazy_recognized() {
     Test::new(indoc! {
       "
