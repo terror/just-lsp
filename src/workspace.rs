@@ -442,25 +442,34 @@ impl Workspace {
 
   #[must_use]
   pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
-    let document = self.documents.get_open(uri)?;
+    self.views(uri).into_iter().next()
+  }
 
-    Some(
-      Self::contexts(&self.root_projects(), uri)
-        .first()
-        .map_or_else(
-          || ModuleView::from(document),
-          |(project, module)| {
-            ModuleView::new(
-              document,
-              ModuleContext {
-                documents: &self.documents,
-                module,
-                project,
-              },
-            )
+  #[must_use]
+  pub fn views(&self, uri: &lsp::Url) -> Vec<ModuleView<'_>> {
+    let Some(document) = self.documents.get_open(uri) else {
+      return Vec::new();
+    };
+
+    let contexts = Self::contexts(&self.root_projects(), uri);
+
+    if contexts.is_empty() {
+      return vec![ModuleView::from(document)];
+    }
+
+    contexts
+      .into_iter()
+      .map(|(project, module)| {
+        ModuleView::new(
+          document,
+          ModuleContext {
+            documents: &self.documents,
+            module,
+            project,
           },
-        ),
-    )
+        )
+      })
+      .collect()
   }
 }
 

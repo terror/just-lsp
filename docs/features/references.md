@@ -35,6 +35,8 @@ Recipes, variables, and functions are found in every file of the project that
 can refer to them, such as a dependency on `foo::bar` in the root justfile that
 refers to a recipe in module `foo`. Parameters are searched only within their
 document. Builtins return every use of the builtin. Alias targets are recipe
-references, but alias names are not resolved as separate symbols.
+references, but alias names are not resolved as separate symbols. Finding
+references from a file imported by several justfiles searches every project
+that imports it.
 
 LSP request: `textDocument/references`.

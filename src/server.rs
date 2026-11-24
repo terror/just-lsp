@@ -94,6 +94,19 @@ impl Server {
     }
   }
 
+  fn merge_locations(
+    mut locations: Vec<lsp::Location>,
+    found: Vec<lsp::Location>,
+  ) -> Vec<lsp::Location> {
+    for location in found {
+      if !locations.contains(&location) {
+        locations.push(location);
+      }
+    }
+
+    locations
+  }
+
   pub(crate) fn new(client: Client) -> Self {
     let executor = Executor::new(client.clone());
 
@@ -885,19 +898,25 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.view(&uri).and_then(|view| {
-      let document = view.document();
+    Ok(
+      workspace
+        .views(&uri)
+        .into_iter()
+        .filter_map(|view| {
+          let document = view.document();
 
-      let resolver = Resolver::new(view);
+          let resolver = Resolver::new(view);
 
-      document
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          resolver
-            .resolve_identifier_references(&identifier, include_declaration)
+          document
+            .node_at_position(position)
+            .filter(|node| node.kind() == "identifier")
+            .map(|identifier| {
+              resolver
+                .resolve_identifier_references(&identifier, include_declaration)
+            })
         })
-    }))
+        .reduce(Self::merge_locations),
+    )
   }
 
   async fn rename(
@@ -912,25 +931,32 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.view(&uri).and_then(|view| {
-      let document = view.document();
+    Ok(
+      workspace
+        .views(&uri)
+        .into_iter()
+        .filter_map(|view| {
+          let document = view.document();
 
-      let resolver = Resolver::new(view);
+          let resolver = Resolver::new(view);
 
-      document
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .filter(|identifier| {
-          resolver
-            .resolve_symbol(identifier)
-            .is_some_and(|symbol| symbol.is_renameable())
+          document
+            .node_at_position(position)
+            .filter(|node| node.kind() == "identifier")
+            .filter(|identifier| {
+              resolver
+                .resolve_symbol(identifier)
+                .is_some_and(|symbol| symbol.is_renameable())
+            })
+            .map(|identifier| {
+              resolver.resolve_identifier_references(&identifier, true)
+            })
         })
-        .map(|identifier| {
+        .reduce(Self::merge_locations)
+        .map(|locations| {
           let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
 
-          for location in
-            resolver.resolve_identifier_references(&identifier, true)
-          {
+          for location in locations {
             changes
               .entry(location.uri)
               .or_default()
@@ -944,8 +970,8 @@ impl LanguageServer for Server {
             changes: Some(changes),
             ..Default::default()
           }
-        })
-    }))
+        }),
+    )
   }
 
   async fn semantic_tokens_full(
@@ -5109,6 +5135,87 @@ mod tests {
             ],
           },
         ))),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn shared_import_references_span_projects() -> Result {
+    let test = Test::new();
+
+    let foo = test.uri("foo.just");
+
+    let bar = test.uri("bar/justfile");
+
+    let baz = test.uri("baz/justfile");
+
+    let position = lsp::TextDocumentPositionParams::new(
+      lsp::TextDocumentIdentifier::new(foo.clone()),
+      lsp::Position::new(0, 0),
+    );
+
+    test
+      .initialize()
+      .open("bar/justfile", "import '../foo.just'\nbar: foo\n")
+      .open("baz/justfile", "import '../foo.just'\nbaz: foo\n")
+      .open("foo.just", "foo:\n")
+      .request::<request::References>(
+        lsp::ReferenceParams {
+          text_document_position: position.clone(),
+          context: lsp::ReferenceContext {
+            include_declaration: true,
+          },
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::Location {
+            uri: bar.clone(),
+            range: lsp::Range::at(1, 5, 1, 8),
+          },
+          lsp::Location {
+            uri: foo.clone(),
+            range: lsp::Range::at(0, 0, 0, 3),
+          },
+          lsp::Location {
+            uri: baz.clone(),
+            range: lsp::Range::at(1, 5, 1, 8),
+          },
+        ])),
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: position,
+          new_name: "qux".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([
+            (
+              bar,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(1, 5, 1, 8),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              baz,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(1, 5, 1, 8),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              foo,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "qux".into(),
+              }],
+            ),
+          ])),
+          ..Default::default()
+        })),
       )
       .run()
       .await
