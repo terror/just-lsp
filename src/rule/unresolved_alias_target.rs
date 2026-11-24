@@ -7,9 +7,7 @@ define_rule! {
     message: "alias target not found",
     run(context) {
       context
-        .document()
-        .aliases()
-        .iter()
+        .local_declarations(context.aliases())
         .filter(|alias| !context.declares_module(&alias.value))
         .filter_map(|alias| context.unresolved_recipe(&alias.value, alias.value.range))
         .collect()
