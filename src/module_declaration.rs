@@ -16,7 +16,7 @@ impl ModuleDeclaration {
     (".justfile", false),
   ];
 
-  pub(crate) fn candidates(&self, base_uri: &lsp::Url) -> Vec<PathBuf> {
+  pub(crate) fn candidates(&self, base_uri: &lsp::Url) -> Vec<(PathBuf, bool)> {
     let (file, directory) = if let Some(path_node) = &self.path {
       let Ok(Some(path)) =
         StringLiteral::resolve_path(&path_node.value, base_uri)
@@ -40,39 +40,41 @@ impl ModuleDeclaration {
       )
     };
 
-    once(file)
+    once((file, true))
       .chain(
         Self::DIRECTORY_CANDIDATES
           .iter()
-          .map(|(name, _)| directory.join(name)),
+          .map(|(name, case_sensitive)| {
+            (directory.join(name), *case_sensitive)
+          }),
       )
       .collect()
   }
 
   fn find_file(
     filesystem: &dyn Filesystem,
-    directory: &Path,
-    candidates: &[(&str, bool)],
+    candidate: &Path,
+    case_sensitive: bool,
   ) -> Option<PathBuf> {
-    let entries = filesystem.read_dir(directory).ok()?;
+    let candidate_name = candidate.file_name()?.to_str()?;
 
-    candidates.iter().find_map(|(candidate, case_sensitive)| {
-      entries.iter().find_map(|path| {
-        let name = path.file_name()?.to_str()?;
-
-        let matches = if *case_sensitive {
-          name == *candidate
-        } else {
-          name.eq_ignore_ascii_case(candidate)
+    filesystem
+      .read_dir(candidate.parent()?)
+      .ok()?
+      .into_iter()
+      .find(|path| {
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+          return false;
         };
 
-        if matches && filesystem.is_file(path) {
-          Some(path.clone())
+        let matches = if case_sensitive {
+          name == candidate_name
         } else {
-          None
-        }
+          name.eq_ignore_ascii_case(candidate_name)
+        };
+
+        matches && filesystem.is_file(path)
       })
-    })
   }
 
   pub(crate) fn is_enabled(&self) -> bool {
@@ -84,34 +86,19 @@ impl ModuleDeclaration {
     base_uri: &lsp::Url,
     filesystem: &dyn Filesystem,
   ) -> Option<PathBuf> {
-    let base_dir = base_uri.file_path().ok()?.parent()?.to_path_buf();
+    let mut candidates = self.candidates(base_uri).into_iter();
 
-    if let Some(path_node) = &self.path {
-      let path =
-        StringLiteral::resolve_path(&path_node.value, base_uri).ok()??;
+    if self.path.is_some() {
+      let (path, _) = candidates.next()?;
 
-      return if filesystem.is_dir(&path) {
-        Self::find_file(filesystem, &path, &Self::DIRECTORY_CANDIDATES)
-      } else {
-        Some(path)
-      };
+      if filesystem.is_file(&path) {
+        return Some(path);
+      }
     }
 
-    let name = &self.name.value;
-
-    let name_just = format!("{name}.just");
-
-    if let Some(name_just) =
-      Self::find_file(filesystem, &base_dir, &[(&name_just, true)])
-    {
-      return Some(name_just);
-    }
-
-    Self::find_file(
-      filesystem,
-      &base_dir.join(name),
-      &Self::DIRECTORY_CANDIDATES,
-    )
+    candidates.find_map(|(candidate, case_sensitive)| {
+      Self::find_file(filesystem, &candidate, case_sensitive)
+    })
   }
 }
 
@@ -192,9 +179,14 @@ mod tests {
       let base =
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
+      let path = directory.path().join(expected);
+
       assert_eq!(
-        module("foo", Some(source)).resolve(&base, &OsFilesystem),
-        Some(directory.path().join(expected)),
+        module("foo", Some(source)).resolve(
+          &base,
+          &MemoryFilesystem::new([(path.clone(), String::new())]),
+        ),
+        Some(path),
       );
     }
 
@@ -223,11 +215,14 @@ mod tests {
       let base =
         lsp::Url::from_file_path(directory.path().join("justfile")).unwrap();
 
+      let path = env::home_dir().unwrap().join("bar.just");
+
       assert_eq!(
-        module("foo", Some(source))
-          .resolve(&base, &OsFilesystem)
-          .unwrap(),
-        env::home_dir().unwrap().join("bar.just"),
+        module("foo", Some(source)).resolve(
+          &base,
+          &MemoryFilesystem::new([(path.clone(), String::new())]),
+        ),
+        Some(path),
       );
     }
 

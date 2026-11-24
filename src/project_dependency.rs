@@ -44,21 +44,18 @@ impl ProjectDependency {
         .as_ref()
         .map_or(module.name.range, |path| path.range),
       optional: module.optional,
-      target: module
-        .resolve(source, filesystem)
-        .filter(|path| filesystem.is_file(path))
-        .map_or_else(
-          || {
-            ProjectDependencyTarget::Candidates(
-              module
-                .candidates(source)
-                .iter()
-                .filter_map(|path| lsp::Url::from_path(&path.clean()))
-                .collect(),
-            )
-          },
-          |path| Self::target(&path),
-        ),
+      target: module.resolve(source, filesystem).map_or_else(
+        || {
+          ProjectDependencyTarget::Candidates(
+            module
+              .candidates(source)
+              .iter()
+              .filter_map(|(path, _)| lsp::Url::from_path(&path.clean()))
+              .collect(),
+          )
+        },
+        |path| Self::target(&path),
+      ),
     }
   }
 
