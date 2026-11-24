@@ -197,8 +197,10 @@ impl Server {
 
   async fn try_did_change(
     &self,
-    params: lsp::DidChangeTextDocumentParams,
+    mut params: lsp::DidChangeTextDocumentParams,
   ) -> Result {
+    params.text_document.uri = params.text_document.uri.normalize();
+
     let result = self.workspace.write().await.change(params);
 
     if !matches!(result, Ok(false)) {
@@ -212,8 +214,10 @@ impl Server {
 
   async fn try_did_open(
     &self,
-    params: lsp::DidOpenTextDocumentParams,
+    mut params: lsp::DidOpenTextDocumentParams,
   ) -> Result {
+    params.text_document.uri = params.text_document.uri.normalize();
+
     let result = self.workspace.write().await.open(params);
 
     self.publish_diagnostics().await;
@@ -230,6 +234,20 @@ impl Debug for Server {
   }
 }
 
+trait UrlExt {
+  fn normalize(&self) -> Self;
+}
+
+impl UrlExt for lsp::Url {
+  fn normalize(&self) -> Self {
+    self
+      .to_file_path()
+      .ok()
+      .and_then(|path| Self::from_file_path(path).ok())
+      .unwrap_or_else(|| self.clone())
+  }
+}
+
 #[tower_lsp::async_trait]
 impl LanguageServer for Server {
   async fn code_action(
@@ -238,7 +256,7 @@ impl LanguageServer for Server {
   ) -> Result<Option<lsp::CodeActionResponse>, jsonrpc::Error> {
     let workspace = self.workspace.read().await;
 
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     let Some(document) = workspace.open_document(uri) else {
       return Ok(None);
@@ -296,7 +314,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::CodeLensParams,
   ) -> Result<Option<Vec<lsp::CodeLens>>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -327,7 +345,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::CompletionParams,
   ) -> Result<Option<lsp::CompletionResponse>, jsonrpc::Error> {
-    let uri = params.text_document_position.text_document.uri;
+    let uri = params.text_document_position.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -436,13 +454,15 @@ impl LanguageServer for Server {
     let uris = params
       .changes
       .into_iter()
-      .map(|change| change.uri)
+      .map(|change| change.uri.normalize())
       .collect::<Vec<_>>();
 
     self.reload(&uris).await;
   }
 
-  async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+  async fn did_close(&self, mut params: lsp::DidCloseTextDocumentParams) {
+    params.text_document.uri = params.text_document.uri.normalize();
+
     let result = self.workspace.write().await.close(&params);
 
     if matches!(result, Ok(false)) {
@@ -471,14 +491,18 @@ impl LanguageServer for Server {
   }
 
   async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
-    self.reload(&[params.text_document.uri]).await;
+    self.reload(&[params.text_document.uri.normalize()]).await;
   }
 
   async fn document_highlight(
     &self,
     params: lsp::DocumentHighlightParams,
   ) -> Result<Option<Vec<lsp::DocumentHighlight>>, jsonrpc::Error> {
-    let uri = params.text_document_position_params.text_document.uri;
+    let uri = params
+      .text_document_position_params
+      .text_document
+      .uri
+      .normalize();
 
     let position = params.text_document_position_params.position;
 
@@ -510,7 +534,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::DocumentLinkParams,
   ) -> Result<Option<Vec<lsp::DocumentLink>>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     Ok(self.workspace.read().await.links(uri))
   }
@@ -519,7 +543,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::DocumentSymbolParams,
   ) -> Result<Option<lsp::DocumentSymbolResponse>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -624,7 +648,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::FoldingRangeParams,
   ) -> Result<Option<Vec<lsp::FoldingRange>>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -668,7 +692,8 @@ impl LanguageServer for Server {
   ) -> Result<Option<Vec<lsp::TextEdit>>, jsonrpc::Error> {
     let workspace = self.workspace.read().await;
 
-    let Some(document) = workspace.open_document(&params.text_document.uri)
+    let Some(document) =
+      workspace.open_document(&params.text_document.uri.normalize())
     else {
       return Ok(None);
     };
@@ -720,7 +745,11 @@ impl LanguageServer for Server {
     &self,
     params: lsp::GotoDefinitionParams,
   ) -> Result<Option<lsp::GotoDefinitionResponse>, jsonrpc::Error> {
-    let uri = params.text_document_position_params.text_document.uri;
+    let uri = params
+      .text_document_position_params
+      .text_document
+      .uri
+      .normalize();
 
     let position = params.text_document_position_params.position;
 
@@ -738,7 +767,11 @@ impl LanguageServer for Server {
     &self,
     params: lsp::HoverParams,
   ) -> Result<Option<lsp::Hover>, jsonrpc::Error> {
-    let uri = params.text_document_position_params.text_document.uri;
+    let uri = params
+      .text_document_position_params
+      .text_document
+      .uri
+      .normalize();
 
     let position = params.text_document_position_params.position;
 
@@ -814,7 +847,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::TextDocumentPositionParams,
   ) -> Result<Option<lsp::PrepareRenameResponse>, jsonrpc::Error> {
-    let uri = &params.text_document.uri;
+    let uri = &params.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -844,7 +877,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::ReferenceParams,
   ) -> Result<Option<Vec<lsp::Location>>, jsonrpc::Error> {
-    let uri = params.text_document_position.text_document.uri;
+    let uri = params.text_document_position.text_document.uri.normalize();
 
     let position = params.text_document_position.position;
 
@@ -871,7 +904,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::RenameParams,
   ) -> Result<Option<lsp::WorkspaceEdit>, jsonrpc::Error> {
-    let uri = params.text_document_position.text_document.uri.clone();
+    let uri = params.text_document_position.text_document.uri.normalize();
 
     let position = params.text_document_position.position;
 
@@ -919,7 +952,7 @@ impl LanguageServer for Server {
     &self,
     params: lsp::SemanticTokensParams,
   ) -> Result<Option<lsp::SemanticTokensResult>, jsonrpc::Error> {
-    let uri = params.text_document.uri;
+    let uri = params.text_document.uri.normalize();
 
     let workspace = self.workspace.read().await;
 
@@ -4424,6 +4457,72 @@ mod tests {
           uri: justfile,
           range: lsp::Range::at(4, 0, 5, 0),
         })),
+      )
+      .run()
+      .await
+  }
+
+  #[test]
+  fn normalize() {
+    #[track_caller]
+    fn case(uri: &str, expected: &str) {
+      assert_eq!(lsp::Url::parse(uri).unwrap().normalize().as_str(), expected);
+    }
+
+    if cfg!(windows) {
+      case("file:///c%3A/foo%40bar", "file:///C:/foo@bar");
+      case("file:///c:/foo", "file:///C:/foo");
+    } else {
+      case("file:///foo%40bar", "file:///foo@bar");
+      case("file:///foo%c3%a9", "file:///foo%C3%A9");
+    }
+
+    case("untitled:foo%40bar", "untitled:foo%40bar");
+  }
+
+  #[tokio::test]
+  async fn percent_encoded_uris() -> Result {
+    let test = Test::new().file("foo@bar/foo.just", "");
+
+    let encode = |path| {
+      lsp::Url::parse(&test.uri(path).as_str().replace('@', "%40")).unwrap()
+    };
+
+    let foo = encode("foo@bar/foo.just");
+
+    let justfile = encode("foo@bar/justfile");
+
+    let target = test.uri("foo@bar/foo.just");
+
+    let position = lsp::TextDocumentPositionParams::new(
+      lsp::TextDocumentIdentifier::new(justfile.clone()),
+      lsp::Position::new(2, 5),
+    );
+
+    test
+      .ready()
+      .open(foo.as_str(), "foo:")
+      .diagnostics("foo@bar/foo.just", Some(1), [])
+      .open(justfile.as_str(), "import 'foo.just'\n\nbar: foo")
+      .diagnostics("foo@bar/justfile", Some(1), [])
+      .definition(
+        justfile.as_str(),
+        lsp::Position::new(2, 5),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
+          range: lsp::Range::at(0, 0, 0, 4),
+        })),
+      )
+      .request::<request::DocumentHighlightRequest>(
+        lsp::DocumentHighlightParams {
+          text_document_position_params: position,
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::DocumentHighlight {
+          range: lsp::Range::at(2, 5, 2, 8),
+          kind: Some(lsp::DocumentHighlightKind::TEXT),
+        }])),
       )
       .run()
       .await
