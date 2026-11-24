@@ -13,6 +13,17 @@ impl Item<'_> {
     }
   }
 
+  fn conflicts_with(&self, other: &Self) -> bool {
+    !self.is_same_kind(other) && self.groups().conflicts_with(&other.groups())
+  }
+
+  fn groups(&self) -> GroupSet {
+    match self {
+      Item::Alias(alias) => GroupSet::from_attributes(&alias.attributes),
+      Item::Recipe(recipe) => GroupSet::from_attributes(&recipe.attributes),
+    }
+  }
+
   fn is_same_kind(&self, other: &Self) -> bool {
     matches!(
       (self, other),
@@ -79,24 +90,26 @@ define_rule! {
       local
         .into_iter()
         .fold(
-          (HashMap::<&str, &Item>::new(), Vec::new()),
+          (HashMap::<&str, Vec<&Item>>::new(), Vec::new()),
           |(mut seen, mut diagnostics), item| {
             let name = item.name();
 
             let first = imported
               .get(name)
               .and_then(|items| {
-                items.iter().copied().find(|previous| !previous.is_same_kind(item))
+                items.iter().copied().find(|previous| previous.conflicts_with(item))
               })
               .or_else(|| {
-                seen.get(name).copied().filter(|first| !first.is_same_kind(item))
+                seen.get(name).and_then(|items| {
+                  items.iter().copied().find(|previous| previous.conflicts_with(item))
+                })
               });
 
             if let Some(first) = first {
               diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
             }
 
-            seen.entry(name).or_insert(item);
+            seen.entry(name).or_default().push(item);
 
             (seen, diagnostics)
           },

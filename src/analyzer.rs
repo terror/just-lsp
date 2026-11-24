@@ -216,6 +216,20 @@ mod tests {
   }
 
   #[test]
+  fn alias_recipe_conflict_respects_os_attributes() {
+    Test::new("[windows]\nalias foo := bar\n[unix]\nfoo:\nbar:\n").run();
+
+    Test::new(
+      "[windows]\nalias foo := bar\n[unix]\nalias foo := bar\n[linux]\nfoo:\nbar:\n",
+    )
+    .error(
+      "Alias `foo` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 3),
+    )
+    .run();
+  }
+
+  #[test]
   fn aliases_basic() {
     Test::new(indoc! {
       "
