@@ -8,6 +8,11 @@ struct SettingValidation {
 
 const SETTING_VALIDATIONS: &[SettingValidation] = &[
   SettingValidation {
+    expected: "`all` or `recipes`",
+    name: "dry-run",
+    validate: |value| matches!(value, "all" | "recipes"),
+  },
+  SettingValidation {
     expected: "a non-empty string literal containing only spaces or only tabs",
     name: "indentation",
     validate: |value| {

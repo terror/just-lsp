@@ -2780,6 +2780,24 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     deprecated: None,
   },
   Builtin::Setting {
+    name: "dry-run",
+    kind: SettingKind::String,
+    description: indoc! {
+      "
+      What to skip when invoked with `--dry-run`.
+
+      `\"all\"` skips recipe bodies, backticks, `shell()`, and
+      `dotenv-command`. `\"recipes\"` only skips recipe bodies. The
+      default is `\"all\"`.
+
+      ```just
+      set dry-run := \"recipes\"
+      ```
+      "
+    },
+    deprecated: None,
+  },
+  Builtin::Setting {
     name: "export",
     kind: SettingKind::Boolean(false),
     description: indoc! {
