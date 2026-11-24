@@ -30,7 +30,8 @@ and recipes in module files run by their module path, such as `foo::bar`, so
 they run in the same context as when invoked from the root. Execution captures standard output and standard error and sends them
 to a `just-recipe:` output document. Displaying this output requires the editor
 to support opening that URI and applying edits to it. A non-zero exit status
-also produces a warning.
+also produces a warning. Standard input is not connected, so recipes that read
+it receive end of file, and `[confirm]` recipes are declined.
 
 ## Parameters
 
