@@ -8,9 +8,7 @@ define_rule! {
     message: "unnecessary parallel attribute",
     run(context) {
       context
-        .document()
-        .recipes()
-        .into_iter()
+        .local_declarations(context.recipes())
         .filter_map(|recipe| {
           let attribute = recipe.find_attribute("parallel")?;
 

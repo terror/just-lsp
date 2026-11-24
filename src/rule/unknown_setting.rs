@@ -9,7 +9,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.document().settings() {
+      for setting in context.local_declarations(context.settings()) {
         if context.builtin_setting(&setting.name.value).is_none() {
           let suggestion = setting.name.value.find_suggestion(
             BUILTINS.iter().filter_map(|builtin| match builtin {

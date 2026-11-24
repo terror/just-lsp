@@ -8,7 +8,7 @@ define_rule! {
     run(context) {
       let mut diagnostics = Vec::new();
 
-      for setting in context.document().settings() {
+      for setting in context.local_declarations(context.settings()) {
         if let Some(Builtin::Setting {
           deprecated: Some(deprecation),
           ..
