@@ -19,7 +19,7 @@ define_rule! {
 
           if passed_default
             && !has_default
-            && !matches!(param.kind, ParameterKind::Variadic(_))
+            && param.kind != ParameterKind::Variadic(VariadicType::ZeroOrMore)
           {
             diagnostics.push(Diagnostic::error(
               format!(
