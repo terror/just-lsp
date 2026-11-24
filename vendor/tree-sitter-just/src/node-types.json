@@ -955,6 +955,10 @@
       "required": false,
       "types": [
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "language",
           "named": true
         }
