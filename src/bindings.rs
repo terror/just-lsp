@@ -65,13 +65,11 @@ impl Bindings {
       .find_all("recipe_body > recipe_line")
       .into_iter()
       .scan(false, |continued, line| {
-        let comment = !*continued
-          && line.child(0).is_some_and(|child| {
-            child.kind() == "text"
-              && document.get_node_text(&child).starts_with('#')
-          });
+        let text = document.get_node_text(&line);
 
-        *continued = !comment && document.get_node_text(&line).ends_with('\\');
+        let comment = !*continued && text.starts_with('#');
+
+        *continued = !comment && text.ends_with('\\');
 
         Some(comment.then_some(line))
       })
