@@ -983,18 +983,24 @@ mod tests {
 
   #[test]
   fn arg_attribute_unknown_parameter() {
-    Test::new(indoc! {
-      "
-      [arg('missing', help='nope')]
-      foo name:
-        echo {{name}}
-      "
-    })
-    .error(
-      "`[arg]` references unknown parameter `missing`",
-      lsp::Range::at(0, 5, 0, 14),
-    )
-    .run();
+    #[track_caller]
+    fn case(name: &str, end: u32) {
+      Test::new(&formatdoc! {
+        "
+        [arg({name}, help='bar')]
+        foo baz:
+          echo {{{{baz}}}}
+        "
+      })
+      .error(
+        "`[arg]` references unknown parameter `bar`",
+        lsp::Range::at(0, 5, 0, end),
+      )
+      .run();
+    }
+
+    case("'bar'", 10);
+    case("x'bar'", 11);
   }
 
   #[test]
@@ -4267,6 +4273,22 @@ mod tests {
     );
 
     case("mod? bob\n\nqux: bob::bar\n", &[]);
+
+    case(
+      "mod bob\n\nqux: bob::bar\n",
+      &[(
+        "Could not find source file for module `bob`",
+        lsp::Range::at(0, 4, 0, 7),
+      )],
+    );
+
+    case(
+      "mod foo 'bob.just'\n",
+      &[(
+        "Could not find source file for module `foo`",
+        lsp::Range::at(0, 8, 0, 18),
+      )],
+    );
   }
 
   #[test]

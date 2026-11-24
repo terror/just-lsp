@@ -38,16 +38,7 @@ define_rule! {
             continue;
           };
 
-          if name.kind != AttributeExpressionKind::StringLiteral {
-            continue;
-          }
-
-          let Some(parameter_name) = StringLiteral::parse(&name.text.value)
-            .ok()
-            .flatten()
-            .filter(|literal| !literal.shell_expanded)
-            .map(|literal| literal.cooked)
-          else {
+          let Some(parameter_name) = name.string_value() else {
             continue;
           };
 
