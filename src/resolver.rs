@@ -6,16 +6,71 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-  /// Creates a new `Resolver` bound to the given `ModuleView`.
+  /// Creates a resolver for the document in `view`.
+  ///
+  /// The view determines which recipes, variables, and functions are visible
+  /// to the resolver, including those declared in imported files and other
+  /// modules of the project. Passing a [`Document`] creates a view that
+  /// contains only that document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt, Resolver, Symbol};
+  ///
+  /// let document = Document::from("foo:\n");
+  ///
+  /// let resolver = Resolver::new(&document);
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("recipe_header > identifier").unwrap();
+  ///
+  /// assert!(matches!(
+  ///   resolver.resolve_symbol(&identifier),
+  ///   Some(Symbol::Recipe(recipe)) if recipe.name.value == "foo",
+  /// ));
+  /// ```
   #[must_use]
   pub fn new(view: impl Into<ModuleView<'a>>) -> Self {
     Self { view: view.into() }
   }
 
-  /// Returns the definition site of the symbol that `identifier` refers to.
-  /// Builtins have no in-document declaration, so the identifier's own range is
-  /// returned instead, letting editors anchor inline documentation at the
-  /// cursor.
+  /// Returns the location where the symbol referenced by `identifier` is
+  /// defined.
+  ///
+  /// Recipes and variables resolve to their entire declaration, and functions
+  /// resolve to their name. Recipe and function parameters resolve to their
+  /// declaration in the current document. Builtins have no declaration, so the
+  /// location of `identifier` itself is returned, letting editors anchor
+  /// documentation at the cursor.
+  ///
+  /// Returns `None` if `identifier` is not bound to a symbol, or refers to a
+  /// name that is not defined. `identifier` must belong to the syntax tree of
+  /// the view's document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{Document, NodeExt, Resolver},
+  ///   tower_lsp::lsp_types::{Location, Position, Range},
+  /// };
+  ///
+  /// let document = Document::from("foo:\n\nbar: foo\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("dependency > identifier").unwrap();
+  ///
+  /// assert_eq!(
+  ///   Resolver::new(&document).resolve_identifier_definition(&identifier),
+  ///   Some(Location {
+  ///     uri: document.uri.clone(),
+  ///     range: Range::new(Position::new(0, 0), Position::new(1, 0)),
+  ///   }),
+  /// );
+  /// ```
   #[must_use]
   pub fn resolve_identifier_definition(
     &self,
@@ -38,9 +93,44 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Builds hover content for the symbol at `identifier`. User-defined symbols
-  /// show their source text; builtins show their Markdown documentation from
-  /// the static [`BUILTINS`] table.
+  /// Returns hover content for the symbol referenced by `identifier`.
+  ///
+  /// Builtins show their Markdown documentation from [`BUILTINS`]. Recipes,
+  /// variables, functions, and recipe parameters show the source text of their
+  /// declaration, and function parameters show their name, all as plain text.
+  /// The hover's range is the range of `identifier`.
+  ///
+  /// Returns `None` if `identifier` is not bound to a symbol, or refers to a
+  /// name that is not defined. `identifier` must belong to the syntax tree of
+  /// the view's document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{Document, NodeExt, Resolver},
+  ///   tower_lsp::lsp_types::{
+  ///     Hover, HoverContents, MarkupContent, MarkupKind, Position, Range,
+  ///   },
+  /// };
+  ///
+  /// let document = Document::from("foo := 'bar'\n\nbaz:\n  echo {{ foo }}\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("value > identifier").unwrap();
+  ///
+  /// assert_eq!(
+  ///   Resolver::new(&document).resolve_identifier_hover(&identifier),
+  ///   Some(Hover {
+  ///     contents: HoverContents::Markup(MarkupContent {
+  ///       kind: MarkupKind::PlainText,
+  ///       value: "foo := 'bar'".into(),
+  ///     }),
+  ///     range: Some(Range::new(Position::new(3, 10), Position::new(3, 13))),
+  ///   }),
+  /// );
+  /// ```
   #[must_use]
   pub fn resolve_identifier_hover(
     &self,
@@ -76,19 +166,73 @@ impl<'a> Resolver<'a> {
     })
   }
 
-  /// Collects every location in the document that references the same symbol as
-  /// `identifier`.
+  /// Returns the locations of every identifier that refers to the same symbol
+  /// as `identifier`.
   ///
-  /// When `include_declaration` is `false`, declaration sites (recipe names,
-  /// variable names, recipe parameter names, function names, and function
-  /// parameter names) are omitted, even if `identifier` is itself one of
-  /// them. Builtins have no in-document declaration, so their occurrences are
-  /// always retained.
+  /// Every document visible from the view is searched, along with the
+  /// documents of the project's other modules, so references in imported files
+  /// and modules are included. Recipe and function parameters are local, so
+  /// only the current document is searched for them.
+  ///
+  /// Recipes, variables, and functions match when both their name and their
+  /// definition agree, so a same-named symbol defined elsewhere, such as a
+  /// recipe in another module, is excluded. Recipe references through module
+  /// paths like `foo::bar` match on their final segment. Builtins match every
+  /// use of the same builtin.
   ///
   /// Scoping follows `just`'s semantics: parameters are local to their recipe,
   /// while variables are global but can be shadowed by a same-named parameter.
-  /// Variable references inside parameter defaults (e.g. `a=a`) are treated as
-  /// belonging to the outer scope, not the parameter being defined.
+  /// Variable references inside parameter defaults, such as `a=a`, belong to
+  /// the outer scope, not the parameter being defined.
+  ///
+  /// When `include_declaration` is `false`, declaration sites (recipe,
+  /// variable, function, and parameter names) are omitted, even if
+  /// `identifier` is itself a declaration.
+  ///
+  /// Locations are grouped by document and sorted by position within each
+  /// document, with duplicates removed. Returns an empty vector if
+  /// `identifier` is not bound to a symbol, or refers to a name that is not
+  /// defined. `identifier` must belong to the syntax tree of the view's
+  /// document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{Document, NodeExt, Resolver},
+  ///   tower_lsp::lsp_types::{Location, Position, Range},
+  /// };
+  ///
+  /// let document = Document::from("foo := 'bar'\n\nbaz:\n  echo {{ foo }}\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("assignment > identifier").unwrap();
+  ///
+  /// let resolver = Resolver::new(&document);
+  ///
+  /// assert_eq!(
+  ///   resolver.resolve_identifier_references(&identifier, true),
+  ///   [
+  ///     Location {
+  ///       uri: document.uri.clone(),
+  ///       range: Range::new(Position::new(0, 0), Position::new(0, 3)),
+  ///     },
+  ///     Location {
+  ///       uri: document.uri.clone(),
+  ///       range: Range::new(Position::new(3, 10), Position::new(3, 13)),
+  ///     },
+  ///   ],
+  /// );
+  ///
+  /// assert_eq!(
+  ///   resolver.resolve_identifier_references(&identifier, false),
+  ///   [Location {
+  ///     uri: document.uri.clone(),
+  ///     range: Range::new(Position::new(3, 10), Position::new(3, 13)),
+  ///   }],
+  /// );
+  /// ```
   #[must_use]
   pub fn resolve_identifier_references(
     &self,
@@ -156,13 +300,41 @@ impl<'a> Resolver<'a> {
     locations
   }
 
-  /// Classifies `identifier` into the [`Symbol`] it refers to, following
-  /// `just`'s name-resolution priority: recipe names, then parameters (which
-  /// shadow globals within their recipe), then variables, then builtins.
+  /// Returns the symbol referenced by `identifier`.
   ///
-  /// Identifiers at definition sites (the left-hand side of an assignment, or a
-  /// parameter name in a recipe header) are looked up through the document so
-  /// that callers receive a fully-populated [`Symbol`] rather than a raw range.
+  /// Names in expressions resolve following `just`'s scoping rules: recipe and
+  /// function parameters shadow variables, which shadow builtin constants.
+  /// Function calls resolve to a user-defined function before a builtin
+  /// function. Recipe names in headers, dependencies, and aliases resolve to
+  /// recipes, following module paths like `foo::bar` into the module that
+  /// declares the recipe.
+  ///
+  /// Identifiers at declaration sites, such as the name of a recipe, variable,
+  /// or parameter, resolve to the symbol they declare. Recipes, variables, and
+  /// functions are looked up in the view, so the returned symbol can be
+  /// declared in an imported file.
+  ///
+  /// Returns `None` if `identifier` is not bound to a symbol, or refers to a
+  /// name that is not defined. `identifier` must belong to the syntax tree of
+  /// the view's document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt, Resolver, Symbol};
+  ///
+  /// let document =
+  ///   Document::from("foo := 'bar'\n\nbaz foo:\n  echo {{ foo }}\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("value > identifier").unwrap();
+  ///
+  /// assert!(matches!(
+  ///   Resolver::new(&document).resolve_symbol(&identifier),
+  ///   Some(Symbol::Parameter(parameter)) if parameter.content == "foo",
+  /// ));
+  /// ```
   #[must_use]
   pub fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     self.symbol(
@@ -174,6 +346,33 @@ impl<'a> Resolver<'a> {
     )
   }
 
+  /// Returns the symbol that `binding` refers to in this resolver's view.
+  ///
+  /// Builtin and parameter bindings carry their symbol directly. Recipes,
+  /// variables, and functions are looked up by name in the view, and recipe
+  /// paths are followed through modules to the module that declares the
+  /// recipe.
+  ///
+  /// Returns `None` for unresolved bindings, or if the name is not defined in
+  /// the view.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Document, NodeExt, Resolver};
+  ///
+  /// let document = Document::from("foo:\n  echo {{ bar }}\n");
+  ///
+  /// let root = document.tree.root_node();
+  ///
+  /// let identifier = root.find("value > identifier").unwrap();
+  ///
+  /// assert!(
+  ///   Resolver::new(&document)
+  ///     .resolve_symbol(&identifier)
+  ///     .is_none()
+  /// );
+  /// ```
   fn symbol(&self, binding: &Binding) -> Option<Symbol> {
     match binding {
       Binding::Builtin(builtin) => Some(Symbol::Builtin(builtin)),
