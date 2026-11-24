@@ -12,7 +12,7 @@ impl GroupSet {
       .any(|a| other.0.iter().any(|b| a.conflicts_with(*b)))
   }
 
-  fn from_attribute(attribute: &str) -> Option<Self> {
+  pub(crate) fn from_attribute(attribute: &str) -> Option<Self> {
     match attribute {
       "android" => Some(Self::from([Group::Android])),
       "dragonfly" => Some(Self::from([Group::Dragonfly])),
