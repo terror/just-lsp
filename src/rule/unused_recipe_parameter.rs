@@ -138,11 +138,8 @@ impl UnusedRecipeParameterRule {
           return (indices, uses_all);
         }
 
-        let unbraced_end =
-          rest.iter().take_while(|b| b.is_ascii_digit()).count();
-
-        let index = if unbraced_end > 0 {
-          Self::parse_positional(&rest[..unbraced_end], false)
+        let index = if rest.first().is_some_and(u8::is_ascii_digit) {
+          Self::parse_positional(&rest[..1], false)
         } else {
           rest
             .iter()
@@ -307,6 +304,7 @@ mod tests {
     case("", &[], false);
     case("  bar ${3} ${4}", &[3, 4], false);
     case("  bar $1 $2", &[1, 2], false);
+    case("  bar $10", &[1], false);
     case("  bar $0 $foo ${bar} ${5} \\$6 ${7", &[5], false);
     case("  bar \"${@}\"", &[], true);
     case("  bar ${*}", &[], true);
@@ -431,6 +429,23 @@ mod tests {
     .warning(
       "Parameter `first` appears unused",
       lsp::Range::at(2, 6, 2, 11),
+    )
+    .run();
+  }
+
+  #[test]
+  fn positional_arguments_unbraced_references_use_first_digit_only() {
+    AnalyzerTest::new(indoc! {
+      "
+      set positional-arguments
+
+      graph first second:
+        ./bin/graph $10
+      "
+    })
+    .warning(
+      "Parameter `second` appears unused",
+      lsp::Range::at(2, 12, 2, 18),
     )
     .run();
   }
