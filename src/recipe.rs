@@ -39,8 +39,7 @@ impl Recipe {
       .any(|attribute| attribute.name.value == name)
   }
 
-  #[must_use]
-  pub fn has_required_parameters(&self) -> bool {
+  fn has_required_parameters(&self) -> bool {
     self.parameters.iter().any(|parameter| {
       parameter.default_value.is_none()
         && parameter.kind != ParameterKind::Variadic(VariadicType::ZeroOrMore)
@@ -58,6 +57,26 @@ impl Recipe {
         attribute.keyword_argument("long").is_some()
           || attribute.keyword_argument("short").is_some()
       })
+  }
+
+  #[must_use]
+  pub fn run_arguments(
+    &self,
+    justfile: &lsp::Url,
+    modules: &[String],
+  ) -> Vec<Value> {
+    let path = modules
+      .iter()
+      .map(String::as_str)
+      .chain([self.name.value.as_str()])
+      .collect::<Vec<_>>()
+      .join("::");
+
+    vec![
+      Value::String(path),
+      Value::String(justfile.to_string()),
+      Value::Bool(self.has_required_parameters()),
+    ]
   }
 
   #[must_use]

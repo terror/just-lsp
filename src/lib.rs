@@ -31,6 +31,7 @@ use {
   rule_context::RuleContext,
   scope_document::ScopeDocument,
   serde::Deserialize,
+  serde_json::Value,
   std::{
     cmp::Reverse,
     collections::{

@@ -150,26 +150,6 @@ impl Server {
     Ok(())
   }
 
-  fn run_recipe_arguments(
-    justfile: &lsp::Url,
-    modules: &[String],
-    recipe: &Recipe,
-  ) -> Result<Vec<Value>, jsonrpc::Error> {
-    let path = modules
-      .iter()
-      .map(String::as_str)
-      .chain([recipe.name.value.as_str()])
-      .collect::<Vec<_>>()
-      .join("::");
-
-    Ok(vec![
-      Value::String(path),
-      serde_json::to_value(justfile)
-        .map_err(|_| jsonrpc::Error::parse_error())?,
-      Value::Bool(recipe.has_required_parameters()),
-    ])
-  }
-
   async fn try_did_change(
     &self,
     params: lsp::DidChangeTextDocumentParams,
@@ -242,9 +222,7 @@ impl LanguageServer for Server {
           command: Some(lsp::Command {
             title,
             command: Command::RunRecipe.to_string(),
-            arguments: Some(Self::run_recipe_arguments(
-              &justfile, &modules, &recipe,
-            )?),
+            arguments: Some(recipe.run_arguments(&justfile, &modules)),
           }),
           ..Default::default()
         }));
@@ -288,9 +266,7 @@ impl LanguageServer for Server {
           command: Some(lsp::Command {
             title: "Run".into(),
             command: Command::RunRecipe.to_string(),
-            arguments: Some(Self::run_recipe_arguments(
-              &justfile, &modules, &recipe,
-            )?),
+            arguments: Some(recipe.run_arguments(&justfile, &modules)),
           }),
           data: None,
         });
