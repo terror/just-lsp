@@ -5683,6 +5683,20 @@ mod tests {
   }
 
   #[test]
+  fn recipe_parameters_order_options() {
+    #[track_caller]
+    fn case(attribute: &str) {
+      Test::new(&format!(
+        "{attribute}\nfoo bar='bar' baz:\n  echo {{{{bar}}}} {{{{baz}}}}\n"
+      ))
+      .run();
+    }
+
+    case("[arg('bar', long)]");
+    case("[arg('baz', short='b')]");
+  }
+
+  #[test]
   fn recipe_parameters_valid() {
     Test::new(indoc! {
       "
