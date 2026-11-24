@@ -4405,6 +4405,31 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn opening_import_loads_parent_project() -> Result {
+    let test = Test::new()
+      .file("justfile", "import 'foo.just'\n\nfoo := 'bar'\n\nbar:\n")
+      .file("foo.just", "baz: bar\n  echo {{foo}}\n");
+
+    let justfile = test.uri("justfile");
+
+    test
+      .ready()
+      .open("foo.just", "baz: bar\n  echo {{foo}}\n")
+      .diagnostics("foo.just", Some(1), [])
+      .diagnostics("justfile", None, [])
+      .definition(
+        "foo.just",
+        lsp::Position::new(0, 6),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: justfile,
+          range: lsp::Range::at(4, 0, 5, 0),
+        })),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn prepare_rename_builtin_function() -> Result {
     Test::new()
       .initialize()

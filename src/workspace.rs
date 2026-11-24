@@ -314,11 +314,17 @@ impl Workspace {
   /// Returns an [`Error`] if the opened document cannot be parsed or a
   /// project root cannot be loaded.
   pub fn open(&mut self, params: lsp::DidOpenTextDocumentParams) -> Result {
-    let mut roots = self.affected_roots(&params.text_document.uri);
+    let uri = params.text_document.uri.clone();
 
-    roots.insert(params.text_document.uri.clone());
+    let mut roots = self.affected_roots(&uri);
 
     self.documents.open(params)?;
+
+    if roots.is_empty() {
+      roots.extend(self.parent_root(&uri));
+    }
+
+    roots.insert(uri);
 
     self.load_projects(roots, false)
   }
@@ -326,6 +332,30 @@ impl Workspace {
   #[must_use]
   pub fn open_document(&self, uri: &lsp::Url) -> Option<&Document> {
     self.documents.get_open(uri)
+  }
+
+  fn parent_root(&mut self, uri: &lsp::Url) -> Option<lsp::Url> {
+    let path = uri.file_path().ok()?;
+
+    for directory in path.ancestors().skip(1) {
+      for justfile in self.documents.filesystem().justfiles(directory) {
+        if justfile == path {
+          continue;
+        }
+
+        let Some(root) = lsp::Url::from_path(&justfile) else {
+          continue;
+        };
+
+        if ProjectLoader::load(&mut self.documents, &root)
+          .is_ok_and(|project| project.loads(uri))
+        {
+          return Some(root);
+        }
+      }
+    }
+
+    None
   }
 
   /// # Errors
@@ -745,6 +775,46 @@ mod tests {
       "mod foo 'bar'\n",
       "bar/mod.just",
       lsp::Range::at(0, 8, 0, 13),
+    );
+  }
+
+  #[test]
+  fn opening_import_discovers_parent_root() {
+    let directory = if cfg!(windows) {
+      PathBuf::from("C:\\")
+    } else {
+      PathBuf::from("/")
+    };
+
+    let uri =
+      |path: &str| lsp::Url::from_file_path(directory.join(path)).unwrap();
+
+    let mut workspace = Workspace {
+      documents: DocumentStore::new(Arc::new(MemoryFilesystem::new(
+        [("JUSTFILE", "import 'foo/bar.just'"), ("foo/justfile", "")]
+          .map(|(path, content)| (directory.join(path), content.into())),
+      ))),
+      ..Workspace::default()
+    };
+
+    workspace
+      .open(lsp::DidOpenTextDocumentParams {
+        text_document: lsp::TextDocumentItem::new(
+          uri("foo/bar.just"),
+          "just".into(),
+          1,
+          String::new(),
+        ),
+      })
+      .unwrap();
+
+    assert_eq!(
+      workspace
+        .root_projects()
+        .into_iter()
+        .map(|project| &project.root)
+        .collect::<Vec<_>>(),
+      [&uri("JUSTFILE")],
     );
   }
 
