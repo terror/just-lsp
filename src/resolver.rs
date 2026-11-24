@@ -6,19 +6,6 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-  fn definition(symbol: &Symbol) -> Option<lsp::Location> {
-    match symbol {
-      Symbol::Function(function) => {
-        Some(function.location(function.name.range))
-      }
-      Symbol::Recipe(recipe) => Some(recipe.location(recipe.range)),
-      Symbol::Variable(variable) => Some(variable.location(variable.range)),
-      Symbol::Builtin(_)
-      | Symbol::FunctionParameter(_)
-      | Symbol::Parameter(_) => None,
-    }
-  }
-
   /// Creates a new `Resolver` bound to the given `ModuleView`.
   #[must_use]
   pub fn new(view: impl Into<ModuleView<'a>>) -> Self {
@@ -123,7 +110,7 @@ impl<'a> Resolver<'a> {
       return Vec::new();
     };
 
-    let definition = Self::definition(&symbol);
+    let definition = symbol.definition();
 
     let mut locations = Vec::<lsp::Location>::new();
 
@@ -145,7 +132,10 @@ impl<'a> Resolver<'a> {
             bound
               .binding
               .refers_to(&target, definition.as_ref(), |binding| {
-                resolver.symbol(binding).as_ref().and_then(Self::definition)
+                resolver
+                  .symbol(binding)
+                  .as_ref()
+                  .and_then(Symbol::definition)
               })
           })
           .map(|bound| {
