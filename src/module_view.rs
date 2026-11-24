@@ -273,24 +273,6 @@ impl<'a> ModuleView<'a> {
   pub(crate) fn variables(&self) -> &[Located<Variable>] {
     &self.symbols.variables
   }
-
-  #[must_use]
-  pub fn with_imports(
-    document: &'a Document,
-    imports: impl IntoIterator<Item = &'a Document>,
-  ) -> Self {
-    Self::from_scope(
-      document,
-      once(document)
-        .chain(imports)
-        .enumerate()
-        .map(|(index, document)| ScopeDocument {
-          document,
-          load_depth: usize::from(index > 0),
-        })
-        .collect(),
-    )
-  }
 }
 
 impl<'a> From<&'a Document> for ModuleView<'a> {

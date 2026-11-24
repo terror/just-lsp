@@ -68,8 +68,8 @@ mod tests {
   #[derive(Debug)]
   struct Test {
     config: Config,
+    files: Vec<(&'static str, String)>,
     messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
-    project: TestProject,
   }
 
   impl Test {
@@ -86,33 +86,32 @@ mod tests {
       self
     }
 
-    fn imported_document(mut self, content: &str) -> Self {
-      self.project.imported_document(content);
+    fn file(mut self, path: &'static str, content: &str) -> Self {
+      self.files.push((path, content.to_owned()));
       self
     }
 
     fn new(content: &str) -> Self {
-      let uri = if cfg!(windows) {
-        "file:///C:/test.just"
-      } else {
-        "file:///test.just"
-      };
-
       Self {
         config: Config::default(),
+        files: vec![("justfile", content.to_owned())],
         messages: Vec::new(),
-        project: TestProject::new(Document {
-          version: 1,
-          ..Document::new(content, lsp::Url::parse(uri).unwrap()).unwrap()
-        }),
       }
     }
 
     #[track_caller]
     fn run(self) {
+      let module = TestModule::new(
+        &self
+          .files
+          .iter()
+          .map(|(path, content)| (*path, content.as_str()))
+          .collect::<Vec<_>>(),
+      );
+
       let analyzer = Analyzer {
         config: Some(&self.config),
-        view: self.project.view(),
+        view: module.view(),
       };
 
       let diagnostics = analyzer
@@ -348,27 +347,30 @@ mod tests {
 
   #[test]
   fn analyzer_ignores_imported_alias_recipe_conflicts() {
-    Test::new("")
-      .imported_document("foo:\nalias foo := bar\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo:\nalias foo := bar\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_cache_without_script() {
-    Test::new("").imported_document("[cache]\nfoo:\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "[cache]\nfoo:\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_dotenv_command_conflicts() {
-    Test::new("")
-      .imported_document("set dotenv-command := 'foo'\nset dotenv-load\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "set dotenv-command := 'foo'\nset dotenv-load\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_dotenv_path_filename_conflicts() {
-    Test::new("")
-      .imported_document(
+    Test::new("import 'foo.just'\n")
+      .file(
+        "foo.just",
         "set dotenv-path := 'foo'\nset dotenv-filename := 'bar'\n",
       )
       .run();
@@ -376,145 +378,155 @@ mod tests {
 
   #[test]
   fn analyzer_ignores_imported_duplicate_aliases() {
-    Test::new("")
-      .imported_document("alias foo := bar\nalias foo := bar\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "alias foo := bar\nalias foo := bar\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_dependencies() {
-    Test::new("").imported_document("foo: bar bar\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo: bar bar\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_functions() {
-    Test::new("")
-      .imported_document("foo() := 'bar'\nfoo() := 'baz'\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo() := 'bar'\nfoo() := 'baz'\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_recipe_parameters() {
-    Test::new("").imported_document("foo bar bar:\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo bar bar:\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_recipes() {
-    Test::new("").imported_document("foo:\nfoo:\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo:\nfoo:\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_settings() {
-    Test::new("")
-      .imported_document("set export\nset export\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "set export\nset export\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_unexports() {
-    Test::new("")
-      .imported_document("unexport foo\nunexport foo\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "unexport foo\nunexport foo\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_duplicate_variables() {
-    Test::new("")
-      .imported_document("foo := 'bar'\nfoo := 'baz'\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo := 'bar'\nfoo := 'baz'\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_exit_message_conflicts() {
-    Test::new("")
-      .imported_document("[exit-message]\n[no-exit-message]\nfoo:\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "[exit-message]\n[no-exit-message]\nfoo:\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_export_unexport_conflicts() {
-    Test::new("")
-      .imported_document("export foo := 'bar'\nunexport foo\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "export foo := 'bar'\nunexport foo\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_extension_without_script() {
-    Test::new("")
-      .imported_document("[extension: 'foo']\nfoo:\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "[extension: 'foo']\nfoo:\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_function_parameters() {
-    Test::new("")
-      .imported_document("foo(bar, bar) := bar\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo(bar, bar) := bar\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_inconsistent_indentation() {
-    Test::new("")
-      .imported_document("foo:\n  echo foo\n    echo bar\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo:\n  echo foo\n    echo bar\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_invalid_setting_kinds() {
-    Test::new("")
-      .imported_document("set export := 'bar'\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "set export := 'bar'\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_invalid_setting_values() {
-    Test::new("")
-      .imported_document("set indentation := 'foo'\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "set indentation := 'foo'\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_mapped_dependencies() {
-    Test::new("").imported_document("foo: *(bar 'baz')\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo: *(bar 'baz')\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_mixed_indentation() {
-    Test::new("").imported_document("foo:\n \techo foo\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo:\n \techo foo\n")
+      .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_recipe_diagnostics() {
-    Test::new("foo: (bar 'baz')\n")
-      .imported_document("bar baz: bar\n")
+    Test::new("foo: (bar 'baz')\nimport 'foo.just'\n")
+      .file("foo.just", "bar baz: bar\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_script_shell_conflicts() {
-    Test::new("")
-      .imported_document("[script]\n[shell]\nfoo:\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "[script]\n[shell]\nfoo:\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_working_directory_attribute_conflicts() {
-    Test::new("")
-      .imported_document("[working-directory: 'foo']\n[no-cd]\nfoo:\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "[working-directory: 'foo']\n[no-cd]\nfoo:\n")
       .run();
   }
 
   #[test]
   fn analyzer_ignores_imported_working_directory_setting_conflicts() {
-    Test::new("")
-      .imported_document("set working-directory := 'foo'\nset no-cd\n")
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "set working-directory := 'foo'\nset no-cd\n")
       .run();
   }
 
   #[test]
   fn analyzer_imported_alias_conflict_reports_local_recipe() {
-    Test::new("foo:\n")
-      .imported_document("\n\nalias foo := bar\nbar:\n")
+    Test::new("foo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nalias foo := bar\nbar:\n")
       .error(
         "Alias `foo` is redefined as a recipe",
         lsp::Range::at(0, 0, 0, 3),
@@ -524,8 +536,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_dotenv_command_conflict_reports_local_load() {
-    Test::new("set dotenv-load\n")
-      .imported_document("\n\nset dotenv-command := 'foo'\n")
+    Test::new("set dotenv-load\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset dotenv-command := 'foo'\n")
       .error(
         "`dotenv-command` is incompatible with `dotenv-load`",
         lsp::Range::at(0, 0, 1, 0),
@@ -535,8 +547,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_dotenv_filename_conflict_reports_local_path() {
-    Test::new("set dotenv-path := 'foo'\n")
-      .imported_document("\n\nset dotenv-filename := 'bar'\n")
+    Test::new("set dotenv-path := 'foo'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset dotenv-filename := 'bar'\n")
       .warning(
         "`dotenv-path` overrides `dotenv-filename`",
         lsp::Range::at(0, 0, 1, 0),
@@ -546,8 +558,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_dotenv_load_conflict_reports_local_command() {
-    Test::new("set dotenv-command := 'foo'\n")
-      .imported_document("\n\nset dotenv-load\n")
+    Test::new("set dotenv-command := 'foo'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset dotenv-load\n")
       .error(
         "`dotenv-load` is incompatible with `dotenv-command`",
         lsp::Range::at(0, 0, 1, 0),
@@ -557,8 +569,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_dotenv_path_conflict_reports_local_filename() {
-    Test::new("set dotenv-filename := 'foo'\n")
-      .imported_document("\n\nset dotenv-path := 'bar'\n")
+    Test::new("set dotenv-filename := 'foo'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset dotenv-path := 'bar'\n")
       .warning(
         "`dotenv-path` overrides `dotenv-filename`",
         lsp::Range::at(0, 0, 1, 0),
@@ -568,40 +580,40 @@ mod tests {
 
   #[test]
   fn analyzer_imported_duplicate_alias_reports_local_declaration() {
-    Test::new("alias foo := bar\nbar:\n")
-      .imported_document("\n\nalias foo := bar\n")
+    Test::new("alias foo := bar\nbar:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nalias foo := bar\n")
       .error("Duplicate alias `foo`", lsp::Range::at(0, 0, 0, 16))
       .run();
   }
 
   #[test]
   fn analyzer_imported_duplicate_function_reports_local_declaration() {
-    Test::new("set unstable\n_foo() := 'bar'\n")
-      .imported_document("\n\n_foo() := 'baz'\n")
+    Test::new("set unstable\n_foo() := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\n_foo() := 'baz'\n")
       .error("Duplicate function `_foo`", lsp::Range::at(1, 0, 2, 0))
       .run();
   }
 
   #[test]
   fn analyzer_imported_duplicate_recipe_reports_local_declaration() {
-    Test::new("foo:\n")
-      .imported_document("\n\nfoo:\n")
+    Test::new("foo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nfoo:\n")
       .error("Duplicate recipe name `foo`", lsp::Range::at(0, 0, 1, 0))
       .run();
   }
 
   #[test]
   fn analyzer_imported_duplicate_setting_reports_local_declaration() {
-    Test::new("set export\n")
-      .imported_document("\n\nset export\n")
+    Test::new("set export\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset export\n")
       .error("Duplicate setting `export`", lsp::Range::at(0, 0, 1, 0))
       .run();
   }
 
   #[test]
   fn analyzer_imported_duplicate_unexport_reports_local_declaration() {
-    Test::new("unexport foo\n")
-      .imported_document("\n\nunexport foo\n")
+    Test::new("unexport foo\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nunexport foo\n")
       .error(
         "Variable `foo` is unexported multiple times",
         lsp::Range::at(0, 9, 0, 12),
@@ -611,16 +623,16 @@ mod tests {
 
   #[test]
   fn analyzer_imported_duplicate_variable_reports_local_declaration() {
-    Test::new("export foo := 'bar'\n")
-      .imported_document("\n\nexport foo := 'baz'\n")
+    Test::new("export foo := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nexport foo := 'baz'\n")
       .error("Duplicate variable `foo`", lsp::Range::at(0, 7, 1, 0))
       .run();
   }
 
   #[test]
   fn analyzer_imported_no_cd_conflict_reports_local_working_directory() {
-    Test::new("set working-directory := 'foo'\n")
-      .imported_document("\n\nset no-cd\n")
+    Test::new("set working-directory := 'foo'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset no-cd\n")
       .error(
         "`no-cd` is incompatible with `working-directory`",
         lsp::Range::at(0, 0, 1, 0),
@@ -630,8 +642,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_recipe_conflict_reports_local_alias() {
-    Test::new("alias foo := bar\n")
-      .imported_document("\n\nfoo:\nbar:\n")
+    Test::new("alias foo := bar\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nfoo:\nbar:\n")
       .error(
         "Recipe `foo` is redefined as an alias",
         lsp::Range::at(0, 6, 0, 9),
@@ -641,16 +653,16 @@ mod tests {
 
   #[test]
   fn analyzer_imported_recipe_usage_does_not_hide_unused_parameters() {
-    Test::new("set allow-duplicate-recipes\nfoo bar:\n")
-      .imported_document("foo bar:\n  echo {{bar}}\n")
+    Test::new("set allow-duplicate-recipes\nfoo bar:\nimport 'foo.just'\n")
+      .file("foo.just", "foo bar:\n  echo {{bar}}\n")
       .warning("Parameter `bar` appears unused", lsp::Range::at(1, 4, 1, 7))
       .run();
   }
 
   #[test]
   fn analyzer_imported_unexport_conflict_reports_local_variable() {
-    Test::new("export foo := 'bar'\n")
-      .imported_document("\n\nunexport foo\n")
+    Test::new("export foo := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nunexport foo\n")
       .error(
         "Variable foo is both exported and unexported",
         lsp::Range::at(0, 7, 0, 10),
@@ -660,8 +672,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_variable_conflict_reports_local_unexport() {
-    Test::new("unexport foo\n")
-      .imported_document("\n\nexport foo := 'bar'\n")
+    Test::new("unexport foo\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nexport foo := 'bar'\n")
       .error(
         "Variable foo is both exported and unexported",
         lsp::Range::at(0, 9, 0, 12),
@@ -671,8 +683,8 @@ mod tests {
 
   #[test]
   fn analyzer_imported_working_directory_conflict_reports_local_no_cd() {
-    Test::new("set no-cd\n")
-      .imported_document("\n\nset working-directory := 'foo'\n")
+    Test::new("set no-cd\nimport 'foo.just'\n")
+      .file("foo.just", "\n\nset working-directory := 'foo'\n")
       .error(
         "`working-directory` is incompatible with `no-cd`",
         lsp::Range::at(0, 0, 1, 0),
@@ -702,9 +714,10 @@ mod tests {
       set allow-duplicate-recipes
       foo $bar:
       baz: (foo 'bar')
+      import 'foo.just'
       "
     })
-    .imported_document("foo $bar $baz:\n")
+    .file("foo.just", "foo $bar $baz:\n")
     .run();
   }
 
@@ -717,12 +730,15 @@ mod tests {
       bar: (use 'arg')
       "
     })
-    .imported_document(indoc! {
-      "
-      use arg:
-        echo {{arg}}
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        use arg:
+          echo {{arg}}
+        "
+      },
+    )
     .run();
   }
 
@@ -737,12 +753,15 @@ mod tests {
       foo: use
       "
     })
-    .imported_document(indoc! {
-      "
-      use:
-        echo {{lib_var}}
-      "
-    })
+    .file(
+      "foo.just",
+      indoc! {
+        "
+        use:
+          echo {{lib_var}}
+        "
+      },
+    )
     .run();
   }
 
@@ -1164,13 +1183,13 @@ mod tests {
         .error(message, range)
         .run();
 
-      Test::new(&content)
-        .imported_document("set lists := false\n")
+      Test::new(&format!("{content}import 'foo.just'\n"))
+        .file("foo.just", "set lists := false\n")
         .error(message, range)
         .run();
 
-      Test::new(&content)
-        .imported_document("set unstable\nset lists\n")
+      Test::new(&format!("{content}import 'foo.just'\n"))
+        .file("foo.just", "set unstable\nset lists\n")
         .run();
     }
 
@@ -2454,8 +2473,8 @@ mod tests {
 
   #[test]
   fn circular_dependencies_report_only_local_members() {
-    Test::new("foo: bar\n")
-      .imported_document("bar: foo\n")
+    Test::new("foo: bar\nimport 'foo.just'\n")
+      .file("foo.just", "bar: foo\n")
       .error(
         "Recipe `foo` has circular dependency `foo -> bar -> foo`",
         lsp::Range::at(0, 0, 1, 0),
@@ -2541,9 +2560,10 @@ mod tests {
       set allow-duplicate-recipes
       foo: bar
       bar: foo
+      import 'foo.just'
       "
     })
-    .imported_document("bar:\n")
+    .file("foo.just", "bar:\n")
     .error(
       "Recipe `foo` has circular dependency `foo -> bar -> foo`",
       lsp::Range::at(1, 0, 2, 0),
@@ -7053,16 +7073,19 @@ mod tests {
 
   #[test]
   fn unstable_feature_gate_imported_features() {
-    Test::new("foo:\n")
-      .imported_document(indoc! {
-        "
-        set lists
-        bar(baz) := baz
-        [script]
-        [cache]
-        baz:
-        "
-      })
+    Test::new("foo:\nimport 'foo.just'\n")
+      .file(
+        "foo.just",
+        indoc! {
+          "
+          set lists
+          bar(baz) := baz
+          [script]
+          [cache]
+          baz:
+          "
+        },
+      )
       .run();
   }
 
@@ -7076,9 +7099,10 @@ mod tests {
       [cache]
       baz:
         echo {{foo('bar')}}
+      import 'foo.just'
       "
     })
-    .imported_document("set unstable\n")
+    .file("foo.just", "set unstable\n")
     .run();
   }
 
@@ -7131,8 +7155,8 @@ mod tests {
 
   #[test]
   fn unused_function_called_from_imported_document() {
-    Test::new("set unstable\nfoo() := 'bar'\n")
-      .imported_document("bar:\n  echo {{foo()}}\n")
+    Test::new("set unstable\nfoo() := 'bar'\nimport 'foo.just'\n")
+      .file("foo.just", "bar:\n  echo {{foo()}}\n")
       .run();
   }
 
@@ -7150,7 +7174,9 @@ mod tests {
 
   #[test]
   fn unused_function_ignores_imported_definitions() {
-    Test::new("").imported_document("foo() := 'bar'\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo() := 'bar'\n")
+      .run();
   }
 
   #[test]
@@ -7160,7 +7186,9 @@ mod tests {
 
   #[test]
   fn unused_function_parameter_ignores_imported_definitions() {
-    Test::new("").imported_document("foo(bar) := 'baz'\n").run();
+    Test::new("import 'foo.just'\n")
+      .file("foo.just", "foo(bar) := 'baz'\n")
+      .run();
   }
 
   #[test]
