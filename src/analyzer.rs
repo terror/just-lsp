@@ -367,16 +367,6 @@ mod tests {
   }
 
   #[test]
-  fn analyzer_ignores_imported_dotenv_path_filename_conflicts() {
-    Test::new("import 'foo.just'\n")
-      .file(
-        "foo.just",
-        "set dotenv-path := 'foo'\nset dotenv-filename := 'bar'\n",
-      )
-      .run();
-  }
-
-  #[test]
   fn analyzer_ignores_imported_duplicate_aliases() {
     Test::new("import 'foo.just'\n")
       .file("foo.just", "alias foo := bar\nalias foo := bar\n")
@@ -546,33 +536,11 @@ mod tests {
   }
 
   #[test]
-  fn analyzer_imported_dotenv_filename_conflict_reports_local_path() {
-    Test::new("set dotenv-path := 'foo'\nimport 'foo.just'\n")
-      .file("foo.just", "\n\nset dotenv-filename := 'bar'\n")
-      .warning(
-        "`dotenv-path` overrides `dotenv-filename`",
-        lsp::Range::at(0, 0, 1, 0),
-      )
-      .run();
-  }
-
-  #[test]
   fn analyzer_imported_dotenv_load_conflict_reports_local_command() {
     Test::new("set dotenv-command := 'foo'\nimport 'foo.just'\n")
       .file("foo.just", "\n\nset dotenv-load\n")
       .error(
         "`dotenv-load` is incompatible with `dotenv-command`",
-        lsp::Range::at(0, 0, 1, 0),
-      )
-      .run();
-  }
-
-  #[test]
-  fn analyzer_imported_dotenv_path_conflict_reports_local_filename() {
-    Test::new("set dotenv-filename := 'foo'\nimport 'foo.just'\n")
-      .file("foo.just", "\n\nset dotenv-path := 'bar'\n")
-      .warning(
-        "`dotenv-path` overrides `dotenv-filename`",
         lsp::Range::at(0, 0, 1, 0),
       )
       .run();
@@ -2971,50 +2939,6 @@ mod tests {
       "set dotenv-required\nset dotenv-command := 'foo'\n",
       "`dotenv-required` is incompatible with `dotenv-command`",
     );
-  }
-
-  #[test]
-  fn dotenv_filename_without_path_is_ok() {
-    Test::new(indoc! {
-      "
-      set dotenv-filename := \".env\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn dotenv_path_and_filename_conflict() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := \".env.production\"
-      set dotenv-filename := \".env\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .warning(
-      "`dotenv-path` overrides `dotenv-filename`",
-      lsp::Range::at(1, 0, 2, 0),
-    )
-    .run();
-  }
-
-  #[test]
-  fn dotenv_path_without_filename_is_ok() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := \".env.production\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
   }
 
   #[test]

@@ -42,7 +42,6 @@ mod circular_import;
 mod deprecated_function;
 mod deprecated_setting;
 mod dotenv_command_conflict;
-mod dotenv_path_filename_conflict;
 mod duplicate_alias;
 mod duplicate_attribute;
 mod duplicate_dependency;
