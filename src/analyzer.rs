@@ -4600,6 +4600,18 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_shebang_operands() {
+    Test::new(indoc! {
+      "
+      foo:
+        #!cmd /c
+        echo bar
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
