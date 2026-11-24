@@ -34,6 +34,8 @@ impl Executor {
 
     command
       .current_dir(directory.clone())
+      .kill_on_drop(true)
+      .stdin(Stdio::null())
       .stdout(Stdio::piped())
       .stderr(Stdio::piped());
 
