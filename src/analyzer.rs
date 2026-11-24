@@ -6514,6 +6514,17 @@ mod tests {
   }
 
   #[test]
+  fn unexport_followed_by_recipe() {
+    Test::new(indoc! {
+      "
+      unexport foo
+      bar:
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn unexported_names_are_not_variables() {
     Test::new(indoc! {
       "
