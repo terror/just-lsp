@@ -129,6 +129,15 @@ impl<'a> ModuleView<'a> {
     &self.symbols.functions
   }
 
+  pub(crate) fn loads(&self, path: &Path) -> bool {
+    let Some(context) = self.context else {
+      return OsFilesystem.is_file(path);
+    };
+
+    lsp::Url::from_path(&path.clean())
+      .is_some_and(|uri| context.project.loads(&uri))
+  }
+
   pub(crate) fn module(&self, path: &Namepath) -> ModuleLookup<'a> {
     let mut view = self.clone();
 

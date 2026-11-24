@@ -6,6 +6,13 @@ pub(crate) struct MemoryFilesystem {
 }
 
 impl MemoryFilesystem {
+  fn is_dir(&self, path: &Path) -> bool {
+    self
+      .files
+      .keys()
+      .any(|file| file != path && file.starts_with(path))
+  }
+
   pub(crate) fn new(
     files: impl IntoIterator<Item = (PathBuf, String)>,
   ) -> Self {
@@ -16,13 +23,6 @@ impl MemoryFilesystem {
 }
 
 impl Filesystem for MemoryFilesystem {
-  fn is_dir(&self, path: &Path) -> bool {
-    self
-      .files
-      .keys()
-      .any(|file| file != path && file.starts_with(path))
-  }
-
   fn is_file(&self, path: &Path) -> bool {
     self.files.contains_key(path)
   }

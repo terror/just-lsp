@@ -1761,6 +1761,18 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn diagnostics_accept_unsaved_import() -> Result {
+    Test::new()
+      .ready()
+      .open("foo.just", "")
+      .diagnostics("foo.just", Some(1), [])
+      .open("justfile", "import 'foo.just'")
+      .diagnostics("justfile", Some(1), [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn diagnostics_clear_closed_projects() -> Result {
     Test::new()
       .file("foo.just", "foo: bar\n")
