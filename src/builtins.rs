@@ -50,12 +50,12 @@ pub const BUILTINS: &[Builtin<'_>] = &[
         },
         AttributeKeyword {
           name: "max",
-          expression: AttributeExpressionKind::Any,
+          expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
         },
         AttributeKeyword {
           name: "min",
-          expression: AttributeExpressionKind::Any,
+          expression: AttributeExpressionKind::StringLiteral,
           value_required: true,
         },
         AttributeKeyword {
@@ -164,8 +164,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       cache.
 
       Currently unstable. The `[cache]` attribute may only be used
-      with script recipes. The `environment`, `inputs`, `outputs`, and
-      `extra` keyword arguments customize the cache key.
+      with shebang and script recipes. The `environment`, `inputs`,
+      `outputs`, and `extra` keyword arguments customize the cache key.
 
       By default, the cache key includes environment variables exported
       or unexported in the justfile. Pass a list of names to `environment`
@@ -380,8 +380,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     },
     description: indoc! {
       "
-      Set the file extension used when writing a shebang recipe's script
-      to a temporary file.
+      Set the file extension used when writing a shebang or script
+      recipe's script to a temporary file.
 
       `EXT` should include the leading period if one is desired (for
       example `\".py\"`). This affects only how the temp file is named,
@@ -590,8 +590,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Don't print an error message if the recipe fails.
 
-      `just` normally prints a line like `error: Recipe \\\"foo\\\" failed
-      with exit code 1` when a recipe exits non-zero. This attribute
+      `just` normally prints a line like ``error: recipe `foo` failed on
+      line 1 with exit code 1`` when a recipe exits non-zero. This attribute
       suppresses that message for the annotated recipe, which is useful
       when the recipe already prints its own, more specific error
       output.
@@ -685,10 +685,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       Turn on positional arguments for this recipe.
 
-      Recipe arguments are passed to the shell as positional parameters
-      (`$0`, `$1`, `$@`, ...) instead of being interpolated as
-      `{{ name }}`. The recipe name is available as `$0` for linewise
-      recipes.
+      Recipe arguments are also passed to the shell as positional
+      parameters (`$1`, `$2`, `$@`, ...). The recipe name is available
+      as `$0` for linewise recipes.
 
       Note that PowerShell does not handle positional arguments the
       same way as POSIX shells; enabling this with PowerShell as the
@@ -1598,9 +1597,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       User-specific executable directory.
 
-      On Unix, follows the XDG Base Directory Specification
-      (`$XDG_BIN_HOME` or `$HOME/.local/bin`). On Windows, returns no
-      well-defined value, so use with care on that platform.
+      Follows the XDG Base Directory Specification (`$XDG_BIN_HOME` or
+      `$HOME/.local/bin`). Only defined on Linux; aborts on other
+      platforms.
       "
     },
     deprecated: None,
@@ -2169,9 +2168,9 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       "
       The user-specific runtime directory.
 
-      Follows the XDG Base Directory Specification on Unix; returns
-      the platform-specified runtime directory on other systems. May
-      be unset on some platforms, in which case the function aborts.
+      Follows the XDG Base Directory Specification (`$XDG_RUNTIME_DIR`).
+      Only defined on Linux; aborts on other platforms or if
+      `$XDG_RUNTIME_DIR` is unset.
       "
     },
     deprecated: None,
@@ -2614,8 +2613,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     signature: FunctionSignature(&[Required("path", Some("string"))]),
     description: indoc! {
       "
-      Return `path` with its extension removed. Aborts if `path` has
-      no extension.
+      Return `path` with its extension removed. Returns `path`
+      unchanged if it has no extension.
 
       ```just
       without_extension(\"/foo/bar.txt\")  # => \"/foo/bar\"
@@ -2914,8 +2913,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
       Set recipe body indentation used when formatting with `--fmt` or
       `--dump`.
 
-      Accepts any string of whitespace characters. The default is four
-      spaces.
+      Accepts a non-empty string of all spaces or all tabs. The default
+      is four spaces.
 
       ```just
       set indentation := \"  \"
@@ -2995,8 +2994,8 @@ pub const BUILTINS: &[Builtin<'_>] = &[
     kind: SettingKind::Boolean(false),
     description: indoc! {
       "
-      Suppress the trailing `error: Recipe \\\"foo\\\" failed with exit
-      code N` message for failed recipes, globally. Individual
+      Suppress the trailing ``error: recipe `foo` failed on line N with
+      exit code M`` message for failed recipes, globally. Individual
       recipes can still opt back in with the `[exit-message]`
       attribute.
       "

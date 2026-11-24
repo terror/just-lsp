@@ -16,23 +16,9 @@ define_rule! {
           if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
             let parameters = &recipe.parameters;
 
-            let flags = recipe
-              .attributes
-              .iter()
-              .filter(|attribute| attribute.keyword_argument("flag").is_some())
-              .filter_map(Attribute::arg_parameter)
-              .collect::<HashSet<_>>();
-
             let required_parameters = parameters
               .iter()
-              .filter(|parameter| {
-                parameter.default_value.is_none()
-                  && !flags.contains(&parameter.name)
-                  && !matches!(
-                    parameter.kind,
-                    ParameterKind::Variadic(VariadicType::ZeroOrMore)
-                  )
-              })
+              .filter(|parameter| recipe.is_required(parameter))
               .count();
 
             let has_unlimited_variadic = !lists && parameters

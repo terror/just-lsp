@@ -11,22 +11,29 @@ define_rule! {
 
       context
         .local_declarations(context.recipes())
-        .filter(|recipe| !recipe.runs_as_script(default_script))
         .filter_map(|recipe| {
+          let script = recipe.runs_as_script(default_script);
+
           let mut lines = recipe
             .body_lines()
-            .filter(|line| line.kind != IndentKind::Mixed);
+            .filter(|line| script || line.kind != IndentKind::Mixed);
 
-          let expected = lines.next()?;
+          let expected =
+            lines.next().filter(|line| line.kind != IndentKind::Mixed)?;
 
           lines
             .scan(expected.continues, |continues, line| {
               Some((mem::replace(continues, line.continues), line))
             })
             .find(|(previous_continues, line)| {
-              !*previous_continues
-                && line.kind == expected.kind
-                && line.indent != expected.indent
+              if script {
+                !line.indent.starts_with(expected.indent)
+                  && !line.mixed_prefix(expected.indent.len())
+              } else {
+                !*previous_continues
+                  && line.kind == expected.kind
+                  && line.indent != expected.indent
+              }
             })
             .map(|(_, line)| {
               Diagnostic::error(

@@ -216,6 +216,20 @@ mod tests {
   }
 
   #[test]
+  fn alias_recipe_conflict_respects_os_attributes() {
+    Test::new("[windows]\nalias foo := bar\n[unix]\nfoo:\nbar:\n").run();
+
+    Test::new(
+      "[windows]\nalias foo := bar\n[unix]\nalias foo := bar\n[linux]\nfoo:\nbar:\n",
+    )
+    .error(
+      "Alias `foo` is redefined as a recipe",
+      lsp::Range::at(5, 0, 5, 3),
+    )
+    .run();
+  }
+
+  #[test]
   fn aliases_basic() {
     Test::new(indoc! {
       "
@@ -363,16 +377,6 @@ mod tests {
   fn analyzer_ignores_imported_dotenv_command_conflicts() {
     Test::new("import 'foo.just'\n")
       .file("foo.just", "set dotenv-command := 'foo'\nset dotenv-load\n")
-      .run();
-  }
-
-  #[test]
-  fn analyzer_ignores_imported_dotenv_path_filename_conflicts() {
-    Test::new("import 'foo.just'\n")
-      .file(
-        "foo.just",
-        "set dotenv-path := 'foo'\nset dotenv-filename := 'bar'\n",
-      )
       .run();
   }
 
@@ -546,17 +550,6 @@ mod tests {
   }
 
   #[test]
-  fn analyzer_imported_dotenv_filename_conflict_reports_local_path() {
-    Test::new("set dotenv-path := 'foo'\nimport 'foo.just'\n")
-      .file("foo.just", "\n\nset dotenv-filename := 'bar'\n")
-      .warning(
-        "`dotenv-path` overrides `dotenv-filename`",
-        lsp::Range::at(0, 0, 1, 0),
-      )
-      .run();
-  }
-
-  #[test]
   fn analyzer_imported_dotenv_load_conflict_reports_local_command() {
     Test::new("set dotenv-command := 'foo'\nimport 'foo.just'\n")
       .file("foo.just", "\n\nset dotenv-load\n")
@@ -568,21 +561,21 @@ mod tests {
   }
 
   #[test]
-  fn analyzer_imported_dotenv_path_conflict_reports_local_filename() {
-    Test::new("set dotenv-filename := 'foo'\nimport 'foo.just'\n")
-      .file("foo.just", "\n\nset dotenv-path := 'bar'\n")
-      .warning(
-        "`dotenv-path` overrides `dotenv-filename`",
-        lsp::Range::at(0, 0, 1, 0),
-      )
-      .run();
-  }
-
-  #[test]
   fn analyzer_imported_duplicate_alias_reports_local_declaration() {
     Test::new("alias foo := bar\nbar:\nimport 'foo.just'\n")
       .file("foo.just", "\n\nalias foo := bar\n")
       .error("Duplicate alias `foo`", lsp::Range::at(0, 0, 0, 16))
+      .run();
+  }
+
+  #[test]
+  fn analyzer_imported_duplicate_default_reports_local_attribute() {
+    Test::new("[default]\nfoo:\nimport 'foo.just'\n")
+      .file("foo.just", "\n\n[default]\nbar:\n")
+      .error(
+        "Recipe `foo` has duplicate `[default]` attribute, which may only appear once per module",
+        lsp::Range::at(0, 0, 1, 0),
+      )
       .run();
   }
 
@@ -781,6 +774,45 @@ mod tests {
   }
 
   #[test]
+  fn arg_attribute_duplicate_option() {
+    #[track_caller]
+    fn case(
+      first: &str,
+      second: &str,
+      message: &'static str,
+      start: u32,
+      end: u32,
+    ) {
+      Test::new(&formatdoc! {
+        "
+        [arg('foo', {first})]
+        [arg('bar', {second})]
+        baz foo bar:
+          echo {{{{foo}}}} {{{{bar}}}}
+        "
+      })
+      .error(message, lsp::Range::at(1, start, 1, end))
+      .run();
+    }
+
+    case(
+      "long",
+      "long='foo'",
+      "Recipe `baz` defines option `--foo` multiple times",
+      17,
+      22,
+    );
+
+    case(
+      "short='b'",
+      "short",
+      "Recipe `baz` defines option `-b` multiple times",
+      12,
+      17,
+    );
+  }
+
+  #[test]
   fn arg_attribute_duplicate_parameter() {
     Test::new(indoc! {
       "
@@ -827,6 +859,156 @@ mod tests {
       lsp::Range::at(0, 0, 1, 0),
     )
     .run();
+  }
+
+  #[test]
+  fn arg_attribute_invalid_options() {
+    #[track_caller]
+    fn case(
+      arguments: &str,
+      parameter: &str,
+      message: &'static str,
+      range: lsp::Range,
+    ) {
+      Test::new(&formatdoc! {
+        "
+        set unstable
+        set lists
+
+        [arg('foo', {arguments})]
+        bar {parameter}:
+          echo {{{{foo}}}}
+        "
+      })
+      .error(message, range)
+      .run();
+    }
+
+    case(
+      "long='a=b'",
+      "foo",
+      "Option name for parameter `foo` contains equal sign",
+      lsp::Range::at(3, 17, 3, 22),
+    );
+
+    case(
+      "long='-a'",
+      "foo",
+      "Option name for parameter `foo` starts with dash",
+      lsp::Range::at(3, 17, 3, 21),
+    );
+
+    case(
+      "long=''",
+      "foo",
+      "Option name for parameter `foo` is empty",
+      lsp::Range::at(3, 17, 3, 19),
+    );
+
+    case(
+      "short='ab'",
+      "foo",
+      "Short option name for parameter `foo` contains multiple characters",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag='bar'",
+      "foo",
+      "`flag` attribute for argument `foo` takes no value",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "flag",
+      "foo",
+      "Argument attribute `flag` only valid with `long` or `short`",
+      lsp::Range::at(3, 12, 3, 16),
+    );
+
+    case(
+      "long, flag, value='bar'",
+      "foo",
+      "Argument `foo` may not have both `flag` and `value` attributes",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag, pattern='bar'",
+      "foo",
+      "Argument `foo` may not have both `flag` and `pattern` attributes",
+      lsp::Range::at(3, 18, 3, 22),
+    );
+
+    case(
+      "long, flag",
+      "foo='bar'",
+      "Flag parameter `foo` may not have a default",
+      lsp::Range::at(4, 4, 4, 13),
+    );
+
+    case(
+      "long, multiple='bar'",
+      "foo",
+      "Attribute key `multiple` takes no value",
+      lsp::Range::at(3, 18, 3, 26),
+    );
+
+    case(
+      "multiple",
+      "foo",
+      "Argument attribute `multiple` only valid with `long` or `short`",
+      lsp::Range::at(3, 12, 3, 20),
+    );
+
+    case(
+      "pattern='('",
+      "foo",
+      "Failed to parse argument pattern",
+      lsp::Range::at(3, 12, 3, 19),
+    );
+
+    case(
+      "pattern='(?x)#'",
+      "foo",
+      "Failed to parse argument pattern",
+      lsp::Range::at(3, 12, 3, 19),
+    );
+
+    case(
+      "min='01'",
+      "+foo",
+      "Invalid `min` value `01`",
+      lsp::Range::at(3, 16, 3, 20),
+    );
+
+    case(
+      "max='18446744073709551616'",
+      "+foo",
+      "Invalid `max` value `18446744073709551616`: number too large to fit in target type",
+      lsp::Range::at(3, 16, 3, 38),
+    );
+
+    case(
+      "min='1' + '2'",
+      "+foo",
+      "Attribute `arg` arguments must be string literals",
+      lsp::Range::at(3, 16, 3, 25),
+    );
+
+    case(
+      "min='2', max='1'",
+      "+foo",
+      "Argument attribute `min` `2` exceeds `max` `1`",
+      lsp::Range::at(3, 12, 3, 15),
+    );
+
+    case(
+      "min='1'",
+      "foo",
+      "Argument attribute `min` only valid with `multiple` or a variadic parameter",
+      lsp::Range::at(3, 12, 3, 15),
+    );
   }
 
   #[test]
@@ -896,13 +1078,6 @@ mod tests {
       "Attribute `arg` arguments must be string literals",
       10,
       23,
-    );
-
-    case(
-      "value='foo'",
-      "`[arg]` `value=` requires `long=` or `short=`",
-      5,
-      16,
     );
   }
 
@@ -1066,8 +1241,8 @@ mod tests {
       "
     })
     .error(
-      "`[arg]` `value=` requires `long=` or `short=`",
-      lsp::Range::at(0, 13, 0, 23),
+      "Argument attribute `value` only valid with `long` or `short`",
+      lsp::Range::at(0, 13, 0, 18),
     )
     .run();
   }
@@ -1091,7 +1266,7 @@ mod tests {
       set unstable
       set lists
 
-      [arg('foo', flag)]
+      [arg('foo', long, flag)]
       bar foo:
         echo {{foo}}
       "
@@ -1103,14 +1278,14 @@ mod tests {
   fn arg_attribute_with_flag_requires_lists() {
     Test::new(indoc! {
       "
-      [arg('foo', flag)]
+      [arg('foo', long, flag)]
       bar foo:
         echo {{foo}}
       "
     })
     .error(
       "`flag` arguments require `set lists`",
-      lsp::Range::at(0, 12, 0, 16),
+      lsp::Range::at(0, 18, 0, 22),
     )
     .run();
   }
@@ -1179,7 +1354,7 @@ mod tests {
 
       Test::new(&content).error(message, range).run();
 
-      Test::new(&format!("{content}\nset lists := false\n"))
+      Test::new(&format!("{content}\nset unstable\nset lists := false\n"))
         .error(message, range)
         .run();
 
@@ -2963,50 +3138,6 @@ mod tests {
   }
 
   #[test]
-  fn dotenv_filename_without_path_is_ok() {
-    Test::new(indoc! {
-      "
-      set dotenv-filename := \".env\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
-  fn dotenv_path_and_filename_conflict() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := \".env.production\"
-      set dotenv-filename := \".env\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .warning(
-      "`dotenv-path` overrides `dotenv-filename`",
-      lsp::Range::at(1, 0, 2, 0),
-    )
-    .run();
-  }
-
-  #[test]
-  fn dotenv_path_without_filename_is_ok() {
-    Test::new(indoc! {
-      "
-      set dotenv-path := \".env.production\"
-
-      foo:
-        echo \"foo\"
-      "
-    })
-    .run();
-  }
-
-  #[test]
   fn duplicate_dragonfly_attribute() {
     Test::new(indoc! {
       "
@@ -3447,6 +3578,33 @@ mod tests {
   }
 
   #[test]
+  fn extraneous_attributes() {
+    Test::new(indoc! {
+      "
+      [private]
+
+      [no-cd]
+
+      foo:
+      "
+    })
+    .error("extraneous attribute", lsp::Range::at(0, 0, 1, 0))
+    .error("extraneous attribute", lsp::Range::at(2, 0, 3, 0))
+    .run();
+
+    Test::new(indoc! {
+      "
+      [private]
+      [no-cd]
+      # foo
+      foo:
+      "
+    })
+    .error("extraneous attributes", lsp::Range::at(0, 0, 2, 0))
+    .run();
+  }
+
+  #[test]
   fn format_strings_mark_variables_as_used() {
     Test::new(indoc! {
       r#"
@@ -3789,16 +3947,6 @@ mod tests {
   }
 
   #[test]
-  fn import_format_string_skipped() {
-    Test::new(indoc! {
-      r#"
-      import f"{'nonexistent.just'}"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
   fn import_circular() {
     #[track_caller]
     fn case(justfile: &str, range: lsp::Range) {
@@ -3838,6 +3986,16 @@ mod tests {
 
     Test::new("import '.'")
       .error(expected, lsp::Range::at(0, 7, 0, 10))
+      .run();
+  }
+
+  #[test]
+  fn import_format_string() {
+    Test::new("import f'foo'")
+      .error(
+        "Expected keyword `x` but found identifier `f`",
+        lsp::Range::at(0, 7, 0, 13),
+      )
       .run();
   }
 
@@ -3909,23 +4067,12 @@ mod tests {
 
   #[test]
   fn import_invalid_string_escape() {
-    #[track_caller]
-    fn case(source: &str, range: lsp::Range) {
-      Test::new(source)
-        .error("Invalid escape sequence in string literal", range)
-        .run();
-    }
-
-    case(r#"import "\u{D800}""#, lsp::Range::at(0, 7, 0, 17));
-    case(r#"import x"\u{110000}""#, lsp::Range::at(0, 7, 0, 20));
-    case(r#"import? "\u{DFFF}""#, lsp::Range::at(0, 8, 0, 18));
-
-    let attribute = if cfg!(windows) { "unix" } else { "windows" };
-
-    case(
-      &format!("[{attribute}]\nimport \"\\u{{D800}}\"\n"),
-      lsp::Range::at(1, 7, 1, 17),
-    );
+    Test::new(r#"import "\u{D800}""#)
+      .error(
+        "unicode escape sequence value `D800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 8, 0, 16),
+      )
+      .run();
   }
 
   #[test]
@@ -3953,6 +4100,37 @@ mod tests {
     })
     .error(expected, lsp::Range::at(0, 7, 0, 26))
     .run();
+  }
+
+  #[test]
+  fn invalid_unicode_escape() {
+    #[track_caller]
+    fn case(source: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(Test::new(source), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(r#"export foo := "\u{10FFFF}""#, &[]);
+
+    case(
+      r#"export foo := "\u{110000}""#,
+      &[(
+        "unicode escape sequence value `110000` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 25),
+      )],
+    );
+
+    case(
+      r#"export foo := "\u{d800}""#,
+      &[(
+        "unicode escape sequence value `d800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 23),
+      )],
+    );
   }
 
   #[test]
@@ -4579,6 +4757,43 @@ mod tests {
   }
 
   #[test]
+  fn parallel_with_mapped_dependency() {
+    Test::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [parallel]
+      foo *args: *(bar *args)
+        echo {{args}}
+
+      bar arg:
+        echo {{arg}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_in_each_group_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar && baz
+
+      bar:
+
+      baz:
+      "
+    })
+    .warning(
+      "Recipe `foo` has only one dependency before and after `&&`, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn parallel_without_dependencies_warns() {
     Test::new(indoc! {
       "
@@ -4679,6 +4894,24 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_chained_comparison() {
+    Test::new(indoc! {
+      "
+      set lists
+      set unstable
+
+      foo:
+        echo {{ if 'a' == 'b' != 'c' { 'd' } else { 'e' } }}
+      "
+    })
+    .error(
+      "Expected `&&`, `||`, `+`, `++`, or `/`, but found `!=`",
+      lsp::Range::at(4, 24, 4, 26),
+    )
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_double_braces_in_recipe() {
     Test::new(indoc! {
       r#"
@@ -4687,6 +4920,26 @@ mod tests {
       "#
     })
     .error("Syntax error near `{{`", lsp::Range::at(1, 8, 1, 10))
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_if_expression_operand() {
+    Test::new(indoc! {
+      "
+      foo:
+        echo {{ if 'a' == 'b' { 'c' } else { 'd' } + 'e' }}
+        echo {{ 'a' + if 'a' == 'b' { 'c' } else { 'd' } / 'e' }}
+      "
+    })
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `+`",
+      lsp::Range::at(1, 45, 1, 46),
+    )
+    .error(
+      "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `/`",
+      lsp::Range::at(2, 51, 2, 52),
+    )
     .run();
   }
 
@@ -5031,6 +5284,18 @@ mod tests {
   }
 
   #[test]
+  fn private_and_eager_variables_are_not_unused() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo := 'bar'
+      eager baz := 'qux'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_consistent_indentation() {
     Test::new("foo:\n  echo \"foo\"\n  echo \"bar\"\n").run();
   }
@@ -5239,6 +5504,30 @@ mod tests {
         echo \"bar\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_dependencies_repeated_subsequent_marker() {
+    Test::new(indoc! {
+      "
+      foo: && bar && baz && qux
+
+      bar:
+
+      baz:
+
+      qux:
+      "
+    })
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 12, 0, 14),
+    )
+    .error(
+      "Expected comment, end of file, end of line, or dependency, but found `&&`",
+      lsp::Range::at(0, 19, 0, 21),
+    )
     .run();
   }
 
@@ -5511,9 +5800,45 @@ mod tests {
       foo:
         bar
           baz
+        \tbaz
       \tqux
       "
     })
+    .error(
+      "Recipe line has inconsistent leading whitespace. Recipe started with `␠␠` but found line with `⇥`",
+      lsp::Range::at(5, 0, 5, 1),
+    )
+    .run();
+  }
+
+  #[test]
+  fn recipe_indentation_script_attribute_mixed() {
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+        bar
+       \tbaz
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(3, 0, 3, 2),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [script]
+      foo:
+       \tbar
+        baz
+      "
+    })
+    .error(
+      "Recipe `foo` mixes tabs and spaces for indentation",
+      lsp::Range::at(2, 0, 2, 2),
+    )
     .run();
   }
 
@@ -5742,6 +6067,27 @@ mod tests {
         echo \"bar\"
       "
     })
+    .run();
+  }
+
+  #[test]
+  fn recipe_invocation_zero_or_more_variadic_with_min_requires_argument() {
+    Test::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [arg('bar', min='2')]
+      foo *bar:
+        echo {{bar}}
+
+      baz: foo
+      "
+    })
+    .error(
+      "Dependency `foo` requires 1 argument, but 0 provided",
+      lsp::Range::at(7, 5, 7, 8),
+    )
     .run();
   }
 
@@ -6580,6 +6926,37 @@ mod tests {
   }
 
   #[test]
+  fn settings_interpreter_empty() {
+    #[track_caller]
+    fn case(setting: &str, message: &'static str) {
+      let content = format!("set {setting} := []\n");
+
+      let start = 8 + u32::try_from(setting.len()).unwrap();
+
+      Test::new(&content)
+        .error(message, lsp::Range::at(0, start, 0, start + 2))
+        .run();
+    }
+
+    case(
+      "script-interpreter",
+      "Setting `script-interpreter` must be a non-empty array",
+    );
+    case("shell", "Setting `shell` must be a non-empty array");
+
+    Test::new("set windows-shell := []\n")
+      .warning(
+        "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
+        lsp::Range::at(0, 4, 0, 17),
+      )
+      .error(
+        "Setting `windows-shell` must be a non-empty array",
+        lsp::Range::at(0, 21, 0, 23),
+      )
+      .run();
+  }
+
+  #[test]
   fn settings_lazy_recognized() {
     Test::new(indoc! {
       "
@@ -7075,7 +7452,12 @@ mod tests {
 
   #[test]
   fn unstable_feature_gate_disabled_lists() {
-    Test::new("set lists := false\n").run();
+    Test::new("set lists := false\n")
+      .warning(
+        "`set lists` is unstable without `set unstable`",
+        lsp::Range::at(0, 4, 0, 9),
+      )
+      .run();
   }
 
   #[test]
