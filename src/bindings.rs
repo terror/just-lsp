@@ -24,7 +24,7 @@ impl Bindings {
 
     self.identifiers.push(BoundIdentifier {
       binding,
-      declaration: Self::is_declaration(identifier),
+      declaration: identifier.is_declaration(),
       expression,
       identifier: TextNode {
         range: document.get_range(identifier),
@@ -150,19 +150,6 @@ impl Bindings {
 
   pub(crate) fn identifiers(&self) -> &[BoundIdentifier] {
     &self.identifiers
-  }
-
-  fn is_declaration(identifier: &Node) -> bool {
-    identifier.parent().is_some_and(|parent| {
-      matches!(
-        parent.kind(),
-        "assignment"
-          | "function_definition"
-          | "function_parameters"
-          | "parameter"
-          | "recipe_header"
-      )
-    })
   }
 
   pub(crate) fn new(view: &ModuleView, document: &Document) -> Self {

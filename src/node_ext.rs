@@ -6,6 +6,7 @@ pub trait NodeExt {
   fn find_all(&self, selector: &str) -> Vec<Node<'_>>;
   fn get_parent(&self, kind: &str) -> Option<Node<'_>>;
   fn has_any_parent(&self, kinds: &[&str]) -> bool;
+  fn is_declaration(&self) -> bool;
   fn siblings(&self) -> impl Iterator<Item = Node<'_>>;
 }
 
@@ -45,6 +46,19 @@ impl NodeExt for Node<'_> {
 
   fn has_any_parent(&self, kinds: &[&str]) -> bool {
     kinds.iter().any(|kind| self.get_parent(kind).is_some())
+  }
+
+  fn is_declaration(&self) -> bool {
+    self.parent().is_some_and(|parent| {
+      matches!(
+        parent.kind(),
+        "assignment"
+          | "function_definition"
+          | "function_parameters"
+          | "parameter"
+          | "recipe_header"
+      )
+    })
   }
 
   fn siblings(&self) -> impl Iterator<Item = Node<'_>> {
