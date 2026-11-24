@@ -3184,8 +3184,11 @@ mod tests {
   #[test]
   fn alphabetical_by_kind() {
     #[track_caller]
-    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
-      let names = names.into_iter().collect::<Vec<_>>();
+    fn case(
+      kind: &str,
+      builtins: impl IntoIterator<Item = &'static Builtin<'static>>,
+    ) {
+      let names = builtins.into_iter().map(Builtin::name).collect::<Vec<_>>();
 
       for window in names.windows(2) {
         assert!(
@@ -3197,46 +3200,22 @@ mod tests {
       }
     }
 
-    case(
-      "attribute",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Attribute { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "constant",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "function",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Function { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "setting",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Setting { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
+    case("attribute", Builtin::attributes());
+    case("constant", Builtin::constants());
+    case("function", Builtin::functions());
+    case("setting", Builtin::settings());
   }
 
   #[test]
   fn no_duplicate_names() {
     #[track_caller]
-    fn case(kind: &str, names: impl IntoIterator<Item = &'static str>) {
+    fn case(
+      kind: &str,
+      builtins: impl IntoIterator<Item = &'static Builtin<'static>>,
+    ) {
       let mut seen = HashSet::new();
 
-      for name in names {
+      for name in builtins.into_iter().flat_map(Builtin::names) {
         assert!(
           seen.insert(name),
           "duplicate {kind} name in BUILTINS: {name}",
@@ -3244,38 +3223,9 @@ mod tests {
       }
     }
 
-    case(
-      "attribute",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Attribute { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "constant",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
-
-    case(
-      "function",
-      BUILTINS.iter().flat_map(|builtin| match builtin {
-        Builtin::Function { name, aliases, .. } => once(*name)
-          .chain(aliases.iter().copied())
-          .collect::<Vec<_>>(),
-        _ => Vec::new(),
-      }),
-    );
-
-    case(
-      "setting",
-      BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Setting { name, .. } => Some(*name),
-        _ => None,
-      }),
-    );
+    case("attribute", Builtin::attributes());
+    case("constant", Builtin::constants());
+    case("function", Builtin::functions());
+    case("setting", Builtin::settings());
   }
 }

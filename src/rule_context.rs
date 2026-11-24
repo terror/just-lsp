@@ -1,12 +1,7 @@
 use super::*;
 
-type BuiltinRef = &'static Builtin<'static>;
-
 pub(crate) struct RuleContext<'a> {
   attributes: OnceLock<Vec<Attribute>>,
-  builtin_attribute_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
-  builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
-  builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
   references: OnceLock<References>,
   user_function_names: OnceLock<HashSet<String>>,
@@ -23,79 +18,6 @@ impl<'a> RuleContext<'a> {
       .attributes
       .get_or_init(|| self.document().attributes())
       .as_slice()
-  }
-
-  pub(crate) fn builtin_attribute(
-    &self,
-    name: &str,
-  ) -> Option<&'static Builtin<'static>> {
-    self.builtin_attribute_map().get(name).copied()
-  }
-
-  fn builtin_attribute_map(
-    &self,
-  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
-    self.builtin_attribute_map.get_or_init(|| {
-      let mut map = HashMap::new();
-
-      for builtin in BUILTINS {
-        if let Builtin::Attribute { name, .. } = builtin {
-          map.entry(*name).or_insert(builtin);
-        }
-      }
-
-      map
-    })
-  }
-
-  pub(crate) fn builtin_function(
-    &self,
-    name: &str,
-  ) -> Option<&'static Builtin<'static>> {
-    self.builtin_function_map().get(name).copied()
-  }
-
-  fn builtin_function_map(
-    &self,
-  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
-    self.builtin_function_map.get_or_init(|| {
-      let mut map = HashMap::new();
-
-      for builtin in BUILTINS {
-        if let Builtin::Function { name, aliases, .. } = builtin {
-          map.entry(*name).or_insert(builtin);
-
-          for alias in *aliases {
-            map.entry(*alias).or_insert(builtin);
-          }
-        }
-      }
-
-      map
-    })
-  }
-
-  pub(crate) fn builtin_setting(
-    &self,
-    name: &str,
-  ) -> Option<&'static Builtin<'static>> {
-    self.builtin_setting_map().get(name).copied()
-  }
-
-  fn builtin_setting_map(
-    &self,
-  ) -> &HashMap<&'static str, &'static Builtin<'static>> {
-    self.builtin_setting_map.get_or_init(|| {
-      let mut map = HashMap::new();
-
-      for builtin in BUILTINS {
-        if let Builtin::Setting { name, .. } = builtin {
-          map.entry(*name).or_insert(builtin);
-        }
-      }
-
-      map
-    })
   }
 
   pub(super) fn conflicting_recipe_attributes(
@@ -235,9 +157,6 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn new(view: &'a ModuleView<'a>) -> Self {
     Self {
       attributes: OnceLock::new(),
-      builtin_attribute_map: OnceLock::new(),
-      builtin_function_map: OnceLock::new(),
-      builtin_setting_map: OnceLock::new(),
       function_calls: OnceLock::new(),
       references: OnceLock::new(),
       user_function_names: OnceLock::new(),

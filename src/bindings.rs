@@ -34,10 +34,6 @@ impl Bindings {
     });
   }
 
-  fn builtin(matches: impl Fn(&Builtin) -> bool) -> Option<Binding> {
-    BUILTINS.iter().position(matches).map(Binding::Builtin)
-  }
-
   fn comment_lines<'a>(
     view: &ModuleView,
     document: &Document,
@@ -109,11 +105,7 @@ impl Bindings {
           .find_variable(&name)
           .map(|_| Binding::Variable(name.clone()))
       })
-      .or_else(|| {
-        Self::builtin(|builtin| {
-          matches!(builtin, Builtin::Constant { name: constant, .. } if *constant == name)
-        })
-      })
+      .or_else(|| Builtin::constant(&name).map(Binding::Builtin))
       .unwrap_or_else(|| Binding::Unresolved {
         suggestion: name.find_suggestion(
           locals
@@ -190,10 +182,7 @@ impl Bindings {
       .variables()
       .iter()
       .map(|variable| variable.name.value.clone())
-      .chain(BUILTINS.iter().filter_map(|builtin| match builtin {
-        Builtin::Constant { name, .. } => Some((*name).to_owned()),
-        _ => None,
-      }))
+      .chain(Builtin::constants().map(Builtin::name).map(str::to_owned))
       .collect::<Vec<_>>();
 
     let mut bindings = Self::default();
@@ -343,20 +332,12 @@ impl Bindings {
         Some(Binding::Recipe(Namepath::from_node(&identifier, document)))
       }
       "assignment" => Some(Binding::Variable(name)),
-      "attribute" => Self::builtin(
-        |builtin| matches!(builtin, Builtin::Attribute { name: attribute, .. } if *attribute == name),
-      ),
+      "attribute" => Builtin::attribute(&name).map(Binding::Builtin),
       "function_call" | "assert_expression" => {
         if view.find_function(&name).is_some() {
           Some(Binding::Function(name))
         } else {
-          Self::builtin(|builtin| {
-            matches!(
-              builtin,
-              Builtin::Function { name: function, aliases, .. }
-                if *function == name || aliases.contains(&name.as_str())
-            )
-          })
+          Builtin::function(&name).map(Binding::Builtin)
         }
       }
       "function_definition" => Some(Binding::Function(name)),
@@ -366,9 +347,7 @@ impl Bindings {
         (segments.last() == Some(&identifier))
           .then(|| Binding::Recipe(Namepath::from_node(&parent, document)))
       }
-      "setting" => Self::builtin(
-        |builtin| matches!(builtin, Builtin::Setting { name: setting, .. } if *setting == name),
-      ),
+      "setting" => Builtin::setting(&name).map(Binding::Builtin),
       _ => None,
     };
 

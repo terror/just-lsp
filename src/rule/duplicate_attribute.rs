@@ -100,7 +100,7 @@ define_rule! {
 
               AttributeKey::Group(group)
             }
-            _ if context.builtin_attribute(&attribute_name).is_some() => {
+            _ if Builtin::attribute(&attribute_name).is_some() => {
               AttributeKey::Name(attribute_name)
             }
             _ => continue,

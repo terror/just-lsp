@@ -11,7 +11,7 @@ define_rule! {
 
       for setting in context.local_declarations(context.settings()) {
         let Some(Builtin::Setting { kind, .. }) =
-          context.builtin_setting(&setting.name.value)
+          Builtin::setting(&setting.name.value)
         else {
           continue;
         };

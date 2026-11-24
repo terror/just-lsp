@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Binding {
-  Builtin(usize),
+  Builtin(&'static Builtin<'static>),
   Function(String),
   FunctionParameter { function: lsp::Range, name: String },
   Parameter { name: String, recipe: lsp::Range },

@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FunctionSignature<'a>(pub &'a [FunctionParameter<'a>]);
 
 impl FunctionSignature<'_> {

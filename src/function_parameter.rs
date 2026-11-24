@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FunctionParameter<'a> {
   Optional(&'a str, Option<&'a str>),
   Required(&'a str, Option<&'a str>),

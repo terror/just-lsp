@@ -12,7 +12,7 @@ define_rule! {
         if let Some(Builtin::Setting {
           deprecated: Some(deprecation),
           ..
-        }) = context.builtin_setting(&setting.name.value)
+        }) = Builtin::setting(&setting.name.value)
         {
           let diagnostic = Diagnostic::warning(
             format!(

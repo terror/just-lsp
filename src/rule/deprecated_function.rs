@@ -18,7 +18,7 @@ define_rule! {
         if let Some(Builtin::Function {
           deprecated: Some(deprecation),
           ..
-        }) = context.builtin_function(function_name.as_str())
+        }) = Builtin::function(function_name.as_str())
         {
           let diagnostic = Diagnostic::warning(
             format!(

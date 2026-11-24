@@ -12,19 +12,12 @@ define_rule! {
       for function_call in context.function_calls() {
         let function_name = &function_call.name.value;
 
-        if context.builtin_function(function_name.as_str()).is_none()
+        if Builtin::function(function_name.as_str()).is_none()
           && !context.user_function_names().contains(function_name)
         {
           let suggestion = function_name.find_suggestion(
-            BUILTINS
-              .iter()
-              .filter_map(|builtin| match builtin {
-                Builtin::Function { name, aliases, .. } => {
-                  Some(once(*name).chain(aliases.iter().copied()))
-                }
-                _ => None,
-              })
-              .flatten()
+            Builtin::functions()
+              .flat_map(Builtin::names)
               .chain(context.user_function_names().iter().map(String::as_str)),
           );
 

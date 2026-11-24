@@ -26,7 +26,7 @@ define_rule! {
             ));
           }
         } else if let Some(Builtin::Function { signature, .. }) =
-          context.builtin_function(function_name.as_str())
+          Builtin::function(function_name.as_str())
         {
           let range = signature.argument_range();
 

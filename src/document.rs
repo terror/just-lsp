@@ -410,16 +410,11 @@ impl Document {
               .is_some_and(|node| node.kind() == "(");
 
             let keywords = parenthesized
-              && BUILTINS.iter().any(|builtin| match builtin {
-                Builtin::Attribute {
-                  name: builtin_name,
-                  signature,
-                  ..
-                } => {
-                  *builtin_name == name.value && !signature.keywords.is_empty()
-                }
-                _ => false,
-              });
+              && matches!(
+                Builtin::attribute(&name.value),
+                Some(Builtin::Attribute { signature, .. })
+                  if !signature.keywords.is_empty()
+              );
 
             let arguments = identifier
               .siblings()
