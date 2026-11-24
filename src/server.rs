@@ -94,19 +94,6 @@ impl Server {
     }
   }
 
-  fn merge_locations(
-    mut locations: Vec<lsp::Location>,
-    found: Vec<lsp::Location>,
-  ) -> Vec<lsp::Location> {
-    for location in found {
-      if !locations.contains(&location) {
-        locations.push(location);
-      }
-    }
-
-    locations
-  }
-
   pub(crate) fn new(client: Client) -> Self {
     let executor = Executor::new(client.clone());
 
@@ -898,25 +885,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(
-      workspace
-        .views(&uri)
-        .into_iter()
-        .filter_map(|view| {
-          let document = view.document();
-
-          let resolver = Resolver::new(view);
-
-          document
-            .node_at_position(position)
-            .filter(|node| node.kind() == "identifier")
-            .map(|identifier| {
-              resolver
-                .resolve_identifier_references(&identifier, include_declaration)
-            })
-        })
-        .reduce(Self::merge_locations),
-    )
+    Ok(workspace.references(&uri, position, include_declaration))
   }
 
   async fn rename(
@@ -931,47 +900,40 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(
-      workspace
-        .views(&uri)
-        .into_iter()
-        .filter_map(|view| {
-          let document = view.document();
+    let renameable = workspace.view(&uri).is_some_and(|view| {
+      let document = view.document();
 
-          let resolver = Resolver::new(view);
+      let resolver = Resolver::new(view);
 
-          document
-            .node_at_position(position)
-            .filter(|node| node.kind() == "identifier")
-            .filter(|identifier| {
-              resolver
-                .resolve_symbol(identifier)
-                .is_some_and(|symbol| symbol.is_renameable())
-            })
-            .map(|identifier| {
-              resolver.resolve_identifier_references(&identifier, true)
-            })
-        })
-        .reduce(Self::merge_locations)
-        .map(|locations| {
-          let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
+      document
+        .node_at_position(position)
+        .filter(|node| node.kind() == "identifier")
+        .and_then(|identifier| resolver.resolve_symbol(&identifier))
+        .is_some_and(|symbol| symbol.is_renameable())
+    });
 
-          for location in locations {
-            changes
-              .entry(location.uri)
-              .or_default()
-              .push(lsp::TextEdit {
-                range: location.range,
-                new_text: new_name.clone(),
-              });
-          }
+    if !renameable {
+      return Ok(None);
+    }
 
-          lsp::WorkspaceEdit {
-            changes: Some(changes),
-            ..Default::default()
-          }
-        }),
-    )
+    Ok(workspace.references(&uri, position, true).map(|locations| {
+      let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
+
+      for location in locations {
+        changes
+          .entry(location.uri)
+          .or_default()
+          .push(lsp::TextEdit {
+            range: location.range,
+            new_text: new_name.clone(),
+          });
+      }
+
+      lsp::WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+      }
+    }))
   }
 
   async fn semantic_tokens_full(

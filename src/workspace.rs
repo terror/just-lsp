@@ -358,6 +358,40 @@ impl Workspace {
     None
   }
 
+  #[must_use]
+  pub fn references(
+    &self,
+    uri: &lsp::Url,
+    position: lsp::Position,
+    include_declaration: bool,
+  ) -> Option<Vec<lsp::Location>> {
+    self
+      .views(uri)
+      .into_iter()
+      .filter_map(|view| {
+        let document = view.document();
+
+        let resolver = Resolver::new(view);
+
+        document
+          .node_at_position(position)
+          .filter(|node| node.kind() == "identifier")
+          .map(|identifier| {
+            resolver
+              .resolve_identifier_references(&identifier, include_declaration)
+          })
+      })
+      .reduce(|mut locations, found| {
+        for location in found {
+          if !locations.contains(&location) {
+            locations.push(location);
+          }
+        }
+
+        locations
+      })
+  }
+
   /// # Errors
   ///
   /// Returns an [`Error`] if an affected project root cannot be loaded.
