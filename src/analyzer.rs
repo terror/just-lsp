@@ -4211,6 +4211,8 @@ mod tests {
 
     case("mod foo\n\nalias qux := foo::bar\n", &[]);
 
+    case("mod foo\n\nalias qux := foo\n", &[]);
+
     case(
       "mod foo\n\nqux: foo::bar\n",
       &[(

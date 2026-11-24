@@ -10,6 +10,7 @@ define_rule! {
         .document()
         .aliases()
         .iter()
+        .filter(|alias| !context.declares_module(&alias.value))
         .filter_map(|alias| context.unresolved_recipe(&alias.value, alias.value.range))
         .collect()
     }
