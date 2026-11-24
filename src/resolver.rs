@@ -208,29 +208,17 @@ impl<'a> Resolver<'a> {
   }
 
   fn symbol(&self, binding: &Binding) -> Option<Symbol> {
-    let document = self.view.document();
-
     match binding {
       Binding::Builtin(builtin) => Some(Symbol::Builtin(builtin)),
       Binding::Function(name) => {
         self.view.find_function(name).cloned().map(Symbol::Function)
       }
-      Binding::FunctionParameter { function, name } => document
-        .functions()
-        .into_iter()
-        .find(|candidate| candidate.range == *function)?
-        .parameters
-        .into_iter()
-        .find(|parameter| parameter.value == *name)
-        .map(Symbol::FunctionParameter),
-      Binding::Parameter { name, recipe } => document
-        .recipes()
-        .into_iter()
-        .find(|candidate| candidate.range == *recipe)?
-        .parameters
-        .into_iter()
-        .find(|parameter| parameter.name == *name)
-        .map(Symbol::Parameter),
+      Binding::FunctionParameter(parameter) => {
+        Some(Symbol::FunctionParameter(parameter.clone()))
+      }
+      Binding::Parameter(parameter) => {
+        Some(Symbol::Parameter(parameter.clone()))
+      }
       Binding::Recipe(path) => {
         self.view.resolve_recipe(path).map(Symbol::Recipe)
       }

@@ -2,7 +2,7 @@ use super::*;
 
 pub(crate) struct References {
   pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
-  pub(crate) used_parameters: Vec<Binding>,
+  pub(crate) used_parameters: Vec<Parameter>,
   pub(crate) variable_usage: HashMap<String, bool>,
 }
 
@@ -49,10 +49,11 @@ impl References {
     let used_parameters = root
       .identifiers()
       .iter()
-      .filter(|bound| {
-        bound.expression && matches!(bound.binding, Binding::Parameter { .. })
+      .filter(|bound| bound.expression)
+      .filter_map(|bound| match &bound.binding {
+        Binding::Parameter(parameter) => Some(parameter.clone()),
+        _ => None,
       })
-      .map(|bound| bound.binding.clone())
       .collect();
 
     Self {
@@ -156,10 +157,7 @@ mod tests {
         let mut actual_used_parameters = references
           .used_parameters
           .iter()
-          .filter_map(|binding| match binding {
-            Binding::Parameter { name, .. } => Some(name.as_str()),
-            _ => None,
-          })
+          .map(|parameter| parameter.name.as_str())
           .collect::<Vec<_>>();
 
         actual_used_parameters.sort_unstable();

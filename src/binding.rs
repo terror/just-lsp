@@ -4,8 +4,8 @@ use super::*;
 pub(crate) enum Binding {
   Builtin(&'static Builtin<'static>),
   Function(String),
-  FunctionParameter { function: lsp::Range, name: String },
-  Parameter { name: String, recipe: lsp::Range },
+  FunctionParameter(TextNode),
+  Parameter(Parameter),
   Recipe(Namepath),
   Unresolved { suggestion: Option<String> },
   Variable(String),
@@ -13,9 +13,6 @@ pub(crate) enum Binding {
 
 impl Binding {
   pub(crate) fn is_local(&self) -> bool {
-    matches!(
-      self,
-      Self::FunctionParameter { .. } | Self::Parameter { .. }
-    )
+    matches!(self, Self::FunctionParameter(_) | Self::Parameter(_))
   }
 }
