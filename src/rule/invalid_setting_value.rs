@@ -56,6 +56,18 @@ define_rule! {
       let mut diagnostics = Vec::new();
 
       for setting in context.local_declarations(context.settings()) {
+        if Self::empty_interpreter(context, setting) {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "Setting `{}` must be a non-empty array",
+              setting.name.value
+            ),
+            setting.value.range,
+          ));
+
+          continue;
+        }
+
         let Some(validation) = SETTING_VALIDATIONS
           .iter()
           .find(|validation| validation.name == setting.name.value)
@@ -84,5 +96,22 @@ define_rule! {
 
       diagnostics
     }
+  }
+}
+
+impl InvalidSettingValueRule {
+  fn empty_interpreter(context: &RuleContext<'_>, setting: &Setting) -> bool {
+    matches!(
+      setting.name.value.as_str(),
+      "script-interpreter" | "shell" | "windows-shell"
+    ) && setting.kind == SettingKind::Array
+      && context
+        .document()
+        .node_at_position(setting.value.range.start)
+        .is_some_and(|node| {
+          node
+            .get_parent("list_literal")
+            .is_some_and(|list| list.child_by_field_name("elements").is_none())
+        })
   }
 }

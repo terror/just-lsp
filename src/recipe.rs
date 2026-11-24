@@ -59,7 +59,7 @@ impl Recipe {
       })
   }
 
-  fn is_required(&self, parameter: &Parameter) -> bool {
+  pub(crate) fn is_required(&self, parameter: &Parameter) -> bool {
     let attribute = self.attributes.iter().find(|attribute| {
       attribute.arg_parameter().as_deref() == Some(parameter.name.as_str())
     });

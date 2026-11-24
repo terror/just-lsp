@@ -38,10 +38,43 @@ define_rule! {
           ));
         }
 
+        if node.kind() == "dependencies" {
+          for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
+            diagnostics.push(Diagnostic::error(
+              "Expected comment, end of file, end of line, or dependency, but found `&&`",
+              document.get_range(&marker),
+            ));
+          }
+        }
+
         if node.is_missing() {
           diagnostics.push(Diagnostic::error(
             SyntaxErrorRule::missing_message(&node),
             document.get_range(&node),
+          ));
+        }
+
+        if node.kind() == "expression"
+          && let Some(operator) = SyntaxErrorRule::chained_comparison(&node)
+        {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "Expected `&&`, `||`, `+`, `++`, or `/`, but found `{}`",
+              operator.kind()
+            ),
+            document.get_range(&operator),
+          ));
+        }
+
+        if node.kind() == "if_expression"
+          && let Some(operator) = SyntaxErrorRule::operator_after_if(&node)
+        {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `{}`",
+              operator.kind()
+            ),
+            document.get_range(&operator),
           ));
         }
 
@@ -68,6 +101,22 @@ define_rule! {
 }
 
 impl SyntaxErrorRule {
+  fn chained_comparison<'a>(node: &Node<'a>) -> Option<Node<'a>> {
+    let operator = SyntaxErrorRule::comparison_operator(node)?;
+
+    let lhs = node.child(0).filter(|lhs| lhs.kind() == "expression")?;
+
+    SyntaxErrorRule::comparison_operator(&lhs)?;
+
+    Some(operator)
+  }
+
+  fn comparison_operator<'a>(node: &Node<'a>) -> Option<Node<'a>> {
+    node
+      .child(1)
+      .filter(|child| ["==", "!=", "=~", "!~"].contains(&child.kind()))
+  }
+
   fn deepest_error(node: Node<'_>) -> Node<'_> {
     let mut cursor = node.walk();
 
@@ -126,6 +175,24 @@ impl SyntaxErrorRule {
       }
     } else {
       format!("Missing {missing}")
+    }
+  }
+
+  fn operator_after_if<'a>(node: &Node<'a>) -> Option<Node<'a>> {
+    let mut current = *node;
+
+    loop {
+      let parent = current
+        .parent()
+        .filter(|parent| parent.kind() == "expression")?;
+
+      if let Some(sibling) = current.next_sibling() {
+        return ["+", "++", "/"]
+          .contains(&sibling.kind())
+          .then_some(sibling);
+      }
+
+      current = parent;
     }
   }
 

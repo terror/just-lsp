@@ -26,6 +26,20 @@ define_rule! {
 
       let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
+      for recipe in context
+        .recipes()
+        .iter()
+        .filter(|recipe| recipe.uri != document.uri)
+      {
+        for attribute in recipe
+          .attributes
+          .iter()
+          .filter(|attribute| attribute.name.value == "default")
+        {
+          conflicts.record(&attribute.name, &recipe.attributes);
+        }
+      }
+
       for recipe in context.local_declarations(context.recipes()) {
         for attribute in recipe
           .attributes

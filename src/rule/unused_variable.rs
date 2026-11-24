@@ -24,7 +24,14 @@ define_rule! {
           continue;
         };
 
-        if variable.export || exported {
+        if variable.eager
+          || variable.export
+          || exported
+          || variable
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name.value == "private")
+        {
           continue;
         }
 
