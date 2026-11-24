@@ -19,7 +19,7 @@ define_rule! {
               (recipe.name.value.as_str(), dependency.name.name().value.as_str())
             })
         })
-        .collect::<Graph>();
+        .collect::<Graph<_>>();
 
       context
         .view()
@@ -28,7 +28,7 @@ define_rule! {
         .filter_map(|recipe| {
           let name = &recipe.name.value;
 
-          let cycle = graph.cycle(name)?;
+          let cycle = graph.cycle(name.as_str())?;
 
           let message = if cycle.len() == 2 {
             format!("Recipe `{name}` depends on itself")

@@ -30,6 +30,16 @@ impl ProjectDependency {
     }
   }
 
+  pub(crate) fn missing_module(&self) -> Option<&str> {
+    match (&self.kind, &self.target) {
+      (
+        ProjectDependencyKind::Module { name },
+        ProjectDependencyTarget::Candidates(_),
+      ) if !self.optional => Some(name),
+      _ => None,
+    }
+  }
+
   pub(crate) fn module(
     source: &lsp::Url,
     module: &ModuleDeclaration,

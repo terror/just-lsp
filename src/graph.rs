@@ -1,16 +1,16 @@
 use super::*;
 
 #[derive(Debug)]
-pub(super) struct Graph<'a> {
-  components: HashMap<&'a str, usize>,
-  edges: HashMap<&'a str, Vec<&'a str>>,
+pub(super) struct Graph<T> {
+  components: HashMap<T, usize>,
+  edges: HashMap<T, Vec<T>>,
 }
 
-impl<'a> Graph<'a> {
+impl<T: Copy + Eq + Hash> Graph<T> {
   fn components(
-    edges: &HashMap<&'a str, Vec<&'a str>>,
-    reverse: &HashMap<&'a str, Vec<&'a str>>,
-  ) -> HashMap<&'a str, usize> {
+    edges: &HashMap<T, Vec<T>>,
+    reverse: &HashMap<T, Vec<T>>,
+  ) -> HashMap<T, usize> {
     let mut order = Vec::new();
     let mut stack = Vec::new();
     let mut visited = HashSet::new();
@@ -23,7 +23,7 @@ impl<'a> Graph<'a> {
           order.push(node);
         } else if visited.insert(node) {
           stack.push((node, true));
-          stack.extend(edges[node].iter().map(|&node| (node, false)));
+          stack.extend(edges[&node].iter().map(|&node| (node, false)));
         }
       }
     }
@@ -37,7 +37,7 @@ impl<'a> Graph<'a> {
       while let Some(node) = stack.pop() {
         if let Entry::Vacant(entry) = components.entry(node) {
           entry.insert(component);
-          stack.extend(reverse[node].iter().copied());
+          stack.extend(reverse[&node].iter().copied());
         }
       }
     }
@@ -45,10 +45,10 @@ impl<'a> Graph<'a> {
     components
   }
 
-  pub(super) fn cycle(&self, start: &str) -> Option<Vec<&'a str>> {
-    let (&start, dependencies) = self.edges.get_key_value(start)?;
+  pub(super) fn cycle(&self, start: T) -> Option<Vec<T>> {
+    let dependencies = self.edges.get(&start)?;
 
-    let component = self.components[start];
+    let component = self.components[&start];
 
     let dependency = dependencies
       .iter()
@@ -69,8 +69,8 @@ impl<'a> Graph<'a> {
         return Some(cycle);
       }
 
-      for &dependency in &self.edges[node] {
-        if self.components[dependency] == component
+      for &dependency in &self.edges[&node] {
+        if self.components[&dependency] == component
           && let Entry::Vacant(entry) = parents.entry(dependency)
         {
           entry.insert(Some(node));
@@ -83,8 +83,8 @@ impl<'a> Graph<'a> {
   }
 }
 
-impl<'a> FromIterator<(&'a str, &'a str)> for Graph<'a> {
-  fn from_iter<T: IntoIterator<Item = (&'a str, &'a str)>>(iter: T) -> Self {
+impl<T: Copy + Eq + Hash> FromIterator<(T, T)> for Graph<T> {
+  fn from_iter<I: IntoIterator<Item = (T, T)>>(iter: I) -> Self {
     let mut edges = HashMap::<_, Vec<_>>::new();
     let mut reverse = HashMap::<_, Vec<_>>::new();
 
@@ -116,7 +116,7 @@ mod tests {
       ("qux", "baz"),
     ]
     .into_iter()
-    .collect::<Graph>();
+    .collect::<Graph<_>>();
 
     let mut components = HashMap::<_, BTreeSet<_>>::new();
 

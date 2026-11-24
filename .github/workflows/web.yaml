@@ -110,5 +110,12 @@ jobs:
     - name: Deploy
       id: deploy
       run: |
-        url=$(vercel deploy --prebuilt --environment="$VERCEL_ENVIRONMENT" --token="$VERCEL_TOKEN")
-        echo "url=$url" >> "$GITHUB_OUTPUT"
+        trap 'cat deploy.log >&2' EXIT
+
+        if url=$(vercel deploy --prebuilt --environment="$VERCEL_ENVIRONMENT" --token="$VERCEL_TOKEN" 2> deploy.log); then
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        elif grep -q api-deployments-free-per-day deploy.log; then
+          echo '::warning::Vercel deployment limit reached, skipping deployment'
+        else
+          exit 1
+        fi
