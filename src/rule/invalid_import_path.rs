@@ -21,6 +21,7 @@ define_rule! {
             }
             Err(Error::EmptyImportPath)
               if import.optional || !import.is_enabled() => return None,
+            Err(Error::InvalidStringEscape) => return None,
             Err(error) => error.to_string(),
             _ => return None,
           };
