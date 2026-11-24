@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.12.0](https://github.com/terror/just-lsp/releases/tag/0.12.0) - 2026-11-23
+
+### Added
+
+- Discover parent justfile when opening imported files ([#895](https://github.com/terror/just-lsp/pull/895) by [terror](https://github.com/terror))
+- Reload files changed on disk ([#890](https://github.com/terror/just-lsp/pull/890) by [terror](https://github.com/terror))
+- Report ambiguous module source files ([#888](https://github.com/terror/just-lsp/pull/888) by [terror](https://github.com/terror))
+- Report module redefinitions ([#892](https://github.com/terror/just-lsp/pull/892) by [terror](https://github.com/terror))
+- Report circular imports ([#898](https://github.com/terror/just-lsp/pull/898) by [terror](https://github.com/terror))
+- Report circular variable dependencies ([#900](https://github.com/terror/just-lsp/pull/900) by [terror](https://github.com/terror))
+- Highlight module paths, alias targets, assert, and timestamp ([#889](https://github.com/terror/just-lsp/pull/889) by [terror](https://github.com/terror))
+- Report missing module source files ([#885](https://github.com/terror/just-lsp/pull/885) by [terror](https://github.com/terror))
+- Add support for `dry-run` setting ([#865](https://github.com/terror/just-lsp/pull/865) by [terror](https://github.com/terror))
+- Analyze documents in their module contexts ([#862](https://github.com/terror/just-lsp/pull/862) by [terror](https://github.com/terror))
+- Resolve module paths in dependencies and aliases ([#860](https://github.com/terror/just-lsp/pull/860) by [terror](https://github.com/terror))
+- Cache document dependencies and load modules ([#857](https://github.com/terror/just-lsp/pull/857) by [terror](https://github.com/terror))
+
+### Fixed
+
+- Recognize positional argument slices in `unused-recipe-parameter` ([#843](https://github.com/terror/just-lsp/pull/843) by [zerone0x](https://github.com/zerone0x))
+- Normalize incoming document URIs ([#887](https://github.com/terror/just-lsp/pull/887) by [terror](https://github.com/terror))
+- Point `windows-powershell` deprecation at `[windows]` set shell ([#893](https://github.com/terror/just-lsp/pull/893) by [terror](https://github.com/terror))
+- Check import paths against loaded documents ([#896](https://github.com/terror/just-lsp/pull/896) by [terror](https://github.com/terror))
+- Parse shebangs with slash-prefixed operands ([#882](https://github.com/terror/just-lsp/pull/882) by [terror](https://github.com/terror))
+- Run recipes from the project root ([#880](https://github.com/terror/just-lsp/pull/880) by [terror](https://github.com/terror))
+- Flag one-or-more variadic parameters after defaults ([#884](https://github.com/terror/just-lsp/pull/884) by [terror](https://github.com/terror))
+- Report numeric literals as syntax errors ([#883](https://github.com/terror/just-lsp/pull/883) by [terror](https://github.com/terror))
+- Fix stale builtin docs ([#886](https://github.com/terror/just-lsp/pull/886) by [terror](https://github.com/terror))
+- Respect `ignore-comments` when resolving recipe lines ([#867](https://github.com/terror/just-lsp/pull/867) by [terror](https://github.com/terror))
+- Skip options in parameter order check ([#866](https://github.com/terror/just-lsp/pull/866) by [terror](https://github.com/terror))
+- Parse shebang interpolations and slash-prefixed operands ([#876](https://github.com/terror/just-lsp/pull/876) by [terror](https://github.com/terror))
+- Allow keywords as names ([#875](https://github.com/terror/just-lsp/pull/875) by [terror](https://github.com/terror))
+- Parse `unexport` followed by a recipe as an unexport ([#874](https://github.com/terror/just-lsp/pull/874) by [terror](https://github.com/terror))
+- Allow aliases to target modules ([#864](https://github.com/terror/just-lsp/pull/864) by [terror](https://github.com/terror))
+- Walk syntax tree iteratively in recursive rules ([#854](https://github.com/terror/just-lsp/pull/854) by [terror](https://github.com/terror))
+- Ignore attribute strings in import paths ([#852](https://github.com/terror/just-lsp/pull/852) by [terror](https://github.com/terror))
+
+### Misc
+
+- Load test projects with project loader ([#901](https://github.com/terror/just-lsp/pull/901) by [terror](https://github.com/terror))
+- Read local declarations from module symbol table ([#902](https://github.com/terror/just-lsp/pull/902) by [terror](https://github.com/terror))
+- Skip Vercel deploy when rate limited ([#894](https://github.com/terror/just-lsp/pull/894) by [terror](https://github.com/terror))
+- Cache called functions per module ([#897](https://github.com/terror/just-lsp/pull/897) by [terror](https://github.com/terror))
+- Share arg attribute parameter name parsing ([#881](https://github.com/terror/just-lsp/pull/881) by [terror](https://github.com/terror))
+- Move filesystem implementations into filesystem module ([#879](https://github.com/terror/just-lsp/pull/879) by [terror](https://github.com/terror))
+- Rename module-era identifiers ([#872](https://github.com/terror/just-lsp/pull/872) by [terror](https://github.com/terror))
+- Remove test-only `Workspace::config` ([#871](https://github.com/terror/just-lsp/pull/871) by [terror](https://github.com/terror))
+- Bind recipes to namepaths ([#870](https://github.com/terror/just-lsp/pull/870) by [terror](https://github.com/terror))
+- Resolve module files from candidates ([#869](https://github.com/terror/just-lsp/pull/869) by [terror](https://github.com/terror))
+- Cache bindings per module document ([#877](https://github.com/terror/just-lsp/pull/877) by [terror](https://github.com/terror))
+- Remove recursive `lsp_position_to_char` default ([#868](https://github.com/terror/just-lsp/pull/868) by [terror](https://github.com/terror))
+- Read documents through a filesystem trait ([#863](https://github.com/terror/just-lsp/pull/863) by [terror](https://github.com/terror))
+- Resolve names in a single pass ([#861](https://github.com/terror/just-lsp/pull/861) by [terror](https://github.com/terror))
+- Build module symbol tables once ([#858](https://github.com/terror/just-lsp/pull/858) by [terror](https://github.com/terror))
+- Clean up project types ([#856](https://github.com/terror/just-lsp/pull/856) by [terror](https://github.com/terror))
+- Route server queries through `Workspace` ([#855](https://github.com/terror/just-lsp/pull/855) by [terror](https://github.com/terror))
+- Derive `PartialEq` for `SettingKind` ([#853](https://github.com/terror/just-lsp/pull/853) by [terror](https://github.com/terror))
+- Use `map_or_default` to fix clippy errors ([#851](https://github.com/terror/just-lsp/pull/851) by [terror](https://github.com/terror))
+- Bump cc from 1.11.1 to 1.11.2 ([#850](https://github.com/terror/just-lsp/pull/850) by [app/dependabot](https://github.com/app/dependabot))
+
 ## [0.11.2](https://github.com/terror/just-lsp/releases/tag/0.11.2) - 2026-11-16
 
 ### Fixed
