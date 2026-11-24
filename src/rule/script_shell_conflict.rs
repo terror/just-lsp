@@ -5,7 +5,19 @@ define_rule! {
     id: "script-shell-conflict",
     message: "conflicting script attributes",
     run(context) {
-      context.conflicting_recipe_attributes("script", "shell")
+      context
+        .conflicting_recipe_attributes("script", "shell")
+        .into_iter()
+        .map(|(recipe, attribute)| {
+          Diagnostic::error(
+            format!(
+              "Recipe `{}` can't combine `[script]` with `[shell]`",
+              recipe.name.value,
+            ),
+            attribute.range,
+          )
+        })
+        .collect()
     }
   }
 }

@@ -11,7 +11,27 @@ define_rule! {
         .local_declarations(context.recipes())
         .flat_map(|recipe| &recipe.dependencies)
         .filter_map(|dependency| {
-          context.unresolved_recipe(&dependency.name, dependency.range)
+          let path = &dependency.name;
+
+          Some(match context.unresolved_recipe(path)? {
+            UnresolvedRecipe::Module(segment) => Diagnostic::error(
+              format!("Module `{}` not found", segment.value),
+              segment.range,
+            ),
+            UnresolvedRecipe::Recipe { suggestion: None } => {
+              Diagnostic::error(format!("Recipe `{path}` not found"), dependency.range)
+            }
+            UnresolvedRecipe::Recipe {
+              suggestion: Some(suggestion),
+            } => Diagnostic::error(
+              format!("Recipe `{path}` not found. Did you mean `{suggestion}`?"),
+              dependency.range,
+            )
+            .quickfix(Quickfix::replacement(
+              path.name(),
+              suggestion.name().value.clone(),
+            )),
+          })
         })
         .collect()
     }

@@ -61,6 +61,7 @@ use {
   tracing::warn,
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree},
   tree_walker::TreeWalker,
+  unresolved_recipe::UnresolvedRecipe,
 };
 
 #[cfg(test)]
@@ -198,6 +199,7 @@ mod test_module;
 mod text_node;
 mod tree_walker;
 mod unexport;
+mod unresolved_recipe;
 mod url_ext;
 mod variable;
 mod workspace;
