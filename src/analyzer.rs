@@ -3763,6 +3763,19 @@ mod tests {
   }
 
   #[test]
+  fn import_directory_path() {
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\.`"
+    } else {
+      "Import path does not exist: `/.`"
+    };
+
+    Test::new("import '.'")
+      .error(expected, lsp::Range::at(0, 7, 0, 10))
+      .run();
+  }
+
+  #[test]
   fn import_invalid_path() {
     let expected = if cfg!(windows) {
       "Import path does not exist: `C:\\foo?bar.just`"
@@ -3809,6 +3822,20 @@ mod tests {
         ..Diagnostic::error(
           format!("Import path does not exist: `{path}`"),
           lsp::Range::at(0, 7, 0, 17),
+        )
+      }],
+    );
+
+    let path = if cfg!(windows) { "C:\\foo" } else { "/foo" };
+
+    case(
+      &[("justfile", "import 'foo'"), ("foo/bar.just", "")],
+      &[Diagnostic {
+        display: "invalid import path".into(),
+        id: "invalid-import-path".into(),
+        ..Diagnostic::error(
+          format!("Import path does not exist: `{path}`"),
+          lsp::Range::at(0, 7, 0, 12),
         )
       }],
     );

@@ -4,10 +4,6 @@ use super::*;
 pub(crate) struct OsFilesystem;
 
 impl Filesystem for OsFilesystem {
-  fn is_dir(&self, path: &Path) -> bool {
-    path.is_dir()
-  }
-
   fn is_file(&self, path: &Path) -> bool {
     path.is_file()
   }

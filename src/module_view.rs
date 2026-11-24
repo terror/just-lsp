@@ -72,12 +72,6 @@ impl<'a> ModuleView<'a> {
     self.documents.iter().map(|document| document.document)
   }
 
-  pub(crate) fn filesystem(&self) -> &'a dyn Filesystem {
-    self
-      .context
-      .map_or(&OsFilesystem, |context| context.documents.filesystem())
-  }
-
   pub(crate) fn find_called_functions(&self) -> HashSet<String> {
     self
       .documents()
@@ -127,6 +121,15 @@ impl<'a> ModuleView<'a> {
 
   pub(crate) fn functions(&self) -> &[Located<Function>] {
     &self.symbols.functions
+  }
+
+  pub(crate) fn loads(&self, path: &Path) -> bool {
+    let Some(context) = self.context else {
+      return OsFilesystem.is_file(path);
+    };
+
+    lsp::Url::from_path(&path.clean())
+      .is_some_and(|uri| context.project.loads(&uri))
   }
 
   pub(crate) fn module(&self, path: &Namepath) -> ModuleLookup<'a> {
