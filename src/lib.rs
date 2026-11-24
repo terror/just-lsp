@@ -39,6 +39,7 @@ use {
       BTreeMap, BTreeSet, HashMap, HashSet, VecDeque, hash_map::Entry,
     },
     env,
+    ffi::OsStr,
     fmt::{self, Debug, Display, Formatter},
     fs,
     hash::Hash,

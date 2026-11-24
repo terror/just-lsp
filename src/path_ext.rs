@@ -2,6 +2,7 @@ use super::*;
 
 pub(crate) trait PathExt {
   fn clean(&self) -> PathBuf;
+  fn is_justfile(&self) -> bool;
 }
 
 impl PathExt for Path {
@@ -27,6 +28,16 @@ impl PathExt for Path {
     }
 
     components.into_iter().collect()
+  }
+
+  fn is_justfile(&self) -> bool {
+    let Some(name) = self.file_name().and_then(OsStr::to_str) else {
+      return false;
+    };
+
+    ["justfile", ".justfile"]
+      .iter()
+      .any(|candidate| name.eq_ignore_ascii_case(candidate))
   }
 }
 
