@@ -31,7 +31,7 @@ impl<'a> ProjectLoader<'a> {
     self.dependencies.insert(uri.clone(), dependencies.clone());
 
     for dependency in dependencies {
-      let ProjectDependencyTarget::Resolved(target) = &dependency.target else {
+      let ProjectDependencyTarget::Path(target) = &dependency.target else {
         continue;
       };
 
@@ -347,10 +347,10 @@ mod tests {
         .map(|dependency| dependency.target.clone())
         .collect::<Vec<_>>(),
       [
-        ProjectDependencyTarget::Resolved(bar.clone()),
-        ProjectDependencyTarget::Resolved(test.uri("missing.just")),
-        ProjectDependencyTarget::Resolved(test.uri("required-missing.just")),
-        ProjectDependencyTarget::Resolved(bar.clone()),
+        ProjectDependencyTarget::Path(bar.clone()),
+        ProjectDependencyTarget::Path(test.uri("missing.just")),
+        ProjectDependencyTarget::Path(test.uri("required-missing.just")),
+        ProjectDependencyTarget::Path(bar.clone()),
         ProjectDependencyTarget::Dynamic,
       ]
     );
@@ -361,8 +361,8 @@ mod tests {
         .map(|dependency| dependency.target.clone())
         .collect::<Vec<_>>(),
       [
-        ProjectDependencyTarget::Resolved(baz.clone()),
-        ProjectDependencyTarget::Resolved(test.root.clone()),
+        ProjectDependencyTarget::Path(baz.clone()),
+        ProjectDependencyTarget::Path(test.root.clone()),
       ]
     );
 
@@ -413,7 +413,7 @@ mod tests {
         kind: ProjectDependencyKind::Module { name: "foo".into() },
         location: lsp::Range::at(0, 4, 0, 7),
         optional: false,
-        target: ProjectDependencyTarget::Resolved(foo.clone()),
+        target: ProjectDependencyTarget::Path(foo.clone()),
       }],
     );
 
@@ -462,7 +462,7 @@ mod tests {
 
     assert_eq!(
       project.dependencies[&test.root][0].target,
-      ProjectDependencyTarget::Resolved(imported.clone()),
+      ProjectDependencyTarget::Path(imported.clone()),
     );
 
     assert_eq!(

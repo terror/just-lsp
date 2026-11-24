@@ -39,8 +39,7 @@ impl Module {
           continue;
         };
 
-        let ProjectDependencyTarget::Resolved(target) = &dependency.target
-        else {
+        let ProjectDependencyTarget::Path(target) = &dependency.target else {
           continue;
         };
 

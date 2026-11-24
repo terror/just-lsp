@@ -62,7 +62,7 @@ impl ProjectDependency {
   fn target(path: &Path) -> ProjectDependencyTarget {
     lsp::Url::from_path(&path.clean()).map_or(
       ProjectDependencyTarget::Missing,
-      ProjectDependencyTarget::Resolved,
+      ProjectDependencyTarget::Path,
     )
   }
 }

@@ -1,12 +1,12 @@
 use super::*;
 
-pub(crate) struct Scope {
+pub(crate) struct References {
   pub(crate) recipe_identifier_usage: HashMap<String, HashSet<String>>,
   pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
   pub(crate) variable_usage: HashMap<String, bool>,
 }
 
-impl Scope {
+impl References {
   pub(crate) fn analyze(context: &RuleContext<'_>) -> Self {
     let view = context.view();
 
@@ -95,9 +95,9 @@ mod tests {
     fn run(self) {
       let view = self.project.view();
 
-      let scope = Scope::analyze(&RuleContext::new(&view));
+      let references = References::analyze(&RuleContext::new(&view));
 
-      let mut actual_unresolved = scope
+      let mut actual_unresolved = references
         .unresolved_identifiers
         .iter()
         .map(|(identifier, _)| identifier.value.as_str())
@@ -114,7 +114,7 @@ mod tests {
         "unresolved mismatch"
       );
 
-      let mut actual_used = scope
+      let mut actual_used = references
         .variable_usage
         .iter()
         .filter(|(_, used)| **used)
@@ -129,7 +129,7 @@ mod tests {
 
       assert_eq!(actual_used, expected_used, "used variables mismatch");
 
-      let mut actual_unused = scope
+      let mut actual_unused = references
         .variable_usage
         .iter()
         .filter(|(_, used)| !**used)
@@ -145,7 +145,7 @@ mod tests {
       assert_eq!(actual_unused, expected_unused, "unused variables mismatch");
 
       for (recipe, expected_names) in &self.recipe_usage {
-        let mut actual_names = scope
+        let mut actual_names = references
           .recipe_identifier_usage
           .get(*recipe)
           .map_or_default(|set| {

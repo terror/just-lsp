@@ -8,7 +8,7 @@ pub(crate) struct RuleContext<'a> {
   builtin_function_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   builtin_setting_map: OnceLock<HashMap<&'static str, BuiltinRef>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  scope: OnceLock<Scope>,
+  references: OnceLock<References>,
   user_function_names: OnceLock<HashSet<String>>,
   view: &'a ModuleView<'a>,
 }
@@ -239,7 +239,7 @@ impl<'a> RuleContext<'a> {
       builtin_function_map: OnceLock::new(),
       builtin_setting_map: OnceLock::new(),
       function_calls: OnceLock::new(),
-      scope: OnceLock::new(),
+      references: OnceLock::new(),
       user_function_names: OnceLock::new(),
       view,
     }
@@ -249,8 +249,8 @@ impl<'a> RuleContext<'a> {
     self.view.recipes()
   }
 
-  pub(crate) fn scope(&self) -> &Scope {
-    self.scope.get_or_init(|| Scope::analyze(self))
+  pub(crate) fn references(&self) -> &References {
+    self.references.get_or_init(|| References::analyze(self))
   }
 
   pub(crate) fn setting_enabled(&self, name: &str) -> bool {

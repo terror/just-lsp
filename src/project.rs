@@ -71,7 +71,7 @@ impl Project {
       .values()
       .flatten()
       .filter_map(|dependency| match &dependency.target {
-        ProjectDependencyTarget::Resolved(target) => Some(target.clone()),
+        ProjectDependencyTarget::Path(target) => Some(target.clone()),
         _ => None,
       })
       .collect();
@@ -116,7 +116,7 @@ impl Project {
     dependency: &'a ProjectDependency,
   ) -> Option<&'a lsp::Url> {
     match &dependency.target {
-      ProjectDependencyTarget::Resolved(target) if self.loads(target) => {
+      ProjectDependencyTarget::Path(target) if self.loads(target) => {
         Some(target)
       }
       _ => None,

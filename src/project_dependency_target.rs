@@ -5,5 +5,5 @@ pub(crate) enum ProjectDependencyTarget {
   Candidates(Vec<lsp::Url>),
   Dynamic,
   Missing,
-  Resolved(lsp::Url),
+  Path(lsp::Url),
 }

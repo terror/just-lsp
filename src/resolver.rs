@@ -154,7 +154,7 @@ impl<'a> Resolver<'a> {
 
     let mut locations = Vec::<lsp::Location>::new();
 
-    for view in self.view.project_views() {
+    for view in self.view.module_views() {
       let resolver = Self { view };
 
       for candidate in resolver.view.documents() {

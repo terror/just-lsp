@@ -29,7 +29,7 @@ impl ImportScope {
         .flatten()
         .filter(|dependency| dependency.kind == ProjectDependencyKind::Import)
         .filter_map(|dependency| match &dependency.target {
-          ProjectDependencyTarget::Resolved(target)
+          ProjectDependencyTarget::Path(target)
             if dependencies.contains_key(target) =>
           {
             Some(target.clone())
