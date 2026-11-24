@@ -4714,6 +4714,43 @@ mod tests {
   }
 
   #[test]
+  fn parallel_with_mapped_dependency() {
+    Test::new(indoc! {
+      "
+      set unstable
+      set lists
+
+      [parallel]
+      foo *args: *(bar *args)
+        echo {{args}}
+
+      bar arg:
+        echo {{arg}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
+  fn parallel_with_single_dependency_in_each_group_warns() {
+    Test::new(indoc! {
+      "
+      [parallel]
+      foo: bar && baz
+
+      bar:
+
+      baz:
+      "
+    })
+    .warning(
+      "Recipe `foo` has only one dependency before and after `&&`, so `[parallel]` has no effect",
+      lsp::Range::at(0, 0, 1, 0),
+    )
+    .run();
+  }
+
+  #[test]
   fn parallel_without_dependencies_warns() {
     Test::new(indoc! {
       "
