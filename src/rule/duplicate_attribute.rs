@@ -26,7 +26,7 @@ define_rule! {
 
       let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
 
-      for recipe in document.recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         for attribute in recipe
           .attributes
           .iter()

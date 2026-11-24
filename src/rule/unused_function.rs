@@ -5,21 +5,15 @@ define_rule! {
     id: "unused-function",
     message: "unused function",
     run(context) {
-      let mut functions = context
+      let called_functions = context.view().called_functions();
+
+      context
         .view()
         .resolved_functions()
-        .map(|function| (function.name.value.as_str(), function))
-        .collect::<HashMap<_, _>>();
-
-      for function_call in context.view().documents().flat_map(Document::function_calls) {
-        functions.remove(function_call.name.value.as_str());
-      }
-
-      functions
-        .into_values()
         .filter(|function| {
           function.uri == context.document().uri
             && !function.name.value.starts_with('_')
+            && !called_functions.contains(&function.name.value)
         })
         .map(|function| {
           Diagnostic::warning(

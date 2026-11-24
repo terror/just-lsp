@@ -8,9 +8,7 @@ define_rule! {
     message: "missing dependency",
     run(context) {
       context
-        .document()
-        .recipes()
-        .iter()
+        .local_declarations(context.recipes())
         .flat_map(|recipe| &recipe.dependencies)
         .filter_map(|dependency| {
           context.unresolved_recipe(&dependency.name, dependency.range)

@@ -11,7 +11,7 @@ define_rule! {
 
       let lists = context.setting_enabled("lists");
 
-      for recipe in context.document().recipes() {
+      for recipe in context.local_declarations(context.recipes()) {
         for dependency in &recipe.dependencies {
           if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
             let parameters = &recipe.parameters;
@@ -19,30 +19,8 @@ define_rule! {
             let flags = recipe
               .attributes
               .iter()
-              .filter(|attribute| {
-                attribute.name.value == "arg" && attribute.keyword_argument("flag").is_some()
-              })
-              .filter_map(|attribute| {
-                let name = attribute.positional_arguments().next()?;
-
-                if name.kind != AttributeExpressionKind::StringLiteral {
-                  return None;
-                }
-
-                let name = StringLiteral::parse(&name.text.value).ok()??;
-
-                Some(if name.shell_expanded {
-                  shellexpand::full_with_context(
-                    &name.cooked,
-                    || env::home_dir()?.into_os_string().into_string().ok(),
-                    |name| env::var(name).map(Some),
-                  )
-                  .ok()?
-                  .into_owned()
-                } else {
-                  name.cooked
-                })
-              })
+              .filter(|attribute| attribute.keyword_argument("flag").is_some())
+              .filter_map(Attribute::arg_parameter)
               .collect::<HashSet<_>>();
 
             let required_parameters = parameters

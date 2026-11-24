@@ -19,6 +19,23 @@ define_rule! {
           ));
         }
 
+        if node.kind() == "numeric_error"
+          && let Some(start) = document.get_node_text(&node).chars().next()
+        {
+          let range = document.get_range(&node);
+
+          diagnostics.push(Diagnostic::error(
+            format!("Unknown start of token `{start}`"),
+            lsp::Range {
+              end: lsp::Position {
+                character: range.start.character + 1,
+                ..range.start
+              },
+              ..range
+            },
+          ));
+        }
+
         if node.is_missing() {
           diagnostics.push(Diagnostic::error(
             SyntaxErrorRule::missing_message(&node),

@@ -35,4 +35,16 @@ impl AttributeExpression {
       },
     }
   }
+
+  pub(crate) fn string_value(&self) -> Option<String> {
+    if self.kind != AttributeExpressionKind::StringLiteral {
+      return None;
+    }
+
+    StringLiteral::parse(&self.text.value)
+      .ok()
+      .flatten()?
+      .expand()
+      .ok()
+  }
 }

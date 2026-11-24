@@ -13,10 +13,8 @@ define_rule! {
 
       let positional_arguments_enabled = context.setting_enabled("positional-arguments");
 
-      let recipes = context.document().recipes();
-
-      recipes
-        .iter()
+      context
+        .local_declarations(context.recipes())
         .filter_map(|recipe| {
           context
             .references()

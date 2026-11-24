@@ -11,7 +11,7 @@ define_rule! {
         return diagnostics;
       }
 
-      for setting in context.document().settings() {
+      for setting in context.local_declarations(context.settings()) {
         if setting.name.value == "lists"
           && matches!(setting.kind, SettingKind::Boolean(true))
         {
@@ -22,7 +22,7 @@ define_rule! {
         }
       }
 
-      for function in context.document().functions() {
+      for function in context.local_declarations(context.functions()) {
         diagnostics.push(Diagnostic::warning(
           format!(
             "User-defined function `{}` is unstable without `set unstable`",

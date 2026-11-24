@@ -418,6 +418,78 @@ mod tests {
           modifiers: 0,
           token_type: "operator",
         },
+        Expected {
+          line: 2,
+          start: 13,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn assert() {
+    assert_eq!(
+      tokenize("foo := assert('bar' == 'baz')\n"),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 0,
+          start: 4,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 7,
+          length: 6,
+          modifiers: 0,
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 13,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 20,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 23,
+          length: 5,
+          modifiers: 0,
+          token_type: "string",
+        },
+        Expected {
+          line: 0,
+          start: 28,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
       ]
     );
   }
@@ -454,51 +526,52 @@ mod tests {
 
   #[test]
   fn attribute() {
-    assert_eq!(
-      tokenize(indoc! {
-        "
-        [private]
-        foo:
-        "
-      }),
-      [
-        Expected {
-          line: 0,
-          start: 0,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 0,
-          start: 1,
-          length: 7,
-          modifiers: 0,
-          token_type: "decorator",
-        },
-        Expected {
-          line: 0,
-          start: 8,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-        Expected {
-          line: 1,
-          start: 0,
-          length: 3,
-          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
-          token_type: "function",
-        },
-        Expected {
-          line: 1,
-          start: 3,
-          length: 1,
-          modifiers: 0,
-          token_type: "operator",
-        },
-      ]
-    );
+    #[track_caller]
+    fn case(attribute: &str, length: u32) {
+      assert_eq!(
+        tokenize(&format!("[{attribute}]\nfoo:\n")),
+        [
+          Expected {
+            line: 0,
+            start: 0,
+            length: 1,
+            modifiers: 0,
+            token_type: "operator",
+          },
+          Expected {
+            line: 0,
+            start: 1,
+            length,
+            modifiers: 0,
+            token_type: "decorator",
+          },
+          Expected {
+            line: 0,
+            start: length + 1,
+            length: 1,
+            modifiers: 0,
+            token_type: "operator",
+          },
+          Expected {
+            line: 1,
+            start: 0,
+            length: 3,
+            modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+            token_type: "function",
+          },
+          Expected {
+            line: 1,
+            start: 3,
+            length: 1,
+            modifiers: 0,
+            token_type: "operator",
+          },
+        ]
+      );
+    }
+
+    case("private", 7);
+    case("timestamp", 9);
   }
 
   #[test]
@@ -1004,6 +1077,112 @@ mod tests {
           length: 3,
           modifiers: 0,
           token_type: "namespace",
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn module_path() {
+    assert_eq!(
+      tokenize(indoc! {
+        "
+        foo: bar::baz (bar::baz)
+
+        alias qux := bar::baz
+        "
+      }),
+      [
+        Expected {
+          line: 0,
+          start: 0,
+          length: 3,
+          modifiers: Tokenizer::modifier_bitset(&["declaration"]),
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 3,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 5,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+        Expected {
+          line: 0,
+          start: 10,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 14,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 0,
+          start: 15,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+        Expected {
+          line: 0,
+          start: 20,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
+        },
+        Expected {
+          line: 0,
+          start: 23,
+          length: 1,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 2,
+          start: 0,
+          length: 5,
+          modifiers: 0,
+          token_type: "keyword",
+        },
+        Expected {
+          line: 2,
+          start: 6,
+          length: 3,
+          modifiers: 0,
+          token_type: "variable",
+        },
+        Expected {
+          line: 2,
+          start: 10,
+          length: 2,
+          modifiers: 0,
+          token_type: "operator",
+        },
+        Expected {
+          line: 2,
+          start: 13,
+          length: 3,
+          modifiers: 0,
+          token_type: "namespace",
+        },
+        Expected {
+          line: 2,
+          start: 18,
+          length: 3,
+          modifiers: 0,
+          token_type: "function",
         },
       ]
     );

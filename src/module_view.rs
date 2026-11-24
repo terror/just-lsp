@@ -20,6 +20,13 @@ impl<'a> ModuleView<'a> {
       .unwrap_or_else(|| Arc::new(Bindings::new(self, document)))
   }
 
+  pub(crate) fn called_functions(&self) -> Arc<HashSet<String>> {
+    self.context.map_or_else(
+      || Arc::new(self.find_called_functions()),
+      |context| context.module.called_functions(self),
+    )
+  }
+
   #[must_use]
   pub fn child(&self, name: &str) -> Option<Self> {
     let context = self.context?;
@@ -35,6 +42,15 @@ impl<'a> ModuleView<'a> {
     ))
   }
 
+  pub(crate) fn dependencies(
+    &self,
+  ) -> impl Iterator<Item = &'a ProjectDependency> + '_ {
+    self
+      .context
+      .into_iter()
+      .flat_map(|context| context.project.dependencies(&self.document.uri))
+  }
+
   #[must_use]
   pub fn document(&self) -> &'a Document {
     self.document
@@ -48,6 +64,14 @@ impl<'a> ModuleView<'a> {
     self
       .context
       .map_or(&OsFilesystem, |context| context.documents.filesystem())
+  }
+
+  pub(crate) fn find_called_functions(&self) -> HashSet<String> {
+    self
+      .documents()
+      .flat_map(Document::function_calls)
+      .map(|function_call| function_call.name.value)
+      .collect()
   }
 
   #[must_use]
@@ -273,6 +297,26 @@ mod tests {
     assert!(Arc::ptr_eq(
       &view.bindings(view.document()),
       &module.view().bindings(view.document()),
+    ));
+  }
+
+  #[test]
+  fn called_functions_are_shared_across_views() {
+    let module = TestModule::new(&[
+      ("justfile", "import 'foo.just'\nbar := baz()"),
+      ("foo.just", "qux := quux()"),
+    ]);
+
+    let view = module.view();
+
+    assert_eq!(
+      *view.called_functions(),
+      HashSet::from(["baz".into(), "quux".into()]),
+    );
+
+    assert!(Arc::ptr_eq(
+      &view.called_functions(),
+      &module.view().called_functions(),
     ));
   }
 
