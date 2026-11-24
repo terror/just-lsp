@@ -4213,6 +4213,50 @@ mod tests {
   }
 
   #[test]
+  fn module_ambiguous_files() {
+    #[track_caller]
+    fn case(files: &[(&str, &str)], expected: &str, range: lsp::Range) {
+      assert_eq!(
+        Analyzer {
+          config: None,
+          view: TestModule::new(files).view(),
+        }
+        .analyze()
+        .iter()
+        .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
+        .collect::<Vec<_>>(),
+        [(
+          expected
+            .replace('/', std::path::MAIN_SEPARATOR_STR)
+            .as_str(),
+          range
+        )],
+      );
+    }
+
+    case(
+      &[
+        ("justfile", "mod? foo"),
+        ("foo.just", ""),
+        ("foo/mod.just", ""),
+      ],
+      "Found multiple source files for module `foo`: `foo/mod.just` and `foo.just`",
+      lsp::Range::at(0, 5, 0, 8),
+    );
+
+    case(
+      &[
+        ("justfile", "mod foo 'bar'"),
+        ("bar/mod.just", ""),
+        ("bar/justfile", ""),
+        ("bar/.justfile", ""),
+      ],
+      "Found multiple source files for module `foo`: `bar/.justfile`, `bar/justfile`, and `bar/mod.just`",
+      lsp::Range::at(0, 8, 0, 13),
+    );
+  }
+
+  #[test]
   fn module_attributes_group() {
     Test::new(indoc! {
       "

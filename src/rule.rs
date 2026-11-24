@@ -34,6 +34,7 @@ macro_rules! define_rule {
 inventory::collect!(&'static dyn Rule);
 
 mod alias_recipe_conflict;
+mod ambiguous_module_file;
 mod assignment_unexport_conflict;
 mod backtick_shebang;
 mod cache_without_script;
