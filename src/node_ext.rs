@@ -18,6 +18,8 @@ impl NodeExt for Node<'_> {
   }
 
   fn get_parent(&self, kind: &str) -> Option<Node<'_>> {
+    debug_assert!(TreeWalker::is_kind(kind), "unknown node kind `{kind}`");
+
     let mut current = *self;
 
     while let Some(parent) = current.parent() {

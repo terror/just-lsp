@@ -22,8 +22,31 @@ impl<'a> TreeWalker<'a> {
     nodes
   }
 
+  pub(super) fn is_kind(kind: &str) -> bool {
+    let language = unsafe { tree_sitter_just() };
+
+    language.id_for_node_kind(kind, true) != 0
+      || language.id_for_node_kind(kind, false) != 0
+  }
+
   pub(super) fn new(node: Node<'a>) -> Self {
     Self { node }
+  }
+
+  fn unknown_kind(selector: &str) -> Option<&str> {
+    let union = selector.contains(',');
+
+    selector
+      .split(',')
+      .flat_map(|selector| {
+        let selector = if union { selector.trim() } else { selector };
+
+        match selector.strip_prefix('^') {
+          Some(kind) => vec![kind],
+          None => selector.split(" > ").collect(),
+        }
+      })
+      .find(|kind| !Self::is_kind(kind))
   }
 
   fn visit_matches<B>(
@@ -31,6 +54,12 @@ impl<'a> TreeWalker<'a> {
     selector: &str,
     mut visit: impl FnMut(Node<'a>) -> ControlFlow<B>,
   ) -> ControlFlow<B> {
+    if cfg!(debug_assertions)
+      && let Some(kind) = Self::unknown_kind(selector)
+    {
+      panic!("unknown node kind `{kind}` in selector `{selector}`");
+    }
+
     let union = selector.contains(',');
 
     for selector in selector.split(',') {
@@ -299,7 +328,7 @@ mod tests {
     );
 
     assert_eq!(
-      TreeWalker::new(root).find_all(" , recipe, foo, assignment, recipe, "),
+      TreeWalker::new(root).find_all("recipe, assignment, recipe"),
       [first, second, assignment, first, second],
     );
   }
@@ -337,35 +366,39 @@ mod tests {
   }
 
   #[test]
-  fn find_empty_child_selector() {
-    Test::new("foo:\n").find("recipe > ", None);
-  }
-
-  #[test]
-  fn find_empty_selector() {
-    Test::new("foo:\n").find("", None);
-  }
-
-  #[test]
-  fn find_leading_whitespace() {
-    Test::new("foo:\n").find(" recipe", None);
-  }
-
-  #[test]
-  fn find_trailing_whitespace() {
-    Test::new("foo:\n").find("recipe ", None);
-  }
-
-  #[test]
   fn find_union() {
     Test::new("foo := [[bar], baz]\n").find(
-      "qux, list_elements > expression > value > identifier, identifier",
+      "list_elements > expression > value > identifier, identifier",
       Some("baz"),
     );
   }
 
   #[test]
-  fn find_unsupported_marker_path() {
-    Test::new("foo:\n").find("^recipe > recipe_header", None);
+  #[should_panic(
+    expected = "unknown node kind `foo` in selector `recipe > foo`"
+  )]
+  fn find_unknown_kind() {
+    Test::new("foo:\n").find("recipe > foo", None);
+  }
+
+  #[test]
+  fn unknown_kind() {
+    #[track_caller]
+    fn case(selector: &str, expected: Option<&str>) {
+      assert_eq!(TreeWalker::unknown_kind(selector), expected);
+    }
+
+    case("recipe", None);
+    case(":", None);
+    case("^&&", None);
+    case("recipe_header > identifier", None);
+    case("^parameter, ^variadic_parameter", None);
+    case("", Some(""));
+    case("foo", Some("foo"));
+    case(" recipe", Some(" recipe"));
+    case("recipe ", Some("recipe "));
+    case("recipe > ", Some(""));
+    case("recipe, , assignment", Some(""));
+    case("^recipe > recipe_header", Some("recipe > recipe_header"));
   }
 }
