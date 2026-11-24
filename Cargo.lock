@@ -532,6 +532,7 @@ dependencies = [
  "ariadne",
  "cc",
  "clap",
+ "futures-util",
  "indoc",
  "inventory",
  "pretty_assertions",

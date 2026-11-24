@@ -5,6 +5,7 @@ pub(crate) struct Server {
   diagnostics: Mutex<BTreeMap<lsp::Url, lsp::PublishDiagnosticsParams>>,
   executor: Executor,
   initialized: AtomicBool,
+  watch_files: AtomicBool,
   workspace: RwLock<Workspace>,
 }
 
@@ -69,6 +70,30 @@ impl Server {
     }
   }
 
+  fn file_watchers() -> lsp::Registration {
+    let watchers = [
+      "**/*.just",
+      "**/[Jj][Uu][Ss][Tt][Ff][Ii][Ll][Ee]",
+      "**/.[Jj][Uu][Ss][Tt][Ff][Ii][Ll][Ee]",
+      "**/just-lsp.toml",
+    ]
+    .into_iter()
+    .map(|glob| lsp::FileSystemWatcher {
+      glob_pattern: lsp::GlobPattern::String(glob.into()),
+      kind: None,
+    })
+    .collect();
+
+    lsp::Registration {
+      id: "file-watchers".into(),
+      method: "workspace/didChangeWatchedFiles".into(),
+      register_options: serde_json::to_value(
+        lsp::DidChangeWatchedFilesRegistrationOptions { watchers },
+      )
+      .ok(),
+    }
+  }
+
   pub(crate) fn new(client: Client) -> Self {
     let executor = Executor::new(client.clone());
 
@@ -77,6 +102,7 @@ impl Server {
       diagnostics: Mutex::new(BTreeMap::new()),
       executor,
       initialized: AtomicBool::new(false),
+      watch_files: AtomicBool::new(false),
       workspace: RwLock::new(Workspace::default()),
     }
   }
@@ -136,6 +162,25 @@ impl Server {
     }
 
     *previous = diagnostics;
+  }
+
+  async fn reload(&self, uris: &[lsp::Url]) {
+    let result = self.workspace.write().await.reload(uris);
+
+    if matches!(result, Ok(false)) {
+      return;
+    }
+
+    self.publish_diagnostics().await;
+
+    if let Err(error) = result {
+      let error = Error::from(error);
+
+      self
+        .client
+        .log_message(lsp::MessageType::ERROR, format!("{error:#}"))
+        .await;
+    }
   }
 
   pub(crate) async fn run() -> Result {
@@ -384,6 +429,19 @@ impl LanguageServer for Server {
     }
   }
 
+  async fn did_change_watched_files(
+    &self,
+    params: lsp::DidChangeWatchedFilesParams,
+  ) {
+    let uris = params
+      .changes
+      .into_iter()
+      .map(|change| change.uri)
+      .collect::<Vec<_>>();
+
+    self.reload(&uris).await;
+  }
+
   async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
     let result = self.workspace.write().await.close(&params);
 
@@ -410,6 +468,10 @@ impl LanguageServer for Server {
         .log_message(lsp::MessageType::ERROR, format!("{error:#}"))
         .await;
     }
+  }
+
+  async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+    self.reload(&[params.text_document.uri]).await;
   }
 
   async fn document_highlight(
@@ -707,6 +769,15 @@ impl LanguageServer for Server {
       }
     }
 
+    let watch_files = params
+      .capabilities
+      .workspace
+      .and_then(|workspace| workspace.did_change_watched_files)
+      .and_then(|capabilities| capabilities.dynamic_registration)
+      .unwrap_or_default();
+
+    self.watch_files.store(watch_files, Ordering::Relaxed);
+
     Ok(lsp::InitializeResult {
       capabilities: Self::capabilities(),
       server_info: Some(lsp::ServerInfo {
@@ -728,6 +799,15 @@ impl LanguageServer for Server {
     self
       .initialized
       .store(true, std::sync::atomic::Ordering::Relaxed);
+
+    if self.watch_files.load(Ordering::Relaxed)
+      && let Err(error) = self
+        .client
+        .register_capability(vec![Self::file_watchers()])
+        .await
+    {
+      warn!(%error, "failed to register file watchers");
+    }
   }
 
   async fn prepare_rename(
@@ -879,6 +959,7 @@ impl LanguageServer for Server {
 mod tests {
   use {
     super::*,
+    futures_util::SinkExt,
     indoc::indoc,
     lsp::{notification, request},
     pretty_assertions::assert_eq,
@@ -902,6 +983,7 @@ mod tests {
     expected: Option<jsonrpc::Response>,
     notifications: Vec<jsonrpc::Request>,
     request: jsonrpc::Request,
+    writes: Vec<(PathBuf, Option<String>)>,
   }
 
   impl Test {
@@ -919,6 +1001,21 @@ mod tests {
         .unwrap()
         .notifications
         .push(Self::message(N::METHOD, params).finish());
+
+      self
+    }
+
+    fn client_request<R: request::Request>(
+      mut self,
+      id: i64,
+      params: R::Params,
+    ) -> Self {
+      self
+        .messages
+        .last_mut()
+        .unwrap()
+        .notifications
+        .push(Self::message(R::METHOD, params).id(id).finish());
 
       self
     }
@@ -1044,8 +1141,18 @@ mod tests {
     }
 
     fn initialize(self) -> Self {
+      self.initialize_with_capabilities(lsp::ClientCapabilities::default())
+    }
+
+    fn initialize_with_capabilities(
+      self,
+      capabilities: lsp::ClientCapabilities,
+    ) -> Self {
       self.request::<request::Initialize>(
-        lsp::InitializeParams::default(),
+        lsp::InitializeParams {
+          capabilities,
+          ..Default::default()
+        },
         Ok(lsp::InitializeResult {
           server_info: Some(lsp::ServerInfo {
             name: env!("CARGO_PKG_NAME").into(),
@@ -1090,6 +1197,7 @@ mod tests {
         expected: None,
         notifications: Vec::new(),
         request: Self::message(N::METHOD, params).finish(),
+        writes: Vec::new(),
       });
 
       self
@@ -1148,6 +1256,10 @@ mod tests {
         )
     }
 
+    fn remove_file(self, path: &str) -> Self {
+      self.write(path, None)
+    }
+
     fn request<R: request::Request>(
       mut self,
       params: R::Params,
@@ -1162,6 +1274,7 @@ mod tests {
         )),
         notifications: Vec::new(),
         request: Self::message(R::METHOD, params).id(id).finish(),
+        writes: Vec::new(),
       });
 
       self
@@ -1172,6 +1285,7 @@ mod tests {
         expected,
         notifications,
         request,
+        writes,
       } in self.messages
       {
         let method = request.method().to_owned();
@@ -1185,7 +1299,16 @@ mod tests {
         let response = loop {
           select! {
             biased;
-            Some(notification) = self.socket.next() => actual.push(notification),
+            Some(notification) = self.socket.next() => {
+              if let Some(id) = notification.id() {
+                self
+                  .socket
+                  .send(jsonrpc::Response::from_ok(id.clone(), Value::Null))
+                  .await?;
+              }
+
+              actual.push(notification);
+            }
             response = &mut response => break response,
           }
         };
@@ -1201,15 +1324,60 @@ mod tests {
         assert_eq!(response?, expected, "{method}");
 
         assert_eq!(actual, notifications, "{method}");
+
+        for (path, content) in writes {
+          match content {
+            Some(content) => fs::write(path, content)?,
+            None => fs::remove_file(path)?,
+          }
+        }
       }
 
       Ok(())
+    }
+
+    fn save(self, path: &str) -> Self {
+      let uri = self.uri(path);
+
+      self.notification::<notification::DidSaveTextDocument>(
+        lsp::DidSaveTextDocumentParams {
+          text_document: lsp::TextDocumentIdentifier::new(uri),
+          text: None,
+        },
+      )
     }
 
     fn uri(&self, path: &str) -> lsp::Url {
       path.parse().unwrap_or_else(|_| {
         lsp::Url::from_file_path(self.tempdir.path().join(path)).unwrap()
       })
+    }
+
+    fn watched_file(self, path: &str, typ: lsp::FileChangeType) -> Self {
+      let uri = self.uri(path);
+
+      self.notification::<notification::DidChangeWatchedFiles>(
+        lsp::DidChangeWatchedFilesParams {
+          changes: vec![lsp::FileEvent::new(uri, typ)],
+        },
+      )
+    }
+
+    fn write(mut self, path: &str, content: Option<&str>) -> Self {
+      let path = self.tempdir.path().join(path);
+
+      self
+        .messages
+        .last_mut()
+        .unwrap()
+        .writes
+        .push((path, content.map(str::to_owned)));
+
+      self
+    }
+
+    fn write_file(self, path: &str, content: &str) -> Self {
+      self.write(path, Some(content))
     }
   }
 
@@ -2596,6 +2764,132 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn did_change_watched_files_reloads_changed_import() -> Result {
+    Test::new()
+      .file("foo.just", "foo:")
+      .ready()
+      .open("justfile", "import 'foo.just'\n\nbar: foo")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .write_file("foo.just", "")
+      .watched_file("foo.just", lsp::FileChangeType::CHANGED)
+      .diagnostics(
+        "justfile",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::error(
+            "Recipe `foo` not found",
+            lsp::Range::at(2, 5, 2, 8),
+          )
+        }
+        .into()],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_watched_files_reloads_configuration() -> Result {
+    Test::new()
+      .file("just-lsp.toml", "[rules]\nunresolved-dependency = 'off'")
+      .ready()
+      .open("justfile", "foo: bar")
+      .diagnostics("justfile", Some(1), [])
+      .write_file("just-lsp.toml", "")
+      .watched_file("just-lsp.toml", lsp::FileChangeType::CHANGED)
+      .diagnostics(
+        "justfile",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_watched_files_reloads_created_module() -> Result {
+    Test::new()
+      .ready()
+      .open("justfile", "mod foo")
+      .diagnostics("justfile", Some(1), [])
+      .write_file("foo.just", "")
+      .watched_file("foo.just", lsp::FileChangeType::CREATED)
+      .diagnostics("foo.just", None, [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_watched_files_reloads_deleted_import() -> Result {
+    let test = Test::new().file("foo.just", "");
+
+    let path = test.tempdir.path().join("foo.just");
+
+    test
+      .ready()
+      .open("justfile", "import 'foo.just'")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .remove_file("foo.just")
+      .watched_file("foo.just", lsp::FileChangeType::DELETED)
+      .diagnostics("foo.just", None, [])
+      .diagnostics(
+        "justfile",
+        Some(1),
+        [Diagnostic {
+          id: "invalid-import-path".into(),
+          ..Diagnostic::error(
+            format!("Import path does not exist: `{}`", path.display()),
+            lsp::Range::at(0, 7, 0, 17),
+          )
+        }
+        .into()],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_change_watched_files_reloads_deleted_root() -> Result {
+    Test::new()
+      .file("foo.just", "foo: bar\n")
+      .file("justfile", "import 'foo.just'\nbar:\n")
+      .ready()
+      .open("justfile", "import 'foo.just'\nbar:\n")
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo.just", "foo: bar\n")
+      .diagnostics("foo.just", Some(1), [])
+      .close("justfile")
+      .diagnostics("justfile", None, [])
+      .remove_file("justfile")
+      .watched_file("justfile", lsp::FileChangeType::DELETED)
+      .diagnostics("justfile", None, [])
+      .diagnostics(
+        "foo.just",
+        Some(1),
+        [Diagnostic {
+          id: "unresolved-dependency".into(),
+          ..Diagnostic::error(
+            "Recipe `bar` not found",
+            lsp::Range::at(0, 5, 0, 8),
+          )
+        }
+        .into()],
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn did_change_without_open_document_is_ignored() -> Result {
     Test::new()
       .initialize()
@@ -2658,6 +2952,39 @@ mod tests {
           },
         ),
       })
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn did_save_reloads_module() -> Result {
+    let test = Test::new();
+
+    let justfile = test.uri("justfile");
+
+    let target = test.uri("foo.just");
+
+    let tooltip = target.to_file_path().unwrap().display().to_string();
+
+    test
+      .initialize()
+      .open("justfile", "mod foo")
+      .open("foo.just", "")
+      .write_file("foo.just", "")
+      .save("foo.just")
+      .request::<request::DocumentLinkRequest>(
+        lsp::DocumentLinkParams {
+          text_document: lsp::TextDocumentIdentifier::new(justfile),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![lsp::DocumentLink {
+          range: lsp::Range::at(0, 4, 0, 7),
+          target: Some(target),
+          tooltip: Some(tooltip),
+          data: None,
+        }])),
+      )
       .run()
       .await
   }
@@ -4019,6 +4346,47 @@ mod tests {
       .request::<request::Initialize>(
         lsp::InitializeParams::default(),
         Err(jsonrpc::Error::invalid_request()),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn initialized_registers_file_watchers() -> Result {
+    Test::new()
+      .initialize_with_capabilities(lsp::ClientCapabilities {
+        workspace: Some(lsp::WorkspaceClientCapabilities {
+          did_change_watched_files: Some(
+            lsp::DidChangeWatchedFilesClientCapabilities {
+              dynamic_registration: Some(true),
+              relative_pattern_support: None,
+            },
+          ),
+          ..Default::default()
+        }),
+        ..Default::default()
+      })
+      .notification::<notification::Initialized>(lsp::InitializedParams {})
+      .client_notification::<notification::LogMessage>(lsp::LogMessageParams {
+        typ: lsp::MessageType::INFO,
+        message: format!("{} initialized", env!("CARGO_PKG_NAME")),
+      })
+      .client_request::<request::RegisterCapability>(
+        0,
+        lsp::RegistrationParams {
+          registrations: vec![lsp::Registration {
+            id: "file-watchers".into(),
+            method: "workspace/didChangeWatchedFiles".into(),
+            register_options: Some(json!({
+              "watchers": [
+                { "globPattern": "**/*.just" },
+                { "globPattern": "**/[Jj][Uu][Ss][Tt][Ff][Ii][Ll][Ee]" },
+                { "globPattern": "**/.[Jj][Uu][Ss][Tt][Ff][Ii][Ll][Ee]" },
+                { "globPattern": "**/just-lsp.toml" },
+              ],
+            })),
+          }],
+        },
       )
       .run()
       .await
