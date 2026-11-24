@@ -9,6 +9,18 @@ pub struct Attribute {
 }
 
 impl Attribute {
+  pub(crate) fn arg_parameter(&self) -> Option<String> {
+    if self.name.value != "arg" {
+      return None;
+    }
+
+    let name = self.positional_arguments().next()?;
+
+    StringLiteral::parse(&name.text.value)
+      .ok()?
+      .map(|literal| literal.cooked)
+  }
+
   pub(crate) fn condition(&self) -> Option<bool> {
     match self.name.value.as_str() {
       "android" | "dragonfly" | "freebsd" | "linux" | "macos" | "netbsd"

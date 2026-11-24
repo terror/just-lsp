@@ -40,17 +40,16 @@ impl Recipe {
   }
 
   pub(crate) fn is_option(&self, parameter: &str) -> bool {
-    self.attributes.iter().any(|attribute| {
-      attribute.name.value == "arg"
-        && (attribute.keyword_argument("long").is_some()
-          || attribute.keyword_argument("short").is_some())
-        && attribute.positional_arguments().next().is_some_and(|name| {
-          StringLiteral::parse(&name.text.value)
-            .ok()
-            .flatten()
-            .is_some_and(|literal| literal.cooked == parameter)
-        })
-    })
+    self
+      .attributes
+      .iter()
+      .filter(|attribute| {
+        attribute.arg_parameter().as_deref() == Some(parameter)
+      })
+      .any(|attribute| {
+        attribute.keyword_argument("long").is_some()
+          || attribute.keyword_argument("short").is_some()
+      })
   }
 
   #[must_use]
