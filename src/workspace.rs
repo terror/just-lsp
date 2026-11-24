@@ -358,6 +358,40 @@ impl Workspace {
     None
   }
 
+  #[must_use]
+  pub fn references(
+    &self,
+    uri: &lsp::Url,
+    position: lsp::Position,
+    include_declaration: bool,
+  ) -> Option<Vec<lsp::Location>> {
+    self
+      .views(uri)
+      .into_iter()
+      .filter_map(|view| {
+        let document = view.document();
+
+        let resolver = Resolver::new(view);
+
+        document
+          .node_at_position(position)
+          .filter(|node| node.kind() == "identifier")
+          .map(|identifier| {
+            resolver
+              .resolve_identifier_references(&identifier, include_declaration)
+          })
+      })
+      .reduce(|mut locations, found| {
+        for location in found {
+          if !locations.contains(&location) {
+            locations.push(location);
+          }
+        }
+
+        locations
+      })
+  }
+
   /// # Errors
   ///
   /// Returns an [`Error`] if an affected project root cannot be loaded.
@@ -442,25 +476,34 @@ impl Workspace {
 
   #[must_use]
   pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
-    let document = self.documents.get_open(uri)?;
+    self.views(uri).into_iter().next()
+  }
 
-    Some(
-      Self::contexts(&self.root_projects(), uri)
-        .first()
-        .map_or_else(
-          || ModuleView::from(document),
-          |(project, module)| {
-            ModuleView::new(
-              document,
-              ModuleContext {
-                documents: &self.documents,
-                module,
-                project,
-              },
-            )
+  #[must_use]
+  pub fn views(&self, uri: &lsp::Url) -> Vec<ModuleView<'_>> {
+    let Some(document) = self.documents.get_open(uri) else {
+      return Vec::new();
+    };
+
+    let contexts = Self::contexts(&self.root_projects(), uri);
+
+    if contexts.is_empty() {
+      return vec![ModuleView::from(document)];
+    }
+
+    contexts
+      .into_iter()
+      .map(|(project, module)| {
+        ModuleView::new(
+          document,
+          ModuleContext {
+            documents: &self.documents,
+            module,
+            project,
           },
-        ),
-    )
+        )
+      })
+      .collect()
   }
 }
 

@@ -885,19 +885,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.view(&uri).and_then(|view| {
-      let document = view.document();
-
-      let resolver = Resolver::new(view);
-
-      document
-        .node_at_position(position)
-        .filter(|node| node.kind() == "identifier")
-        .map(|identifier| {
-          resolver
-            .resolve_identifier_references(&identifier, include_declaration)
-        })
-    }))
+    Ok(workspace.references(&uri, position, include_declaration))
   }
 
   async fn rename(
@@ -912,7 +900,7 @@ impl LanguageServer for Server {
 
     let workspace = self.workspace.read().await;
 
-    Ok(workspace.view(&uri).and_then(|view| {
+    let renameable = workspace.view(&uri).is_some_and(|view| {
       let document = view.document();
 
       let resolver = Resolver::new(view);
@@ -920,31 +908,31 @@ impl LanguageServer for Server {
       document
         .node_at_position(position)
         .filter(|node| node.kind() == "identifier")
-        .filter(|identifier| {
-          resolver
-            .resolve_symbol(identifier)
-            .is_some_and(|symbol| symbol.is_renameable())
-        })
-        .map(|identifier| {
-          let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
+        .and_then(|identifier| resolver.resolve_symbol(&identifier))
+        .is_some_and(|symbol| symbol.is_renameable())
+    });
 
-          for location in
-            resolver.resolve_identifier_references(&identifier, true)
-          {
-            changes
-              .entry(location.uri)
-              .or_default()
-              .push(lsp::TextEdit {
-                range: location.range,
-                new_text: new_name.clone(),
-              });
-          }
+    if !renameable {
+      return Ok(None);
+    }
 
-          lsp::WorkspaceEdit {
-            changes: Some(changes),
-            ..Default::default()
-          }
-        })
+    Ok(workspace.references(&uri, position, true).map(|locations| {
+      let mut changes = HashMap::<lsp::Url, Vec<lsp::TextEdit>>::new();
+
+      for location in locations {
+        changes
+          .entry(location.uri)
+          .or_default()
+          .push(lsp::TextEdit {
+            range: location.range,
+            new_text: new_name.clone(),
+          });
+      }
+
+      lsp::WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+      }
     }))
   }
 
@@ -5109,6 +5097,87 @@ mod tests {
             ],
           },
         ))),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn shared_import_references_span_projects() -> Result {
+    let test = Test::new();
+
+    let foo = test.uri("foo.just");
+
+    let bar = test.uri("bar/justfile");
+
+    let baz = test.uri("baz/justfile");
+
+    let position = lsp::TextDocumentPositionParams::new(
+      lsp::TextDocumentIdentifier::new(foo.clone()),
+      lsp::Position::new(0, 0),
+    );
+
+    test
+      .initialize()
+      .open("bar/justfile", "import '../foo.just'\nbar: foo\n")
+      .open("baz/justfile", "import '../foo.just'\nbaz: foo\n")
+      .open("foo.just", "foo:\n")
+      .request::<request::References>(
+        lsp::ReferenceParams {
+          text_document_position: position.clone(),
+          context: lsp::ReferenceContext {
+            include_declaration: true,
+          },
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+          partial_result_params: lsp::PartialResultParams::default(),
+        },
+        Ok(Some(vec![
+          lsp::Location {
+            uri: bar.clone(),
+            range: lsp::Range::at(1, 5, 1, 8),
+          },
+          lsp::Location {
+            uri: foo.clone(),
+            range: lsp::Range::at(0, 0, 0, 3),
+          },
+          lsp::Location {
+            uri: baz.clone(),
+            range: lsp::Range::at(1, 5, 1, 8),
+          },
+        ])),
+      )
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: position,
+          new_name: "qux".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([
+            (
+              bar,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(1, 5, 1, 8),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              baz,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(1, 5, 1, 8),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              foo,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "qux".into(),
+              }],
+            ),
+          ])),
+          ..Default::default()
+        })),
       )
       .run()
       .await

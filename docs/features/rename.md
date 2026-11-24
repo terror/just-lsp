@@ -6,7 +6,8 @@ order: 60
 Invoke your editor's rename command on a recipe, variable, recipe parameter,
 user-defined function, or function parameter to update its declaration and all
 matching identifier references across the project, including imported files
-and modules.
+and modules. Renaming in a file imported by several justfiles updates every
+project that imports it.
 
 Renaming follows symbol scope. A recipe parameter can be renamed without
 changing a global variable with the same name, and a user-defined function can
