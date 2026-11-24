@@ -6,23 +6,43 @@ define_rule! {
     id: "working-directory-conflict",
     message: "conflicting working directory configuration",
     run(context) {
-      let mut diagnostics = context.conflicting_settings(|left, right| {
-        match (left.name.value.as_str(), right.name.value.as_str()) {
-          ("working-directory", "no-cd") => {
-            matches!(right.kind, SettingKind::Boolean(true))
+      context
+        .conflicting_settings(|left, right| {
+          match (left.name.value.as_str(), right.name.value.as_str()) {
+            ("working-directory", "no-cd") => {
+              matches!(right.kind, SettingKind::Boolean(true))
+            }
+            ("no-cd", "working-directory") => {
+              matches!(left.kind, SettingKind::Boolean(true))
+            }
+            _ => false,
           }
-          ("no-cd", "working-directory") => {
-            matches!(left.kind, SettingKind::Boolean(true))
-          }
-          _ => false,
-        }
-      });
-
-      diagnostics.extend(
-        context.conflicting_recipe_attributes("working-directory", "no-cd"),
-      );
-
-      diagnostics
+        })
+        .into_iter()
+        .map(|(previous, current)| {
+          Diagnostic::error(
+            format!(
+              "`{}` is incompatible with `{}`",
+              previous.name.value, current.name.value,
+            ),
+            current.range,
+          )
+        })
+        .chain(
+          context
+            .conflicting_recipe_attributes("working-directory", "no-cd")
+            .into_iter()
+            .map(|(recipe, attribute)| {
+              Diagnostic::error(
+                format!(
+                  "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
+                  recipe.name.value,
+                ),
+                attribute.range,
+              )
+            }),
+        )
+        .collect()
     }
   }
 }

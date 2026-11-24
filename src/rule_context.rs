@@ -24,7 +24,7 @@ impl<'a> RuleContext<'a> {
     &self,
     left: &str,
     right: &str,
-  ) -> Vec<Diagnostic> {
+  ) -> Vec<(&Recipe, &Attribute)> {
     self
       .local_declarations(self.recipes())
       .filter_map(|recipe| {
@@ -32,13 +32,7 @@ impl<'a> RuleContext<'a> {
 
         recipe.find_attribute(right)?;
 
-        Some(Diagnostic::error(
-          format!(
-            "Recipe `{}` can't combine `[{left}]` with `[{right}]`",
-            recipe.name.value
-          ),
-          attribute.range,
-        ))
+        Some((recipe, attribute))
       })
       .collect()
   }
@@ -46,7 +40,7 @@ impl<'a> RuleContext<'a> {
   pub(super) fn conflicting_settings(
     &self,
     incompatible: impl Fn(&Setting, &Setting) -> bool,
-  ) -> Vec<Diagnostic> {
+  ) -> Vec<(&Located<Setting>, &Located<Setting>)> {
     let mut settings = self
       .settings()
       .iter()
@@ -59,7 +53,7 @@ impl<'a> RuleContext<'a> {
 
     settings.sort_by_key(|(setting, _)| setting.uri == self.document().uri);
 
-    let mut diagnostics = Vec::new();
+    let mut conflicts = Vec::new();
 
     for (index, (current, current_groups)) in settings.iter().enumerate() {
       if current.uri != self.document().uri {
@@ -73,18 +67,12 @@ impl<'a> RuleContext<'a> {
           && incompatible(previous, current)
           && seen.insert(previous.name.value.as_str())
         {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "`{}` is incompatible with `{}`",
-              previous.name.value, current.name.value,
-            ),
-            current.range,
-          ));
+          conflicts.push((*previous, *current));
         }
       }
     }
 
-    diagnostics
+    conflicts
   }
 
   pub(crate) fn declares_module(&self, path: &Namepath) -> bool {
@@ -191,15 +179,11 @@ impl<'a> RuleContext<'a> {
   pub(crate) fn unresolved_recipe(
     &self,
     path: &Namepath,
-    range: lsp::Range,
-  ) -> Option<Diagnostic> {
+  ) -> Option<UnresolvedRecipe> {
     let module = match self.view.module(path) {
       ModuleLookup::Found(module) => module,
       ModuleLookup::Undeclared(segment) => {
-        return Some(Diagnostic::error(
-          format!("Module `{}` not found", segment.value),
-          segment.range,
-        ));
+        return Some(UnresolvedRecipe::Module(segment));
       }
       ModuleLookup::Unloaded => return None,
     };
@@ -210,32 +194,28 @@ impl<'a> RuleContext<'a> {
       return None;
     }
 
-    let suggestion = name.value.find_suggestion(
-      module
-        .recipes()
-        .iter()
-        .map(|recipe| recipe.name.value.as_str()),
-    );
-
-    let message = match &suggestion {
-      Some(suggestion) => {
-        let suggestion = path
+    let suggestion = name
+      .value
+      .find_suggestion(
+        module
+          .recipes()
+          .iter()
+          .map(|recipe| recipe.name.value.as_str()),
+      )
+      .map(|suggestion| Namepath {
+        range: path.range,
+        segments: path
           .modules()
           .iter()
-          .map(|module| module.value.as_str())
-          .chain([suggestion.as_str()])
-          .collect::<Vec<_>>()
-          .join("::");
+          .cloned()
+          .chain([TextNode {
+            range: name.range,
+            value: suggestion,
+          }])
+          .collect(),
+      });
 
-        format!("Recipe `{path}` not found. Did you mean `{suggestion}`?")
-      }
-      None => format!("Recipe `{path}` not found"),
-    };
-
-    let quickfix =
-      suggestion.map(|suggestion| Quickfix::replacement(name, suggestion));
-
-    Some(Diagnostic::error(message, range).quickfix(quickfix))
+    Some(UnresolvedRecipe::Recipe { suggestion })
   }
 
   pub(crate) fn user_function_names(&self) -> &HashSet<String> {
