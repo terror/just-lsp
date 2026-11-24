@@ -55,6 +55,12 @@ define_rule! {
   }
 }
 
+enum Slice {
+  All,
+  Malformed,
+  Positions(Vec<usize>),
+}
+
 impl UnusedRecipeParameterRule {
   fn parse_positional(bytes: &[u8], braced: bool) -> Option<usize> {
     let inner = if braced {
@@ -68,6 +74,37 @@ impl UnusedRecipeParameterRule {
     }
 
     str::from_utf8(inner).ok()?.parse().ok().filter(|&n| n > 0)
+  }
+
+  fn parse_slice(rest: &[u8], parameters: usize) -> Slice {
+    let Some(end) = rest.iter().position(|&b| b == b'}') else {
+      return Slice::Malformed;
+    };
+
+    let Some(inner) = rest[..end].strip_prefix(b":") else {
+      return Slice::Malformed;
+    };
+
+    let Ok(inner) = str::from_utf8(inner) else {
+      return Slice::Malformed;
+    };
+
+    let (offset, length) = match inner.split_once(':') {
+      Some((offset, length)) => (offset, Some(length)),
+      None => (inner, None),
+    };
+
+    let Some(offset) = Self::slice_number(offset) else {
+      return Slice::All;
+    };
+
+    let upper = match length.and_then(Self::slice_number) {
+      Some(length) => offset.saturating_add(length).saturating_sub(1),
+      None if offset == 0 => return Slice::All,
+      None => parameters,
+    };
+
+    Slice::Positions((offset.max(1)..=upper.min(parameters)).collect())
   }
 
   fn positional_argument_usage(recipe: &Recipe) -> (HashSet<usize>, bool) {
@@ -92,6 +129,16 @@ impl UnusedRecipeParameterRule {
           return (indices, true);
         }
 
+        if let [b'{', b'@' | b'*', tail @ ..] = rest {
+          match Self::parse_slice(tail, recipe.parameters.len()) {
+            Slice::Positions(positions) => indices.extend(positions),
+            Slice::All => return (indices, true),
+            Slice::Malformed => {}
+          }
+
+          return (indices, uses_all);
+        }
+
         let unbraced_end =
           rest.iter().take_while(|b| b.is_ascii_digit()).count();
 
@@ -110,6 +157,16 @@ impl UnusedRecipeParameterRule {
 
         (indices, uses_all)
       })
+  }
+
+  fn slice_number(text: &str) -> Option<usize> {
+    let text = text.trim();
+
+    if text.bytes().all(|b| b.is_ascii_digit()) {
+      text.parse().ok()
+    } else {
+      None
+    }
   }
 }
 
@@ -161,7 +218,7 @@ mod tests {
   fn positional_argument_usage() {
     #[track_caller]
     fn case(body: &str, indices: &[usize], uses_all: bool) {
-      let document = Document::from(format!("foo:\n{body}").as_str());
+      let document = Document::from(format!("foo a b c:\n{body}").as_str());
 
       assert!(!document.tree.root_node().has_error());
 
@@ -183,5 +240,21 @@ mod tests {
     case("  bar $*", &[], true);
     case("  bar \\$@", &[], false);
     case("  bar $1\n  baz $@\n  qux ${3}", &[1, 3], true);
+    case("  bar \"${@:1}\"", &[1, 2, 3], false);
+    case("  bar \"${@:2}\"", &[2, 3], false);
+    case("  bar \"${*:3}\"", &[3], false);
+    case("  bar \"${@:4}\"", &[], false);
+    case("  bar \"${@:0}\"", &[], true);
+    case("  bar \"${@:2:1}\"", &[2], false);
+    case("  bar \"${@:2:2}\"", &[2, 3], false);
+    case("  bar \"${*:2:2}\"", &[2, 3], false);
+    case("  bar \"${@:2:0}\"", &[], false);
+    case("  bar \"${@:0:2}\"", &[1], false);
+    case("  bar \"${@:2:$n}\"", &[2, 3], false);
+    case("  bar \\${@:2}", &[], false);
+    case("  bar \"${@:$n}\"", &[], true);
+    case("  bar \"${@: -1}\"", &[], true);
+    case("  bar \"${@: 2}\"", &[2, 3], false);
+    case("  bar \"${@:2", &[], false);
   }
 }
