@@ -234,20 +234,6 @@ impl Debug for Server {
   }
 }
 
-trait UrlExt {
-  fn normalize(&self) -> Self;
-}
-
-impl UrlExt for lsp::Url {
-  fn normalize(&self) -> Self {
-    self
-      .to_file_path()
-      .ok()
-      .and_then(|path| Self::from_file_path(path).ok())
-      .unwrap_or_else(|| self.clone())
-  }
-}
-
 #[tower_lsp::async_trait]
 impl LanguageServer for Server {
   async fn code_action(
@@ -4460,24 +4446,6 @@ mod tests {
       )
       .run()
       .await
-  }
-
-  #[test]
-  fn normalize() {
-    #[track_caller]
-    fn case(uri: &str, expected: &str) {
-      assert_eq!(lsp::Url::parse(uri).unwrap().normalize().as_str(), expected);
-    }
-
-    if cfg!(windows) {
-      case("file:///c%3A/foo%40bar", "file:///C:/foo@bar");
-      case("file:///c:/foo", "file:///C:/foo");
-    } else {
-      case("file:///foo%40bar", "file:///foo@bar");
-      case("file:///foo%c3%a9", "file:///foo%C3%A9");
-    }
-
-    case("untitled:foo%40bar", "untitled:foo%40bar");
   }
 
   #[tokio::test]
