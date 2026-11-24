@@ -72,6 +72,12 @@ impl<'a> ModuleView<'a> {
     self.documents.iter().map(|document| document.document)
   }
 
+  pub(crate) fn filesystem(&self) -> &'a dyn Filesystem {
+    self
+      .context
+      .map_or(&OsFilesystem, |context| context.documents.filesystem())
+  }
+
   pub(crate) fn find_called_functions(&self) -> HashSet<String> {
     self
       .documents()

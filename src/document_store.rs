@@ -90,6 +90,10 @@ impl DocumentStore {
     )
   }
 
+  pub(crate) fn filesystem(&self) -> &dyn Filesystem {
+    &*self.filesystem
+  }
+
   #[must_use]
   pub(crate) fn get(&self, uri: &lsp::Url) -> Option<&Document> {
     self.documents.get(uri).map(|entry| &entry.document)
