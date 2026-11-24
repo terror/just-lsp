@@ -55,83 +55,32 @@ impl<'a> ModuleView<'a> {
   }
 
   pub(crate) fn completion_items(&self) -> Vec<lsp::CompletionItem> {
-    let mut completion_items = Vec::new();
-
-    let mut recipes = self.resolved_recipes().cloned().collect::<Vec<_>>();
+    let mut recipes = self.resolved_recipes().collect::<Vec<_>>();
 
     recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
-    for recipe in recipes {
-      let recipe = recipe.into_inner();
-
-      completion_items.push(lsp::CompletionItem {
-        label: recipe.name.value.clone(),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
-          },
-        )),
-        insert_text: Some(recipe.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    let mut variables = self.resolved_variables().cloned().collect::<Vec<_>>();
+    let mut variables = self.resolved_variables().collect::<Vec<_>>();
 
     variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
-    for variable in variables {
-      let variable = variable.into_inner();
-
-      completion_items.push(lsp::CompletionItem {
-        label: variable.name.value.clone(),
-        kind: Some(lsp::CompletionItemKind::VARIABLE),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: variable.content,
-          },
-        )),
-        insert_text: Some(variable.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    let mut functions = self.resolved_functions().cloned().collect::<Vec<_>>();
+    let mut functions = self.resolved_functions().collect::<Vec<_>>();
 
     functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
 
-    for function in functions {
-      let function = function.into_inner();
-
-      let parameters = function
-        .parameters
-        .iter()
-        .map(|parameter| parameter.value.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-
-      completion_items.push(lsp::CompletionItem {
-        label: format!("{}({})", function.name.value, parameters),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: function.content.clone(),
-          },
-        )),
-        filter_text: Some(function.name.value.clone()),
-        insert_text: Some(function.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    completion_items
+    recipes
+      .into_iter()
+      .map(|recipe| recipe.completion_item())
+      .chain(
+        variables
+          .into_iter()
+          .map(|variable| variable.completion_item()),
+      )
+      .chain(
+        functions
+          .into_iter()
+          .map(|function| function.completion_item()),
+      )
+      .collect()
   }
 
   pub(crate) fn dependencies(

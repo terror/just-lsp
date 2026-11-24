@@ -705,11 +705,6 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
-    self.views(uri).into_iter().next()
-  }
-
-  #[must_use]
   pub fn views(&self, uri: &lsp::Url) -> Vec<ModuleView<'_>> {
     let Some(document) = self.documents.get_open(uri) else {
       return Vec::new();
