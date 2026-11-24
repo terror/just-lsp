@@ -77,12 +77,15 @@ impl UnusedRecipeParameterRule {
   }
 
   fn parse_slice(rest: &[u8], parameters: usize) -> Slice {
-    let Some(inner) = rest
-      .iter()
-      .position(|&b| b == b'}')
-      .and_then(|end| str::from_utf8(&rest[..end]).ok())
-      .and_then(|text| text.strip_prefix(':'))
-    else {
+    let Some(end) = rest.iter().position(|&b| b == b'}') else {
+      return Slice::Malformed;
+    };
+
+    let Some(inner) = rest[..end].strip_prefix(b":") else {
+      return Slice::Malformed;
+    };
+
+    let Ok(inner) = str::from_utf8(inner) else {
       return Slice::Malformed;
     };
 
@@ -251,7 +254,7 @@ mod tests {
     case("  bar \\${@:2}", &[], false);
     case("  bar \"${@:$n}\"", &[], true);
     case("  bar \"${@: -1}\"", &[], true);
-    case("  bar \"${@:x}\"", &[], true);
+    case("  bar \"${@: 2}\"", &[2, 3], false);
     case("  bar \"${@:2", &[], false);
   }
 }
