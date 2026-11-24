@@ -1736,6 +1736,39 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn diagnostics_closing_root_preserves_module_scope() -> Result {
+    let diagnostic = lsp::Diagnostic::from(Diagnostic {
+      id: "unresolved-dependency".into(),
+      ..Diagnostic::warning(
+        "Recipe `bar` not found",
+        lsp::Range::at(0, 5, 0, 8),
+      )
+    });
+
+    Test::new()
+      .file(
+        "just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'warning'\n",
+      )
+      .file(
+        "foo/just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'off'\n",
+      )
+      .file("foo/justfile", "foo: bar\n")
+      .file("justfile", "mod foo\n")
+      .ready()
+      .open("justfile", "mod foo\n")
+      .diagnostics("foo/justfile", None, [diagnostic.clone()])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo/justfile", "foo: bar\n")
+      .diagnostics("foo/justfile", Some(1), [diagnostic])
+      .close("justfile")
+      .diagnostics("justfile", None, [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn diagnostics_closing_root_promotes_closed_import() -> Result {
     Test::new()
       .file("just-lsp.toml", "[rules]\nunresolved-dependency = 'off'\n")
@@ -1969,6 +2002,33 @@ mod tests {
       .close("justfile")
       .diagnostics("foo/justfile", None, [])
       .diagnostics("justfile", None, [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn diagnostics_ignore_module_configuration() -> Result {
+    let diagnostic = lsp::Diagnostic::from(Diagnostic {
+      id: "unresolved-dependency".into(),
+      ..Diagnostic::warning(
+        "Recipe `bar` not found",
+        lsp::Range::at(0, 5, 0, 8),
+      )
+    });
+
+    Test::new()
+      .file(
+        "just-lsp.toml",
+        "[rules]\nunresolved-dependency = 'warning'\n",
+      )
+      .file("foo/just-lsp.toml", "foo")
+      .file("foo/justfile", "foo: bar\n")
+      .ready()
+      .open("justfile", "mod foo\n")
+      .diagnostics("foo/justfile", None, [diagnostic.clone()])
+      .diagnostics("justfile", Some(1), [])
+      .open("foo/justfile", "foo: bar\n")
+      .diagnostics("foo/justfile", Some(1), [diagnostic])
       .run()
       .await
   }
@@ -2935,6 +2995,30 @@ mod tests {
           message: "Cannot format document with an invalid configuration"
             .into(),
         },
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn goto_definition_in_module_uses_module_imports() -> Result {
+    let test = Test::new()
+      .file("foo/justfile", "import 'bar.just'\n\nbaz: qux\n")
+      .file("foo/bar.just", "qux:\n");
+
+    let target = test.uri("foo/bar.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo\n")
+      .open("foo/justfile", "import 'bar.just'\n\nbaz: qux\n")
+      .definition(
+        "foo/justfile",
+        lsp::Position::new(2, 6),
+        Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+          uri: target,
+          range: lsp::Range::at(0, 0, 1, 0),
+        })),
       )
       .run()
       .await
@@ -4133,6 +4217,51 @@ mod tests {
           text_document_position: lsp::TextDocumentPositionParams::new(
             lsp::TextDocumentIdentifier::new(justfile.clone()),
             lsp::Position::new(2, 11),
+          ),
+          new_name: "qux".into(),
+          work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+        },
+        Ok(Some(lsp::WorkspaceEdit {
+          changes: Some(HashMap::from([
+            (
+              justfile,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(2, 10, 2, 13),
+                new_text: "qux".into(),
+              }],
+            ),
+            (
+              foo,
+              vec![lsp::TextEdit {
+                range: lsp::Range::at(0, 0, 0, 3),
+                new_text: "qux".into(),
+              }],
+            ),
+          ])),
+          ..Default::default()
+        })),
+      )
+      .run()
+      .await
+  }
+
+  #[tokio::test]
+  async fn rename_module_recipe_declaration() -> Result {
+    let test = Test::new().file("foo.just", "bar:\n");
+
+    let justfile = test.uri("justfile");
+
+    let foo = test.uri("foo.just");
+
+    test
+      .initialize()
+      .open("justfile", "mod foo\n\nbaz: foo::bar\n")
+      .open("foo.just", "bar:\n")
+      .request::<request::Rename>(
+        lsp::RenameParams {
+          text_document_position: lsp::TextDocumentPositionParams::new(
+            lsp::TextDocumentIdentifier::new(foo.clone()),
+            lsp::Position::new(0, 1),
           ),
           new_name: "qux".into(),
           work_done_progress_params: lsp::WorkDoneProgressParams::default(),
