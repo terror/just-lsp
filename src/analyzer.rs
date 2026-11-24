@@ -4322,6 +4322,70 @@ mod tests {
   }
 
   #[test]
+  fn module_redefinition() {
+    #[track_caller]
+    fn case(files: &[(&str, &str)], expected: &[(&str, lsp::Range)]) {
+      assert_eq!(
+        Analyzer {
+          config: None,
+          view: TestModule::new(files).view(),
+        }
+        .analyze()
+        .iter()
+        .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
+        .collect::<Vec<_>>(),
+        expected,
+      );
+    }
+
+    case(
+      &[("justfile", "mod foo\nmod foo\n"), ("foo.just", "")],
+      &[("Duplicate module `foo`", lsp::Range::at(1, 4, 1, 7))],
+    );
+
+    case(
+      &[("justfile", "foo:\nmod foo\n"), ("foo.just", "")],
+      &[(
+        "Recipe `foo` is redefined as a module",
+        lsp::Range::at(1, 4, 1, 7),
+      )],
+    );
+
+    case(
+      &[
+        ("justfile", "mod foo\nalias foo := bar\nbar:\n"),
+        ("foo.just", ""),
+      ],
+      &[(
+        "Module `foo` is redefined as an alias",
+        lsp::Range::at(1, 6, 1, 9),
+      )],
+    );
+
+    case(
+      &[
+        ("justfile", "import 'bar.just'\nfoo:\n"),
+        ("bar.just", "mod foo\n"),
+        ("foo.just", ""),
+      ],
+      &[(
+        "Module `foo` is redefined as a recipe",
+        lsp::Range::at(1, 0, 1, 3),
+      )],
+    );
+
+    case(&[("justfile", "mod? foo\nfoo:\n")], &[]);
+
+    case(
+      &[
+        ("justfile", "[linux]\nmod foo\n[windows]\nfoo:\n"),
+        ("foo.just", ""),
+      ],
+      &[],
+    );
+  }
+
+  #[test]
   fn openbsd_macos_no_conflict() {
     Test::new(indoc! {
       "
