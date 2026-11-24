@@ -4988,6 +4988,18 @@ mod tests {
   }
 
   #[test]
+  fn private_and_eager_variables_are_not_unused() {
+    Test::new(indoc! {
+      "
+      [private]
+      foo := 'bar'
+      eager baz := 'qux'
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn recipe_consistent_indentation() {
     Test::new("foo:\n  echo \"foo\"\n  echo \"bar\"\n").run();
   }
