@@ -4555,6 +4555,17 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_shebang_interpolation() {
+    Test::new(indoc! {
+      "
+      foo bar:
+        #!/usr/bin/env {{bar}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid_with_shell_expanded_strings() {
     Test::new(indoc! {
       r#"
@@ -4565,6 +4576,19 @@ mod tests {
       foo:
         echo {{greeting}}
       "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_slash_prefixed_operands() {
+    Test::new(indoc! {
+      "
+      foo := 'bar' + / 'baz'
+
+      bar:
+        echo {{foo}}
+      "
     })
     .run();
   }

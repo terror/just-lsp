@@ -218,11 +218,12 @@ module.exports = grammar({
     //               | expression '&&' expression
     //               | expression '||' expression
     //               | value
-    expression: ($) => seq(optional("/"), $._expression_inner),
+    expression: ($) => $._expression_inner,
 
     _expression_inner: ($) =>
       choice(
         $.if_expression,
+        prec.right(4, seq("/", $._expression_recurse)),
         prec.left(4, seq($._expression_recurse, "++", $._expression_recurse)),
         prec.left(4, seq($._expression_recurse, "/", $._expression_recurse)),
         prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
@@ -471,7 +472,7 @@ module.exports = grammar({
       seq(
         /\S*\//,
         optional(seq("env", repeat(SHEBANG_ENV_FLAG))),
-        alias($.identifier, $.language),
+        choice(alias($.identifier, $.language), $.interpolation),
         /.*/,
       ),
 
