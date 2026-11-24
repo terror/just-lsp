@@ -35,6 +35,15 @@ impl<'a> ModuleView<'a> {
     ))
   }
 
+  pub(crate) fn dependencies(
+    &self,
+  ) -> impl Iterator<Item = &'a ProjectDependency> + '_ {
+    self
+      .context
+      .into_iter()
+      .flat_map(|context| context.project.dependencies(&self.document.uri))
+  }
+
   #[must_use]
   pub fn document(&self) -> &'a Document {
     self.document

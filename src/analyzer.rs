@@ -4267,6 +4267,22 @@ mod tests {
     );
 
     case("mod? bob\n\nqux: bob::bar\n", &[]);
+
+    case(
+      "mod bob\n\nqux: bob::bar\n",
+      &[(
+        "Could not find source file for module `bob`",
+        lsp::Range::at(0, 4, 0, 7),
+      )],
+    );
+
+    case(
+      "mod foo 'bob.just'\n",
+      &[(
+        "Could not find source file for module `foo`",
+        lsp::Range::at(0, 8, 0, 18),
+      )],
+    );
   }
 
   #[test]
