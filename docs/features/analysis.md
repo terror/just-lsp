@@ -12,7 +12,10 @@ Files used as modules are analyzed in the context of the justfile that declares
 them, so settings, imports, and recipe paths such as `foo::bar` resolve the way
 `just` sees them. When you open a file that is imported or used as a module,
 the server searches its parent directories for a `justfile` or `.justfile` that
-loads it and analyzes the file as part of that project.
+loads it and analyzes the file as part of that project. A file loaded in
+several contexts, such as an import shared by a justfile and one of its
+modules, reports a variable, function, or parameter as unused only when it is
+unused in every context.
 
 Changes to closed files on disk are picked up as well. The server reloads
 projects when a file is saved, and, when the editor supports dynamic file

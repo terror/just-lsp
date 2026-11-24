@@ -2466,6 +2466,34 @@ mod tests {
   }
 
   #[tokio::test]
+  async fn diagnostics_intersect_unanimous_rules() -> Result {
+    Test::new()
+      .file("foo.just", "import 'baz.just'\n")
+      .file("baz.just", "bar := 'foo'\nbaz := 'foo'\n")
+      .ready()
+      .open(
+        "justfile",
+        "import 'baz.just'\nmod foo\nbar:\n  echo {{bar}}\n",
+      )
+      .diagnostics(
+        "baz.just",
+        None,
+        [Diagnostic {
+          id: "unused-variable".into(),
+          ..Diagnostic::warning(
+            "Variable `baz` appears unused",
+            lsp::Range::at(1, 0, 1, 3),
+          )
+        }
+        .into()],
+      )
+      .diagnostics("foo.just", None, [])
+      .diagnostics("justfile", Some(1), [])
+      .run()
+      .await
+  }
+
+  #[tokio::test]
   async fn diagnostics_keep_closed_imports() -> Result {
     Test::new()
       .file("foo.just", "foo: bar\n")

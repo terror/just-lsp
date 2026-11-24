@@ -14,6 +14,7 @@ pub struct Diagnostic {
   pub range: lsp::Range,
   /// The severity level of the diagnostic.
   pub severity: lsp::DiagnosticSeverity,
+  pub unanimous: bool,
 }
 
 impl Diagnostic {
@@ -25,10 +26,11 @@ impl Diagnostic {
       quickfixes: Vec::new(),
       range,
       severity: lsp::DiagnosticSeverity::ERROR,
+      unanimous: false,
     }
   }
 
-  pub(crate) fn merge(analyses: Vec<Vec<Self>>) -> Vec<Self> {
+  pub(crate) fn merge(analyses: &[Vec<Self>]) -> Vec<Self> {
     let mut quickfixes = analyses
       .first()
       .into_iter()
@@ -44,9 +46,25 @@ impl Diagnostic {
       });
     }
 
+    let candidates = analyses
+      .iter()
+      .flatten()
+      .filter(|diagnostic| {
+        !diagnostic.unanimous
+          || analyses.iter().all(|diagnostics| {
+            diagnostics.iter().any(|other| {
+              other.id == diagnostic.id
+                && other.message == diagnostic.message
+                && other.range == diagnostic.range
+            })
+          })
+      })
+      .cloned()
+      .collect::<Vec<_>>();
+
     let mut diagnostics = Vec::<Self>::new();
 
-    for mut diagnostic in analyses.into_iter().flatten() {
+    for mut diagnostic in candidates {
       diagnostic
         .quickfixes
         .retain(|quickfix| quickfixes.contains(quickfix));
@@ -94,6 +112,7 @@ impl Diagnostic {
       quickfixes: Vec::new(),
       range,
       severity: lsp::DiagnosticSeverity::WARNING,
+      unanimous: false,
     }
   }
 }

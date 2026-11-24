@@ -25,7 +25,7 @@ impl Workspace {
     projects: &[&Project],
   ) -> Vec<Diagnostic> {
     Diagnostic::merge(
-      Self::contexts(projects, &document.uri)
+      &Self::contexts(projects, &document.uri)
         .into_iter()
         .map(|(project, module)| {
           let Some(config) = self
@@ -50,7 +50,7 @@ impl Workspace {
 
           analyzer.analyze()
         })
-        .collect(),
+        .collect::<Vec<_>>(),
     )
   }
 

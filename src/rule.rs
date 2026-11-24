@@ -6,6 +6,7 @@ macro_rules! define_rule {
     $name:ident {
       id: $id:literal,
       message: $message:literal,
+      $(unanimous: $unanimous:literal,)?
       run($context:ident) $body:block
       $(,)?
     }
@@ -25,6 +26,12 @@ macro_rules! define_rule {
       fn run(&self, $context: &RuleContext<'_>) -> Vec<Diagnostic> {
         $body
       }
+
+      $(
+        fn unanimous(&self) -> bool {
+          $unanimous
+        }
+      )?
     }
 
     inventory::submit!(&$name as &dyn Rule);
@@ -106,4 +113,8 @@ pub(crate) trait Rule: Sync {
 
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
+
+  fn unanimous(&self) -> bool {
+    false
+  }
 }

@@ -6,6 +6,7 @@ define_rule! {
   UnusedRecipeParameterRule {
     id: "unused-recipe-parameter",
     message: "unused parameter",
+    unanimous: true,
     run(context) {
       let default_script = context.setting_enabled("default-script");
 

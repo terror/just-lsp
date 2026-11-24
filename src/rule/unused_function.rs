@@ -4,6 +4,7 @@ define_rule! {
   UnusedFunctionRule {
     id: "unused-function",
     message: "unused function",
+    unanimous: true,
     run(context) {
       let called_functions = context.view().called_functions();
 

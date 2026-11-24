@@ -6,6 +6,7 @@ define_rule! {
   UnusedVariableRule {
     id: "unused-variable",
     message: "unused variable",
+    unanimous: true,
     run(context) {
       let mut diagnostics = Vec::new();
 

@@ -37,6 +37,7 @@ impl Analyzer<'_> {
               id: rule.id().to_string(),
               display: rule.message().to_string(),
               severity: rule_config.severity(diagnostic.severity)?,
+              unanimous: rule.unanimous(),
               ..diagnostic
             })
           })
