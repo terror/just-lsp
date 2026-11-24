@@ -54,6 +54,35 @@ impl<'a> ModuleView<'a> {
       .map_or(&[], Vec::as_slice)
   }
 
+  pub(crate) fn completion_items(&self) -> Vec<lsp::CompletionItem> {
+    let mut recipes = self.resolved_recipes().collect::<Vec<_>>();
+
+    recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
+
+    let mut variables = self.resolved_variables().collect::<Vec<_>>();
+
+    variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
+
+    let mut functions = self.resolved_functions().collect::<Vec<_>>();
+
+    functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
+
+    recipes
+      .into_iter()
+      .map(|recipe| recipe.completion_item())
+      .chain(
+        variables
+          .into_iter()
+          .map(|variable| variable.completion_item()),
+      )
+      .chain(
+        functions
+          .into_iter()
+          .map(|function| function.completion_item()),
+      )
+      .collect()
+  }
+
   pub(crate) fn dependencies(
     &self,
   ) -> impl Iterator<Item = &'a ProjectDependency> + '_ {

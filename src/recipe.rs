@@ -17,6 +17,22 @@ impl Recipe {
     self.body.iter().filter_map(RecipeLine::parse)
   }
 
+  pub(crate) fn completion_item(&self) -> lsp::CompletionItem {
+    lsp::CompletionItem {
+      label: self.name.value.clone(),
+      kind: Some(lsp::CompletionItemKind::FUNCTION),
+      documentation: Some(lsp::Documentation::MarkupContent(
+        lsp::MarkupContent {
+          kind: lsp::MarkupKind::PlainText,
+          value: self.content.clone(),
+        },
+      )),
+      insert_text: Some(self.name.value.clone()),
+      insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+      ..Default::default()
+    }
+  }
+
   #[must_use]
   pub fn find_attribute(&self, name: &str) -> Option<&Attribute> {
     self

@@ -127,7 +127,7 @@ mod tests {
 
       let diagnostics = Analyzer {
         config: Some(&self.config),
-        view: workspace.view(root).unwrap(),
+        view: workspace.views(root).remove(0),
       }
       .analyze();
 

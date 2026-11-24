@@ -116,87 +116,11 @@ impl Workspace {
     &self,
     uri: &lsp::Url,
   ) -> Option<Vec<lsp::CompletionItem>> {
-    let view = self.view(uri)?;
+    let mut completion_items =
+      Self::union(self.views(uri).iter().map(ModuleView::completion_items))?;
 
-    let mut completion_items = Vec::new();
-
-    let mut recipes = view.resolved_recipes().cloned().collect::<Vec<_>>();
-
-    recipes.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-    for recipe in recipes {
-      let recipe = recipe.into_inner();
-
-      completion_items.push(lsp::CompletionItem {
-        label: recipe.name.value.clone(),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: recipe.content,
-          },
-        )),
-        insert_text: Some(recipe.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    let mut variables = view.resolved_variables().cloned().collect::<Vec<_>>();
-
-    variables.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-    for variable in variables {
-      let variable = variable.into_inner();
-
-      completion_items.push(lsp::CompletionItem {
-        label: variable.name.value.clone(),
-        kind: Some(lsp::CompletionItemKind::VARIABLE),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: variable.content,
-          },
-        )),
-        insert_text: Some(variable.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    let mut functions = view.resolved_functions().cloned().collect::<Vec<_>>();
-
-    functions.sort_by(|a, b| a.name.value.cmp(&b.name.value));
-
-    for function in functions {
-      let function = function.into_inner();
-
-      let parameters = function
-        .parameters
-        .iter()
-        .map(|parameter| parameter.value.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-
-      completion_items.push(lsp::CompletionItem {
-        label: format!("{}({})", function.name.value, parameters),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        documentation: Some(lsp::Documentation::MarkupContent(
-          lsp::MarkupContent {
-            kind: lsp::MarkupKind::PlainText,
-            value: function.content.clone(),
-          },
-        )),
-        filter_text: Some(function.name.value.clone()),
-        insert_text: Some(function.name.value),
-        insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-        ..Default::default()
-      });
-    }
-
-    for builtin in BUILTINS {
-      completion_items.extend(builtin.completion_items());
-    }
+    completion_items
+      .extend(BUILTINS.iter().flat_map(Builtin::completion_items));
 
     Some(completion_items)
   }
@@ -230,14 +154,11 @@ impl Workspace {
       return Some(lsp::Location::new(target.clone(), lsp::Range::default()));
     }
 
-    let view = self.view(uri)?;
+    let identifier = self.identifier(uri, position)?;
 
-    let identifier = view
-      .document()
-      .node_at_position(position)
-      .filter(|node| node.kind() == "identifier")?;
-
-    Resolver::new(view).resolve_identifier_definition(&identifier)
+    self
+      .resolvers(uri)
+      .find_map(|resolver| resolver.resolve_identifier_definition(&identifier))
   }
 
   #[must_use]
@@ -423,16 +344,9 @@ impl Workspace {
     uri: &lsp::Url,
     position: lsp::Position,
   ) -> Option<Vec<lsp::DocumentHighlight>> {
-    let view = self.view(uri)?;
-
-    let identifier = view
-      .document()
-      .node_at_position(position)
-      .filter(|node| node.kind() == "identifier")?;
-
     Some(
-      Resolver::new(view)
-        .resolve_identifier_references(&identifier, true)
+      self
+        .references(uri, position, true)?
         .into_iter()
         .filter(|location| location.uri == *uri)
         .map(|location| lsp::DocumentHighlight {
@@ -449,14 +363,23 @@ impl Workspace {
     uri: &lsp::Url,
     position: lsp::Position,
   ) -> Option<lsp::Hover> {
-    let view = self.view(uri)?;
+    let identifier = self.identifier(uri, position)?;
 
-    let identifier = view
-      .document()
+    self
+      .resolvers(uri)
+      .find_map(|resolver| resolver.resolve_identifier_hover(&identifier))
+  }
+
+  fn identifier(
+    &self,
+    uri: &lsp::Url,
+    position: lsp::Position,
+  ) -> Option<Node<'_>> {
+    self
+      .documents
+      .get_open(uri)?
       .node_at_position(position)
-      .filter(|node| node.kind() == "identifier")?;
-
-    Resolver::new(view).resolve_identifier_hover(&identifier)
+      .filter(|node| node.kind() == "identifier")
   }
 
   #[must_use]
@@ -623,17 +546,17 @@ impl Workspace {
     uri: &lsp::Url,
     position: lsp::Position,
   ) -> Option<lsp::PrepareRenameResponse> {
-    let view = self.view(uri)?;
+    let document = self.documents.get_open(uri)?;
 
-    let document = view.document();
+    let identifier = self.identifier(uri, position)?;
 
-    let identifier = document
-      .node_at_position(position)
-      .filter(|node| node.kind() == "identifier")?;
-
-    Resolver::new(view)
-      .resolve_symbol(&identifier)
-      .is_some_and(|symbol| symbol.is_renameable())
+    self
+      .resolvers(uri)
+      .any(|resolver| {
+        resolver
+          .resolve_symbol(&identifier)
+          .is_some_and(|symbol| symbol.is_renameable())
+      })
       .then(|| lsp::PrepareRenameResponse::RangeWithPlaceholder {
         range: document.get_range(&identifier),
         placeholder: document.get_node_text(&identifier),
@@ -647,31 +570,11 @@ impl Workspace {
     position: lsp::Position,
     include_declaration: bool,
   ) -> Option<Vec<lsp::Location>> {
-    self
-      .views(uri)
-      .into_iter()
-      .filter_map(|view| {
-        let document = view.document();
+    let identifier = self.identifier(uri, position)?;
 
-        let resolver = Resolver::new(view);
-
-        document
-          .node_at_position(position)
-          .filter(|node| node.kind() == "identifier")
-          .map(|identifier| {
-            resolver
-              .resolve_identifier_references(&identifier, include_declaration)
-          })
-      })
-      .reduce(|mut locations, found| {
-        for location in found {
-          if !locations.contains(&location) {
-            locations.push(location);
-          }
-        }
-
-        locations
-      })
+    Self::union(self.resolvers(uri).map(|resolver| {
+      resolver.resolve_identifier_references(&identifier, include_declaration)
+    }))
   }
 
   /// # Errors
@@ -741,6 +644,10 @@ impl Workspace {
     })
   }
 
+  fn resolvers(&self, uri: &lsp::Url) -> impl Iterator<Item = Resolver<'_>> {
+    self.views(uri).into_iter().map(Resolver::new)
+  }
+
   fn root_projects(&self) -> Vec<&Project> {
     let mut projects = self
       .projects
@@ -783,9 +690,18 @@ impl Workspace {
     self.config = config;
   }
 
-  #[must_use]
-  pub fn view(&self, uri: &lsp::Url) -> Option<ModuleView<'_>> {
-    self.views(uri).into_iter().next()
+  fn union<T: PartialEq>(
+    results: impl IntoIterator<Item = Vec<T>>,
+  ) -> Option<Vec<T>> {
+    results.into_iter().reduce(|mut union, items| {
+      for item in items {
+        if !union.contains(&item) {
+          union.push(item);
+        }
+      }
+
+      union
+    })
   }
 
   #[must_use]
@@ -1281,6 +1197,78 @@ mod tests {
           RuleConfig::Level(RuleLevel::Warning),
         )]),
       }),
+    );
+  }
+
+  #[test]
+  fn queries_search_every_context() {
+    let directory = if cfg!(windows) {
+      PathBuf::from("C:\\")
+    } else {
+      PathBuf::from("/")
+    };
+
+    let uri =
+      |path: &str| lsp::Url::from_file_path(directory.join(path)).unwrap();
+
+    let mut workspace = Workspace {
+      documents: DocumentStore::new(Arc::new(MemoryFilesystem::new(
+        [
+          ("justfile", "import 'foo.just'\nmod bar\n"),
+          ("bar.just", "import 'foo.just'\nbaz:\n"),
+        ]
+        .map(|(path, content)| (directory.join(path), content.into())),
+      ))),
+      ..Workspace::default()
+    };
+
+    let foo = uri("foo.just");
+
+    workspace
+      .open(lsp::DidOpenTextDocumentParams {
+        text_document: lsp::TextDocumentItem::new(
+          foo.clone(),
+          "just".into(),
+          1,
+          "qux: baz\n".into(),
+        ),
+      })
+      .unwrap();
+
+    let position = lsp::Position::new(0, 6);
+
+    let baz = lsp::Location::new(uri("bar.just"), lsp::Range::at(1, 0, 2, 0));
+
+    assert_eq!(workspace.definition(&foo, position), Some(baz));
+
+    assert_eq!(
+      workspace.hover(&foo, position),
+      Some(lsp::Hover {
+        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+          kind: lsp::MarkupKind::PlainText,
+          value: "baz:".into(),
+        }),
+        range: Some(lsp::Range::at(0, 5, 0, 8)),
+      }),
+    );
+
+    assert_eq!(
+      workspace.prepare_rename(&foo, position),
+      Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
+        range: lsp::Range::at(0, 5, 0, 8),
+        placeholder: "baz".into(),
+      }),
+    );
+
+    assert_eq!(
+      workspace
+        .completions(&foo)
+        .unwrap()
+        .into_iter()
+        .filter(|item| item.sort_text.is_none())
+        .map(|item| item.label)
+        .collect::<Vec<_>>(),
+      ["qux", "baz"],
     );
   }
 
