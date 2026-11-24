@@ -3866,23 +3866,12 @@ mod tests {
 
   #[test]
   fn import_invalid_string_escape() {
-    #[track_caller]
-    fn case(source: &str, range: lsp::Range) {
-      Test::new(source)
-        .error("Invalid escape sequence in string literal", range)
-        .run();
-    }
-
-    case(r#"import "\u{D800}""#, lsp::Range::at(0, 7, 0, 17));
-    case(r#"import x"\u{110000}""#, lsp::Range::at(0, 7, 0, 20));
-    case(r#"import? "\u{DFFF}""#, lsp::Range::at(0, 8, 0, 18));
-
-    let attribute = if cfg!(windows) { "unix" } else { "windows" };
-
-    case(
-      &format!("[{attribute}]\nimport \"\\u{{D800}}\"\n"),
-      lsp::Range::at(1, 7, 1, 17),
-    );
+    Test::new(r#"import "\u{D800}""#)
+      .error(
+        "unicode escape sequence value `D800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 8, 0, 16),
+      )
+      .run();
   }
 
   #[test]
@@ -3910,6 +3899,37 @@ mod tests {
     })
     .error(expected, lsp::Range::at(0, 7, 0, 26))
     .run();
+  }
+
+  #[test]
+  fn invalid_unicode_escape() {
+    #[track_caller]
+    fn case(source: &str, errors: &[(&'static str, lsp::Range)]) {
+      errors
+        .iter()
+        .fold(Test::new(source), |test, (message, range)| {
+          test.error(message, *range)
+        })
+        .run();
+    }
+
+    case(r#"export foo := "\u{10FFFF}""#, &[]);
+
+    case(
+      r#"export foo := "\u{110000}""#,
+      &[(
+        "unicode escape sequence value `110000` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 25),
+      )],
+    );
+
+    case(
+      r#"export foo := "\u{d800}""#,
+      &[(
+        "unicode escape sequence value `d800` greater than maximum valid code point `10FFFF`",
+        lsp::Range::at(0, 15, 0, 23),
+      )],
+    );
   }
 
   #[test]

@@ -70,6 +70,7 @@ mod invalid_mapped_dependency;
 mod invalid_recipe_parameter_order;
 mod invalid_setting_type;
 mod invalid_setting_value;
+mod invalid_unicode_escape;
 mod list_feature_gate;
 mod missing_module_file;
 mod mixed_indentation;
