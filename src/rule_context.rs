@@ -165,6 +165,16 @@ impl<'a> RuleContext<'a> {
     diagnostics
   }
 
+  pub(crate) fn declares_module(&self, path: &Namepath) -> bool {
+    match self.view.module(path) {
+      ModuleLookup::Found(view) => view
+        .modules()
+        .iter()
+        .any(|module| module.name.value == path.name().value),
+      ModuleLookup::Undeclared(_) | ModuleLookup::Unloaded => false,
+    }
+  }
+
   pub(crate) fn document(&self) -> &'a Document {
     self.view.document()
   }
