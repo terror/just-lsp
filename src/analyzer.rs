@@ -3904,16 +3904,6 @@ mod tests {
   }
 
   #[test]
-  fn import_format_string_skipped() {
-    Test::new(indoc! {
-      r#"
-      import f"{'nonexistent.just'}"
-      "#
-    })
-    .run();
-  }
-
-  #[test]
   fn import_circular() {
     #[track_caller]
     fn case(justfile: &str, range: lsp::Range) {
@@ -3953,6 +3943,16 @@ mod tests {
 
     Test::new("import '.'")
       .error(expected, lsp::Range::at(0, 7, 0, 10))
+      .run();
+  }
+
+  #[test]
+  fn import_format_string() {
+    Test::new("import f'foo'")
+      .error(
+        "Expected keyword `x` but found identifier `f`",
+        lsp::Range::at(0, 7, 0, 13),
+      )
       .run();
   }
 

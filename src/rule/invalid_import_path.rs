@@ -13,6 +13,13 @@ define_rule! {
         .imports()
         .into_iter()
         .filter_map(|import| {
+          if import.is_dynamic() {
+            return Some(Diagnostic::error(
+              "Expected keyword `x` but found identifier `f`",
+              import.path.range,
+            ));
+          }
+
           let message = match import.resolve(&document.uri) {
             Ok(Some(path))
               if import.is_enabled() && !import.optional && !view.loads(&path) =>
