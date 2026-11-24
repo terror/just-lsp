@@ -4437,6 +4437,18 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_numeric_literal() {
+    Test::new(indoc! {
+      "
+      foo bar=1:
+        echo {{bar}}
+      "
+    })
+    .error("Unknown start of token `1`", lsp::Range::at(0, 8, 0, 9))
+    .run();
+  }
+
+  #[test]
   fn parser_errors_valid() {
     Test::new(indoc! {
       "

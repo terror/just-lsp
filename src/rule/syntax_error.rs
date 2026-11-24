@@ -19,6 +19,10 @@ define_rule! {
           ));
         }
 
+        if node.kind() == "numeric_error" {
+          diagnostics.extend(SyntaxErrorRule::numeric_error(document, &node));
+        }
+
         if node.is_missing() {
           diagnostics.push(Diagnostic::error(
             SyntaxErrorRule::missing_message(&node),
@@ -85,6 +89,23 @@ impl SyntaxErrorRule {
     } else {
       format!("Missing {missing}")
     }
+  }
+
+  fn numeric_error(document: &Document, node: &Node<'_>) -> Option<Diagnostic> {
+    let start = document.get_node_text(node).chars().next()?;
+
+    let range = document.get_range(node);
+
+    Some(Diagnostic::error(
+      format!("Unknown start of token `{start}`"),
+      lsp::Range {
+        start: range.start,
+        end: lsp::Position {
+          character: range.start.character + 1,
+          ..range.start
+        },
+      },
+    ))
   }
 
   fn snippet_preview(text: &str) -> Option<String> {
