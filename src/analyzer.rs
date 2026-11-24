@@ -1331,6 +1331,44 @@ mod tests {
   }
 
   #[test]
+  fn attribute_expression_scope() {
+    Test::new(indoc! {
+      "
+      [doc(foo)]
+      bar foo:
+        echo {{foo}}
+      "
+    })
+    .error("Variable `foo` not found", lsp::Range::at(0, 5, 0, 8))
+    .run();
+
+    Test::new(indoc! {
+      "
+      foo := 'bar'
+
+      [env('BAR', foo)]
+      baz foo:
+        echo
+      "
+    })
+    .warning("Parameter `foo` appears unused", lsp::Range::at(3, 4, 3, 7))
+    .run();
+
+    Test::new(indoc! {
+      "
+      set unstable
+
+      foo := 'bar'
+
+      [arg('foo', long, value=foo)]
+      baz foo:
+        echo {{foo}}
+      "
+    })
+    .run();
+  }
+
+  #[test]
   fn attribute_string_literal_expression() {
     Test::new(indoc! {
       "

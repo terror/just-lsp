@@ -347,6 +347,32 @@ mod tests {
   }
 
   #[test]
+  fn resolve_attribute_expression_definition() {
+    let document = Document::from(indoc! {
+      "
+      foo := 'bar'
+      [doc(foo)]
+      baz foo:
+        echo {{ foo }}
+      "
+    });
+
+    assert_eq!(
+      Resolver::new(&document).resolve_identifier_definition(
+        &document
+          .tree
+          .root_node()
+          .find("value > identifier")
+          .unwrap(),
+      ),
+      Some(lsp::Location {
+        uri: document.uri.clone(),
+        range: lsp::Range::at(0, 0, 1, 0),
+      }),
+    );
+  }
+
+  #[test]
   fn resolve_builtin_attribute_hover() {
     let document = Document::from(indoc! {
       "

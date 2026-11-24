@@ -5,8 +5,9 @@ order: 10
 
 Reports a variable or parameter reference that cannot be resolved in its expression scope.
 
-- Checks include expressions in assignments, recipe interpolations, parameter defaults, and function bodies.
+- Checks include expressions in assignments, recipe interpolations, parameter defaults, attribute arguments, and function bodies.
 - Variables from imports and parameters visible in the current scope can resolve a reference. A parameter from another recipe or function cannot.
+- `[doc]`, `[env]`, and `[arg]` `help` and `pattern` arguments only see global variables. `[arg]` `value` arguments only see parameters declared before the configured parameter.
 - With `set ignore-comments`, comment lines in non-script recipe bodies are not evaluated, so interpolations in them are not checked. A comment line that continues a previous line is still checked.
 - Shell text is not a just expression: `$FOO` and `{{FOO}}` have different meanings. Misspelled function calls are handled by `unknown-function`.
 

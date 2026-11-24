@@ -299,6 +299,8 @@ impl Bindings {
 
     let comments = Self::comment_lines(view, document, &recipe_node);
 
+    let attributes = document.get_attributes(&recipe_node);
+
     for identifier in document.get_expression_identifiers(&recipe_node) {
       if identifier.has_any_parent(&["parameter", "variadic_parameter"])
         || comments.iter().any(|comment| {
@@ -308,13 +310,15 @@ impl Bindings {
         continue;
       }
 
+      let scope = Self::scope(&attributes, document, &identifier, &locals);
+
       self.expression(
         view,
         document,
         globals,
         identifier,
-        Some(&name),
-        &locals,
+        scope.is_some().then_some(name.as_str()),
+        scope.unwrap_or_default(),
       );
     }
   }
@@ -374,6 +378,50 @@ impl Bindings {
 
     if let Some(binding) = binding {
       self.bind(document, &identifier, binding, false);
+    }
+  }
+
+  fn scope<'a>(
+    attributes: &[Attribute],
+    document: &Document,
+    identifier: &Node,
+    locals: &'a [(String, Binding)],
+  ) -> Option<&'a [(String, Binding)]> {
+    let range = document.get_range(identifier);
+
+    let Some((attribute, argument)) = attributes
+      .iter()
+      .flat_map(|attribute| {
+        attribute
+          .arguments
+          .iter()
+          .map(move |argument| (attribute, argument))
+      })
+      .find(|(_, argument)| argument.range().overlaps(range))
+    else {
+      return Some(locals);
+    };
+
+    match (attribute.name.value.as_str(), argument) {
+      ("arg", AttributeArgument::Keyword { name, .. })
+        if name.value == "value" =>
+      {
+        let end = attribute
+          .arg_parameter()
+          .and_then(|parameter| {
+            locals.iter().position(|(local, _)| *local == parameter)
+          })
+          .unwrap_or_default();
+
+        Some(&locals[..end])
+      }
+      ("arg", AttributeArgument::Keyword { name, .. })
+        if name.value == "help" || name.value == "pattern" =>
+      {
+        None
+      }
+      ("doc" | "env", _) => None,
+      _ => Some(locals),
     }
   }
 }
