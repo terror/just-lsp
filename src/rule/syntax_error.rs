@@ -9,9 +9,11 @@ define_rule! {
     run(context) {
       let document = context.document();
 
+      let root = context.tree().root_node();
+
       let mut diagnostics = Vec::new();
 
-      let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
+      let _ = TreeWalker::new(root).walk(|node, _| {
         if node.is_error() {
           diagnostics.push(Diagnostic::error(
             SyntaxErrorRule::error_message(document, &node),
@@ -79,6 +81,20 @@ define_rule! {
         ControlFlow::<(), bool>::Continue(true)
       });
 
+      if diagnostics.is_empty() && root.has_error() {
+        let node = SyntaxErrorRule::deepest_error(root);
+
+        let end = document.get_range(&node).end;
+
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Missing newline in {}",
+            SyntaxErrorRule::describe_kind(node.kind())
+          ),
+          lsp::Range { start: end, end },
+        ));
+      }
+
       diagnostics
     }
   }
@@ -99,6 +115,15 @@ impl SyntaxErrorRule {
     node
       .child(1)
       .filter(|child| ["==", "!=", "=~", "!~"].contains(&child.kind()))
+  }
+
+  fn deepest_error(node: Node<'_>) -> Node<'_> {
+    let mut cursor = node.walk();
+
+    match node.children(&mut cursor).find(Node::has_error) {
+      Some(child) => SyntaxErrorRule::deepest_error(child),
+      None => node,
+    }
   }
 
   fn describe_kind(kind: &str) -> String {

@@ -4498,6 +4498,33 @@ mod tests {
   }
 
   #[test]
+  fn missing_newline_between_items() {
+    Test::new(indoc! {
+      "
+      foo := 'bar' baz := 'bob'
+      "
+    })
+    .warning("Variable `foo` appears unused", lsp::Range::at(0, 0, 0, 3))
+    .error(
+      "Missing newline in assignment",
+      lsp::Range::at(0, 12, 0, 12),
+    )
+    .warning(
+      "Variable `baz` appears unused",
+      lsp::Range::at(0, 13, 0, 16),
+    )
+    .run();
+
+    Test::new(indoc! {
+      "
+      [private] foo:
+      "
+    })
+    .error("Missing newline in attribute", lsp::Range::at(0, 9, 0, 9))
+    .run();
+  }
+
+  #[test]
   fn mixed_os_specific_and_regular_recipe() {
     Test::new(indoc! {
       "
