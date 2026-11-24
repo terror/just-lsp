@@ -35,12 +35,6 @@ impl<'a> ModuleView<'a> {
     ))
   }
 
-  pub(crate) fn descend(&self, modules: &[String]) -> Option<Self> {
-    modules
-      .iter()
-      .try_fold(self.clone(), |view, module| view.child(module))
-  }
-
   #[must_use]
   pub fn document(&self) -> &'a Document {
     self.document
