@@ -146,6 +146,7 @@
     "dotenv-override"
     "dotenv-path"
     "dotenv-required"
+    "dry-run"
     "export"
     "fallback"
     "guards"

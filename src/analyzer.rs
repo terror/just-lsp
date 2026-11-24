@@ -6123,6 +6123,32 @@ mod tests {
   }
 
   #[test]
+  fn settings_dry_run_value_validation() {
+    #[track_caller]
+    fn case(value: &str, valid: bool) {
+      let content = format!("set dry-run := {value}\n");
+
+      let test = Test::new(&content);
+
+      let test = if valid {
+        test
+      } else {
+        test.error(
+          "Setting `dry-run` must be `all` or `recipes`",
+          lsp::Range::at(0, 15, 0, 15 + u32::try_from(value.len()).unwrap()),
+        )
+      };
+
+      test.run();
+    }
+
+    case("'all'", true);
+    case("'recipes'", true);
+    case("'foo'", false);
+    case("'all' + ''", false);
+  }
+
+  #[test]
   fn settings_guards_recognized() {
     Test::new(indoc! {
       "
