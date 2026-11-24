@@ -36,6 +36,15 @@ define_rule! {
           ));
         }
 
+        if node.kind() == "dependencies" {
+          for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
+            diagnostics.push(Diagnostic::error(
+              "Expected comment, end of file, end of line, or dependency, but found `&&`",
+              document.get_range(&marker),
+            ));
+          }
+        }
+
         if node.is_missing() {
           diagnostics.push(Diagnostic::error(
             SyntaxErrorRule::missing_message(&node),
