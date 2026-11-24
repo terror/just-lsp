@@ -209,6 +209,13 @@ impl<'a> ModuleView<'a> {
       .map(|index| &self.symbols.variables[*index])
   }
 
+  pub(crate) fn setting_enabled(&self, name: &str) -> bool {
+    self.settings().iter().any(|setting| {
+      setting.name.value == name
+        && matches!(setting.kind, SettingKind::Boolean(true))
+    })
+  }
+
   pub(crate) fn settings(&self) -> &[Located<Setting>] {
     &self.symbols.settings
   }

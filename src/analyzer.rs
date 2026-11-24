@@ -6136,6 +6136,29 @@ mod tests {
   }
 
   #[test]
+  fn settings_ignore_comments() {
+    Test::new(indoc! {
+      "
+      set ignore-comments
+
+      foo:
+        # {{bar}}
+        echo \\
+        # {{baz}}
+        @# {{qux}}
+
+      [script]
+      bar:
+        # {{bob}}
+      "
+    })
+    .error("Variable `baz` not found", lsp::Range::at(5, 6, 5, 9))
+    .error("Variable `qux` not found", lsp::Range::at(6, 7, 6, 10))
+    .error("Variable `bob` not found", lsp::Range::at(10, 6, 10, 9))
+    .run();
+  }
+
+  #[test]
   fn settings_indentation_value_validation() {
     #[track_caller]
     fn case(value: &str, valid: bool) {
