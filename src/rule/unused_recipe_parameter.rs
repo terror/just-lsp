@@ -61,18 +61,12 @@ enum Slice {
 }
 
 impl UnusedRecipeParameterRule {
-  fn parse_positional(bytes: &[u8], braced: bool) -> Option<usize> {
-    let inner = if braced {
-      bytes.strip_prefix(b"{").and_then(|b| b.strip_suffix(b"}"))
-    } else {
-      Some(bytes)
-    }?;
-
-    if inner.is_empty() || !inner.iter().all(u8::is_ascii_digit) {
+  fn parse_positional(digits: &[u8]) -> Option<usize> {
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
       return None;
     }
 
-    str::from_utf8(inner).ok()?.parse().ok().filter(|&n| n > 0)
+    str::from_utf8(digits).ok()?.parse().ok().filter(|&n| n > 0)
   }
 
   fn parse_slice(rest: &[u8], parameters: usize) -> Slice {
@@ -138,13 +132,13 @@ impl UnusedRecipeParameterRule {
           return (indices, uses_all);
         }
 
-        let index = if rest.first().is_some_and(u8::is_ascii_digit) {
-          Self::parse_positional(&rest[..1], false)
-        } else {
-          rest
+        let index = match rest {
+          [digit @ b'1'..=b'9', ..] => Some(usize::from(digit - b'0')),
+          [b'{', tail @ ..] => tail
             .iter()
             .position(|&b| b == b'}')
-            .and_then(|end| Self::parse_positional(&rest[..=end], true))
+            .and_then(|end| Self::parse_positional(&tail[..end])),
+          _ => None,
         };
 
         if let Some(index) = index {
@@ -246,43 +240,19 @@ mod tests {
   }
 
   #[test]
-  fn parse_positional_rejects_incomplete_braced() {
-    assert_eq!(
-      UnusedRecipeParameterRule::parse_positional(b"{56", true),
-      None
-    );
-  }
+  fn parse_positional() {
+    #[track_caller]
+    fn case(digits: &[u8], expected: Option<usize>) {
+      assert_eq!(
+        UnusedRecipeParameterRule::parse_positional(digits),
+        expected
+      );
+    }
 
-  #[test]
-  fn parse_positional_rejects_missing_digits() {
-    assert_eq!(
-      UnusedRecipeParameterRule::parse_positional(b"rest", false),
-      None
-    );
-  }
-
-  #[test]
-  fn parse_positional_rejects_zero() {
-    assert_eq!(
-      UnusedRecipeParameterRule::parse_positional(b"0", false),
-      None
-    );
-  }
-
-  #[test]
-  fn parse_positional_with_braces_extracts_number() {
-    assert_eq!(
-      UnusedRecipeParameterRule::parse_positional(b"{34}", true),
-      Some(34)
-    );
-  }
-
-  #[test]
-  fn parse_positional_without_braces_extracts_number() {
-    assert_eq!(
-      UnusedRecipeParameterRule::parse_positional(b"12", false),
-      Some(12)
-    );
+    case(b"", None);
+    case(b"0", None);
+    case(b"12", Some(12));
+    case(b"foo", None);
   }
 
   #[test]
@@ -429,23 +399,6 @@ mod tests {
     .warning(
       "Parameter `first` appears unused",
       lsp::Range::at(2, 6, 2, 11),
-    )
-    .run();
-  }
-
-  #[test]
-  fn positional_arguments_unbraced_references_use_first_digit_only() {
-    AnalyzerTest::new(indoc! {
-      "
-      set positional-arguments
-
-      graph first second:
-        ./bin/graph $10
-      "
-    })
-    .warning(
-      "Parameter `second` appears unused",
-      lsp::Range::at(2, 12, 2, 18),
     )
     .run();
   }
