@@ -48,6 +48,7 @@ lto = true
 [dependencies]
 indoc = "2.0.7"
 inventory = "0.3.24"
+regex = "1.13.2"
 ropey = { version = "1.6.1", default-features = false, features = ["cr_lines", "simd"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
