@@ -10,11 +10,11 @@ impl Scope {
   pub(crate) fn analyze(context: &RuleContext<'_>) -> Self {
     let view = context.view();
 
-    let root = Bindings::new(view, context.document());
+    let root = view.bindings(context.document());
 
     let imported = context
       .imported_documents()
-      .map(|document| Bindings::new(view, document))
+      .map(|document| view.bindings(document))
       .collect::<Vec<_>>();
 
     let mut variable_usage = context
@@ -25,7 +25,7 @@ impl Scope {
 
     for bound in once(&root)
       .chain(&imported)
-      .flat_map(Bindings::identifiers)
+      .flat_map(|bindings| bindings.identifiers())
       .filter(|bound| bound.expression)
     {
       if let Binding::Variable(name) = &bound.binding
@@ -47,7 +47,7 @@ impl Scope {
       .collect();
 
     Self {
-      recipe_identifier_usage: root.recipe_identifiers,
+      recipe_identifier_usage: root.recipe_identifiers.clone(),
       unresolved_identifiers,
       variable_usage,
     }

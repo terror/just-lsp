@@ -2,12 +2,27 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) struct Module {
+  bindings: HashMap<lsp::Url, OnceLock<Arc<Bindings>>>,
   pub(crate) children: BTreeMap<String, lsp::Url>,
   pub(crate) import_scope: ImportScope,
   symbols: OnceLock<Arc<SymbolTable>>,
 }
 
 impl Module {
+  pub(crate) fn bindings(
+    &self,
+    view: &ModuleView,
+    document: &Document,
+  ) -> Option<Arc<Bindings>> {
+    Some(
+      self
+        .bindings
+        .get(&document.uri)?
+        .get_or_init(|| Arc::new(Bindings::new(view, document)))
+        .clone(),
+    )
+  }
+
   pub(crate) fn new(
     root: &lsp::Url,
     dependencies: &HashMap<lsp::Url, Vec<ProjectDependency>>,
@@ -38,6 +53,11 @@ impl Module {
     }
 
     Self {
+      bindings: import_scope
+        .documents()
+        .iter()
+        .map(|document| (document.document.clone(), OnceLock::new()))
+        .collect(),
       children,
       import_scope,
       symbols: OnceLock::new(),

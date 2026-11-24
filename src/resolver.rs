@@ -137,7 +137,9 @@ impl<'a> Resolver<'a> {
   ) -> Vec<lsp::Location> {
     let document = self.view.document();
 
-    let Some(target) = Bindings::new(&self.view, document)
+    let Some(target) = self
+      .view
+      .bindings(document)
       .get(identifier)
       .map(|bound| bound.binding.clone())
     else {
@@ -160,7 +162,9 @@ impl<'a> Resolver<'a> {
           continue;
         }
 
-        let mut found = Bindings::new(&resolver.view, candidate)
+        let mut found = resolver
+          .view
+          .bindings(candidate)
           .identifiers()
           .iter()
           .filter(|bound| include_declaration || !bound.declaration)
@@ -195,7 +199,9 @@ impl<'a> Resolver<'a> {
   #[must_use]
   pub fn resolve_symbol(&self, identifier: &Node) -> Option<Symbol> {
     self.symbol(
-      &Bindings::new(&self.view, self.view.document())
+      &self
+        .view
+        .bindings(self.view.document())
         .get(identifier)?
         .binding,
     )

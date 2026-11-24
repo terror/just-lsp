@@ -13,6 +13,13 @@ impl<'a> ModuleView<'a> {
     &self.symbols.aliases
   }
 
+  pub(crate) fn bindings(&self, document: &Document) -> Arc<Bindings> {
+    self
+      .context
+      .and_then(|context| context.module.bindings(self, document))
+      .unwrap_or_else(|| Arc::new(Bindings::new(self, document)))
+  }
+
   #[must_use]
   pub fn child(&self, name: &str) -> Option<Self> {
     let context = self.context?;
@@ -255,6 +262,18 @@ impl<'a> From<&'a Document> for ModuleView<'a> {
 #[cfg(test)]
 mod tests {
   use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+
+  #[test]
+  fn bindings_are_shared_across_views() {
+    let module = TestModule::new(&[("justfile", "foo:")]);
+
+    let view = module.view();
+
+    assert!(Arc::ptr_eq(
+      &view.bindings(view.document()),
+      &module.view().bindings(view.document()),
+    ));
+  }
 
   #[test]
   fn child_views_module_scope() {
