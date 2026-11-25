@@ -4,7 +4,7 @@ use {super::*, pretty_assertions::assert_eq};
 pub(crate) struct AnalyzerTest {
   config: Config,
   files: Vec<(&'static str, String)>,
-  messages: Vec<(&'static str, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
+  messages: Vec<(String, lsp::Range, Option<lsp::DiagnosticSeverity>)>,
 }
 
 impl AnalyzerTest {
@@ -12,14 +12,12 @@ impl AnalyzerTest {
     Self { config, ..self }
   }
 
-  pub(crate) fn error(
-    mut self,
-    message: &'static str,
-    range: lsp::Range,
-  ) -> Self {
-    self
-      .messages
-      .push((message, range, Some(lsp::DiagnosticSeverity::ERROR)));
+  pub(crate) fn error(mut self, message: &str, range: lsp::Range) -> Self {
+    self.messages.push((
+      message.to_owned(),
+      range,
+      Some(lsp::DiagnosticSeverity::ERROR),
+    ));
     self
   }
 
@@ -61,7 +59,7 @@ impl AnalyzerTest {
       diagnostics
         .iter()
         .map(|diagnostic| (
-          diagnostic.message.as_str(),
+          diagnostic.message.clone(),
           diagnostic.range,
           diagnostic.severity,
         ))
@@ -70,13 +68,9 @@ impl AnalyzerTest {
     );
   }
 
-  pub(crate) fn warning(
-    mut self,
-    message: &'static str,
-    range: lsp::Range,
-  ) -> Self {
+  pub(crate) fn warning(mut self, message: &str, range: lsp::Range) -> Self {
     self.messages.push((
-      message,
+      message.to_owned(),
       range,
       Some(lsp::DiagnosticSeverity::WARNING),
     ));

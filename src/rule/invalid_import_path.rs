@@ -42,7 +42,7 @@ define_rule! {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {super::*, indoc::indoc};
 
   #[test]
   fn import_directory_path() {
@@ -111,51 +111,30 @@ mod tests {
 
   #[test]
   fn import_paths_use_filesystem() {
-    #[track_caller]
-    fn case(files: &[(&str, &str)], expected: &[Diagnostic]) {
-      assert_eq!(
-        Analyzer {
-          config: None,
-          view: TestModule::new(files).view(),
-        }
-        .analyze(),
-        expected,
-      );
-    }
+    AnalyzerTest::new("import 'foo.just'")
+      .file("foo.just", "")
+      .run();
 
-    case(&[("justfile", "import 'foo.just'"), ("foo.just", "")], &[]);
-
-    let path = if cfg!(windows) {
-      "C:\\foo.just"
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\foo.just`"
     } else {
-      "/foo.just"
+      "Import path does not exist: `/foo.just`"
     };
 
-    case(
-      &[("justfile", "import 'foo.just'")],
-      &[Diagnostic {
-        display: "invalid import path".into(),
-        id: "invalid-import-path".into(),
-        ..Diagnostic::error(
-          format!("Import path does not exist: `{path}`"),
-          lsp::Range::at(0, 7, 0, 17),
-        )
-      }],
-    );
+    AnalyzerTest::new("import 'foo.just'")
+      .error(expected, lsp::Range::at(0, 7, 0, 17))
+      .run();
 
-    let path = if cfg!(windows) { "C:\\foo" } else { "/foo" };
+    let expected = if cfg!(windows) {
+      "Import path does not exist: `C:\\foo`"
+    } else {
+      "Import path does not exist: `/foo`"
+    };
 
-    case(
-      &[("justfile", "import 'foo'"), ("foo/bar.just", "")],
-      &[Diagnostic {
-        display: "invalid import path".into(),
-        id: "invalid-import-path".into(),
-        ..Diagnostic::error(
-          format!("Import path does not exist: `{path}`"),
-          lsp::Range::at(0, 7, 0, 12),
-        )
-      }],
-    );
+    AnalyzerTest::new("import 'foo'")
+      .file("foo/bar.just", "")
+      .error(expected, lsp::Range::at(0, 7, 0, 12))
+      .run();
   }
 
   #[test]

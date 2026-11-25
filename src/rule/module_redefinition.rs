@@ -145,69 +145,44 @@ define_rule! {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use super::*;
 
   #[test]
   fn module_redefinition() {
-    #[track_caller]
-    fn case(files: &[(&str, &str)], expected: &[(&str, lsp::Range)]) {
-      assert_eq!(
-        Analyzer {
-          config: None,
-          view: TestModule::new(files).view(),
-        }
-        .analyze()
-        .iter()
-        .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
-        .collect::<Vec<_>>(),
-        expected,
-      );
-    }
+    AnalyzerTest::new("mod foo\nmod foo\n")
+      .file("foo.just", "")
+      .error("Duplicate module `foo`", lsp::Range::at(1, 4, 1, 7))
+      .run();
 
-    case(
-      &[("justfile", "mod foo\nmod foo\n"), ("foo.just", "")],
-      &[("Duplicate module `foo`", lsp::Range::at(1, 4, 1, 7))],
-    );
-
-    case(
-      &[("justfile", "foo:\nmod foo\n"), ("foo.just", "")],
-      &[(
+    AnalyzerTest::new("foo:\nmod foo\n")
+      .file("foo.just", "")
+      .error(
         "Recipe `foo` is redefined as a module",
         lsp::Range::at(1, 4, 1, 7),
-      )],
-    );
+      )
+      .run();
 
-    case(
-      &[
-        ("justfile", "mod foo\nalias foo := bar\nbar:\n"),
-        ("foo.just", ""),
-      ],
-      &[(
+    AnalyzerTest::new("mod foo\nalias foo := bar\nbar:\n")
+      .file("foo.just", "")
+      .error(
         "Module `foo` is redefined as an alias",
         lsp::Range::at(1, 6, 1, 9),
-      )],
-    );
+      )
+      .run();
 
-    case(
-      &[
-        ("justfile", "import 'bar.just'\nfoo:\n"),
-        ("bar.just", "mod foo\n"),
-        ("foo.just", ""),
-      ],
-      &[(
+    AnalyzerTest::new("import 'bar.just'\nfoo:\n")
+      .file("bar.just", "mod foo\n")
+      .file("foo.just", "")
+      .error(
         "Module `foo` is redefined as a recipe",
         lsp::Range::at(1, 0, 1, 3),
-      )],
-    );
+      )
+      .run();
 
-    case(&[("justfile", "mod? foo\nfoo:\n")], &[]);
+    AnalyzerTest::new("mod? foo\nfoo:\n").run();
 
-    case(
-      &[
-        ("justfile", "[linux]\nmod foo\n[windows]\nfoo:\n"),
-        ("foo.just", ""),
-      ],
-      &[],
-    );
+    AnalyzerTest::new("[linux]\nmod foo\n[windows]\nfoo:\n")
+      .file("foo.just", "")
+      .run();
   }
 }

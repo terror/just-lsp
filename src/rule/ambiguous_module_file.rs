@@ -50,49 +50,29 @@ define_rule! {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use super::*;
 
   #[test]
   fn module_ambiguous_files() {
-    #[track_caller]
-    fn case(files: &[(&str, &str)], expected: &str, range: lsp::Range) {
-      assert_eq!(
-        Analyzer {
-          config: None,
-          view: TestModule::new(files).view(),
-        }
-        .analyze()
-        .iter()
-        .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
-        .collect::<Vec<_>>(),
-        [(
-          expected
-            .replace('/', std::path::MAIN_SEPARATOR_STR)
-            .as_str(),
-          range
-        )],
-      );
-    }
+    AnalyzerTest::new("mod? foo")
+      .file("foo.just", "")
+      .file("foo/mod.just", "")
+      .error(
+        &"Found multiple source files for module `foo`: `foo/mod.just` and `foo.just`"
+          .replace('/', std::path::MAIN_SEPARATOR_STR),
+        lsp::Range::at(0, 5, 0, 8),
+      )
+      .run();
 
-    case(
-      &[
-        ("justfile", "mod? foo"),
-        ("foo.just", ""),
-        ("foo/mod.just", ""),
-      ],
-      "Found multiple source files for module `foo`: `foo/mod.just` and `foo.just`",
-      lsp::Range::at(0, 5, 0, 8),
-    );
-
-    case(
-      &[
-        ("justfile", "mod foo 'bar'"),
-        ("bar/mod.just", ""),
-        ("bar/justfile", ""),
-        ("bar/.justfile", ""),
-      ],
-      "Found multiple source files for module `foo`: `bar/.justfile`, `bar/justfile`, and `bar/mod.just`",
-      lsp::Range::at(0, 8, 0, 13),
-    );
+    AnalyzerTest::new("mod foo 'bar'")
+      .file("bar/mod.just", "")
+      .file("bar/justfile", "")
+      .file("bar/.justfile", "")
+      .error(
+        &"Found multiple source files for module `foo`: `bar/.justfile`, `bar/justfile`, and `bar/mod.just`"
+          .replace('/', std::path::MAIN_SEPARATOR_STR),
+        lsp::Range::at(0, 8, 0, 13),
+      )
+      .run();
   }
 }
