@@ -78,7 +78,7 @@ impl Module {
   pub(crate) fn usage(&self, view: &ModuleView) -> Arc<Usage> {
     self
       .usage
-      .get_or_init(|| Arc::new(Usage::new(view)))
+      .get_or_init(|| Arc::new(Usage::from(view)))
       .clone()
   }
 }

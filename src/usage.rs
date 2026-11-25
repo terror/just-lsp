@@ -13,7 +13,27 @@ impl Usage {
     &self.called_functions
   }
 
-  pub(crate) fn new(view: &ModuleView) -> Self {
+  pub(crate) fn unresolved_identifiers(
+    &self,
+    uri: &lsp::Url,
+  ) -> &[(TextNode, Option<String>)] {
+    self
+      .unresolved_identifiers
+      .get(uri)
+      .map_or(&[], Vec::as_slice)
+  }
+
+  pub(crate) fn used_parameters(&self, uri: &lsp::Url) -> &[Parameter] {
+    self.used_parameters.get(uri).map_or(&[], Vec::as_slice)
+  }
+
+  pub(crate) fn used_variables(&self) -> &HashSet<String> {
+    &self.used_variables
+  }
+}
+
+impl From<&ModuleView<'_>> for Usage {
+  fn from(view: &ModuleView<'_>) -> Self {
     let bindings = view
       .documents()
       .map(|document| (&document.uri, view.bindings(document)))
@@ -79,24 +99,6 @@ impl Usage {
       used_variables,
     }
   }
-
-  pub(crate) fn unresolved_identifiers(
-    &self,
-    uri: &lsp::Url,
-  ) -> &[(TextNode, Option<String>)] {
-    self
-      .unresolved_identifiers
-      .get(uri)
-      .map_or(&[], Vec::as_slice)
-  }
-
-  pub(crate) fn used_parameters(&self, uri: &lsp::Url) -> &[Parameter] {
-    self.used_parameters.get(uri).map_or(&[], Vec::as_slice)
-  }
-
-  pub(crate) fn used_variables(&self) -> &HashSet<String> {
-    &self.used_variables
-  }
 }
 
 #[cfg(test)]
@@ -139,7 +141,7 @@ mod tests {
 
       let view = module.view();
 
-      let usage = Usage::new(&view);
+      let usage = Usage::from(&view);
 
       let mut actual_unresolved = usage
         .unresolved_identifiers(&view.document().uri)

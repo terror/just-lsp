@@ -286,7 +286,7 @@ impl<'a> ModuleView<'a> {
 
   pub(crate) fn usage(&self) -> Arc<Usage> {
     self.context.map_or_else(
-      || Arc::new(Usage::new(self)),
+      || Arc::new(Usage::from(self)),
       |context| context.module.usage(self),
     )
   }
