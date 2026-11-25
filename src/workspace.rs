@@ -54,14 +54,80 @@ impl Workspace {
     )
   }
 
-  /// Applies changes to an open document and rebuilds affected projects.
+  /// Applies the client's changes to an open document and rebuilds the
+  /// projects that contain it.
   ///
-  /// Returns `false` if the document is not open.
+  /// Changes are applied as described in [`Document::apply_change`]. Each
+  /// project that loads the document, or would load it as an import or module
+  /// file, is then rebuilt so its imports and modules reflect the new
+  /// contents. Projects with no open documents are dropped, and closed
+  /// documents that no remaining project loads are evicted.
+  ///
+  /// Each rebuilt project's `just-lsp.toml` is read again. If it cannot be read
+  /// or parsed, the error is returned after every project has been rebuilt,
+  /// and that project produces no diagnostics until its configuration is
+  /// fixed.
+  ///
+  /// Returns `false`, without making changes, if the document is not open.
   ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the changed document cannot be parsed or an
-  /// affected project root cannot be loaded.
+  /// Returns an [`Error`] if the changes cannot be applied, or if a rebuilt
+  /// project's root document cannot be loaded or its `just-lsp.toml` cannot
+  /// be read or parsed.
+  ///
+  /// # Panics
+  ///
+  /// Panics if a change's start position is after its end position after
+  /// conversion to character offsets.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Workspace,
+  ///   tower_lsp::lsp_types::{
+  ///     DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+  ///     TextDocumentContentChangeEvent, TextDocumentItem, Url,
+  ///     VersionedTextDocumentIdentifier,
+  ///   },
+  /// };
+  ///
+  /// let directory = tempfile::tempdir().unwrap();
+  ///
+  /// let uri = Url::from_file_path(directory.path().join("justfile")).unwrap();
+  ///
+  /// let mut workspace = Workspace::default();
+  ///
+  /// workspace
+  ///   .open(DidOpenTextDocumentParams {
+  ///     text_document: TextDocumentItem::new(
+  ///       uri.clone(),
+  ///       "just".into(),
+  ///       1,
+  ///       "foo:\n".into(),
+  ///     ),
+  ///   })
+  ///   .unwrap();
+  ///
+  /// let changed = workspace
+  ///   .change(DidChangeTextDocumentParams {
+  ///     text_document: VersionedTextDocumentIdentifier::new(uri.clone(), 2),
+  ///     content_changes: vec![TextDocumentContentChangeEvent {
+  ///       range: None,
+  ///       range_length: None,
+  ///       text: "foo: bar\n".into(),
+  ///     }],
+  ///   })
+  ///   .unwrap();
+  ///
+  /// assert!(changed);
+  ///
+  /// assert_eq!(
+  ///   workspace.document_diagnostics(&uri)[0].message,
+  ///   "Recipe `bar` not found",
+  /// );
+  /// ```
   pub fn change(
     &mut self,
     params: lsp::DidChangeTextDocumentParams,
@@ -81,14 +147,57 @@ impl Workspace {
     Ok(true)
   }
 
-  /// Closes a document and rebuilds affected projects.
+  /// Closes a document and rebuilds the projects that contain it.
   ///
-  /// Restores the document from disk, or removes it if it cannot be loaded.
-  /// Returns `false` if the document is not open.
+  /// The document's contents are read from disk again, discarding unsaved
+  /// changes. If the file cannot be read, the document is removed along with
+  /// the project rooted at it. The projects that contain the document are then
+  /// rebuilt as described in [`Workspace::change`], so the document is evicted
+  /// if no project with open documents still loads it.
+  ///
+  /// Returns `false`, without making changes, if the document is not open.
   ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if an affected project root cannot be loaded.
+  /// Returns an [`Error`] if a rebuilt project's root document cannot be
+  /// loaded or its `just-lsp.toml` cannot be read or parsed.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Workspace,
+  ///   tower_lsp::lsp_types::{
+  ///     DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+  ///     TextDocumentIdentifier, TextDocumentItem, Url,
+  ///   },
+  /// };
+  ///
+  /// let directory = tempfile::tempdir().unwrap();
+  ///
+  /// let uri = Url::from_file_path(directory.path().join("justfile")).unwrap();
+  ///
+  /// let mut workspace = Workspace::default();
+  ///
+  /// workspace
+  ///   .open(DidOpenTextDocumentParams {
+  ///     text_document: TextDocumentItem::new(
+  ///       uri.clone(),
+  ///       "just".into(),
+  ///       1,
+  ///       "foo:\n".into(),
+  ///     ),
+  ///   })
+  ///   .unwrap();
+  ///
+  /// let params = DidCloseTextDocumentParams {
+  ///   text_document: TextDocumentIdentifier::new(uri.clone()),
+  /// };
+  ///
+  /// assert!(workspace.close(&params).unwrap());
+  /// assert!(workspace.open_document(&uri).is_none());
+  /// assert!(!workspace.close(&params).unwrap());
+  /// ```
   pub fn close(
     &mut self,
     params: &lsp::DidCloseTextDocumentParams,
@@ -410,9 +519,46 @@ impl Workspace {
     )
   }
 
+  /// Loads the project rooted at `root`, along with its imports and modules.
+  ///
+  /// Documents that are already loaded are reused, and the rest are read from
+  /// disk. Unlike projects loaded by [`Workspace::open`], the project is
+  /// retained even if none of its documents are open, so its documents are
+  /// included in [`Workspace::diagnostics`]. It is dropped the next time
+  /// projects are rebuilt if it still has no open documents.
+  ///
+  /// The project's `just-lsp.toml` is read from the nearest ancestor
+  /// directory of `root`. If it cannot be read or parsed, the error is
+  /// returned after the project has been loaded, and the project produces no
+  /// diagnostics until its configuration is fixed.
+  ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the project root cannot be loaded.
+  /// Returns an [`Error`] if `root` is not a `file` URL, its document cannot
+  /// be read or parsed, or its `just-lsp.toml` cannot be read or parsed.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::Workspace, tower_lsp::lsp_types::Url};
+  ///
+  /// let directory = tempfile::tempdir().unwrap();
+  ///
+  /// let path = directory.path().join("justfile");
+  ///
+  /// std::fs::write(&path, "foo: bar\n").unwrap();
+  ///
+  /// let uri = Url::from_file_path(path).unwrap();
+  ///
+  /// let mut workspace = Workspace::default();
+  ///
+  /// workspace.load_project(uri.clone()).unwrap();
+  ///
+  /// assert_eq!(
+  ///   workspace.diagnostics()[&uri][0].message,
+  ///   "Recipe `bar` not found",
+  /// );
+  /// ```
   pub fn load_project(&mut self, root: lsp::Url) -> Result {
     self.load_projects([root], true)
   }
@@ -489,12 +635,54 @@ impl Workspace {
     errors.into_iter().next().map_or(Ok(()), Err)
   }
 
-  /// Opens a document and rebuilds its project and affected projects.
+  /// Opens a document and rebuilds the projects that contain it.
+  ///
+  /// The document replaces any document already loaded with the same URI, and
+  /// becomes the root of its own project. If no loaded project contains the
+  /// document, its directory and then each ancestor directory are searched for
+  /// a justfile whose project imports the document or loads it as a module,
+  /// and the nearest such project is loaded too, so the document is analyzed
+  /// in the context of the justfile that uses it. Projects are then rebuilt as
+  /// described in [`Workspace::change`].
   ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the opened document cannot be parsed or a
-  /// project root cannot be loaded.
+  /// Returns an [`Error`] if the document cannot be parsed, or if a rebuilt
+  /// project's root document cannot be loaded or its `just-lsp.toml` cannot
+  /// be read or parsed.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Workspace,
+  ///   tower_lsp::lsp_types::{
+  ///     DidOpenTextDocumentParams, TextDocumentItem, Url,
+  ///   },
+  /// };
+  ///
+  /// let directory = tempfile::tempdir().unwrap();
+  ///
+  /// let uri = Url::from_file_path(directory.path().join("justfile")).unwrap();
+  ///
+  /// let mut workspace = Workspace::default();
+  ///
+  /// workspace
+  ///   .open(DidOpenTextDocumentParams {
+  ///     text_document: TextDocumentItem::new(
+  ///       uri.clone(),
+  ///       "just".into(),
+  ///       1,
+  ///       "foo: bar\n".into(),
+  ///     ),
+  ///   })
+  ///   .unwrap();
+  ///
+  /// assert_eq!(
+  ///   workspace.document_diagnostics(&uri)[0].message,
+  ///   "Recipe `bar` not found",
+  /// );
+  /// ```
   pub fn open(&mut self, params: lsp::DidOpenTextDocumentParams) -> Result {
     let uri = params.text_document.uri.clone();
 
@@ -577,9 +765,70 @@ impl Workspace {
     }))
   }
 
+  /// Reloads documents that changed on disk and rebuilds the projects that
+  /// contain them.
+  ///
+  /// Closed documents in `uris` are evicted and read from disk again when a
+  /// project loads them, while open documents keep their editor contents.
+  /// Each project that contains one of `uris` is rebuilt as described in
+  /// [`Workspace::change`], and a project whose root document can no longer
+  /// be loaded is removed. If any of `uris` is a `just-lsp.toml` file, the
+  /// configuration of every project is read again.
+  ///
+  /// Returns `false`, without making changes, if no project contains any of
+  /// `uris` and none of them is a `just-lsp.toml` file.
+  ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if an affected project root cannot be loaded.
+  /// Returns an [`Error`] if a rebuilt project's `just-lsp.toml` cannot be
+  /// read or parsed.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Workspace,
+  ///   tower_lsp::lsp_types::{
+  ///     DidOpenTextDocumentParams, TextDocumentItem, Url,
+  ///   },
+  /// };
+  ///
+  /// let directory = tempfile::tempdir().unwrap();
+  ///
+  /// let path = directory.path().join("foo.just");
+  ///
+  /// std::fs::write(&path, "bar:\n").unwrap();
+  ///
+  /// let uri = Url::from_file_path(directory.path().join("justfile")).unwrap();
+  ///
+  /// let mut workspace = Workspace::default();
+  ///
+  /// workspace
+  ///   .open(DidOpenTextDocumentParams {
+  ///     text_document: TextDocumentItem::new(
+  ///       uri.clone(),
+  ///       "just".into(),
+  ///       1,
+  ///       "import 'foo.just'\n\nfoo: bar\n".into(),
+  ///     ),
+  ///   })
+  ///   .unwrap();
+  ///
+  /// assert!(workspace.document_diagnostics(&uri).is_empty());
+  ///
+  /// std::fs::write(&path, "qux:\n").unwrap();
+  ///
+  /// let changed = workspace
+  ///   .reload(&[Url::from_file_path(&path).unwrap()])
+  ///   .unwrap();
+  ///
+  /// assert!(changed);
+  ///
+  /// assert_eq!(
+  ///   workspace.document_diagnostics(&uri)[0].message,
+  ///   "Recipe `bar` not found",
+  /// );
+  /// ```
   pub fn reload(&mut self, uris: &[lsp::Url]) -> Result<bool> {
     let configs = uris.iter().any(|uri| {
       uri

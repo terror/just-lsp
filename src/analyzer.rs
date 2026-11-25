@@ -7,11 +7,51 @@ pub struct Analyzer<'a> {
 }
 
 impl Analyzer<'_> {
-  /// Run all registered rules against the document.
+  /// Returns the diagnostics produced by running every rule against the
+  /// view's document.
   ///
-  /// Rules that return `None` from `severity()` are filtered out, so config can
-  /// suppress individual rules entirely. Diagnostics are sorted by position
-  /// then message for deterministic output.
+  /// Each rule's settings are looked up by its ID in `config`, or in the
+  /// default configuration when `config` is `None`. Rules whose level is
+  /// `off` are skipped. Otherwise, each diagnostic's severity is replaced by
+  /// the configured level, or kept as the rule's default if no level is
+  /// configured, and its `id` and `display` are set to the rule's ID and
+  /// message.
+  ///
+  /// Rules can see declarations from imported files and other modules through
+  /// the view, but only report problems in the view's document. Diagnostics
+  /// are sorted by start position, then by message, and are not deduplicated.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use just_lsp::{Analyzer, Config, Document};
+  ///
+  /// let document = Document::from("foo: bar\n");
+  ///
+  /// let diagnostics = Analyzer {
+  ///   config: None,
+  ///   view: (&document).into(),
+  /// }
+  /// .analyze();
+  ///
+  /// assert_eq!(diagnostics[0].id, "unresolved-dependency");
+  /// assert_eq!(diagnostics[0].message, "Recipe `bar` not found");
+  ///
+  /// let config = serde_json::from_value::<Config>(serde_json::json!({
+  ///   "rules": {
+  ///     "unresolved-dependency": "off"
+  ///   }
+  /// }))
+  /// .unwrap();
+  ///
+  /// let diagnostics = Analyzer {
+  ///   config: Some(&config),
+  ///   view: (&document).into(),
+  /// }
+  /// .analyze();
+  ///
+  /// assert!(diagnostics.is_empty());
+  /// ```
   #[must_use]
   pub fn analyze(&self) -> Vec<Diagnostic> {
     let context = RuleContext::new(&self.view);
