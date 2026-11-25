@@ -18,10 +18,44 @@ impl Import {
     Attribute::is_enabled(&self.attributes)
   }
 
+  /// Returns the filesystem path of the imported file.
+  ///
+  /// The path literal is unquoted and its escape sequences are processed.
+  /// Shell-expanded literals, such as `x'$FOO/bar.just'`, also have
+  /// environment variables and a leading `~` expanded. A path beginning with
+  /// `~/` is resolved against the home directory, and any other relative path
+  /// is resolved against the directory containing `base_uri`. Absolute paths
+  /// are returned as is. The file is not required to exist.
+  ///
+  /// Returns `None` if the path is not a complete string literal, if it
+  /// begins with `~/` and the home directory is unknown, or if `base_uri` is
+  /// not a `file` URL.
+  ///
   /// # Errors
   ///
-  /// Returns an error if a shell-expanded path references an environment
-  /// variable that cannot be read.
+  /// Returns an error if the path is empty, contains an invalid escape
+  /// sequence, or is shell-expanded and references an environment variable
+  /// that cannot be read.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::Document,
+  ///   tower_lsp::lsp_types::Url,
+  /// };
+  ///
+  /// let directory = std::env::temp_dir();
+  ///
+  /// let base = Url::from_file_path(directory.join("justfile")).unwrap();
+  ///
+  /// let document = Document::from("import 'foo.just'\n");
+  ///
+  /// assert_eq!(
+  ///   document.imports()[0].resolve(&base).unwrap(),
+  ///   Some(directory.join("foo.just")),
+  /// );
+  /// ```
   pub fn resolve(&self, base_uri: &lsp::Url) -> Result<Option<PathBuf>> {
     StringLiteral::resolve_path(&self.path.value, base_uri)
   }

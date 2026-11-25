@@ -47,23 +47,149 @@ pub struct Edit<'a> {
 }
 
 pub trait RopeExt {
+  /// Replaces the characters covered by `edit` with its text.
+  ///
+  /// Only the rope's contents are changed. To keep a syntax tree in sync, pass
+  /// the edit's `input_edit` to tree-sitter separately. `edit` should be
+  /// built by [`RopeExt::build_edit`] from the rope's current contents.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the edit's character range is out of bounds for the rope.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::RopeExt,
+  ///   ropey::Rope,
+  ///   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent},
+  /// };
+  ///
+  /// let mut rope = Rope::from_str("foo bar");
+  ///
+  /// let change = TextDocumentContentChangeEvent {
+  ///   range: Some(Range::new(Position::new(0, 4), Position::new(0, 7))),
+  ///   range_length: None,
+  ///   text: "baz".into(),
+  /// };
+  ///
+  /// let edit = rope.build_edit(&change);
+  ///
+  /// rope.apply_edit(&edit);
+  ///
+  /// assert_eq!(rope.to_string(), "foo baz");
+  /// ```
   fn apply_edit(&mut self, edit: &Edit);
 
+  /// Returns the edit that applies `change` to the rope.
+  ///
+  /// A change without a range replaces the entire contents. Range positions
+  /// are measured in UTF-16 code units and are clamped to the document as
+  /// described in [`RopeExt::lsp_position_to_position`]. The edit records the
+  /// replaced character range for use with [`RopeExt::apply_edit`], and the
+  /// byte offsets and points of the change for use with tree-sitter.
+  ///
+  /// The rope is not modified.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::RopeExt,
+  ///   ropey::Rope,
+  ///   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent},
+  ///   tree_sitter::Point,
+  /// };
+  ///
+  /// let rope = Rope::from_str("é foo");
+  ///
+  /// let change = TextDocumentContentChangeEvent {
+  ///   range: Some(Range::new(Position::new(0, 2), Position::new(0, 5))),
+  ///   range_length: None,
+  ///   text: "bar\n".into(),
+  /// };
+  ///
+  /// let edit = rope.build_edit(&change);
+  ///
+  /// assert_eq!((edit.start_char, edit.end_char), (2, 5));
+  /// assert_eq!(edit.input_edit.start_byte, 3);
+  /// assert_eq!(edit.input_edit.old_end_byte, 6);
+  /// assert_eq!(edit.input_edit.new_end_byte, 7);
+  /// assert_eq!(edit.input_edit.new_end_position, Point::new(1, 0));
+  /// ```
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
   ) -> Edit<'a>;
 
+  /// Returns the LSP position of the byte offset `byte`.
+  ///
+  /// The line is zero-based, and the character is measured in UTF-16 code
+  /// units from the start of the line, as required by the LSP specification.
+  /// An offset inside a multi-byte character maps to the start of that
+  /// character.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `byte` is greater than the length of the rope in bytes, or if
+  /// the line or character does not fit in a `u32`.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::RopeExt, ropey::Rope, tower_lsp::lsp_types::Position};
+  ///
+  /// let rope = Rope::from_str("foo\n😀bar");
+  ///
+  /// assert_eq!(rope.byte_to_lsp_position(8), Position::new(1, 2));
+  /// ```
   fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position;
 
   fn lsp_position_to_char(&self, position: lsp::Position) -> usize;
 
+  /// Returns the byte offset, character offset, and tree-sitter point of the
+  /// LSP position `position`.
+  ///
+  /// The position's character is measured in UTF-16 code units. A character
+  /// past the end of a line is clamped to the end of the line, before its line
+  /// break, and a line past the end of the document is clamped to the end of
+  /// the document. The point's column is a byte offset within its row.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {
+  ///   just_lsp::{RopeExt, RopePosition},
+  ///   ropey::Rope,
+  ///   tower_lsp::lsp_types::Position,
+  ///   tree_sitter::Point,
+  /// };
+  ///
+  /// let rope = Rope::from_str("foo\n😀bar");
+  ///
+  /// assert_eq!(
+  ///   rope.lsp_position_to_position(Position::new(1, 2)),
+  ///   RopePosition {
+  ///     byte: 8,
+  ///     char: 5,
+  ///     point: Point::new(1, 4),
+  ///   },
+  /// );
+  ///
+  /// assert_eq!(
+  ///   rope.lsp_position_to_position(Position::new(0, 10)),
+  ///   RopePosition {
+  ///     byte: 3,
+  ///     char: 3,
+  ///     point: Point::new(0, 3),
+  ///   },
+  /// );
+  /// ```
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position;
 }
 
 impl RopeExt for Rope {
-  /// Applies a previously constructed [`Edit`] to the rope, keeping both the
-  /// textual contents and the internal tree-sitter offsets in sync.
   fn apply_edit(&mut self, edit: &Edit) {
     self.remove(edit.start_char..edit.end_char);
 
@@ -72,8 +198,6 @@ impl RopeExt for Rope {
     }
   }
 
-  /// Converts an LSP `textDocument/didChange` event into a [`Edit`] that can be
-  /// consumed both by `ropey` and tree-sitter.
   fn build_edit<'a>(
     &self,
     change: &'a lsp::TextDocumentContentChangeEvent,
@@ -109,8 +233,6 @@ impl RopeExt for Rope {
     }
   }
 
-  /// Maps an absolute byte offset into an LSP line/character pair where the
-  /// column is expressed in UTF-16 code units as required by the spec.
   fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position {
     let line = self.byte_to_line(byte);
 
@@ -149,9 +271,6 @@ impl RopeExt for Rope {
     self.line_to_char(row) + column
   }
 
-  /// Converts an LSP position back into absolute byte/char offsets and a
-  /// tree-sitter point so downstream consumers can choose whichever coordinate
-  /// space they need.
   fn lsp_position_to_position(&self, position: lsp::Position) -> Position {
     let char = self.lsp_position_to_char(position);
 

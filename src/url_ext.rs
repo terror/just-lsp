@@ -1,9 +1,31 @@
 use super::*;
 
 pub trait UrlExt: Sized {
+  /// Returns the local file path that the URL refers to.
+  ///
+  /// Percent-encoded characters are decoded, and the path uses the
+  /// platform's separators.
+  ///
   /// # Errors
   ///
-  /// Returns an [`Error`] if the URL is not a valid file path.
+  /// Returns [`Error::InvalidDocumentUri`] if the URL is not a `file` URL or
+  /// cannot be converted to a path on this platform. On
+  /// `wasm32-unknown-unknown`, which has no filesystem, an I/O error is
+  /// always returned.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::UrlExt, tower_lsp::lsp_types::Url};
+  ///
+  /// let path = std::env::temp_dir().join("foo bar");
+  ///
+  /// let url = Url::from_file_path(&path).unwrap();
+  ///
+  /// assert_eq!(url.file_path().unwrap(), path);
+  ///
+  /// assert!(Url::parse("untitled:foo").unwrap().file_path().is_err());
+  /// ```
   fn file_path(&self) -> Result<PathBuf>;
 
   fn from_path(path: &Path) -> Option<Self>;
