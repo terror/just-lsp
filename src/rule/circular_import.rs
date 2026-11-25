@@ -34,7 +34,7 @@ define_rule! {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, pretty_assertions::assert_eq};
+  use super::*;
 
   #[test]
   fn import_circular() {
@@ -46,20 +46,9 @@ mod tests {
         "/justfile"
       };
 
-      assert_eq!(
-        Analyzer {
-          config: None,
-          view: TestModule::new(&[("justfile", justfile)]).view(),
-        }
-        .analyze()
-        .iter()
-        .map(|diagnostic| (diagnostic.message.as_str(), diagnostic.range))
-        .collect::<Vec<_>>(),
-        [(
-          format!("Import `{path}` in `{path}` is circular").as_str(),
-          range,
-        )],
-      );
+      AnalyzerTest::new(justfile)
+        .error(&format!("Import `{path}` in `{path}` is circular"), range)
+        .run();
     }
 
     case("import 'justfile'", lsp::Range::at(0, 7, 0, 17));
