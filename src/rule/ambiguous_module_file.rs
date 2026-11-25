@@ -4,47 +4,57 @@ define_rule! {
   AmbiguousModuleFileRule {
     id: "ambiguous-module-file",
     message: "ambiguous module file",
-    run(context) {
-      let document = context.document();
+  }
+}
 
-      let Some(directory) = document
-        .uri
-        .file_path()
-        .ok()
-        .and_then(|path| path.parent().map(Path::to_path_buf))
-      else {
-        return Vec::new();
-      };
+impl AmbiguousModuleFileRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
 
-      document
-        .modules()
-        .into_iter()
-        .filter(ModuleDeclaration::is_enabled)
-        .filter_map(|module| {
-          let mut files = module.files(&document.uri, context.view().filesystem());
+    let Some(directory) = document
+      .uri
+      .file_path()
+      .ok()
+      .and_then(|path| path.parent().map(Path::to_path_buf))
+    else {
+      return Vec::new();
+    };
 
-          if files.len() < 2 {
-            return None;
-          }
+    document
+      .modules()
+      .into_iter()
+      .filter(ModuleDeclaration::is_enabled)
+      .filter_map(|module| {
+        let mut files =
+          module.files(&document.uri, context.view().filesystem());
 
-          files.sort();
+        if files.len() < 2 {
+          return None;
+        }
 
-          let files = files
-            .iter()
-            .map(|file| file.strip_prefix(&directory).unwrap_or(file).display().to_string())
-            .collect::<Vec<_>>();
+        files.sort();
 
-          Some(Diagnostic::error(
-            format!(
-              "Found multiple source files for module `{}`: {}",
-              module.name.value,
-              List::and_ticked(&files),
-            ),
-            module.location(),
-          ))
-        })
-        .collect()
-    }
+        let files = files
+          .iter()
+          .map(|file| {
+            file
+              .strip_prefix(&directory)
+              .unwrap_or(file)
+              .display()
+              .to_string()
+          })
+          .collect::<Vec<_>>();
+
+        Some(Diagnostic::error(
+          format!(
+            "Found multiple source files for module `{}`: {}",
+            module.name.value,
+            List::and_ticked(&files),
+          ),
+          module.location(),
+        ))
+      })
+      .collect()
   }
 }
 

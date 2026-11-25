@@ -5,78 +5,6 @@ define_rule! {
   DeprecatedSettingRule {
     id: "deprecated-setting",
     message: "deprecated setting",
-    run(context) {
-      let mut diagnostics = Vec::new();
-
-      for setting in context.local_declarations(context.settings()) {
-        if let Some(Builtin::Setting {
-          deprecated: Some(deprecation),
-          ..
-        }) = Builtin::setting(&setting.name.value)
-        {
-          let diagnostic = Diagnostic::warning(
-            format!(
-              "`{}` is deprecated, use {deprecation} instead",
-              setting.name.value
-            ),
-            setting.name.range,
-          );
-
-          let diagnostic = match *deprecation {
-            Deprecation::BooleanSetting {
-              attribute,
-              setting: replacement,
-              value,
-            } => match setting.kind {
-              SettingKind::Boolean(false) => diagnostic.quickfix(
-                Quickfix::removal(
-                  setting.range,
-                  format!("Remove `set {}`", setting.name.value),
-                )
-              ),
-              SettingKind::Boolean(true) => diagnostic.quickfix(
-                Self::attribute_quickfix(
-                  context,
-                  setting,
-                  attribute,
-                  replacement,
-                  lsp::TextEdit {
-                    range: lsp::Range::new(
-                      setting.name.range.start,
-                      setting.value.range.end,
-                    ),
-                    new_text: format!("{replacement} := {value}"),
-                  },
-                )
-              ),
-              _ => diagnostic,
-            },
-            Deprecation::Replacement(replacement) => {
-              diagnostic.quickfix(Quickfix::replacement(&setting.name, replacement))
-            }
-            Deprecation::SettingAttribute {
-              attribute,
-              setting: replacement,
-            } => diagnostic.quickfix(
-              Self::attribute_quickfix(
-                context,
-                setting,
-                attribute,
-                replacement,
-                lsp::TextEdit {
-                  range: setting.name.range,
-                  new_text: replacement.into(),
-                },
-              )
-            ),
-          };
-
-          diagnostics.push(diagnostic);
-        }
-      }
-
-      diagnostics
-    }
   }
 }
 
@@ -117,6 +45,76 @@ impl DeprecatedSettingRule {
       ),
       [edit].into_iter().chain(attribute_edit),
     ))
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for setting in context.local_declarations(context.settings()) {
+      if let Some(Builtin::Setting {
+        deprecated: Some(deprecation),
+        ..
+      }) = Builtin::setting(&setting.name.value)
+      {
+        let diagnostic = Diagnostic::warning(
+          format!(
+            "`{}` is deprecated, use {deprecation} instead",
+            setting.name.value
+          ),
+          setting.name.range,
+        );
+
+        let diagnostic = match *deprecation {
+          Deprecation::BooleanSetting {
+            attribute,
+            setting: replacement,
+            value,
+          } => match setting.kind {
+            SettingKind::Boolean(false) => {
+              diagnostic.quickfix(Quickfix::removal(
+                setting.range,
+                format!("Remove `set {}`", setting.name.value),
+              ))
+            }
+            SettingKind::Boolean(true) => {
+              diagnostic.quickfix(Self::attribute_quickfix(
+                context,
+                setting,
+                attribute,
+                replacement,
+                lsp::TextEdit {
+                  range: lsp::Range::new(
+                    setting.name.range.start,
+                    setting.value.range.end,
+                  ),
+                  new_text: format!("{replacement} := {value}"),
+                },
+              ))
+            }
+            _ => diagnostic,
+          },
+          Deprecation::Replacement(replacement) => diagnostic
+            .quickfix(Quickfix::replacement(&setting.name, replacement)),
+          Deprecation::SettingAttribute {
+            attribute,
+            setting: replacement,
+          } => diagnostic.quickfix(Self::attribute_quickfix(
+            context,
+            setting,
+            attribute,
+            replacement,
+            lsp::TextEdit {
+              range: setting.name.range,
+              new_text: replacement.into(),
+            },
+          )),
+        };
+
+        diagnostics.push(diagnostic);
+      }
+    }
+
+    diagnostics
   }
 }
 

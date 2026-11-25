@@ -6,63 +6,6 @@ define_rule! {
   IneffectiveParallelAttributeRule {
     id: "ineffective-parallel-attribute",
     message: "unnecessary parallel attribute",
-    run(context) {
-      context
-        .local_declarations(context.recipes())
-        .filter_map(|recipe| {
-          let attribute = recipe.find_attribute("parallel")?;
-
-          if recipe
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.mapped.is_some())
-          {
-            return None;
-          }
-
-          let count = |phase| {
-            recipe
-              .dependencies
-              .iter()
-              .filter(|dependency| dependency.phase == phase)
-              .count()
-          };
-
-          let diagnostic = match (
-            count(DependencyPhase::Prior),
-            count(DependencyPhase::Subsequent),
-          ) {
-            (0, 0) => Diagnostic::warning(
-              format!(
-                "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
-                recipe.name.value
-              ),
-              attribute.range,
-            ),
-            (1, 0) | (0, 1) => Diagnostic::warning(
-              format!(
-                "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
-                recipe.name.value
-              ),
-              attribute.range,
-            ),
-            (1, 1) => Diagnostic::warning(
-              format!(
-                "Recipe `{}` has only one dependency before and after `&&`, so `[parallel]` has no effect",
-                recipe.name.value
-              ),
-              attribute.range,
-            ),
-            _ => return None,
-          };
-
-          Some(diagnostic.quickfix(Self::attribute_removal_quickfix(
-            attribute,
-            context.document(),
-          )))
-        })
-        .collect()
-    }
   }
 }
 
@@ -121,6 +64,64 @@ impl IneffectiveParallelAttributeRule {
       range,
       format!("Remove `[{}]`", attribute.name.value),
     ))
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    context
+      .local_declarations(context.recipes())
+      .filter_map(|recipe| {
+        let attribute = recipe.find_attribute("parallel")?;
+
+        if recipe
+          .dependencies
+          .iter()
+          .any(|dependency| dependency.mapped.is_some())
+        {
+          return None;
+        }
+
+        let count = |phase| {
+          recipe
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.phase == phase)
+            .count()
+        };
+
+        let diagnostic = match (
+          count(DependencyPhase::Prior),
+          count(DependencyPhase::Subsequent),
+        ) {
+          (0, 0) => Diagnostic::warning(
+            format!(
+              "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
+              recipe.name.value
+            ),
+            attribute.range,
+          ),
+          (1, 0) | (0, 1) => Diagnostic::warning(
+            format!(
+              "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
+              recipe.name.value
+            ),
+            attribute.range,
+          ),
+          (1, 1) => Diagnostic::warning(
+            format!(
+              "Recipe `{}` has only one dependency before and after `&&`, so `[parallel]` has no effect",
+              recipe.name.value
+            ),
+            attribute.range,
+          ),
+          _ => return None,
+        };
+
+        Some(diagnostic.quickfix(Self::attribute_removal_quickfix(
+          attribute,
+          context.document(),
+        )))
+      })
+      .collect()
   }
 }
 

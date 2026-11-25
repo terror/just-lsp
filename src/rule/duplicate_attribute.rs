@@ -21,105 +21,106 @@ define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
     message: "duplicate attribute",
-    run(context) {
-      let document = context.document();
+  }
+}
 
-      let (mut diagnostics, mut conflicts) = (Vec::new(), ConflictTracker::default());
+impl DuplicateAttributeRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
 
-      for recipe in context
-        .recipes()
+    let (mut diagnostics, mut conflicts) =
+      (Vec::new(), ConflictTracker::default());
+
+    for recipe in context
+      .recipes()
+      .iter()
+      .filter(|recipe| recipe.uri != document.uri)
+    {
+      for attribute in recipe
+        .attributes
         .iter()
-        .filter(|recipe| recipe.uri != document.uri)
+        .filter(|attribute| attribute.name.value == "default")
       {
-        for attribute in recipe
-          .attributes
-          .iter()
-          .filter(|attribute| attribute.name.value == "default")
-        {
-          conflicts.record(&attribute.name, &recipe.attributes);
-        }
+        conflicts.record(&attribute.name, &recipe.attributes);
       }
-
-      for recipe in context.local_declarations(context.recipes()) {
-        for attribute in recipe
-          .attributes
-          .iter()
-          .filter(|attribute| attribute.name.value == "default")
-        {
-          if conflicts.record(&attribute.name, &recipe.attributes) {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
-                recipe.name.value
-              ),
-              attribute.range,
-            ));
-          }
-        }
-      }
-
-      let mut seen = HashSet::new();
-
-      for attribute_node in context.tree().root_node().find_all("attribute") {
-        let Some(parent) = attribute_node.parent() else {
-          continue;
-        };
-
-        let Some(target) = AttributeTarget::try_from_kind(parent.kind()) else {
-          continue;
-        };
-
-        let target_key = (parent.start_byte(), parent.end_byte());
-
-        for identifier in attribute_node.find_all("^identifier") {
-          let attribute_name = document.get_node_text(&identifier);
-
-          let key = match attribute_name.as_str() {
-            "arg" | "env" | "metadata" => continue,
-            "default" if target == AttributeTarget::Recipe => continue,
-            "group" => {
-              let group = identifier
-                .siblings()
-                .take_while(|node| node.kind() != "identifier")
-                .find(|node| node.kind() == "expression")
-                .and_then(|argument| {
-                  let value = argument.find("^value")?;
-
-                  let string = value.find("^string")?;
-
-                  if string.byte_range() != argument.byte_range() {
-                    return None;
-                  }
-
-                  StringLiteral::parse(&document.get_node_text(&string)).ok()?
-                });
-
-              let Some(group) = group else {
-                continue;
-              };
-
-              AttributeKey::Group(group)
-            }
-            _ if Builtin::attribute(&attribute_name).is_some() => {
-              AttributeKey::Name(attribute_name)
-            }
-            _ => continue,
-          };
-
-          if !seen.insert((target_key, key.clone())) {
-            diagnostics.push(Diagnostic::error(
-              format!(
-                "{} attribute {key} is duplicated",
-                target.target_name()
-              ),
-              document.get_range(&attribute_node),
-            ));
-          }
-        }
-      }
-
-      diagnostics
     }
+
+    for recipe in context.local_declarations(context.recipes()) {
+      for attribute in recipe
+        .attributes
+        .iter()
+        .filter(|attribute| attribute.name.value == "default")
+      {
+        if conflicts.record(&attribute.name, &recipe.attributes) {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
+              recipe.name.value
+            ),
+            attribute.range,
+          ));
+        }
+      }
+    }
+
+    let mut seen = HashSet::new();
+
+    for attribute_node in context.tree().root_node().find_all("attribute") {
+      let Some(parent) = attribute_node.parent() else {
+        continue;
+      };
+
+      let Some(target) = AttributeTarget::try_from_kind(parent.kind()) else {
+        continue;
+      };
+
+      let target_key = (parent.start_byte(), parent.end_byte());
+
+      for identifier in attribute_node.find_all("^identifier") {
+        let attribute_name = document.get_node_text(&identifier);
+
+        let key = match attribute_name.as_str() {
+          "arg" | "env" | "metadata" => continue,
+          "default" if target == AttributeTarget::Recipe => continue,
+          "group" => {
+            let group = identifier
+              .siblings()
+              .take_while(|node| node.kind() != "identifier")
+              .find(|node| node.kind() == "expression")
+              .and_then(|argument| {
+                let value = argument.find("^value")?;
+
+                let string = value.find("^string")?;
+
+                if string.byte_range() != argument.byte_range() {
+                  return None;
+                }
+
+                StringLiteral::parse(&document.get_node_text(&string)).ok()?
+              });
+
+            let Some(group) = group else {
+              continue;
+            };
+
+            AttributeKey::Group(group)
+          }
+          _ if Builtin::attribute(&attribute_name).is_some() => {
+            AttributeKey::Name(attribute_name)
+          }
+          _ => continue,
+        };
+
+        if !seen.insert((target_key, key.clone())) {
+          diagnostics.push(Diagnostic::error(
+            format!("{} attribute {key} is duplicated", target.target_name()),
+            document.get_range(&attribute_node),
+          ));
+        }
+      }
+    }
+
+    diagnostics
   }
 }
 

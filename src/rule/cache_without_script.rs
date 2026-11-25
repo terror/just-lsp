@@ -4,33 +4,35 @@ define_rule! {
   CacheWithoutScriptRule {
     id: "cache-without-script",
     message: "cache without script mode",
-    run(context) {
-      let default_script = context.setting_enabled("default-script");
+  }
+}
 
-      let mut diagnostics = Vec::new();
+impl CacheWithoutScriptRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let default_script = context.setting_enabled("default-script");
 
-      for recipe in context.local_declarations(context.recipes()) {
-        let Some(cache_attribute) = recipe.find_attribute("cache") else {
-          continue;
-        };
+    let mut diagnostics = Vec::new();
 
-        if recipe.has_attribute("script")
-          || recipe.runs_as_script(default_script)
-        {
-          continue;
-        }
+    for recipe in context.local_declarations(context.recipes()) {
+      let Some(cache_attribute) = recipe.find_attribute("cache") else {
+        continue;
+      };
 
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Recipe `{}` uses `[cache]` without script mode",
-            recipe.name.value
-          ),
-          cache_attribute.range,
-        ));
+      if recipe.has_attribute("script") || recipe.runs_as_script(default_script)
+      {
+        continue;
       }
 
-      diagnostics
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Recipe `{}` uses `[cache]` without script mode",
+          recipe.name.value
+        ),
+        cache_attribute.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

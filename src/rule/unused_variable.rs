@@ -6,43 +6,46 @@ define_rule! {
   UnusedVariableRule {
     id: "unused-variable",
     message: "unused variable",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      let exported = context.setting_enabled("export");
+impl UnusedVariableRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-      for (variable_name, is_used) in &context.references().variable_usage {
-        if variable_name.starts_with('_') || *is_used {
-          continue;
-        }
+    let exported = context.setting_enabled("export");
 
-        let Some(variable) = context
-          .local_declarations(context.variables())
-          .filter(|variable| variable.name.value == *variable_name)
-          .last()
-        else {
-          continue;
-        };
-
-        if variable.eager
-          || variable.export
-          || exported
-          || variable
-            .attributes
-            .iter()
-            .any(|attribute| attribute.name.value == "private")
-        {
-          continue;
-        }
-
-        diagnostics.push(Diagnostic::warning(
-          format!("Variable `{variable_name}` appears unused"),
-          variable.name.range,
-        ));
+    for (variable_name, is_used) in &context.references().variable_usage {
+      if variable_name.starts_with('_') || *is_used {
+        continue;
       }
 
-      diagnostics
+      let Some(variable) = context
+        .local_declarations(context.variables())
+        .filter(|variable| variable.name.value == *variable_name)
+        .last()
+      else {
+        continue;
+      };
+
+      if variable.eager
+        || variable.export
+        || exported
+        || variable
+          .attributes
+          .iter()
+          .any(|attribute| attribute.name.value == "private")
+      {
+        continue;
+      }
+
+      diagnostics.push(Diagnostic::warning(
+        format!("Variable `{variable_name}` appears unused"),
+        variable.name.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

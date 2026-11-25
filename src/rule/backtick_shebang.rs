@@ -6,56 +6,55 @@ define_rule! {
   BacktickShebangRule {
     id: "backtick-shebang",
     message: "backtick shebang",
-    run(context) {
-      let document = context.document();
+  }
+}
 
-      context
-        .tree()
-        .root_node()
-        .find_all("external_command")
-        .into_iter()
-        .filter(|command| {
-          let command = document.get_node_text(command);
+impl BacktickShebangRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
 
-          let Some(contents) = command
-            .strip_prefix("```")
-            .and_then(|s| s.strip_suffix("```"))
-          else {
-            return command
-              .strip_prefix('`')
-              .and_then(|s| s.strip_suffix('`'))
-              .is_some_and(|s| s.starts_with("#!"));
-          };
+    context
+      .tree()
+      .root_node()
+      .find_all("external_command")
+      .into_iter()
+      .filter(|command| {
+        let command = document.get_node_text(command);
 
-          let is_blank = |line: &str| {
-            line.trim_matches([' ', '\t', '\r']).is_empty()
-          };
+        let Some(contents) = command
+          .strip_prefix("```")
+          .and_then(|s| s.strip_suffix("```"))
+        else {
+          return command
+            .strip_prefix('`')
+            .and_then(|s| s.strip_suffix('`'))
+            .is_some_and(|s| s.starts_with("#!"));
+        };
 
-          let Some(line) = contents
+        let is_blank =
+          |line: &str| line.trim_matches([' ', '\t', '\r']).is_empty();
+
+        let Some(line) = contents.lines().take(2).find(|line| !is_blank(line))
+        else {
+          return false;
+        };
+
+        let text = line.trim_start_matches([' ', '\t']);
+
+        let indent = &line[..line.len() - text.len()];
+
+        text.starts_with("#!")
+          && contents
             .lines()
-            .take(2)
-            .find(|line| !is_blank(line))
-          else {
-            return false;
-          };
-
-          let text = line.trim_start_matches([' ', '\t']);
-
-          let indent = &line[..line.len() - text.len()];
-
-          text.starts_with("#!")
-            && contents
-              .lines()
-              .all(|line| is_blank(line) || line.starts_with(indent))
-        })
-        .map(|command| {
-          Diagnostic::error(
-            "Backticks may not start with `#!`",
-            document.get_range(&command),
-          )
-        })
-        .collect()
-    }
+            .all(|line| is_blank(line) || line.starts_with(indent))
+      })
+      .map(|command| {
+        Diagnostic::error(
+          "Backticks may not start with `#!`",
+          document.get_range(&command),
+        )
+      })
+      .collect()
   }
 }
 

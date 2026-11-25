@@ -52,50 +52,6 @@ define_rule! {
   InvalidSettingValueRule {
     id: "invalid-setting-value",
     message: "invalid setting value",
-    run(context) {
-      let mut diagnostics = Vec::new();
-
-      for setting in context.local_declarations(context.settings()) {
-        if Self::empty_interpreter(context, setting) {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Setting `{}` must be a non-empty array",
-              setting.name.value
-            ),
-            setting.value.range,
-          ));
-
-          continue;
-        }
-
-        let Some(validation) = SETTING_VALIDATIONS
-          .iter()
-          .find(|validation| validation.name == setting.name.value)
-        else {
-          continue;
-        };
-
-        let valid = setting
-          .value
-          .value
-          .literal()
-          .is_some_and(|value| (validation.validate)(&value));
-
-        if valid {
-          continue;
-        }
-
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Setting `{}` must be {}",
-            validation.name, validation.expected,
-          ),
-          setting.value.range,
-        ));
-      }
-
-      diagnostics
-    }
   }
 }
 
@@ -113,6 +69,48 @@ impl InvalidSettingValueRule {
             .get_parent("list_literal")
             .is_some_and(|list| list.child_by_field_name("elements").is_none())
         })
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for setting in context.local_declarations(context.settings()) {
+      if Self::empty_interpreter(context, setting) {
+        diagnostics.push(Diagnostic::error(
+          format!("Setting `{}` must be a non-empty array", setting.name.value),
+          setting.value.range,
+        ));
+
+        continue;
+      }
+
+      let Some(validation) = SETTING_VALIDATIONS
+        .iter()
+        .find(|validation| validation.name == setting.name.value)
+      else {
+        continue;
+      };
+
+      let valid = setting
+        .value
+        .value
+        .literal()
+        .is_some_and(|value| (validation.validate)(&value));
+
+      if valid {
+        continue;
+      }
+
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Setting `{}` must be {}",
+          validation.name, validation.expected,
+        ),
+        setting.value.range,
+      ));
+    }
+
+    diagnostics
   }
 }
 

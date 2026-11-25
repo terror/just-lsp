@@ -4,21 +4,24 @@ define_rule! {
   ExitMessageConflictRule {
     id: "exit-message-conflict",
     message: "conflicting exit message attributes",
-    run(context) {
-      context
-        .conflicting_recipe_attributes("exit-message", "no-exit-message")
-        .into_iter()
-        .map(|(recipe, attribute)| {
-          Diagnostic::error(
-            format!(
-              "Recipe `{}` can't combine `[exit-message]` with `[no-exit-message]`",
-              recipe.name.value,
-            ),
-            attribute.range,
-          )
-        })
-        .collect()
-    }
+  }
+}
+
+impl ExitMessageConflictRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    context
+      .conflicting_recipe_attributes("exit-message", "no-exit-message")
+      .into_iter()
+      .map(|(recipe, attribute)| {
+        Diagnostic::error(
+          format!(
+            "Recipe `{}` can't combine `[exit-message]` with `[no-exit-message]`",
+            recipe.name.value,
+          ),
+          attribute.range,
+        )
+      })
+      .collect()
   }
 }
 

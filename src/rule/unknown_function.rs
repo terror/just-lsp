@@ -6,41 +6,44 @@ define_rule! {
   UnknownFunctionRule {
     id: "unknown-function",
     message: "unknown function",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for function_call in context.function_calls() {
-        let function_name = &function_call.name.value;
+impl UnknownFunctionRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        if Builtin::function(function_name.as_str()).is_none()
-          && !context.user_function_names().contains(function_name)
-        {
-          let suggestion = function_name.find_suggestion(
-            Builtin::functions()
-              .flat_map(Builtin::names)
-              .chain(context.user_function_names().iter().map(String::as_str)),
-          );
+    for function_call in context.function_calls() {
+      let function_name = &function_call.name.value;
 
-          let message = match &suggestion {
-            Some(suggestion) => format!(
-              "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
-            ),
-            None => format!("Unknown function `{function_name}`"),
-          };
+      if Builtin::function(function_name.as_str()).is_none()
+        && !context.user_function_names().contains(function_name)
+      {
+        let suggestion = function_name.find_suggestion(
+          Builtin::functions()
+            .flat_map(Builtin::names)
+            .chain(context.user_function_names().iter().map(String::as_str)),
+        );
 
-          let quickfix = suggestion.map(|suggestion| {
-            Quickfix::replacement(&function_call.name, suggestion)
-          });
+        let message = match &suggestion {
+          Some(suggestion) => format!(
+            "Unknown function `{function_name}`. Did you mean `{suggestion}`?"
+          ),
+          None => format!("Unknown function `{function_name}`"),
+        };
 
-          diagnostics.push(
-            Diagnostic::error(message, function_call.name.range)
-              .quickfix(quickfix),
-          );
-        }
+        let quickfix = suggestion.map(|suggestion| {
+          Quickfix::replacement(&function_call.name, suggestion)
+        });
+
+        diagnostics.push(
+          Diagnostic::error(message, function_call.name.range)
+            .quickfix(quickfix),
+        );
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 

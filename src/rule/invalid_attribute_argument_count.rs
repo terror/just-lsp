@@ -6,46 +6,49 @@ define_rule! {
   InvalidAttributeArgumentCountRule {
     id: "invalid-attribute-argument-count",
     message: "invalid attribute arguments",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for attribute in context.attributes() {
-        let attribute_name = &attribute.name.value;
+impl InvalidAttributeArgumentCountRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        let Some(Builtin::Attribute { signature, .. }) =
-          Builtin::attribute(attribute_name)
-        else {
-          continue;
-        };
+    for attribute in context.attributes() {
+      let attribute_name = &attribute.name.value;
 
-        let argument_count = attribute.positional_arguments().count();
+      let Some(Builtin::Attribute { signature, .. }) =
+        Builtin::attribute(attribute_name)
+      else {
+        continue;
+      };
 
-        let range = signature.positional.argument_range();
+      let argument_count = attribute.positional_arguments().count();
 
-        if range.contains(&argument_count) {
-          continue;
-        }
+      let range = signature.positional.argument_range();
 
-        let (min, max) = (*range.start(), *range.end());
-
-        let expected = match max {
-          usize::MAX => format!("at least {min}"),
-          _ if min == max => format!("{min}"),
-          _ => format!("{min}-{max}"),
-        };
-
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
-            Count("argument", argument_count),
-            if min == 1 && matches!(max, 1 | usize::MAX) { "argument" } else { "arguments" },
-          ),
-          attribute.range,
-        ));
+      if range.contains(&argument_count) {
+        continue;
       }
 
-      diagnostics
+      let (min, max) = (*range.start(), *range.end());
+
+      let expected = match max {
+        usize::MAX => format!("at least {min}"),
+        _ if min == max => format!("{min}"),
+        _ => format!("{min}-{max}"),
+      };
+
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
+          Count("argument", argument_count),
+          if min == 1 && matches!(max, 1 | usize::MAX) { "argument" } else { "arguments" },
+        ),
+        attribute.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

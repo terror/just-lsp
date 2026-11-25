@@ -6,51 +6,6 @@ define_rule! {
   UnusedRecipeParameterRule {
     id: "unused-recipe-parameter",
     message: "unused parameter",
-    run(context) {
-      let default_script = context.setting_enabled("default-script");
-
-      let exported = context.setting_enabled("export");
-
-      let positional_arguments_enabled = context.setting_enabled("positional-arguments");
-
-      let used_parameters = &context.references().used_parameters;
-
-      context
-        .local_declarations(context.recipes())
-        .flat_map(|recipe| {
-          let recipe_enables_positional_arguments =
-            positional_arguments_enabled || recipe.has_attribute("positional-arguments");
-
-          let (positional_usage, uses_all) = if recipe_enables_positional_arguments {
-            let (indices, uses_all) = UnusedRecipeParameterRule::positional_argument_usage(recipe);
-
-            (indices, recipe.runs_as_script(default_script) || uses_all)
-          } else {
-            (HashSet::new(), false)
-          };
-
-          recipe.parameters.iter().enumerate().filter_map(move |(index, parameter)| {
-            let used_via_position = uses_all || positional_usage.contains(&(index + 1));
-
-            let used = recipe.parameters.iter().any(|candidate| {
-              candidate.name == parameter.name && used_parameters.contains(candidate)
-            });
-
-            let is_unused = !used
-              && !parameter.export
-              && !exported
-              && !used_via_position;
-
-            is_unused.then(|| {
-              Diagnostic::warning(
-                format!("Parameter `{}` appears unused", parameter.name),
-                parameter.range,
-              )
-            })
-          })
-        })
-        .collect()
-    }
   }
 }
 
@@ -156,6 +111,57 @@ impl UnusedRecipeParameterRule {
 
         (indices, uses_all)
       })
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let default_script = context.setting_enabled("default-script");
+
+    let exported = context.setting_enabled("export");
+
+    let positional_arguments_enabled =
+      context.setting_enabled("positional-arguments");
+
+    let used_parameters = &context.references().used_parameters;
+
+    context
+      .local_declarations(context.recipes())
+      .flat_map(|recipe| {
+        let recipe_enables_positional_arguments = positional_arguments_enabled
+          || recipe.has_attribute("positional-arguments");
+
+        let (positional_usage, uses_all) =
+          if recipe_enables_positional_arguments {
+            let (indices, uses_all) =
+              UnusedRecipeParameterRule::positional_argument_usage(recipe);
+
+            (indices, recipe.runs_as_script(default_script) || uses_all)
+          } else {
+            (HashSet::new(), false)
+          };
+
+        recipe.parameters.iter().enumerate().filter_map(
+          move |(index, parameter)| {
+            let used_via_position =
+              uses_all || positional_usage.contains(&(index + 1));
+
+            let used = recipe.parameters.iter().any(|candidate| {
+              candidate.name == parameter.name
+                && used_parameters.contains(candidate)
+            });
+
+            let is_unused =
+              !used && !parameter.export && !exported && !used_via_position;
+
+            is_unused.then(|| {
+              Diagnostic::warning(
+                format!("Parameter `{}` appears unused", parameter.name),
+                parameter.range,
+              )
+            })
+          },
+        )
+      })
+      .collect()
   }
 
   fn slice_number(text: &str) -> Option<usize> {

@@ -5,22 +5,25 @@ define_rule! {
   DuplicateSettingRule {
     id: "duplicate-setting",
     message: "duplicate setting",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for setting in context.duplicate_declarations(
-        context.settings(),
-        |setting| &setting.name,
-        |setting| &setting.attributes,
-      ) {
-        diagnostics.push(Diagnostic::error(
-          format!("Duplicate setting `{}`", setting.name.value),
-          setting.range,
-        ));
-      }
+impl DuplicateSettingRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-      diagnostics
+    for setting in context.duplicate_declarations(
+      context.settings(),
+      |setting| &setting.name,
+      |setting| &setting.attributes,
+    ) {
+      diagnostics.push(Diagnostic::error(
+        format!("Duplicate setting `{}`", setting.name.value),
+        setting.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

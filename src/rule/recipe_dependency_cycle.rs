@@ -6,43 +6,49 @@ define_rule! {
   RecipeDependencyCycleRule {
     id: "recipe-dependency-cycle",
     message: "circular dependency",
-    run(context) {
-      let graph = context
-        .view()
-        .resolved_recipes()
-        .flat_map(|recipe| {
-          recipe
-            .dependencies
-            .iter()
-            .filter(|dependency| dependency.name.modules().is_empty())
-            .map(move |dependency| {
-              (recipe.name.value.as_str(), dependency.name.name().value.as_str())
-            })
-        })
-        .collect::<Graph<_>>();
+  }
+}
 
-      context
-        .view()
-        .resolved_recipes()
-        .filter(|recipe| recipe.uri == context.document().uri)
-        .filter_map(|recipe| {
-          let name = &recipe.name.value;
-
-          let cycle = graph.cycle(name.as_str())?;
-
-          let message = if cycle.len() == 2 {
-            format!("Recipe `{name}` depends on itself")
-          } else {
-            format!(
-              "Recipe `{name}` has circular dependency `{}`",
-              cycle.join(" -> ")
+impl RecipeDependencyCycleRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let graph = context
+      .view()
+      .resolved_recipes()
+      .flat_map(|recipe| {
+        recipe
+          .dependencies
+          .iter()
+          .filter(|dependency| dependency.name.modules().is_empty())
+          .map(move |dependency| {
+            (
+              recipe.name.value.as_str(),
+              dependency.name.name().value.as_str(),
             )
-          };
+          })
+      })
+      .collect::<Graph<_>>();
 
-          Some(Diagnostic::error(message, recipe.range))
-        })
-        .collect()
-    }
+    context
+      .view()
+      .resolved_recipes()
+      .filter(|recipe| recipe.uri == context.document().uri)
+      .filter_map(|recipe| {
+        let name = &recipe.name.value;
+
+        let cycle = graph.cycle(name.as_str())?;
+
+        let message = if cycle.len() == 2 {
+          format!("Recipe `{name}` depends on itself")
+        } else {
+          format!(
+            "Recipe `{name}` has circular dependency `{}`",
+            cycle.join(" -> ")
+          )
+        };
+
+        Some(Diagnostic::error(message, recipe.range))
+      })
+      .collect()
   }
 }
 

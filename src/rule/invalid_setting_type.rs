@@ -6,37 +6,40 @@ define_rule! {
   InvalidSettingTypeRule {
     id: "invalid-setting-type",
     message: "invalid setting kind",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for setting in context.local_declarations(context.settings()) {
-        let Some(Builtin::Setting { kind, .. }) =
-          Builtin::setting(&setting.name.value)
-        else {
-          continue;
-        };
+impl InvalidSettingTypeRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        if kind.accepts(&setting.kind) {
-          continue;
-        }
+    for setting in context.local_declarations(context.settings()) {
+      let Some(Builtin::Setting { kind, .. }) =
+        Builtin::setting(&setting.name.value)
+      else {
+        continue;
+      };
 
-        let article = if *kind == SettingKind::Array {
-          "an"
-        } else {
-          "a"
-        };
-
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Setting `{}` expects {article} {kind} value",
-            setting.name.value
-          ),
-          setting.range,
-        ));
+      if kind.accepts(&setting.kind) {
+        continue;
       }
 
-      diagnostics
+      let article = if *kind == SettingKind::Array {
+        "an"
+      } else {
+        "a"
+      };
+
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Setting `{}` expects {article} {kind} value",
+          setting.name.value
+        ),
+        setting.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

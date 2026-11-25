@@ -59,63 +59,75 @@ define_rule! {
   AliasRecipeConflictRule {
     id: "alias-recipe-conflict",
     message: "name conflict",
-    run(context) {
-      let (aliases, recipes) = (context.aliases(), context.recipes());
+  }
+}
 
-      if aliases.is_empty() || recipes.is_empty() {
-        return Vec::new();
-      }
+impl AliasRecipeConflictRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let (aliases, recipes) = (context.aliases(), context.recipes());
 
-      let items = aliases
-        .iter()
-        .map(Item::Alias)
-        .chain(recipes.iter().map(Item::Recipe))
-        .collect::<Vec<_>>();
-
-      let mut imported = HashMap::<&str, Vec<&Item>>::new();
-
-      for item in &items {
-        if item.uri() != &context.document().uri {
-          imported.entry(item.name()).or_default().push(item);
-        }
-      }
-
-      let mut local = items
-        .iter()
-        .filter(|item| item.uri() == &context.document().uri)
-        .collect::<Vec<_>>();
-
-      local.sort_by_key(|item| item.range().start);
-
-      local
-        .into_iter()
-        .fold(
-          (HashMap::<&str, Vec<&Item>>::new(), Vec::new()),
-          |(mut seen, mut diagnostics), item| {
-            let name = item.name();
-
-            let first = imported
-              .get(name)
-              .and_then(|items| {
-                items.iter().copied().find(|previous| previous.conflicts_with(item))
-              })
-              .or_else(|| {
-                seen.get(name).and_then(|items| {
-                  items.iter().copied().find(|previous| previous.conflicts_with(item))
-                })
-              });
-
-            if let Some(first) = first {
-              diagnostics.push(Diagnostic::error(first.conflict_message(name), item.range()));
-            }
-
-            seen.entry(name).or_default().push(item);
-
-            (seen, diagnostics)
-          },
-        )
-        .1
+    if aliases.is_empty() || recipes.is_empty() {
+      return Vec::new();
     }
+
+    let items = aliases
+      .iter()
+      .map(Item::Alias)
+      .chain(recipes.iter().map(Item::Recipe))
+      .collect::<Vec<_>>();
+
+    let mut imported = HashMap::<&str, Vec<&Item>>::new();
+
+    for item in &items {
+      if item.uri() != &context.document().uri {
+        imported.entry(item.name()).or_default().push(item);
+      }
+    }
+
+    let mut local = items
+      .iter()
+      .filter(|item| item.uri() == &context.document().uri)
+      .collect::<Vec<_>>();
+
+    local.sort_by_key(|item| item.range().start);
+
+    local
+      .into_iter()
+      .fold(
+        (HashMap::<&str, Vec<&Item>>::new(), Vec::new()),
+        |(mut seen, mut diagnostics), item| {
+          let name = item.name();
+
+          let first = imported
+            .get(name)
+            .and_then(|items| {
+              items
+                .iter()
+                .copied()
+                .find(|previous| previous.conflicts_with(item))
+            })
+            .or_else(|| {
+              seen.get(name).and_then(|items| {
+                items
+                  .iter()
+                  .copied()
+                  .find(|previous| previous.conflicts_with(item))
+              })
+            });
+
+          if let Some(first) = first {
+            diagnostics.push(Diagnostic::error(
+              first.conflict_message(name),
+              item.range(),
+            ));
+          }
+
+          seen.entry(name).or_default().push(item);
+
+          (seen, diagnostics)
+        },
+      )
+      .1
   }
 }
 

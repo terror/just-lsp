@@ -6,26 +6,29 @@ define_rule! {
   InvalidAttributePlacementRule {
     id: "invalid-attribute-placement",
     message: "invalid attribute target",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for attribute in context.attributes() {
-        let attribute_name = &attribute.name.value;
+impl InvalidAttributePlacementRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        if Builtin::attribute(attribute_name).is_none() {
-          continue;
-        }
+    for attribute in context.attributes() {
+      let attribute_name = &attribute.name.value;
 
-        if attribute.target.is_none() {
-          diagnostics.push(Diagnostic::error(
-            format!("Attribute `{attribute_name}` applied to invalid target"),
-            attribute.range,
-          ));
-        }
+      if Builtin::attribute(attribute_name).is_none() {
+        continue;
       }
 
-      diagnostics
+      if attribute.target.is_none() {
+        diagnostics.push(Diagnostic::error(
+          format!("Attribute `{attribute_name}` applied to invalid target"),
+          attribute.range,
+        ));
+      }
     }
+
+    diagnostics
   }
 }
 

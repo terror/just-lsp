@@ -5,42 +5,43 @@ define_rule! {
   DeprecatedFunctionRule {
     id: "deprecated-function",
     message: "deprecated function",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for function_call in context.function_calls() {
-        let function_name = &function_call.name.value;
+impl DeprecatedFunctionRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        if context.user_function_names().contains(function_name) {
-          continue;
-        }
+    for function_call in context.function_calls() {
+      let function_name = &function_call.name.value;
 
-        if let Some(Builtin::Function {
-          deprecated: Some(deprecation),
-          ..
-        }) = Builtin::function(function_name.as_str())
-        {
-          let diagnostic = Diagnostic::warning(
-            format!(
-              "`{function_name}` is deprecated, use {deprecation} instead"
-            ),
-            function_call.name.range,
-          );
-
-          let diagnostic = if let Deprecation::Replacement(replacement) = deprecation {
-            diagnostic.quickfix(Quickfix::replacement(
-              &function_call.name,
-              *replacement,
-            ))
-          } else {
-            diagnostic
-          };
-
-          diagnostics.push(diagnostic);
-        }
+      if context.user_function_names().contains(function_name) {
+        continue;
       }
 
-      diagnostics
+      if let Some(Builtin::Function {
+        deprecated: Some(deprecation),
+        ..
+      }) = Builtin::function(function_name.as_str())
+      {
+        let diagnostic = Diagnostic::warning(
+          format!("`{function_name}` is deprecated, use {deprecation} instead"),
+          function_call.name.range,
+        );
+
+        let diagnostic = if let Deprecation::Replacement(replacement) =
+          deprecation
+        {
+          diagnostic
+            .quickfix(Quickfix::replacement(&function_call.name, *replacement))
+        } else {
+          diagnostic
+        };
+
+        diagnostics.push(diagnostic);
+      }
     }
+
+    diagnostics
   }
 }

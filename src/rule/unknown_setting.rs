@@ -6,35 +6,37 @@ define_rule! {
   UnknownSettingRule {
     id: "unknown-setting",
     message: "unknown setting",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for setting in context.local_declarations(context.settings()) {
-        if Builtin::setting(&setting.name.value).is_none() {
-          let suggestion = setting.name.value.find_suggestion(
-            Builtin::settings().map(Builtin::name),
-          );
+impl UnknownSettingRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-          let message = match &suggestion {
-            Some(suggestion) => format!(
-              "Unknown setting `{}`. Did you mean `{suggestion}`?",
-              setting.name.value,
-            ),
-            None => format!("Unknown setting `{}`", setting.name.value),
-          };
+    for setting in context.local_declarations(context.settings()) {
+      if Builtin::setting(&setting.name.value).is_none() {
+        let suggestion = setting
+          .name
+          .value
+          .find_suggestion(Builtin::settings().map(Builtin::name));
 
-          let quickfix = suggestion.map(|suggestion| {
-            Quickfix::replacement(&setting.name, suggestion)
-          });
+        let message = match &suggestion {
+          Some(suggestion) => format!(
+            "Unknown setting `{}`. Did you mean `{suggestion}`?",
+            setting.name.value,
+          ),
+          None => format!("Unknown setting `{}`", setting.name.value),
+        };
 
-          diagnostics.push(
-            Diagnostic::error(message, setting.range).quickfix(quickfix),
-          );
-        }
+        let quickfix = suggestion
+          .map(|suggestion| Quickfix::replacement(&setting.name, suggestion));
+
+        diagnostics
+          .push(Diagnostic::error(message, setting.range).quickfix(quickfix));
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 
