@@ -18,11 +18,13 @@ impl AnalyzerTest {
       range,
       Some(lsp::DiagnosticSeverity::ERROR),
     ));
+
     self
   }
 
   pub(crate) fn file(mut self, path: &'static str, content: &str) -> Self {
     self.files.push((path, content.to_owned()));
+
     self
   }
 
@@ -74,6 +76,7 @@ impl AnalyzerTest {
       range,
       Some(lsp::DiagnosticSeverity::WARNING),
     ));
+
     self
   }
 }
