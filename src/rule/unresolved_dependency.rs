@@ -13,12 +13,13 @@ define_rule! {
 impl UnresolvedDependencyRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.recipes())
+      .local()
+      .recipes()
       .flat_map(|recipe| &recipe.dependencies)
       .filter_map(|dependency| {
         let path = &dependency.name;
 
-        Some(match context.unresolved_recipe(path)? {
+        Some(match context.module().unresolved_recipe(path)? {
           UnresolvedRecipe::Module(segment) => Diagnostic::new(
             format!("Module `{}` not found", segment.value),
             segment.range,

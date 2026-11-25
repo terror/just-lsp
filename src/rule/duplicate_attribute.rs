@@ -32,11 +32,7 @@ impl DuplicateAttributeRule {
     let (mut diagnostics, mut conflicts) =
       (Vec::new(), ConflictTracker::default());
 
-    for recipe in context
-      .recipes()
-      .iter()
-      .filter(|recipe| recipe.uri != document.uri)
-    {
+    for recipe in context.imported().recipes() {
       for attribute in recipe
         .attributes
         .iter()
@@ -46,7 +42,7 @@ impl DuplicateAttributeRule {
       }
     }
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       for attribute in recipe
         .attributes
         .iter()
@@ -66,7 +62,9 @@ impl DuplicateAttributeRule {
 
     let mut seen = HashSet::new();
 
-    for attribute_node in context.tree().root_node().find_all("attribute") {
+    for attribute_node in
+      context.local().tree().root_node().find_all("attribute")
+    {
       let Some(parent) = attribute_node.parent() else {
         continue;
       };

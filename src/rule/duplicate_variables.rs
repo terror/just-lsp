@@ -12,7 +12,9 @@ define_rule! {
 
 impl DuplicateVariableRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let allow_duplicates = context.setting_enabled("allow-duplicate-variables");
+    let allow_duplicates = context
+      .module()
+      .setting_enabled("allow-duplicate-variables");
 
     if allow_duplicates {
       return Vec::new();
@@ -21,7 +23,7 @@ impl DuplicateVariableRule {
     let mut diagnostics = Vec::new();
 
     for variable in context.duplicate_declarations(
-      context.variables(),
+      context.module().variables(),
       |variable| &variable.name,
       |variable| &variable.attributes,
     ) {

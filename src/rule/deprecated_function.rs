@@ -13,10 +13,10 @@ impl DeprecatedFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for function_call in context.function_calls() {
+    for function_call in context.local().function_calls() {
       let function_name = &function_call.name.value;
 
-      if context.find_function(function_name).is_some() {
+      if context.module().find_function(function_name).is_some() {
         continue;
       }
 

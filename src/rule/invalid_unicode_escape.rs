@@ -13,6 +13,7 @@ impl InvalidUnicodeEscapeRule {
     let document = context.document();
 
     context
+      .local()
       .tree()
       .root_node()
       .find_all("escape_sequence")

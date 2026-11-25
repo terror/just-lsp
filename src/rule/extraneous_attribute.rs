@@ -14,7 +14,7 @@ impl ExtraneousAttributeRule {
 
     let mut diagnostics = Vec::new();
 
-    for attribute in context.tree().root_node().find_all("attribute") {
+    for attribute in context.local().tree().root_node().find_all("attribute") {
       let Some(next) = attribute.next_sibling() else {
         continue;
       };

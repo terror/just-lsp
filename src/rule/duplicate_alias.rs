@@ -14,7 +14,7 @@ impl DuplicateAliasRule {
     let mut diagnostics = Vec::new();
 
     for alias in context.duplicate_declarations(
-      context.aliases(),
+      context.module().aliases(),
       |alias| &alias.name,
       |alias| &alias.attributes,
     ) {

@@ -14,11 +14,12 @@ impl InvalidDependencyArgumentCountRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let lists = context.setting_enabled("lists");
+    let lists = context.module().setting_enabled("lists");
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       for dependency in &recipe.dependencies {
-        if let Some(recipe) = context.resolve_recipe(&dependency.name) {
+        if let Some(recipe) = context.module().resolve_recipe(&dependency.name)
+        {
           let parameters = &recipe.parameters;
 
           let required_parameters = parameters

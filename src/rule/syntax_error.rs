@@ -109,7 +109,7 @@ impl SyntaxErrorRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let document = context.document();
 
-    let root = context.tree().root_node();
+    let root = context.local().tree().root_node();
 
     let mut diagnostics = Vec::new();
 

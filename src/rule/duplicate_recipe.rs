@@ -12,7 +12,8 @@ define_rule! {
 
 impl DuplicateRecipeRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
+    let allow_duplicates =
+      context.module().setting_enabled("allow-duplicate-recipes");
 
     if allow_duplicates {
       return Vec::new();
@@ -21,7 +22,7 @@ impl DuplicateRecipeRule {
     let mut diagnostics = Vec::new();
 
     for recipe in context.duplicate_declarations(
-      context.recipes(),
+      context.module().recipes(),
       |recipe| &recipe.name,
       |recipe| &recipe.attributes,
     ) {

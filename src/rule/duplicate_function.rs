@@ -13,7 +13,7 @@ impl DuplicateFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
       .duplicate_declarations(
-        context.functions(),
+        context.module().functions(),
         |function| &function.name,
         |function| &function.attributes,
       )

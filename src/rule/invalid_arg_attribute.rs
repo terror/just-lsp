@@ -19,6 +19,7 @@ impl InvalidArgAttributeRule {
     let mut diagnostics = Vec::new();
 
     for attribute in context
+      .local()
       .attributes()
       .iter()
       .filter(|attribute| attribute.name.value == "arg")
@@ -143,7 +144,7 @@ impl InvalidArgAttributeRule {
       }
     }
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       let mut seen = HashSet::new();
 
       let (mut longs, mut shorts) = (HashSet::new(), HashSet::new());

@@ -15,6 +15,7 @@ impl BacktickShebangRule {
     let document = context.document();
 
     context
+      .local()
       .tree()
       .root_node()
       .find_all("external_command")

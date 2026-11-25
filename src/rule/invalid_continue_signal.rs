@@ -13,6 +13,7 @@ define_rule! {
 impl InvalidContinueSignalRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
+      .local()
       .attributes()
       .iter()
       .filter(|attribute| attribute.name.value == "continue")

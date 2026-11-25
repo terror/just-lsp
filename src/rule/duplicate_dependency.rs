@@ -28,7 +28,7 @@ impl DuplicateDependencyRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       let mut seen: HashSet<DependencyKey> = HashSet::new();
 
       for dependency in &recipe.dependencies {

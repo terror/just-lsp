@@ -12,12 +12,13 @@ define_rule! {
 impl UnresolvedAliasTargetRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.aliases())
-      .filter(|alias| !context.declares_module(&alias.value))
+      .local()
+      .aliases()
+      .filter(|alias| !context.module().declares_module(&alias.value))
       .filter_map(|alias| {
         let path = &alias.value;
 
-        Some(match context.unresolved_recipe(path)? {
+        Some(match context.module().unresolved_recipe(path)? {
           UnresolvedRecipe::Module(segment) => Diagnostic::new(
             format!("Module `{}` not found", segment.value),
             segment.range,
