@@ -12,7 +12,7 @@ define_rule! {
 impl DuplicateFunctionParameterRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.functions())
+      .functions(Scope::Local)
       .flat_map(|function| {
         let mut seen = HashSet::new();
 

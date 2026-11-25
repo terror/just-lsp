@@ -75,7 +75,7 @@ impl InvalidSettingValueRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for setting in context.local_declarations(context.settings()) {
+    for setting in context.settings(Scope::Local) {
       if Self::empty_interpreter(context, setting) {
         diagnostics.push(Diagnostic::new(
           format!("Setting `{}` must be a non-empty array", setting.name.value),

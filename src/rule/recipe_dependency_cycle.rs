@@ -13,8 +13,7 @@ define_rule! {
 impl RecipeDependencyCycleRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let graph = context
-      .view()
-      .resolved_recipes()
+      .resolved_recipes(Scope::Module)
       .flat_map(|recipe| {
         recipe
           .dependencies
@@ -30,9 +29,7 @@ impl RecipeDependencyCycleRule {
       .collect::<Graph<_>>();
 
     context
-      .view()
-      .resolved_recipes()
-      .filter(|recipe| recipe.uri == context.document().uri)
+      .resolved_recipes(Scope::Local)
       .filter_map(|recipe| {
         let name = &recipe.name.value;
 

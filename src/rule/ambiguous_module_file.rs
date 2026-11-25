@@ -26,8 +26,7 @@ impl AmbiguousModuleFileRule {
       .into_iter()
       .filter(ModuleDeclaration::is_enabled)
       .filter_map(|module| {
-        let mut files =
-          module.files(&document.uri, context.view().filesystem());
+        let mut files = module.files(&document.uri, context.filesystem());
 
         if files.len() < 2 {
           return None;

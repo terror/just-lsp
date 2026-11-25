@@ -12,8 +12,6 @@ impl InvalidImportPathRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let document = context.document();
 
-    let view = context.view();
-
     document
       .imports()
       .into_iter()
@@ -29,7 +27,7 @@ impl InvalidImportPathRule {
           Ok(Some(path))
             if import.is_enabled()
               && !import.optional
-              && !view.loads(&path) =>
+              && !context.loads(&path) =>
           {
             format!("Import path does not exist: `{}`", path.display())
           }

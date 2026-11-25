@@ -14,7 +14,7 @@ impl InvalidSettingTypeRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for setting in context.local_declarations(context.settings()) {
+    for setting in context.settings(Scope::Local) {
       let Some(Builtin::Setting { kind, .. }) =
         Builtin::setting(&setting.name.value)
       else {

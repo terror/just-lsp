@@ -13,7 +13,7 @@ impl DuplicateUnexportRule {
     let mut diagnostics = Vec::new();
 
     for unexport in context.duplicate_declarations(
-      context.unexports(),
+      context.unexports(Scope::Module),
       |unexport| &unexport.name,
       |unexport| &unexport.attributes,
     ) {

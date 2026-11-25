@@ -17,7 +17,7 @@ impl GuardInfallibleConflictRule {
     let default_script = context.setting_enabled("default-script");
 
     context
-      .local_declarations(context.recipes())
+      .recipes(Scope::Local)
       .filter(|recipe| !recipe.runs_as_script(default_script))
       .flat_map(|recipe| {
         recipe

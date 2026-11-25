@@ -17,7 +17,7 @@ impl InvalidFunctionArgumentCountRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      if let Some(function) = context.view().find_function(function_name) {
+      if let Some(function) = context.find_function(function_name) {
         let (argument_count, parameter_count) =
           (function_call.arguments.len(), function.parameters.len());
 

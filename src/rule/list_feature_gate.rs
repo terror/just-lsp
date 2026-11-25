@@ -157,7 +157,7 @@ impl ListFeatureGateRule {
         if let Some(name) = node.child_by_field_name("name") {
           let name_text = document.get_node_text(&name);
 
-          if !context.user_function_names().contains(&name_text)
+          if context.find_function(&name_text).is_none()
             && let Some(message) = Self::function_message(&name_text)
           {
             diagnostics

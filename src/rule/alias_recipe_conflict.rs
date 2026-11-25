@@ -5,7 +5,17 @@ enum Item<'a> {
   Recipe(&'a Located<Recipe>),
 }
 
-impl Item<'_> {
+impl<'a> Item<'a> {
+  fn all(
+    context: &RuleContext<'a>,
+    scope: Scope,
+  ) -> impl Iterator<Item = Self> {
+    context
+      .aliases(scope)
+      .map(Item::Alias)
+      .chain(context.recipes(scope).map(Item::Recipe))
+  }
+
   fn conflict_message(&self, name: &str) -> String {
     match self {
       Item::Alias(_) => format!("Alias `{name}` is redefined as a recipe"),
@@ -31,7 +41,7 @@ impl Item<'_> {
     )
   }
 
-  fn name(&self) -> &str {
+  fn name(&self) -> &'a str {
     match self {
       Item::Alias(alias) => &alias.name.value,
       Item::Recipe(recipe) => &recipe.name.value,
@@ -42,13 +52,6 @@ impl Item<'_> {
     match self {
       Item::Alias(alias) => alias.name.range,
       Item::Recipe(recipe) => recipe.name.range,
-    }
-  }
-
-  fn uri(&self) -> &lsp::Url {
-    match self {
-      Item::Alias(alias) => &alias.uri,
-      Item::Recipe(recipe) => &recipe.uri,
     }
   }
 }
@@ -65,35 +68,22 @@ define_rule! {
 
 impl AliasRecipeConflictRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let (aliases, recipes) = (context.aliases(), context.recipes());
-
-    if aliases.is_empty() || recipes.is_empty() {
+    if context.aliases(Scope::Module).next().is_none() {
       return Vec::new();
     }
 
-    let items = aliases
-      .iter()
-      .map(Item::Alias)
-      .chain(recipes.iter().map(Item::Recipe))
-      .collect::<Vec<_>>();
+    let mut imported = HashMap::<&str, Vec<Item>>::new();
 
-    let mut imported = HashMap::<&str, Vec<&Item>>::new();
-
-    for item in &items {
-      if item.uri() != &context.document().uri {
-        imported.entry(item.name()).or_default().push(item);
-      }
+    for item in Item::all(context, Scope::Imported) {
+      imported.entry(item.name()).or_default().push(item);
     }
 
-    let mut local = items
-      .iter()
-      .filter(|item| item.uri() == &context.document().uri)
-      .collect::<Vec<_>>();
+    let mut local = Item::all(context, Scope::Local).collect::<Vec<_>>();
 
     local.sort_by_key(|item| item.range().start);
 
     local
-      .into_iter()
+      .iter()
       .fold(
         (HashMap::<&str, Vec<&Item>>::new(), Vec::new()),
         |(mut seen, mut diagnostics), item| {
@@ -102,10 +92,7 @@ impl AliasRecipeConflictRule {
           let first = imported
             .get(name)
             .and_then(|items| {
-              items
-                .iter()
-                .copied()
-                .find(|previous| previous.conflicts_with(item))
+              items.iter().find(|previous| previous.conflicts_with(item))
             })
             .or_else(|| {
               seen.get(name).and_then(|items| {

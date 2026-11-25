@@ -11,7 +11,6 @@ define_rule! {
 impl MissingModuleFileRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .view()
       .dependencies()
       .filter_map(|dependency| {
         Some(Diagnostic::new(

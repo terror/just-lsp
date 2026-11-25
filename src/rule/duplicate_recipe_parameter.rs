@@ -14,7 +14,7 @@ impl DuplicateRecipeParameterRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       let mut seen = HashSet::new();
 
       for param in &recipe.parameters {

@@ -14,7 +14,7 @@ impl InvalidMappedDependencyRule {
 
     let lists = context.setting_enabled("lists");
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       for dependency in &recipe.dependencies {
         let starred = dependency
           .arguments

@@ -16,7 +16,7 @@ impl DeprecatedFunctionRule {
     for function_call in context.function_calls() {
       let function_name = &function_call.name.value;
 
-      if context.user_function_names().contains(function_name) {
+      if context.find_function(function_name).is_some() {
         continue;
       }
 

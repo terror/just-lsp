@@ -69,7 +69,7 @@ impl IneffectiveParallelAttributeRule {
 
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.recipes())
+      .recipes(Scope::Local)
       .filter_map(|recipe| {
         let attribute = recipe.find_attribute("parallel")?;
 

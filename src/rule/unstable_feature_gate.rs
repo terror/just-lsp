@@ -16,7 +16,7 @@ impl UnstableFeatureGateRule {
       return diagnostics;
     }
 
-    for setting in context.local_declarations(context.settings()) {
+    for setting in context.settings(Scope::Local) {
       if setting.name.value == "lists" {
         diagnostics.push(Diagnostic::new(
           "`set lists` is unstable without `set unstable`",
@@ -25,7 +25,7 @@ impl UnstableFeatureGateRule {
       }
     }
 
-    for function in context.local_declarations(context.functions()) {
+    for function in context.functions(Scope::Local) {
       diagnostics.push(Diagnostic::new(
         format!(
           "User-defined function `{}` is unstable without `set unstable`",

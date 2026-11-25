@@ -1,65 +1,33 @@
 use super::*;
 
-pub(crate) struct References {
-  pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
-  pub(crate) used_parameters: Vec<Parameter>,
-  pub(crate) variable_usage: HashMap<String, bool>,
+#[derive(Debug)]
+pub(crate) struct Usage {
+  pub(crate) called_functions: HashSet<String>,
+  pub(crate) used_variables: HashSet<String>,
 }
 
-impl References {
-  pub(crate) fn analyze(context: &RuleContext<'_>) -> Self {
-    let view = context.view();
-
-    let root = view.bindings(context.document());
-
-    let imported = context
-      .imported_documents()
+impl From<&ModuleView<'_>> for Usage {
+  fn from(view: &ModuleView<'_>) -> Self {
+    let bindings = view
+      .documents()
       .map(|document| view.bindings(document))
       .collect::<Vec<_>>();
 
-    let mut variable_usage = context
-      .variables()
-      .iter()
-      .map(|variable| (variable.name.value.clone(), false))
-      .collect::<HashMap<_, _>>();
-
-    for bound in once(&root)
-      .chain(&imported)
-      .flat_map(|bindings| bindings.identifiers())
-      .filter(|bound| bound.expression)
-    {
-      if let Binding::Variable(name) = &bound.binding
-        && let Some(used) = variable_usage.get_mut(name)
-      {
-        *used = true;
-      }
-    }
-
-    let unresolved_identifiers = root
-      .identifiers()
-      .iter()
-      .filter_map(|bound| match &bound.binding {
-        Binding::Unresolved { suggestion } => {
-          Some((bound.identifier.clone(), suggestion.clone()))
-        }
-        _ => None,
-      })
-      .collect();
-
-    let used_parameters = root
-      .identifiers()
-      .iter()
-      .filter(|bound| bound.expression)
-      .filter_map(|bound| match &bound.binding {
-        Binding::Parameter(parameter) => Some(parameter.clone()),
-        _ => None,
-      })
-      .collect();
-
     Self {
-      unresolved_identifiers,
-      used_parameters,
-      variable_usage,
+      called_functions: view
+        .documents()
+        .flat_map(Document::function_calls)
+        .map(|function_call| function_call.name.value)
+        .collect(),
+      used_variables: bindings
+        .iter()
+        .flat_map(|bindings| bindings.identifiers())
+        .filter(|bound| bound.expression)
+        .filter_map(|bound| match &bound.binding {
+          Binding::Variable(name) => Some(name.clone()),
+          _ => None,
+        })
+        .collect(),
     }
   }
 }
@@ -71,7 +39,6 @@ mod tests {
   struct Test {
     files: Vec<(&'static str, String)>,
     unresolved: Vec<&'static str>,
-    unused: Vec<&'static str>,
     used: Vec<&'static str>,
     used_parameters: Option<Vec<&'static str>>,
   }
@@ -86,7 +53,6 @@ mod tests {
       Self {
         files: vec![("justfile", content.to_owned())],
         unresolved: Vec::new(),
-        unused: Vec::new(),
         used: Vec::new(),
         used_parameters: None,
       }
@@ -104,11 +70,12 @@ mod tests {
 
       let view = module.view();
 
-      let references = References::analyze(&RuleContext::new(&view));
+      let usage = Usage::from(&view);
 
-      let mut actual_unresolved = references
-        .unresolved_identifiers
-        .iter()
+      let bindings = view.bindings(view.document());
+
+      let mut actual_unresolved = bindings
+        .unresolved_identifiers()
         .map(|(identifier, _)| identifier.value.as_str())
         .collect::<Vec<_>>();
 
@@ -123,11 +90,10 @@ mod tests {
         "unresolved mismatch"
       );
 
-      let mut actual_used = references
-        .variable_usage
+      let mut actual_used = usage
+        .used_variables
         .iter()
-        .filter(|(_, used)| **used)
-        .map(|(name, _)| name.as_str())
+        .map(String::as_str)
         .collect::<Vec<_>>();
 
       actual_used.sort_unstable();
@@ -138,25 +104,9 @@ mod tests {
 
       assert_eq!(actual_used, expected_used, "used variables mismatch");
 
-      let mut actual_unused = references
-        .variable_usage
-        .iter()
-        .filter(|(_, used)| !**used)
-        .map(|(name, _)| name.as_str())
-        .collect::<Vec<_>>();
-
-      actual_unused.sort_unstable();
-
-      let mut expected_unused = self.unused.clone();
-
-      expected_unused.sort_unstable();
-
-      assert_eq!(actual_unused, expected_unused, "unused variables mismatch");
-
       if let Some(mut expected_used_parameters) = self.used_parameters {
-        let mut actual_used_parameters = references
-          .used_parameters
-          .iter()
+        let mut actual_used_parameters = bindings
+          .used_parameters()
           .map(|parameter| parameter.name.as_str())
           .collect::<Vec<_>>();
 
@@ -174,13 +124,6 @@ mod tests {
     fn unresolved(self, names: &[&'static str]) -> Self {
       Self {
         unresolved: names.to_vec(),
-        ..self
-      }
-    }
-
-    fn unused(self, names: &[&'static str]) -> Self {
-      Self {
-        unused: names.to_vec(),
         ..self
       }
     }
@@ -300,7 +243,6 @@ mod tests {
       },
     )
     .used(&["lib_var"])
-    .unused(&["helper"])
     .run();
   }
 
@@ -456,7 +398,6 @@ mod tests {
       "
     })
     .used(&["a", "c"])
-    .unused(&["b"])
     .run();
   }
 
@@ -519,7 +460,6 @@ mod tests {
         echo {{x}}
       "
     })
-    .unused(&["x"])
     .run();
   }
 
@@ -550,7 +490,6 @@ mod tests {
     })
     .unresolved(&["a"])
     .used_parameters(&["a"])
-    .unused(&["x"])
     .run();
   }
 
@@ -574,13 +513,11 @@ mod tests {
 
       Test::new(&format!("bar := 'foo'\n{content}"))
         .used(&["bar"])
-        .unused(&["baz"])
         .run();
 
       Test::new("bar := 'foo'\nimport 'foo.just'\n")
         .file("foo.just", &content)
         .used(&["bar"])
-        .unused(&["baz"])
         .run();
     }
 
@@ -635,7 +572,6 @@ mod tests {
       },
     )
     .used(&["param"])
-    .unused(&["helper"])
     .run();
   }
 
@@ -657,7 +593,6 @@ mod tests {
       "
     })
     .unresolved(&["bar"])
-    .unused(&["foo"])
     .run();
   }
 
@@ -720,7 +655,6 @@ mod tests {
       "
     })
     .used(&["a", "b"])
-    .unused(&["c"])
     .run();
   }
 
@@ -731,7 +665,6 @@ mod tests {
       foo := 'bar'
       "
     })
-    .unused(&["foo"])
     .run();
   }
 
@@ -761,7 +694,6 @@ mod tests {
       "
     })
     .used(&["foo"])
-    .unused(&["baz"])
     .run();
   }
 
@@ -802,7 +734,6 @@ mod tests {
       "
     })
     .used(&["foo"])
-    .unused(&["baz"])
     .run();
   }
 

@@ -143,7 +143,7 @@ impl InvalidArgAttributeRule {
       }
     }
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       let mut seen = HashSet::new();
 
       let (mut longs, mut shorts) = (HashSet::new(), HashSet::new());

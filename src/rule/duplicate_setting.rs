@@ -14,7 +14,7 @@ impl DuplicateSettingRule {
     let mut diagnostics = Vec::new();
 
     for setting in context.duplicate_declarations(
-      context.settings(),
+      context.settings(Scope::Module),
       |setting| &setting.name,
       |setting| &setting.attributes,
     ) {

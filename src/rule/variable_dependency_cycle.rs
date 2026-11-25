@@ -8,17 +8,17 @@ enum Definition<'a> {
 
 impl<'a> Definition<'a> {
   fn edges(
-    view: &'a ModuleView,
+    context: &RuleContext<'a>,
     document: &Document,
     bindings: &'a Bindings,
   ) -> Vec<(Self, Self)> {
-    let declarations = view
-      .resolved_variables()
+    let declarations = context
+      .resolved_variables(Scope::Module)
       .filter(|variable| variable.uri == document.uri)
       .map(|variable| (Self::Variable(&variable.name.value), variable.range))
       .chain(
-        view
-          .resolved_functions()
+        context
+          .resolved_functions(Scope::Module)
           .filter(|function| function.uri == document.uri)
           .map(|function| {
             (Self::Function(&function.name.value), function.range)
@@ -69,23 +69,20 @@ define_rule! {
 
 impl VariableDependencyCycleRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let view = context.view();
-
-    let bindings = view
+    let bindings = context
       .documents()
-      .map(|document| (document, view.bindings(document)))
+      .map(|document| (document, context.bindings(document)))
       .collect::<Vec<_>>();
 
     let graph = bindings
       .iter()
       .flat_map(|(document, bindings)| {
-        Definition::edges(view, document, bindings)
+        Definition::edges(context, document, bindings)
       })
       .collect::<Graph<_>>();
 
-    view
-      .resolved_variables()
-      .filter(|variable| variable.uri == context.document().uri)
+    context
+      .resolved_variables(Scope::Local)
       .filter_map(|variable| {
         let name = &variable.name.value;
 

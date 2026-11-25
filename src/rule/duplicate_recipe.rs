@@ -21,7 +21,7 @@ impl DuplicateRecipeRule {
     let mut diagnostics = Vec::new();
 
     for recipe in context.duplicate_declarations(
-      context.recipes(),
+      context.recipes(Scope::Module),
       |recipe| &recipe.name,
       |recipe| &recipe.attributes,
     ) {
