@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   DotenvCommandConflictRule {
     id: "dotenv-command-conflict",
-    message: "conflicting dotenv command setting",
+    title: "conflicting dotenv command setting",
+    severity: Error,
   }
 }
 
@@ -16,7 +17,7 @@ impl DotenvCommandConflictRule {
       })
       .into_iter()
       .map(|(previous, current)| {
-        Diagnostic::error(
+        Diagnostic::new(
           format!(
             "`{}` is incompatible with `{}`",
             previous.name.value, current.name.value,

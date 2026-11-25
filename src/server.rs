@@ -1242,8 +1242,8 @@ mod tests {
       let range = lsp::Range::at(0, 8, 0, 11);
 
       let diagnostic = lsp::Diagnostic::from(Diagnostic {
-        id: "undefined-identifier".into(),
-        ..Diagnostic::error(
+        id: "undefined-identifier",
+        ..Diagnostic::new(
           "Variable `bar` not found. Did you mean `baz`?",
           range,
         )
@@ -1335,8 +1335,9 @@ mod tests {
           "foo.just",
           Some(1),
           [Diagnostic {
-            id: "deprecated-setting".into(),
-            ..Diagnostic::warning(
+            id: "deprecated-setting",
+            severity: lsp::DiagnosticSeverity::WARNING,
+            ..Diagnostic::new(
               "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
               range,
             )
@@ -1650,8 +1651,8 @@ mod tests {
         "justfile",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `foo` not found",
             lsp::Range::at(2, 5, 2, 8),
           )
@@ -1687,8 +1688,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1713,8 +1714,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1754,11 +1755,9 @@ mod tests {
   #[tokio::test]
   async fn diagnostics_closing_root_preserves_module_scope() -> Result {
     let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "unresolved-dependency".into(),
-      ..Diagnostic::warning(
-        "Recipe `bar` not found",
-        lsp::Range::at(0, 5, 0, 8),
-      )
+      id: "unresolved-dependency",
+      severity: lsp::DiagnosticSeverity::WARNING,
+      ..Diagnostic::new("Recipe `bar` not found", lsp::Range::at(0, 5, 0, 8))
     });
 
     Test::new()
@@ -1812,8 +1811,9 @@ mod tests {
         "bar/justfile",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::warning(
+          id: "unresolved-dependency",
+          severity: lsp::DiagnosticSeverity::WARNING,
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1841,8 +1841,8 @@ mod tests {
         "foo.just",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1869,8 +1869,8 @@ mod tests {
         "foo.just",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1887,8 +1887,9 @@ mod tests {
     let range = lsp::Range::at(0, 4, 0, 17);
 
     let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "deprecated-setting".into(),
-      ..Diagnostic::warning(
+      id: "deprecated-setting",
+      severity: lsp::DiagnosticSeverity::WARNING,
+      ..Diagnostic::new(
         "`windows-shell` is deprecated, use `[windows]` attribute on `set shell` instead",
         range,
       )
@@ -1943,8 +1944,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1960,8 +1961,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -1981,8 +1982,8 @@ mod tests {
 
     let diagnostic = |source: &str, target: &str| {
       lsp::Diagnostic::from(Diagnostic {
-        id: "circular-import".into(),
-        ..Diagnostic::error(
+        id: "circular-import",
+        ..Diagnostic::new(
           format!(
             "Import `{}` in `{}` is circular",
             test.tempdir.path().join(target).display(),
@@ -2011,11 +2012,9 @@ mod tests {
   #[tokio::test]
   async fn diagnostics_ignore_import_configuration() -> Result {
     let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "unresolved-dependency".into(),
-      ..Diagnostic::warning(
-        "Recipe `bar` not found",
-        lsp::Range::at(0, 5, 0, 8),
-      )
+      id: "unresolved-dependency",
+      severity: lsp::DiagnosticSeverity::WARNING,
+      ..Diagnostic::new("Recipe `bar` not found", lsp::Range::at(0, 5, 0, 8))
     });
 
     Test::new()
@@ -2045,11 +2044,9 @@ mod tests {
   #[tokio::test]
   async fn diagnostics_ignore_module_configuration() -> Result {
     let diagnostic = lsp::Diagnostic::from(Diagnostic {
-      id: "unresolved-dependency".into(),
-      ..Diagnostic::warning(
-        "Recipe `bar` not found",
-        lsp::Range::at(0, 5, 0, 8),
-      )
+      id: "unresolved-dependency",
+      severity: lsp::DiagnosticSeverity::WARNING,
+      ..Diagnostic::new("Recipe `bar` not found", lsp::Range::at(0, 5, 0, 8))
     });
 
     Test::new()
@@ -2080,8 +2077,8 @@ mod tests {
         "bar.just",
         None,
         [Diagnostic {
-          id: "duplicate-recipe-parameter".into(),
-          ..Diagnostic::error(
+          id: "duplicate-recipe-parameter",
+          ..Diagnostic::new(
             "Duplicate parameter `bar`",
             lsp::Range::at(0, 8, 0, 11),
           )
@@ -2098,11 +2095,9 @@ mod tests {
   async fn diagnostics_isolate_invalid_promoted_configuration() -> Result {
     async fn case(close: bool) -> Result {
       let diagnostic = lsp::Diagnostic::from(Diagnostic {
-        id: "unresolved-dependency".into(),
-        ..Diagnostic::warning(
-          "Recipe `bar` not found",
-          lsp::Range::at(0, 5, 0, 8),
-        )
+        id: "unresolved-dependency",
+        severity: lsp::DiagnosticSeverity::WARNING,
+        ..Diagnostic::new("Recipe `bar` not found", lsp::Range::at(0, 5, 0, 8))
       });
 
       let test = Test::new()
@@ -2179,8 +2174,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2195,8 +2190,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2218,8 +2213,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2278,8 +2273,8 @@ mod tests {
         "foo.just",
         None,
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2326,8 +2321,9 @@ mod tests {
         "foo/justfile",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::warning(
+          id: "unresolved-dependency",
+          severity: lsp::DiagnosticSeverity::WARNING,
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2357,8 +2353,8 @@ mod tests {
         "foo.just",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2514,8 +2510,8 @@ mod tests {
         "justfile",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `foo` not found",
             lsp::Range::at(2, 5, 2, 8),
           )
@@ -2539,8 +2535,8 @@ mod tests {
         "justfile",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )
@@ -2560,8 +2556,8 @@ mod tests {
         "justfile",
         Some(1),
         [Diagnostic {
-          id: "missing-module-file".into(),
-          ..Diagnostic::error(
+          id: "missing-module-file",
+          ..Diagnostic::new(
             "Could not find source file for module `foo`",
             lsp::Range::at(0, 4, 0, 7),
           )
@@ -2594,8 +2590,8 @@ mod tests {
         "justfile",
         Some(1),
         [Diagnostic {
-          id: "invalid-import-path".into(),
-          ..Diagnostic::error(
+          id: "invalid-import-path",
+          ..Diagnostic::new(
             format!("Import path does not exist: `{}`", path.display()),
             lsp::Range::at(0, 7, 0, 17),
           )
@@ -2626,8 +2622,8 @@ mod tests {
         "foo.just",
         Some(1),
         [Diagnostic {
-          id: "unresolved-dependency".into(),
-          ..Diagnostic::error(
+          id: "unresolved-dependency",
+          ..Diagnostic::new(
             "Recipe `bar` not found",
             lsp::Range::at(0, 5, 0, 8),
           )

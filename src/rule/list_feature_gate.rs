@@ -6,7 +6,8 @@ const LOGICAL_OPERATORS: &[&str] = &["&&", "||"];
 define_rule! {
   ListFeatureGateRule {
     id: "list-feature-gate",
-    message: "list feature requires set lists",
+    title: "list feature requires set lists",
+    severity: Error,
   }
 }
 
@@ -97,7 +98,7 @@ impl ListFeatureGateRule {
               _ => return None,
             };
 
-            Some(Diagnostic::error(message, name.range))
+            Some(Diagnostic::new(message, name.range))
           }
           AttributeArgument::Positional(_) => None,
         }),
@@ -120,7 +121,7 @@ impl ListFeatureGateRule {
     match node.kind() {
       "condition" => {
         if Self::condition_comparison_operator(node).is_none() {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "`if` and `assert` conditions other than comparisons require `set lists`",
             document.get_range(&node),
           ));
@@ -128,14 +129,14 @@ impl ListFeatureGateRule {
       }
       "expression" => {
         if let Some(operator) = Self::operator(node, LOGICAL_OPERATORS) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "logical operators require `set lists`",
             document.get_range(&operator),
           ));
         }
 
         if let Some(operator) = Self::operator(node, &["++"]) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "list concatenation operator `++` requires `set lists`",
             document.get_range(&operator),
           ));
@@ -146,7 +147,7 @@ impl ListFeatureGateRule {
           .is_none_or(|parent| parent.kind() != "condition")
           && let Some(operator) = Self::comparison_operator(node)
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "comparison operators require `set lists`",
             document.get_range(&operator),
           ));
@@ -160,13 +161,13 @@ impl ListFeatureGateRule {
             && let Some(message) = Self::function_message(&name_text)
           {
             diagnostics
-              .push(Diagnostic::error(message, document.get_range(&name)));
+              .push(Diagnostic::new(message, document.get_range(&name)));
           }
         }
       }
       "if_expression" => {
         if node.find("^else_clause").is_none() {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "`if` without `else` requires `set lists`",
             document.get_range(&Self::if_token(node).unwrap_or(node)),
           ));
@@ -174,7 +175,7 @@ impl ListFeatureGateRule {
       }
       "list_literal" => {
         if !Self::interpreter_setting_array(document, node) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "list literals require `set lists`",
             document.get_range(&node),
           ));
@@ -182,7 +183,7 @@ impl ListFeatureGateRule {
       }
       "not_expression" => {
         if let Some(operator) = Self::operator(node, &["!"]) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "negation operator requires `set lists`",
             document.get_range(&operator),
           ));

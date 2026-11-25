@@ -5,7 +5,8 @@ define_rule! {
   /// set.
   UnknownAttributeRule {
     id: "unknown-attribute",
-    message: "unknown attribute",
+    title: "unknown attribute",
+    severity: Error,
   }
 }
 
@@ -31,7 +32,7 @@ impl UnknownAttributeRule {
           .map(|suggestion| Quickfix::replacement(&attribute.name, suggestion));
 
         diagnostics.push(
-          Diagnostic::error(message, attribute.name.range).quickfix(quickfix),
+          Diagnostic::new(message, attribute.name.range).quickfix(quickfix),
         );
       }
     }

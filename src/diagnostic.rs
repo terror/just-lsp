@@ -3,9 +3,9 @@ use super::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Diagnostic {
   /// A short header summarizing the diagnostic.
-  pub display: String,
+  pub display: &'static str,
   /// A unique identifier for the diagnostic.
-  pub id: String,
+  pub id: &'static str,
   /// A detailed message describing the diagnostic.
   pub message: String,
   /// Quickfixes that can be applied to resolve the diagnostic.
@@ -17,17 +17,6 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-  pub fn error(message: impl Into<String>, range: lsp::Range) -> Self {
-    Self {
-      display: String::new(),
-      id: String::new(),
-      message: message.into(),
-      quickfixes: Vec::new(),
-      range,
-      severity: lsp::DiagnosticSeverity::ERROR,
-    }
-  }
-
   pub(crate) fn merge(analyses: Vec<Vec<Self>>) -> Vec<Self> {
     let mut quickfixes = analyses
       .first()
@@ -78,6 +67,17 @@ impl Diagnostic {
     diagnostics
   }
 
+  pub fn new(message: impl Into<String>, range: lsp::Range) -> Self {
+    Self {
+      display: "",
+      id: "",
+      message: message.into(),
+      quickfixes: Vec::new(),
+      range,
+      severity: lsp::DiagnosticSeverity::ERROR,
+    }
+  }
+
   #[must_use]
   pub fn quickfix(self, quickfix: impl Into<Option<Quickfix>>) -> Self {
     Self {
@@ -85,23 +85,12 @@ impl Diagnostic {
       ..self
     }
   }
-
-  pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
-    Self {
-      display: String::new(),
-      id: String::new(),
-      message: message.into(),
-      quickfixes: Vec::new(),
-      range,
-      severity: lsp::DiagnosticSeverity::WARNING,
-    }
-  }
 }
 
 impl From<Diagnostic> for lsp::Diagnostic {
   fn from(value: Diagnostic) -> lsp::Diagnostic {
     lsp::Diagnostic {
-      code: Some(lsp::NumberOrString::String(value.id)),
+      code: Some(lsp::NumberOrString::String(value.id.into())),
       message: value.message,
       range: value.range,
       severity: Some(value.severity),

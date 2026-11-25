@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   AssignmentUnexportConflictRule {
     id: "assignment-unexport-conflict",
-    message: "export/unexport conflict",
+    title: "export/unexport conflict",
+    severity: Error,
   }
 }
 
@@ -19,7 +20,7 @@ impl AssignmentUnexportConflictRule {
 
     for variable in context.local_declarations(context.variables()) {
       if unexports.conflicts_with(&variable.name, &variable.attributes) {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!(
             "Variable {} is both exported and unexported",
             variable.name.value
@@ -39,7 +40,7 @@ impl AssignmentUnexportConflictRule {
 
     for unexport in context.local_declarations(context.unexports()) {
       if variables.conflicts_with(&unexport.name, &unexport.attributes) {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!(
             "Variable {} is both exported and unexported",
             unexport.name.value

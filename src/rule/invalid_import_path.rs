@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidImportPathRule {
     id: "invalid-import-path",
-    message: "invalid import path",
+    title: "invalid import path",
+    severity: Error,
   }
 }
 
@@ -18,7 +19,7 @@ impl InvalidImportPathRule {
       .into_iter()
       .filter_map(|import| {
         if import.is_dynamic() {
-          return Some(Diagnostic::error(
+          return Some(Diagnostic::new(
             "Expected keyword `x` but found identifier `f`",
             import.path.range,
           ));
@@ -42,7 +43,7 @@ impl InvalidImportPathRule {
           _ => return None,
         };
 
-        Some(Diagnostic::error(message, import.path.range))
+        Some(Diagnostic::new(message, import.path.range))
       })
       .collect()
   }

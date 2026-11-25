@@ -5,7 +5,8 @@ define_rule! {
   /// line, matching the behavior of the `just` parser.
   InconsistentIndentationRule {
     id: "inconsistent-recipe-indentation",
-    message: "inconsistent indentation",
+    title: "inconsistent indentation",
+    severity: Error,
   }
 }
 
@@ -40,7 +41,7 @@ impl InconsistentIndentationRule {
             }
           })
           .map(|(_, line)| {
-            Diagnostic::error(
+            Diagnostic::new(
               format!(
                 "Recipe line has inconsistent leading whitespace. \
                  Recipe started with `{}` but found line with `{}`",

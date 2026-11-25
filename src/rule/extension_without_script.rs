@@ -5,7 +5,8 @@ define_rule! {
   /// a shebang.
   ExtensionWithoutScriptRule {
     id: "extension-without-script",
-    message: "extension without script",
+    title: "extension without script",
+    severity: Error,
   }
 }
 
@@ -24,7 +25,7 @@ impl ExtensionWithoutScriptRule {
         continue;
       }
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Recipe `{}` uses `[extension]` without `[script]` or a shebang",
           recipe.name.value

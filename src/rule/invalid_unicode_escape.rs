@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidUnicodeEscapeRule {
     id: "invalid-unicode-escape",
-    message: "invalid unicode escape",
+    title: "invalid unicode escape",
+    severity: Error,
   }
 }
 
@@ -24,7 +25,7 @@ impl InvalidUnicodeEscapeRule {
         let codepoint = u32::from_str_radix(hex, 16).ok()?;
 
         char::from_u32(codepoint).is_none().then(|| {
-          Diagnostic::error(
+          Diagnostic::new(
             format!(
               "unicode escape sequence value `{hex}` greater than maximum valid code point `10FFFF`"
             ),

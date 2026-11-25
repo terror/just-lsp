@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidAttributeKeywordRule {
     id: "invalid-attribute-keyword",
-    message: "invalid attribute keyword",
+    title: "invalid attribute keyword",
+    severity: Error,
   }
 }
 
@@ -25,7 +26,7 @@ impl InvalidAttributeKeywordRule {
       for argument in &attribute.arguments {
         let AttributeArgument::Keyword { name, value, range } = argument else {
           if !keywords.is_empty() {
-            diagnostics.push(Diagnostic::error(
+            diagnostics.push(Diagnostic::new(
               "Positional attribute arguments cannot follow keyword attribute arguments",
               argument.range(),
             ));
@@ -35,7 +36,7 @@ impl InvalidAttributeKeywordRule {
         };
 
         if !signature.keywords.is_empty() && !keywords.insert(&name.value) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!("Duplicate `[{attribute_name}]` keyword `{}`", name.value),
             name.range,
           ));
@@ -46,7 +47,7 @@ impl InvalidAttributeKeywordRule {
           .iter()
           .find(|keyword| keyword.name == name.value)
         else {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             if signature.keywords.is_empty() {
               format!(
                 "Attribute `{attribute_name}` does not accept keyword arguments"
@@ -70,7 +71,7 @@ impl InvalidAttributeKeywordRule {
         };
 
         if value.is_none() && keyword.value_required {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "`[{attribute_name}]` keyword `{}` requires a value",
               name.value

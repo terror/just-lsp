@@ -101,7 +101,7 @@ impl Analyze {
           ReportKind::Custom(kind_label.as_str(), color),
           span.clone(),
         )
-        .with_message(&diagnostic.display)
+        .with_message(diagnostic.display)
         .with_label(
           Label::new(span.clone())
             .with_message(diagnostic.message.trim().to_string())

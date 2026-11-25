@@ -58,7 +58,8 @@ define_rule! {
   /// each other at runtime.
   AliasRecipeConflictRule {
     id: "alias-recipe-conflict",
-    message: "name conflict",
+    title: "name conflict",
+    severity: Error,
   }
 }
 
@@ -116,7 +117,7 @@ impl AliasRecipeConflictRule {
             });
 
           if let Some(first) = first {
-            diagnostics.push(Diagnostic::error(
+            diagnostics.push(Diagnostic::new(
               first.conflict_message(name),
               item.range(),
             ));

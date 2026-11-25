@@ -5,7 +5,8 @@ define_rule! {
   /// shebang, which `just` reserves for a future syntax extension.
   BacktickShebangRule {
     id: "backtick-shebang",
-    message: "backtick shebang",
+    title: "backtick shebang",
+    severity: Error,
   }
 }
 
@@ -49,7 +50,7 @@ impl BacktickShebangRule {
             .all(|line| is_blank(line) || line.starts_with(indent))
       })
       .map(|command| {
-        Diagnostic::error(
+        Diagnostic::new(
           "Backticks may not start with `#!`",
           document.get_range(&command),
         )

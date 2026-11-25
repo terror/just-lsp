@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   GuardInfallibleConflictRule {
     id: "guard-infallible-conflict",
-    message: "guard and infallible sigils",
+    title: "guard and infallible sigils",
+    severity: Error,
   }
 }
 
@@ -41,7 +42,7 @@ impl GuardInfallibleConflictRule {
             (sigils.contains('?') && sigils.contains('-')).then(|| {
               let start = u32::try_from(line.indent.len()).unwrap_or(u32::MAX);
 
-              Diagnostic::error(
+              Diagnostic::new(
                 "the guard `?` and infallible `-` sigils may not be used together",
                 lsp::Range::at(
                   line.number,

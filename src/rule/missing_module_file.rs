@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   MissingModuleFileRule {
     id: "missing-module-file",
-    message: "missing module file",
+    title: "missing module file",
+    severity: Error,
   }
 }
 
@@ -13,7 +14,7 @@ impl MissingModuleFileRule {
       .view()
       .dependencies()
       .filter_map(|dependency| {
-        Some(Diagnostic::error(
+        Some(Diagnostic::new(
           format!(
             "Could not find source file for module `{}`",
             dependency.missing_module()?

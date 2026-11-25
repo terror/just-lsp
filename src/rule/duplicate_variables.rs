@@ -5,7 +5,8 @@ define_rule! {
   /// explicitly opting into overriding via `allow-duplicate-variables`.
   DuplicateVariableRule {
     id: "duplicate-variable",
-    message: "duplicate variable",
+    title: "duplicate variable",
+    severity: Error,
   }
 }
 
@@ -24,7 +25,7 @@ impl DuplicateVariableRule {
       |variable| &variable.name,
       |variable| &variable.attributes,
     ) {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("Duplicate variable `{}`", variable.name.value),
         variable.range,
       ));

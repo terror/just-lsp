@@ -5,7 +5,8 @@ define_rule! {
   /// attributes.
   InvalidAttributePlacementRule {
     id: "invalid-attribute-placement",
-    message: "invalid attribute target",
+    title: "invalid attribute target",
+    severity: Error,
   }
 }
 
@@ -21,7 +22,7 @@ impl InvalidAttributePlacementRule {
       }
 
       if attribute.target.is_none() {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!("Attribute `{attribute_name}` applied to invalid target"),
           attribute.range,
         ));

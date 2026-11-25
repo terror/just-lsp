@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   UnstableFeatureGateRule {
     id: "unstable-feature-gate",
-    message: "unstable feature used without set unstable",
+    title: "unstable feature used without set unstable",
+    severity: Warning,
   }
 }
 
@@ -17,7 +18,7 @@ impl UnstableFeatureGateRule {
 
     for setting in context.local_declarations(context.settings()) {
       if setting.name.value == "lists" {
-        diagnostics.push(Diagnostic::warning(
+        diagnostics.push(Diagnostic::new(
           "`set lists` is unstable without `set unstable`",
           setting.name.range,
         ));
@@ -25,7 +26,7 @@ impl UnstableFeatureGateRule {
     }
 
     for function in context.local_declarations(context.functions()) {
-      diagnostics.push(Diagnostic::warning(
+      diagnostics.push(Diagnostic::new(
         format!(
           "User-defined function `{}` is unstable without `set unstable`",
           function.name.value
@@ -38,7 +39,7 @@ impl UnstableFeatureGateRule {
       if attribute.name.value == "cache"
         && attribute.target == Some(AttributeTarget::Recipe)
       {
-        diagnostics.push(Diagnostic::warning(
+        diagnostics.push(Diagnostic::new(
           "`[cache]` is unstable without `set unstable`",
           attribute.name.range,
         ));

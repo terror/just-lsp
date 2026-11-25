@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   AmbiguousModuleFileRule {
     id: "ambiguous-module-file",
-    message: "ambiguous module file",
+    title: "ambiguous module file",
+    severity: Error,
   }
 }
 
@@ -45,7 +46,7 @@ impl AmbiguousModuleFileRule {
           })
           .collect::<Vec<_>>();
 
-        Some(Diagnostic::error(
+        Some(Diagnostic::new(
           format!(
             "Found multiple source files for module `{}`: {}",
             module.name.value,

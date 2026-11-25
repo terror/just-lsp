@@ -5,7 +5,8 @@ define_rule! {
   /// dependencies for the attribute to have any effect.
   IneffectiveParallelAttributeRule {
     id: "ineffective-parallel-attribute",
-    message: "unnecessary parallel attribute",
+    title: "unnecessary parallel attribute",
+    severity: Warning,
   }
 }
 
@@ -92,21 +93,21 @@ impl IneffectiveParallelAttributeRule {
           count(DependencyPhase::Prior),
           count(DependencyPhase::Subsequent),
         ) {
-          (0, 0) => Diagnostic::warning(
+          (0, 0) => Diagnostic::new(
             format!(
               "Recipe `{}` has no dependencies, so `[parallel]` has no effect",
               recipe.name.value
             ),
             attribute.range,
           ),
-          (1, 0) | (0, 1) => Diagnostic::warning(
+          (1, 0) | (0, 1) => Diagnostic::new(
             format!(
               "Recipe `{}` has only one dependency, so `[parallel]` has no effect",
               recipe.name.value
             ),
             attribute.range,
           ),
-          (1, 1) => Diagnostic::warning(
+          (1, 1) => Diagnostic::new(
             format!(
               "Recipe `{}` has only one dependency before and after `&&`, so `[parallel]` has no effect",
               recipe.name.value

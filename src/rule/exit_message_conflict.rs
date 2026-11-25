@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   ExitMessageConflictRule {
     id: "exit-message-conflict",
-    message: "conflicting exit message attributes",
+    title: "conflicting exit message attributes",
+    severity: Error,
   }
 }
 
@@ -13,7 +14,7 @@ impl ExitMessageConflictRule {
       .conflicting_recipe_attributes("exit-message", "no-exit-message")
       .into_iter()
       .map(|(recipe, attribute)| {
-        Diagnostic::error(
+        Diagnostic::new(
           format!(
             "Recipe `{}` can't combine `[exit-message]` with `[no-exit-message]`",
             recipe.name.value,

@@ -4,7 +4,8 @@ define_rule! {
   /// Flags user-defined functions that reuse the same name multiple times.
   DuplicateFunctionRule {
     id: "duplicate-function",
-    message: "duplicate function",
+    title: "duplicate function",
+    severity: Error,
   }
 }
 
@@ -18,7 +19,7 @@ impl DuplicateFunctionRule {
       )
       .into_iter()
       .map(|function| {
-        Diagnostic::error(
+        Diagnostic::new(
           format!("Duplicate function `{}`", function.name.value),
           function.range,
         )

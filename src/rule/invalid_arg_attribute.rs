@@ -9,7 +9,8 @@ define_rule! {
   /// `value=` is paired with `long=` or `short=`.
   InvalidArgAttributeRule {
     id: "invalid-arg-attribute",
-    message: "invalid arg attribute",
+    title: "invalid arg attribute",
+    severity: Error,
   }
 }
 
@@ -57,7 +58,7 @@ impl InvalidArgAttributeRule {
         };
 
         if let Some(message) = message {
-          diagnostics.push(Diagnostic::error(message, expression.text.range));
+          diagnostics.push(Diagnostic::new(message, expression.text.range));
         }
       }
 
@@ -69,7 +70,7 @@ impl InvalidArgAttributeRule {
       if let Some((key, _)) = value
         && !has_option
       {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           "Argument attribute `value` only valid with `long` or `short`",
           key.range,
         ));
@@ -98,7 +99,7 @@ impl InvalidArgAttributeRule {
         };
 
         if let Some(message) = message {
-          diagnostics.push(Diagnostic::error(message, key.range));
+          diagnostics.push(Diagnostic::new(message, key.range));
         }
       }
 
@@ -114,7 +115,7 @@ impl InvalidArgAttributeRule {
         };
 
         if let Some(message) = message {
-          diagnostics.push(Diagnostic::error(message, key.range));
+          diagnostics.push(Diagnostic::new(message, key.range));
         }
       }
 
@@ -123,7 +124,7 @@ impl InvalidArgAttributeRule {
         && (Regex::new(&pattern).is_err()
           || Regex::new(&format!("^(?:{pattern})$")).is_err())
       {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           "Failed to parse argument pattern",
           key.range,
         ));
@@ -135,7 +136,7 @@ impl InvalidArgAttributeRule {
       if let (Some((_, max)), Some((key, min))) = (max, min)
         && min > max
       {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!("Argument attribute `min` `{min}` exceeds `max` `{max}`"),
           key.range,
         ));
@@ -166,14 +167,14 @@ impl InvalidArgAttributeRule {
           .find(|parameter| parameter.name == parameter_name);
 
         if parameter.is_none() {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!("`[arg]` references unknown parameter `{parameter_name}`"),
             name.text.range,
           ));
         }
 
         if !seen.insert(parameter_name.clone()) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "`[arg]` attribute for parameter `{parameter_name}` is duplicated"
             ),
@@ -184,7 +185,7 @@ impl InvalidArgAttributeRule {
         if let Some((long, range)) = option(attribute, "long", &parameter_name)
           && !longs.insert(long.clone())
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Recipe `{}` defines option `--{long}` multiple times",
               recipe.name.value
@@ -198,7 +199,7 @@ impl InvalidArgAttributeRule {
           && let Some(short) = short.chars().next()
           && !shorts.insert(short)
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Recipe `{}` defines option `-{short}` multiple times",
               recipe.name.value
@@ -214,7 +215,7 @@ impl InvalidArgAttributeRule {
         if keyword(attribute, "flag").is_some()
           && parameter.default_value.is_some()
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!("Flag parameter `{parameter_name}` may not have a default"),
             parameter.range,
           ));
@@ -225,7 +226,7 @@ impl InvalidArgAttributeRule {
           && keyword(attribute, "multiple").is_none()
           && parameter.kind == ParameterKind::Normal
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Argument attribute `{}` only valid with `multiple` or a variadic parameter",
               key.value
@@ -252,7 +253,7 @@ fn count<'a>(
   let value = expression.string_value()?;
 
   if !COUNT.is_match(&value) {
-    diagnostics.push(Diagnostic::error(
+    diagnostics.push(Diagnostic::new(
       format!("Invalid `{key}` value `{value}`"),
       expression.text.range,
     ));
@@ -263,7 +264,7 @@ fn count<'a>(
   match value.parse::<u64>() {
     Ok(count) => Some((name, count)),
     Err(error) => {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("Invalid `{key}` value `{value}`: {error}"),
         expression.text.range,
       ));

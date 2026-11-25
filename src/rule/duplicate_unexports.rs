@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   DuplicateUnexportRule {
     id: "duplicate-unexport",
-    message: "duplicate unexport",
+    title: "duplicate unexport",
+    severity: Error,
   }
 }
 
@@ -16,7 +17,7 @@ impl DuplicateUnexportRule {
       |unexport| &unexport.name,
       |unexport| &unexport.attributes,
     ) {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Variable `{}` is unexported multiple times",
           unexport.name.value

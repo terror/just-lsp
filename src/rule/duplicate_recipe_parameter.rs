@@ -5,7 +5,8 @@ define_rule! {
   /// and illegal variadic/default combinations.
   DuplicateRecipeParameterRule {
     id: "duplicate-recipe-parameter",
-    message: "invalid recipe parameters",
+    title: "invalid recipe parameters",
+    severity: Error,
   }
 }
 
@@ -18,7 +19,7 @@ impl DuplicateRecipeParameterRule {
 
       for param in &recipe.parameters {
         if !seen.insert(param.name.clone()) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!("Duplicate parameter `{}`", param.name),
             param.range,
           ));

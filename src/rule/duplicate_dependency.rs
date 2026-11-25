@@ -19,7 +19,8 @@ define_rule! {
   /// more than once since `just` only runs it once.
   DuplicateDependencyRule {
     id: "duplicate-dependency",
-    message: "duplicate dependencies",
+    title: "duplicate dependencies",
+    severity: Warning,
   }
 }
 
@@ -58,7 +59,7 @@ impl DuplicateDependencyRule {
             )
           };
 
-          diagnostics.push(Diagnostic::warning(message, dependency.range));
+          diagnostics.push(Diagnostic::new(message, dependency.range));
         }
       }
     }

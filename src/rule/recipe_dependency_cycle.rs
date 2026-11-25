@@ -5,7 +5,8 @@ define_rule! {
   /// execution loops.
   RecipeDependencyCycleRule {
     id: "recipe-dependency-cycle",
-    message: "circular dependency",
+    title: "circular dependency",
+    severity: Error,
   }
 }
 
@@ -46,7 +47,7 @@ impl RecipeDependencyCycleRule {
           )
         };
 
-        Some(Diagnostic::error(message, recipe.range))
+        Some(Diagnostic::new(message, recipe.range))
       })
       .collect()
   }

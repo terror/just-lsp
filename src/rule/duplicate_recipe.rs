@@ -5,7 +5,8 @@ define_rule! {
   /// which would shadow each other at runtime unless overrides are enabled.
   DuplicateRecipeRule {
     id: "duplicate-recipe",
-    message: "duplicate recipes",
+    title: "duplicate recipes",
+    severity: Error,
   }
 }
 
@@ -24,7 +25,7 @@ impl DuplicateRecipeRule {
       |recipe| &recipe.name,
       |recipe| &recipe.attributes,
     ) {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("Duplicate recipe name `{}`", recipe.name.value),
         recipe.range,
       ));

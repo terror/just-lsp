@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   CircularImportRule {
     id: "circular-import",
-    message: "circular import",
+    title: "circular import",
+    severity: Error,
   }
 }
 
@@ -22,7 +23,7 @@ impl CircularImportRule {
           return None;
         };
 
-        Some(Diagnostic::error(
+        Some(Diagnostic::new(
           format!(
             "Import `{}` in `{}` is circular",
             target.file_path().ok()?.display(),

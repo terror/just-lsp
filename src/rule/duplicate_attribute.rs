@@ -20,7 +20,8 @@ impl Display for AttributeKey {
 define_rule! {
   DuplicateAttributeRule {
     id: "duplicate-attribute",
-    message: "duplicate attribute",
+    title: "duplicate attribute",
+    severity: Error,
   }
 }
 
@@ -52,7 +53,7 @@ impl DuplicateAttributeRule {
         .filter(|attribute| attribute.name.value == "default")
       {
         if conflicts.record(&attribute.name, &recipe.attributes) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
               recipe.name.value
@@ -112,7 +113,7 @@ impl DuplicateAttributeRule {
         };
 
         if !seen.insert((target_key, key.clone())) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!("{} attribute {key} is duplicated", target.target_name()),
             document.get_range(&attribute_node),
           ));

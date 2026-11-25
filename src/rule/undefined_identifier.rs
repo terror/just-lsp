@@ -5,7 +5,8 @@ define_rule! {
   /// defined and aren't builtins.
   UndefinedIdentifierRule {
     id: "undefined-identifier",
-    message: "undefined identifier",
+    title: "undefined identifier",
+    severity: Error,
   }
 }
 
@@ -28,7 +29,7 @@ impl UndefinedIdentifierRule {
         .map(|suggestion| Quickfix::replacement(identifier, suggestion));
 
       diagnostics
-        .push(Diagnostic::error(message, identifier.range).quickfix(quickfix));
+        .push(Diagnostic::new(message, identifier.range).quickfix(quickfix));
     }
 
     diagnostics
