@@ -14,8 +14,7 @@ impl UndefinedIdentifierRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for (identifier, suggestion) in &context.references().unresolved_identifiers
-    {
+    for (identifier, suggestion) in context.unresolved_identifiers() {
       let message = match suggestion {
         Some(suggestion) => format!(
           "Variable `{}` not found. Did you mean `{suggestion}`?",

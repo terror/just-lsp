@@ -13,7 +13,7 @@ define_rule! {
 impl UnresolvedDependencyRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.recipes())
+      .recipes(Scope::Local)
       .flat_map(|recipe| &recipe.dependencies)
       .filter_map(|dependency| {
         let path = &dependency.name;

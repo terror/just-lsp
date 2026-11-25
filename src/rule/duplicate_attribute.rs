@@ -32,11 +32,7 @@ impl DuplicateAttributeRule {
     let (mut diagnostics, mut conflicts) =
       (Vec::new(), ConflictTracker::default());
 
-    for recipe in context
-      .recipes()
-      .iter()
-      .filter(|recipe| recipe.uri != document.uri)
-    {
+    for recipe in context.recipes(Scope::Imported) {
       for attribute in recipe
         .attributes
         .iter()
@@ -46,7 +42,7 @@ impl DuplicateAttributeRule {
       }
     }
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       for attribute in recipe
         .attributes
         .iter()

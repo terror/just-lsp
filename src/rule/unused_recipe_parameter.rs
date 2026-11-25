@@ -122,10 +122,10 @@ impl UnusedRecipeParameterRule {
     let positional_arguments_enabled =
       context.setting_enabled("positional-arguments");
 
-    let used_parameters = &context.references().used_parameters;
+    let used_parameters = &context.used_parameters().collect::<Vec<_>>();
 
     context
-      .local_declarations(context.recipes())
+      .recipes(Scope::Local)
       .flat_map(|recipe| {
         let recipe_enables_positional_arguments = positional_arguments_enabled
           || recipe.has_attribute("positional-arguments");
@@ -147,7 +147,7 @@ impl UnusedRecipeParameterRule {
 
             let used = recipe.parameters.iter().any(|candidate| {
               candidate.name == parameter.name
-                && used_parameters.contains(candidate)
+                && used_parameters.contains(&candidate)
             });
 
             let is_unused =

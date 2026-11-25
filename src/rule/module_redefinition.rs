@@ -29,7 +29,6 @@ struct Definition<'a> {
   groups: GroupSet,
   kind: DefinitionKind,
   name: &'a TextNode,
-  uri: &'a lsp::Url,
 }
 
 impl<'a> Definition<'a> {
@@ -44,13 +43,11 @@ impl<'a> Definition<'a> {
     kind: DefinitionKind,
     name: &'a TextNode,
     attributes: &[Attribute],
-    uri: &'a lsp::Url,
   ) -> Self {
     Self {
       groups: GroupSet::from_attributes(attributes),
       kind,
       name,
-      uri,
     }
   }
 
@@ -77,53 +74,43 @@ define_rule! {
 }
 
 impl ModuleRedefinitionRule {
-  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let filesystem = context.view().filesystem();
+  fn definitions<'a>(
+    context: &RuleContext<'a>,
+    scope: Scope,
+  ) -> Vec<Definition<'a>> {
+    let filesystem = context.filesystem();
 
-    let modules = context
-      .view()
-      .modules()
-      .iter()
+    context
+      .modules(scope)
       .filter(|module| module.resolve(&module.uri, filesystem).is_some())
       .map(|module| {
         Definition::new(
           DefinitionKind::Module,
           &module.name,
           &module.attributes,
-          &module.uri,
         )
       })
-      .collect::<Vec<_>>();
+      .chain(context.aliases(scope).map(|alias| {
+        Definition::new(DefinitionKind::Alias, &alias.name, &alias.attributes)
+      }))
+      .chain(context.recipes(scope).map(|recipe| {
+        Definition::new(
+          DefinitionKind::Recipe,
+          &recipe.name,
+          &recipe.attributes,
+        )
+      }))
+      .collect()
+  }
 
-    if modules.is_empty() {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    if context.modules(Scope::Module).next().is_none() {
       return Vec::new();
     }
 
-    let aliases = context.aliases().iter().map(|alias| {
-      Definition::new(
-        DefinitionKind::Alias,
-        &alias.name,
-        &alias.attributes,
-        &alias.uri,
-      )
-    });
+    let imported = Self::definitions(context, Scope::Imported);
 
-    let recipes = context.recipes().iter().map(|recipe| {
-      Definition::new(
-        DefinitionKind::Recipe,
-        &recipe.name,
-        &recipe.attributes,
-        &recipe.uri,
-      )
-    });
-
-    let (mut local, imported) = modules
-      .into_iter()
-      .chain(aliases)
-      .chain(recipes)
-      .partition::<Vec<_>, _>(|definition| {
-        definition.uri == &context.document().uri
-      });
+    let mut local = Self::definitions(context, Scope::Local);
 
     local.sort_by_key(|definition| definition.name.range.start);
 

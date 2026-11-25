@@ -327,4 +327,29 @@ impl Bindings {
       self.bind(document, &identifier, binding, false);
     }
   }
+
+  pub(crate) fn unresolved_identifiers(
+    &self,
+  ) -> impl Iterator<Item = (&TextNode, &Option<String>)> {
+    self
+      .identifiers
+      .iter()
+      .filter_map(|bound| match &bound.binding {
+        Binding::Unresolved { suggestion } => {
+          Some((&bound.identifier, suggestion))
+        }
+        _ => None,
+      })
+  }
+
+  pub(crate) fn used_parameters(&self) -> impl Iterator<Item = &Parameter> {
+    self
+      .identifiers
+      .iter()
+      .filter(|bound| bound.expression)
+      .filter_map(|bound| match &bound.binding {
+        Binding::Parameter(parameter) => Some(parameter),
+        _ => None,
+      })
+  }
 }

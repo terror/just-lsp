@@ -16,7 +16,7 @@ impl ExtensionWithoutScriptRule {
 
     let mut diagnostics = Vec::new();
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       let Some(extension_attribute) = recipe.find_attribute("extension") else {
         continue;
       };

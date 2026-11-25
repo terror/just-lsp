@@ -16,9 +16,9 @@ impl InvalidDependencyArgumentCountRule {
 
     let lists = context.setting_enabled("lists");
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.recipes(Scope::Local) {
       for dependency in &recipe.dependencies {
-        if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
+        if let Some(recipe) = context.resolve_recipe(&dependency.name) {
           let parameters = &recipe.parameters;
 
           let required_parameters = parameters

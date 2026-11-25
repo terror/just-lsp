@@ -15,7 +15,6 @@ impl CircularImportRule {
     };
 
     context
-      .view()
       .circular_dependencies()
       .iter()
       .filter_map(|dependency| {

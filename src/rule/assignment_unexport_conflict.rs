@@ -12,13 +12,13 @@ impl AssignmentUnexportConflictRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut unexports = ConflictTracker::default();
 
-    for unexport in context.unexports() {
+    for unexport in context.unexports(Scope::Module) {
       unexports.record(&unexport.name, &unexport.attributes);
     }
 
     let mut diagnostics = Vec::new();
 
-    for variable in context.local_declarations(context.variables()) {
+    for variable in context.variables(Scope::Local) {
       if unexports.conflicts_with(&variable.name, &variable.attributes) {
         diagnostics.push(Diagnostic::new(
           format!(
@@ -32,13 +32,11 @@ impl AssignmentUnexportConflictRule {
 
     let mut variables = ConflictTracker::default();
 
-    for variable in context.variables() {
-      if variable.uri != context.document().uri {
-        variables.record(&variable.name, &variable.attributes);
-      }
+    for variable in context.variables(Scope::Imported) {
+      variables.record(&variable.name, &variable.attributes);
     }
 
-    for unexport in context.local_declarations(context.unexports()) {
+    for unexport in context.unexports(Scope::Local) {
       if variables.conflicts_with(&unexport.name, &unexport.attributes) {
         diagnostics.push(Diagnostic::new(
           format!(

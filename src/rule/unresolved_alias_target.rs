@@ -12,7 +12,7 @@ define_rule! {
 impl UnresolvedAliasTargetRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .local_declarations(context.aliases())
+      .aliases(Scope::Local)
       .filter(|alias| !context.declares_module(&alias.value))
       .filter_map(|alias| {
         let path = &alias.value;

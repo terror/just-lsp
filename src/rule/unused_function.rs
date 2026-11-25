@@ -10,14 +10,12 @@ define_rule! {
 
 impl UnusedFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let called_functions = context.view().called_functions();
+    let called_functions = context.called_functions();
 
     context
-      .view()
-      .resolved_functions()
+      .resolved_functions(Scope::Local)
       .filter(|function| {
-        function.uri == context.document().uri
-          && !function.name.value.starts_with('_')
+        !function.name.value.starts_with('_')
           && !called_functions.contains(&function.name.value)
       })
       .map(|function| {

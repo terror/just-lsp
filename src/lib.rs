@@ -26,11 +26,11 @@ use {
   project_dependency_target::ProjectDependencyTarget,
   project_loader::ProjectLoader,
   recipe_line::{IndentKind, RecipeLine},
-  references::References,
   regex::Regex,
   ropey::Rope,
   rule::Rule,
   rule_context::RuleContext,
+  scope::Scope,
   scope_document::ScopeDocument,
   serde::Deserialize,
   serde_json::Value,
@@ -62,6 +62,7 @@ use {
   tree_sitter::{InputEdit, Language, Node, Parser, Point, Tree},
   tree_walker::TreeWalker,
   unresolved_recipe::UnresolvedRecipe,
+  usage::Usage,
 };
 
 #[cfg(test)]
@@ -180,11 +181,11 @@ mod quickfix;
 mod range_ext;
 mod recipe;
 mod recipe_line;
-mod references;
 mod resolver;
 mod rope_ext;
 mod rule;
 mod rule_context;
+mod scope;
 mod scope_document;
 mod setting;
 mod setting_kind;
@@ -201,6 +202,7 @@ mod tree_walker;
 mod unexport;
 mod unresolved_recipe;
 mod url_ext;
+mod usage;
 mod variable;
 mod workspace;
 
