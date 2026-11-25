@@ -14,16 +14,17 @@ impl UnusedVariableRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    let exported = context.setting_enabled("export");
+    let exported = context.module().setting_enabled("export");
 
     let variables = context
-      .local_declarations(context.variables())
+      .local()
+      .variables()
       .map(|variable| (variable.name.value.as_str(), variable))
       .collect::<HashMap<_, _>>();
 
     for (variable_name, variable) in variables {
       if variable_name.starts_with('_')
-        || context.used_variables().contains(variable_name)
+        || context.module().used_variables().contains(variable_name)
       {
         continue;
       }

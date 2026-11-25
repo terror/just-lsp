@@ -13,11 +13,13 @@ impl<'a> Definition<'a> {
     bindings: &'a Bindings,
   ) -> Vec<(Self, Self)> {
     let declarations = context
+      .module()
       .resolved_variables()
       .filter(|variable| variable.uri == document.uri)
       .map(|variable| (Self::Variable(&variable.name.value), variable.range))
       .chain(
         context
+          .module()
           .resolved_functions()
           .filter(|function| function.uri == document.uri)
           .map(|function| {
@@ -82,8 +84,8 @@ impl VariableDependencyCycleRule {
       .collect::<Graph<_>>();
 
     context
+      .local()
       .resolved_variables()
-      .filter(|variable| variable.uri == context.document().uri)
       .filter_map(|variable| {
         let name = &variable.name.value;
 

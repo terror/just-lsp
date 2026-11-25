@@ -12,10 +12,11 @@ define_rule! {
 
 impl MixedIndentationRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let default_script = context.setting_enabled("default-script");
+    let default_script = context.module().setting_enabled("default-script");
 
     context
-      .local_declarations(context.recipes())
+      .local()
+      .recipes()
       .filter_map(|recipe| {
         let script = recipe.runs_as_script(default_script);
 

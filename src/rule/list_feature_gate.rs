@@ -78,12 +78,13 @@ impl ListFeatureGateRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    if context.setting_enabled("lists") {
+    if context.module().setting_enabled("lists") {
       return diagnostics;
     }
 
     diagnostics.extend(
       context
+        .local()
         .attributes()
         .iter()
         .filter(|attribute| attribute.name.value == "arg")
@@ -104,7 +105,9 @@ impl ListFeatureGateRule {
         }),
     );
 
-    let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
+    let root = context.local().tree().root_node();
+
+    let _ = TreeWalker::new(root).walk(|node, _| {
       Self::validate_node(context, context.document(), node, &mut diagnostics);
       ControlFlow::<(), bool>::Continue(true)
     });
@@ -157,7 +160,7 @@ impl ListFeatureGateRule {
         if let Some(name) = node.child_by_field_name("name") {
           let name_text = document.get_node_text(&name);
 
-          if context.find_function(&name_text).is_none()
+          if context.module().find_function(&name_text).is_none()
             && let Some(message) = Self::function_message(&name_text)
           {
             diagnostics

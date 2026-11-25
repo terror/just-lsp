@@ -14,7 +14,7 @@ impl UnsupportedAttributeTargetRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for attribute in context.attributes() {
+    for attribute in context.local().attributes() {
       let attribute_name = &attribute.name.value;
 
       let Some(Builtin::Attribute { targets, .. }) =

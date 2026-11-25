@@ -23,11 +23,12 @@ impl DeprecatedSettingRule {
       candidate.name.value != attribute && candidate.condition().is_some()
     });
 
-    let replacement_exists = context.settings().iter().any(|candidate| {
-      candidate.name.value == replacement
-        && GroupSet::from_attributes(&candidate.attributes)
-          .conflicts_with(&groups)
-    });
+    let replacement_exists =
+      context.module().settings().iter().any(|candidate| {
+        candidate.name.value == replacement
+          && GroupSet::from_attributes(&candidate.attributes)
+            .conflicts_with(&groups)
+      });
 
     if has_other_platform || replacement_exists {
       return None;
@@ -51,7 +52,7 @@ impl DeprecatedSettingRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for setting in context.local_declarations(context.settings()) {
+    for setting in context.local().settings() {
       if let Some(Builtin::Setting {
         deprecated: Some(deprecation),
         ..

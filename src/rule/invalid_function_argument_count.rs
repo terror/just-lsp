@@ -14,10 +14,10 @@ impl InvalidFunctionArgumentCountRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for function_call in context.function_calls() {
+    for function_call in context.local().function_calls() {
       let function_name = &function_call.name.value;
 
-      if let Some(function) = context.find_function(function_name) {
+      if let Some(function) = context.module().find_function(function_name) {
         let (argument_count, parameter_count) =
           (function_call.arguments.len(), function.parameters.len());
 

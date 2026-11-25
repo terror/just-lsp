@@ -13,6 +13,7 @@ impl UnusedFunctionParameterRule {
     let document = context.document();
 
     context
+      .local()
       .tree()
       .root_node()
       .find_all("function_parameters > identifier")

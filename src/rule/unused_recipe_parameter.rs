@@ -115,17 +115,18 @@ impl UnusedRecipeParameterRule {
   }
 
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let default_script = context.setting_enabled("default-script");
+    let default_script = context.module().setting_enabled("default-script");
 
-    let exported = context.setting_enabled("export");
+    let exported = context.module().setting_enabled("export");
 
     let positional_arguments_enabled =
-      context.setting_enabled("positional-arguments");
+      context.module().setting_enabled("positional-arguments");
 
-    let used_parameters = context.used_parameters();
+    let used_parameters = context.local().used_parameters();
 
     context
-      .local_declarations(context.recipes())
+      .local()
+      .recipes()
       .flat_map(|recipe| {
         let recipe_enables_positional_arguments = positional_arguments_enabled
           || recipe.has_attribute("positional-arguments");

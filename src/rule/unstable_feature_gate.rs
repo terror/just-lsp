@@ -12,11 +12,11 @@ impl UnstableFeatureGateRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    if context.setting_enabled("unstable") {
+    if context.module().setting_enabled("unstable") {
       return diagnostics;
     }
 
-    for setting in context.local_declarations(context.settings()) {
+    for setting in context.local().settings() {
       if setting.name.value == "lists" {
         diagnostics.push(Diagnostic::new(
           "`set lists` is unstable without `set unstable`",
@@ -25,7 +25,7 @@ impl UnstableFeatureGateRule {
       }
     }
 
-    for function in context.local_declarations(context.functions()) {
+    for function in context.local().functions() {
       diagnostics.push(Diagnostic::new(
         format!(
           "User-defined function `{}` is unstable without `set unstable`",
@@ -35,7 +35,7 @@ impl UnstableFeatureGateRule {
       ));
     }
 
-    for attribute in context.attributes() {
+    for attribute in context.local().attributes() {
       if attribute.name.value == "cache"
         && attribute.target == Some(AttributeTarget::Recipe)
       {

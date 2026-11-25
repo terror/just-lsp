@@ -12,7 +12,7 @@ impl InvalidRecipeParameterOrderRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       let mut passed_default = false;
 
       for param in recipe

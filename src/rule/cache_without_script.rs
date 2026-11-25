@@ -10,11 +10,11 @@ define_rule! {
 
 impl CacheWithoutScriptRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let default_script = context.setting_enabled("default-script");
+    let default_script = context.module().setting_enabled("default-script");
 
     let mut diagnostics = Vec::new();
 
-    for recipe in context.local_declarations(context.recipes()) {
+    for recipe in context.local().recipes() {
       let Some(cache_attribute) = recipe.find_attribute("cache") else {
         continue;
       };

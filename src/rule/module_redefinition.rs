@@ -29,7 +29,6 @@ struct Definition<'a> {
   groups: GroupSet,
   kind: DefinitionKind,
   name: &'a TextNode,
-  uri: &'a lsp::Url,
 }
 
 impl<'a> Definition<'a> {
@@ -44,13 +43,11 @@ impl<'a> Definition<'a> {
     kind: DefinitionKind,
     name: &'a TextNode,
     attributes: &[Attribute],
-    uri: &'a lsp::Url,
   ) -> Self {
     Self {
       groups: GroupSet::from_attributes(attributes),
       kind,
       name,
-      uri,
     }
   }
 
@@ -77,52 +74,56 @@ define_rule! {
 }
 
 impl ModuleRedefinitionRule {
-  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let filesystem = context.filesystem();
-
-    let modules = context
-      .modules()
-      .iter()
+  fn definitions<'a>(
+    filesystem: &dyn Filesystem,
+    modules: impl Iterator<Item = &'a Located<ModuleDeclaration>>,
+    aliases: impl Iterator<Item = &'a Located<Alias>>,
+    recipes: impl Iterator<Item = &'a Located<Recipe>>,
+  ) -> Vec<Definition<'a>> {
+    modules
       .filter(|module| module.resolve(&module.uri, filesystem).is_some())
       .map(|module| {
         Definition::new(
           DefinitionKind::Module,
           &module.name,
           &module.attributes,
-          &module.uri,
         )
       })
-      .collect::<Vec<_>>();
+      .chain(aliases.map(|alias| {
+        Definition::new(DefinitionKind::Alias, &alias.name, &alias.attributes)
+      }))
+      .chain(recipes.map(|recipe| {
+        Definition::new(
+          DefinitionKind::Recipe,
+          &recipe.name,
+          &recipe.attributes,
+        )
+      }))
+      .collect()
+  }
 
-    if modules.is_empty() {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    if context.module().modules().is_empty() {
       return Vec::new();
     }
 
-    let aliases = context.aliases().iter().map(|alias| {
-      Definition::new(
-        DefinitionKind::Alias,
-        &alias.name,
-        &alias.attributes,
-        &alias.uri,
-      )
-    });
+    let filesystem = context.filesystem();
 
-    let recipes = context.recipes().iter().map(|recipe| {
-      Definition::new(
-        DefinitionKind::Recipe,
-        &recipe.name,
-        &recipe.attributes,
-        &recipe.uri,
-      )
-    });
+    let (imported, local) = (context.imported(), context.local());
 
-    let (mut local, imported) = modules
-      .into_iter()
-      .chain(aliases)
-      .chain(recipes)
-      .partition::<Vec<_>, _>(|definition| {
-        definition.uri == &context.document().uri
-      });
+    let imported = Self::definitions(
+      filesystem,
+      imported.modules(),
+      imported.aliases(),
+      imported.recipes(),
+    );
+
+    let mut local = Self::definitions(
+      filesystem,
+      local.modules(),
+      local.aliases(),
+      local.recipes(),
+    );
 
     local.sort_by_key(|definition| definition.name.range.start);
 

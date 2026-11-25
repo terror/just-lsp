@@ -10,14 +10,14 @@ define_rule! {
 
 impl GuardInfallibleConflictRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    if !context.setting_enabled("guards") {
+    if !context.module().setting_enabled("guards") {
       return Vec::new();
     }
 
-    let default_script = context.setting_enabled("default-script");
+    let default_script = context.module().setting_enabled("default-script");
 
     context
-      .local_declarations(context.recipes())
+      .local().recipes()
       .filter(|recipe| !recipe.runs_as_script(default_script))
       .flat_map(|recipe| {
         recipe

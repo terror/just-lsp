@@ -14,15 +14,16 @@ impl UnknownFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for function_call in context.function_calls() {
+    for function_call in context.local().function_calls() {
       let function_name = &function_call.name.value;
 
       if Builtin::function(function_name.as_str()).is_none()
-        && context.find_function(function_name).is_none()
+        && context.module().find_function(function_name).is_none()
       {
         let suggestion = function_name.find_suggestion(
           Builtin::functions().flat_map(Builtin::names).chain(
             context
+              .module()
               .resolved_functions()
               .map(|function| function.name.value.as_str()),
           ),

@@ -1,4 +1,11 @@
-use super::*;
+use {
+  super::*, imported_scope::ImportedScope, local_scope::LocalScope,
+  module_scope::ModuleScope,
+};
+
+mod imported_scope;
+mod local_scope;
+mod module_scope;
 
 pub(crate) struct RuleContext<'a> {
   attributes: OnceLock<Vec<Attribute>>,
@@ -8,23 +15,8 @@ pub(crate) struct RuleContext<'a> {
 }
 
 impl<'a> RuleContext<'a> {
-  pub(crate) fn aliases(&self) -> &[Located<Alias>] {
-    self.view.aliases()
-  }
-
-  pub(crate) fn attributes(&self) -> &[Attribute] {
-    self
-      .attributes
-      .get_or_init(|| self.document().attributes())
-      .as_slice()
-  }
-
   pub(crate) fn bindings(&self, document: &Document) -> Arc<Bindings> {
     self.view.bindings(document)
-  }
-
-  pub(crate) fn called_functions(&self) -> &HashSet<String> {
-    self.usage().called_functions()
   }
 
   pub(crate) fn circular_dependencies(&self) -> &'a [ProjectDependency] {
@@ -37,13 +29,14 @@ impl<'a> RuleContext<'a> {
     right: &str,
   ) -> Vec<(&Recipe, &Attribute)> {
     self
-      .local_declarations(self.recipes())
+      .local()
+      .recipes()
       .filter_map(|recipe| {
         let attribute = recipe.find_attribute(left)?;
 
         recipe.find_attribute(right)?;
 
-        Some((recipe, attribute))
+        Some((&**recipe, attribute))
       })
       .collect()
   }
@@ -53,6 +46,7 @@ impl<'a> RuleContext<'a> {
     incompatible: impl Fn(&Setting, &Setting) -> bool,
   ) -> Vec<(&Located<Setting>, &Located<Setting>)> {
     let mut settings = self
+      .module()
       .settings()
       .iter()
       .map(|setting| {
@@ -62,12 +56,12 @@ impl<'a> RuleContext<'a> {
       })
       .collect::<Vec<_>>();
 
-    settings.sort_by_key(|(setting, _)| setting.uri == self.document().uri);
+    settings.sort_by_key(|(setting, _)| self.is_local(setting));
 
     let mut conflicts = Vec::new();
 
     for (index, (current, current_groups)) in settings.iter().enumerate() {
-      if current.uri != self.document().uri {
+      if !self.is_local(current) {
         continue;
       }
 
@@ -84,16 +78,6 @@ impl<'a> RuleContext<'a> {
     }
 
     conflicts
-  }
-
-  pub(crate) fn declares_module(&self, path: &Namepath) -> bool {
-    match self.view.module(path) {
-      ModuleLookup::Found(view) => view
-        .modules()
-        .iter()
-        .any(|module| module.name.value == path.name().value),
-      ModuleLookup::Undeclared(_) | ModuleLookup::Unloaded => false,
-    }
   }
 
   pub(crate) fn dependencies(
@@ -119,13 +103,15 @@ impl<'a> RuleContext<'a> {
     let mut conflicts = ConflictTracker::default();
 
     for declaration in declarations {
-      if declaration.uri != self.document().uri {
+      if !self.is_local(declaration) {
         conflicts.record(name(declaration), attributes(declaration));
       }
     }
 
-    self
-      .local_declarations(declarations)
+    declarations
+      .iter()
+      .filter(|declaration| self.is_local(declaration))
+      .map(Deref::deref)
       .filter(|declaration| {
         conflicts.record(name(declaration), attributes(declaration))
       })
@@ -136,37 +122,24 @@ impl<'a> RuleContext<'a> {
     self.view.filesystem()
   }
 
-  pub(crate) fn find_function(&self, name: &str) -> Option<&Located<Function>> {
-    self.view.find_function(name)
+  pub(crate) fn imported(&self) -> ImportedScope<'_> {
+    ImportedScope::new(self)
   }
 
-  pub(crate) fn function_calls(&self) -> &[FunctionCall] {
-    self
-      .function_calls
-      .get_or_init(|| self.document().function_calls())
-      .as_slice()
-  }
-
-  pub(crate) fn functions(&self) -> &[Located<Function>] {
-    self.view.functions()
+  fn is_local<T>(&self, declaration: &Located<T>) -> bool {
+    declaration.uri == self.document().uri
   }
 
   pub(crate) fn loads(&self, path: &Path) -> bool {
     self.view.loads(path)
   }
 
-  pub(super) fn local_declarations<'b, T>(
-    &self,
-    declarations: &'b [Located<T>],
-  ) -> impl Iterator<Item = &'b T> {
-    declarations
-      .iter()
-      .filter(|declaration| declaration.uri == self.document().uri)
-      .map(Deref::deref)
+  pub(crate) fn local(&self) -> LocalScope<'_> {
+    LocalScope::new(self)
   }
 
-  pub(crate) fn modules(&self) -> &[Located<ModuleDeclaration>] {
-    self.view.modules()
+  pub(crate) fn module(&self) -> ModuleScope<'_> {
+    ModuleScope::new(self)
   }
 
   #[must_use]
@@ -179,111 +152,8 @@ impl<'a> RuleContext<'a> {
     }
   }
 
-  pub(crate) fn recipes(&self) -> &[Located<Recipe>] {
-    self.view.recipes()
-  }
-
-  pub(crate) fn resolve_recipe(
-    &self,
-    path: &Namepath,
-  ) -> Option<Located<Recipe>> {
-    self.view.resolve_recipe(path)
-  }
-
-  pub(crate) fn resolved_functions(
-    &self,
-  ) -> impl Iterator<Item = &Located<Function>> {
-    self.view.resolved_functions()
-  }
-
-  pub(crate) fn resolved_recipes(
-    &self,
-  ) -> impl Iterator<Item = &Located<Recipe>> {
-    self.view.resolved_recipes()
-  }
-
-  pub(crate) fn resolved_variables(
-    &self,
-  ) -> impl Iterator<Item = &Located<Variable>> {
-    self.view.resolved_variables()
-  }
-
-  pub(crate) fn setting_enabled(&self, name: &str) -> bool {
-    self.view.setting_enabled(name)
-  }
-
-  pub(crate) fn settings(&self) -> &[Located<Setting>] {
-    self.view.settings()
-  }
-
-  pub(crate) fn tree(&self) -> &Tree {
-    &self.document().tree
-  }
-
-  pub(crate) fn unexports(&self) -> &[Located<Unexport>] {
-    self.view.unexports()
-  }
-
-  pub(crate) fn unresolved_identifiers(&self) -> &[(TextNode, Option<String>)] {
-    self.usage().unresolved_identifiers(&self.document().uri)
-  }
-
-  pub(crate) fn unresolved_recipe(
-    &self,
-    path: &Namepath,
-  ) -> Option<UnresolvedRecipe> {
-    let module = match self.view.module(path) {
-      ModuleLookup::Found(module) => module,
-      ModuleLookup::Undeclared(segment) => {
-        return Some(UnresolvedRecipe::Module(segment));
-      }
-      ModuleLookup::Unloaded => return None,
-    };
-
-    let name = path.name();
-
-    if module.find_recipe(&name.value).is_some() {
-      return None;
-    }
-
-    let suggestion = name
-      .value
-      .find_suggestion(
-        module
-          .recipes()
-          .iter()
-          .map(|recipe| recipe.name.value.as_str()),
-      )
-      .map(|suggestion| Namepath {
-        range: path.range,
-        segments: path
-          .modules()
-          .iter()
-          .cloned()
-          .chain([TextNode {
-            range: name.range,
-            value: suggestion,
-          }])
-          .collect(),
-      });
-
-    Some(UnresolvedRecipe::Recipe { suggestion })
-  }
-
   fn usage(&self) -> &Usage {
     self.usage.get_or_init(|| self.view.usage())
-  }
-
-  pub(crate) fn used_parameters(&self) -> &[Parameter] {
-    self.usage().used_parameters(&self.document().uri)
-  }
-
-  pub(crate) fn used_variables(&self) -> &HashSet<String> {
-    self.usage().used_variables()
-  }
-
-  pub(crate) fn variables(&self) -> &[Located<Variable>] {
-    self.view.variables()
   }
 }
 
@@ -338,6 +208,7 @@ mod tests {
 
     assert_eq!(
       context
+        .module()
         .recipes()
         .iter()
         .map(|recipe| recipe.location(recipe.name.range))
@@ -350,9 +221,26 @@ mod tests {
 
     assert_eq!(
       context
-        .local_declarations(context.recipes())
+        .local()
+        .recipes()
+        .map(|recipe| recipe.location(recipe.name.range))
         .collect::<Vec<_>>(),
-      [&document.recipes()[0]],
+      [lsp::Location::new(
+        document.uri.clone(),
+        lsp::Range::at(0, 0, 0, 3)
+      )],
+    );
+
+    assert_eq!(
+      context
+        .imported()
+        .recipes()
+        .map(|recipe| recipe.location(recipe.name.range))
+        .collect::<Vec<_>>(),
+      [lsp::Location::new(
+        root.uri.clone(),
+        lsp::Range::at(0, 0, 0, 3)
+      )],
     );
   }
 
@@ -388,6 +276,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let recipe_names = context
+        .module()
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.as_str())
@@ -427,6 +316,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let recipe_names = context
+        .module()
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.as_str())
@@ -456,6 +346,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let setting_names = context
+        .module()
         .settings()
         .iter()
         .map(|s| s.name.value.as_str())
@@ -485,6 +376,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let variable_names = context
+        .module()
         .variables()
         .iter()
         .map(|variable| variable.name.value.as_str())
@@ -513,6 +405,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let recipe_names = context
+        .module()
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.as_str())
@@ -565,6 +458,7 @@ mod tests {
 
     context(&dir.path().join("justfile"), |context| {
       let recipe_names = context
+        .module()
         .recipes()
         .iter()
         .map(|recipe| recipe.name.value.as_str())
