@@ -16,18 +16,17 @@ impl UnusedVariableRule {
 
     let exported = context.setting_enabled("export");
 
-    for (variable_name, is_used) in &context.references().variable_usage {
-      if variable_name.starts_with('_') || *is_used {
+    let variables = context
+      .local_declarations(context.variables())
+      .map(|variable| (variable.name.value.as_str(), variable))
+      .collect::<HashMap<_, _>>();
+
+    for (variable_name, variable) in variables {
+      if variable_name.starts_with('_')
+        || context.used_variables().contains(variable_name)
+      {
         continue;
       }
-
-      let Some(variable) = context
-        .local_declarations(context.variables())
-        .filter(|variable| variable.name.value == *variable_name)
-        .last()
-      else {
-        continue;
-      };
 
       if variable.eager
         || variable.export

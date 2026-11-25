@@ -18,12 +18,14 @@ impl UnknownFunctionRule {
       let function_name = &function_call.name.value;
 
       if Builtin::function(function_name.as_str()).is_none()
-        && !context.user_function_names().contains(function_name)
+        && context.find_function(function_name).is_none()
       {
         let suggestion = function_name.find_suggestion(
-          Builtin::functions()
-            .flat_map(Builtin::names)
-            .chain(context.user_function_names().iter().map(String::as_str)),
+          Builtin::functions().flat_map(Builtin::names).chain(
+            context
+              .resolved_functions()
+              .map(|function| function.name.value.as_str()),
+          ),
         );
 
         let message = match &suggestion {

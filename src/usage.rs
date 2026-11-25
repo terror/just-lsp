@@ -1,66 +1,101 @@
 use super::*;
 
-pub(crate) struct References {
-  pub(crate) unresolved_identifiers: Vec<(TextNode, Option<String>)>,
-  pub(crate) used_parameters: Vec<Parameter>,
-  pub(crate) variable_usage: HashMap<String, bool>,
+#[derive(Debug)]
+pub(crate) struct Usage {
+  called_functions: HashSet<String>,
+  unresolved_identifiers: HashMap<lsp::Url, Vec<(TextNode, Option<String>)>>,
+  used_parameters: HashMap<lsp::Url, Vec<Parameter>>,
+  used_variables: HashSet<String>,
 }
 
-impl References {
-  pub(crate) fn analyze(context: &RuleContext<'_>) -> Self {
-    let view = context.view();
+impl Usage {
+  pub(crate) fn called_functions(&self) -> &HashSet<String> {
+    &self.called_functions
+  }
 
-    let root = view.bindings(context.document());
-
-    let imported = context
-      .imported_documents()
-      .map(|document| view.bindings(document))
+  pub(crate) fn new(view: &ModuleView) -> Self {
+    let bindings = view
+      .documents()
+      .map(|document| (&document.uri, view.bindings(document)))
       .collect::<Vec<_>>();
 
-    let mut variable_usage = context
-      .variables()
-      .iter()
-      .map(|variable| (variable.name.value.clone(), false))
-      .collect::<HashMap<_, _>>();
+    let called_functions = view
+      .documents()
+      .flat_map(Document::function_calls)
+      .map(|function_call| function_call.name.value)
+      .collect();
 
-    for bound in once(&root)
-      .chain(&imported)
-      .flat_map(|bindings| bindings.identifiers())
-      .filter(|bound| bound.expression)
-    {
-      if let Binding::Variable(name) = &bound.binding
-        && let Some(used) = variable_usage.get_mut(name)
-      {
-        *used = true;
-      }
-    }
-
-    let unresolved_identifiers = root
-      .identifiers()
+    let unresolved_identifiers = bindings
       .iter()
-      .filter_map(|bound| match &bound.binding {
-        Binding::Unresolved { suggestion } => {
-          Some((bound.identifier.clone(), suggestion.clone()))
-        }
-        _ => None,
+      .map(|(uri, bindings)| {
+        (
+          (*uri).clone(),
+          bindings
+            .identifiers()
+            .iter()
+            .filter_map(|bound| match &bound.binding {
+              Binding::Unresolved { suggestion } => {
+                Some((bound.identifier.clone(), suggestion.clone()))
+              }
+              _ => None,
+            })
+            .collect(),
+        )
       })
       .collect();
 
-    let used_parameters = root
-      .identifiers()
+    let used_parameters = bindings
       .iter()
+      .map(|(uri, bindings)| {
+        (
+          (*uri).clone(),
+          bindings
+            .identifiers()
+            .iter()
+            .filter(|bound| bound.expression)
+            .filter_map(|bound| match &bound.binding {
+              Binding::Parameter(parameter) => Some(parameter.clone()),
+              _ => None,
+            })
+            .collect(),
+        )
+      })
+      .collect();
+
+    let used_variables = bindings
+      .iter()
+      .flat_map(|(_, bindings)| bindings.identifiers())
       .filter(|bound| bound.expression)
       .filter_map(|bound| match &bound.binding {
-        Binding::Parameter(parameter) => Some(parameter.clone()),
+        Binding::Variable(name) => Some(name.clone()),
         _ => None,
       })
       .collect();
 
     Self {
+      called_functions,
       unresolved_identifiers,
       used_parameters,
-      variable_usage,
+      used_variables,
     }
+  }
+
+  pub(crate) fn unresolved_identifiers(
+    &self,
+    uri: &lsp::Url,
+  ) -> &[(TextNode, Option<String>)] {
+    self
+      .unresolved_identifiers
+      .get(uri)
+      .map_or(&[], Vec::as_slice)
+  }
+
+  pub(crate) fn used_parameters(&self, uri: &lsp::Url) -> &[Parameter] {
+    self.used_parameters.get(uri).map_or(&[], Vec::as_slice)
+  }
+
+  pub(crate) fn used_variables(&self) -> &HashSet<String> {
+    &self.used_variables
   }
 }
 
@@ -104,10 +139,10 @@ mod tests {
 
       let view = module.view();
 
-      let references = References::analyze(&RuleContext::new(&view));
+      let usage = Usage::new(&view);
 
-      let mut actual_unresolved = references
-        .unresolved_identifiers
+      let mut actual_unresolved = usage
+        .unresolved_identifiers(&view.document().uri)
         .iter()
         .map(|(identifier, _)| identifier.value.as_str())
         .collect::<Vec<_>>();
@@ -123,11 +158,10 @@ mod tests {
         "unresolved mismatch"
       );
 
-      let mut actual_used = references
-        .variable_usage
+      let mut actual_used = usage
+        .used_variables()
         .iter()
-        .filter(|(_, used)| **used)
-        .map(|(name, _)| name.as_str())
+        .map(String::as_str)
         .collect::<Vec<_>>();
 
       actual_used.sort_unstable();
@@ -138,14 +172,16 @@ mod tests {
 
       assert_eq!(actual_used, expected_used, "used variables mismatch");
 
-      let mut actual_unused = references
-        .variable_usage
+      let mut actual_unused = view
+        .variables()
         .iter()
-        .filter(|(_, used)| !**used)
-        .map(|(name, _)| name.as_str())
+        .map(|variable| variable.name.value.as_str())
+        .filter(|name| !usage.used_variables().contains(*name))
         .collect::<Vec<_>>();
 
       actual_unused.sort_unstable();
+
+      actual_unused.dedup();
 
       let mut expected_unused = self.unused.clone();
 
@@ -154,8 +190,8 @@ mod tests {
       assert_eq!(actual_unused, expected_unused, "unused variables mismatch");
 
       if let Some(mut expected_used_parameters) = self.used_parameters {
-        let mut actual_used_parameters = references
-          .used_parameters
+        let mut actual_used_parameters = usage
+          .used_parameters(&view.document().uri)
           .iter()
           .map(|parameter| parameter.name.as_str())
           .collect::<Vec<_>>();

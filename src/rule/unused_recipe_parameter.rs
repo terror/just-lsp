@@ -122,7 +122,7 @@ impl UnusedRecipeParameterRule {
     let positional_arguments_enabled =
       context.setting_enabled("positional-arguments");
 
-    let used_parameters = &context.references().used_parameters;
+    let used_parameters = context.used_parameters();
 
     context
       .local_declarations(context.recipes())

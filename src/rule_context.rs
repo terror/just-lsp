@@ -3,8 +3,7 @@ use super::*;
 pub(crate) struct RuleContext<'a> {
   attributes: OnceLock<Vec<Attribute>>,
   function_calls: OnceLock<Vec<FunctionCall>>,
-  references: OnceLock<References>,
-  user_function_names: OnceLock<HashSet<String>>,
+  usage: OnceLock<Arc<Usage>>,
   view: &'a ModuleView<'a>,
 }
 
@@ -18,6 +17,18 @@ impl<'a> RuleContext<'a> {
       .attributes
       .get_or_init(|| self.document().attributes())
       .as_slice()
+  }
+
+  pub(crate) fn bindings(&self, document: &Document) -> Arc<Bindings> {
+    self.view.bindings(document)
+  }
+
+  pub(crate) fn called_functions(&self) -> &HashSet<String> {
+    self.usage().called_functions()
+  }
+
+  pub(crate) fn circular_dependencies(&self) -> &'a [ProjectDependency] {
+    self.view.circular_dependencies()
   }
 
   pub(super) fn conflicting_recipe_attributes(
@@ -85,8 +96,18 @@ impl<'a> RuleContext<'a> {
     }
   }
 
+  pub(crate) fn dependencies(
+    &self,
+  ) -> impl Iterator<Item = &'a ProjectDependency> + '_ {
+    self.view.dependencies()
+  }
+
   pub(crate) fn document(&self) -> &'a Document {
     self.view.document()
+  }
+
+  pub(crate) fn documents(&self) -> impl Iterator<Item = &'a Document> + '_ {
+    self.view.documents()
   }
 
   pub(super) fn duplicate_declarations<'b, T>(
@@ -111,6 +132,14 @@ impl<'a> RuleContext<'a> {
       .collect()
   }
 
+  pub(crate) fn filesystem(&self) -> &'a dyn Filesystem {
+    self.view.filesystem()
+  }
+
+  pub(crate) fn find_function(&self, name: &str) -> Option<&Located<Function>> {
+    self.view.find_function(name)
+  }
+
   pub(crate) fn function_calls(&self) -> &[FunctionCall] {
     self
       .function_calls
@@ -122,13 +151,8 @@ impl<'a> RuleContext<'a> {
     self.view.functions()
   }
 
-  pub(crate) fn imported_documents(
-    &self,
-  ) -> impl Iterator<Item = &'a Document> + '_ {
-    self
-      .view
-      .documents()
-      .filter(|document| document.uri != self.document().uri)
+  pub(crate) fn loads(&self, path: &Path) -> bool {
+    self.view.loads(path)
   }
 
   pub(super) fn local_declarations<'b, T>(
@@ -141,13 +165,16 @@ impl<'a> RuleContext<'a> {
       .map(Deref::deref)
   }
 
+  pub(crate) fn modules(&self) -> &[Located<ModuleDeclaration>] {
+    self.view.modules()
+  }
+
   #[must_use]
   pub(crate) fn new(view: &'a ModuleView<'a>) -> Self {
     Self {
       attributes: OnceLock::new(),
       function_calls: OnceLock::new(),
-      references: OnceLock::new(),
-      user_function_names: OnceLock::new(),
+      usage: OnceLock::new(),
       view,
     }
   }
@@ -156,8 +183,29 @@ impl<'a> RuleContext<'a> {
     self.view.recipes()
   }
 
-  pub(crate) fn references(&self) -> &References {
-    self.references.get_or_init(|| References::analyze(self))
+  pub(crate) fn resolve_recipe(
+    &self,
+    path: &Namepath,
+  ) -> Option<Located<Recipe>> {
+    self.view.resolve_recipe(path)
+  }
+
+  pub(crate) fn resolved_functions(
+    &self,
+  ) -> impl Iterator<Item = &Located<Function>> {
+    self.view.resolved_functions()
+  }
+
+  pub(crate) fn resolved_recipes(
+    &self,
+  ) -> impl Iterator<Item = &Located<Recipe>> {
+    self.view.resolved_recipes()
+  }
+
+  pub(crate) fn resolved_variables(
+    &self,
+  ) -> impl Iterator<Item = &Located<Variable>> {
+    self.view.resolved_variables()
   }
 
   pub(crate) fn setting_enabled(&self, name: &str) -> bool {
@@ -174,6 +222,10 @@ impl<'a> RuleContext<'a> {
 
   pub(crate) fn unexports(&self) -> &[Located<Unexport>] {
     self.view.unexports()
+  }
+
+  pub(crate) fn unresolved_identifiers(&self) -> &[(TextNode, Option<String>)] {
+    self.usage().unresolved_identifiers(&self.document().uri)
   }
 
   pub(crate) fn unresolved_recipe(
@@ -218,22 +270,20 @@ impl<'a> RuleContext<'a> {
     Some(UnresolvedRecipe::Recipe { suggestion })
   }
 
-  pub(crate) fn user_function_names(&self) -> &HashSet<String> {
-    self.user_function_names.get_or_init(|| {
-      self
-        .functions()
-        .iter()
-        .map(|function| function.name.value.clone())
-        .collect()
-    })
+  fn usage(&self) -> &Usage {
+    self.usage.get_or_init(|| self.view.usage())
+  }
+
+  pub(crate) fn used_parameters(&self) -> &[Parameter] {
+    self.usage().used_parameters(&self.document().uri)
+  }
+
+  pub(crate) fn used_variables(&self) -> &HashSet<String> {
+    self.usage().used_variables()
   }
 
   pub(crate) fn variables(&self) -> &[Located<Variable>] {
     self.view.variables()
-  }
-
-  pub(crate) fn view(&self) -> &ModuleView<'a> {
-    self.view
   }
 }
 
@@ -303,14 +353,6 @@ mod tests {
         .local_declarations(context.recipes())
         .collect::<Vec<_>>(),
       [&document.recipes()[0]],
-    );
-
-    assert_eq!(
-      context
-        .imported_documents()
-        .map(|document| &document.uri)
-        .collect::<Vec<_>>(),
-      [&root.uri],
     );
   }
 

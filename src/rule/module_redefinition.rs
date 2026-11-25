@@ -78,10 +78,9 @@ define_rule! {
 
 impl ModuleRedefinitionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let filesystem = context.view().filesystem();
+    let filesystem = context.filesystem();
 
     let modules = context
-      .view()
       .modules()
       .iter()
       .filter(|module| module.resolve(&module.uri, filesystem).is_some())

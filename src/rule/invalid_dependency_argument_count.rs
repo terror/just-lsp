@@ -18,7 +18,7 @@ impl InvalidDependencyArgumentCountRule {
 
     for recipe in context.local_declarations(context.recipes()) {
       for dependency in &recipe.dependencies {
-        if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
+        if let Some(recipe) = context.resolve_recipe(&dependency.name) {
           let parameters = &recipe.parameters;
 
           let required_parameters = parameters

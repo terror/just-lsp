@@ -10,10 +10,9 @@ define_rule! {
 
 impl UnusedFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let called_functions = context.view().called_functions();
+    let called_functions = context.called_functions();
 
     context
-      .view()
       .resolved_functions()
       .filter(|function| {
         function.uri == context.document().uri

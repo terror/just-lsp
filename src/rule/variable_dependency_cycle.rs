@@ -8,16 +8,16 @@ enum Definition<'a> {
 
 impl<'a> Definition<'a> {
   fn edges(
-    view: &'a ModuleView,
+    context: &'a RuleContext<'_>,
     document: &Document,
     bindings: &'a Bindings,
   ) -> Vec<(Self, Self)> {
-    let declarations = view
+    let declarations = context
       .resolved_variables()
       .filter(|variable| variable.uri == document.uri)
       .map(|variable| (Self::Variable(&variable.name.value), variable.range))
       .chain(
-        view
+        context
           .resolved_functions()
           .filter(|function| function.uri == document.uri)
           .map(|function| {
@@ -69,21 +69,19 @@ define_rule! {
 
 impl VariableDependencyCycleRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
-    let view = context.view();
-
-    let bindings = view
+    let bindings = context
       .documents()
-      .map(|document| (document, view.bindings(document)))
+      .map(|document| (document, context.bindings(document)))
       .collect::<Vec<_>>();
 
     let graph = bindings
       .iter()
       .flat_map(|(document, bindings)| {
-        Definition::edges(view, document, bindings)
+        Definition::edges(context, document, bindings)
       })
       .collect::<Graph<_>>();
 
-    view
+    context
       .resolved_variables()
       .filter(|variable| variable.uri == context.document().uri)
       .filter_map(|variable| {
