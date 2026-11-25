@@ -51,7 +51,8 @@ define_rule! {
   /// Ensures settings with constrained values use a supported literal value.
   InvalidSettingValueRule {
     id: "invalid-setting-value",
-    message: "invalid setting value",
+    title: "invalid setting value",
+    severity: Error,
   }
 }
 
@@ -76,7 +77,7 @@ impl InvalidSettingValueRule {
 
     for setting in context.local_declarations(context.settings()) {
       if Self::empty_interpreter(context, setting) {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!("Setting `{}` must be a non-empty array", setting.name.value),
           setting.value.range,
         ));
@@ -101,7 +102,7 @@ impl InvalidSettingValueRule {
         continue;
       }
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Setting `{}` must be {}",
           validation.name, validation.expected,

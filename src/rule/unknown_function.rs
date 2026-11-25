@@ -5,7 +5,8 @@ define_rule! {
   /// `just`.
   UnknownFunctionRule {
     id: "unknown-function",
-    message: "unknown function",
+    title: "unknown function",
+    severity: Error,
   }
 }
 
@@ -37,8 +38,7 @@ impl UnknownFunctionRule {
         });
 
         diagnostics.push(
-          Diagnostic::error(message, function_call.name.range)
-            .quickfix(quickfix),
+          Diagnostic::new(message, function_call.name.range).quickfix(quickfix),
         );
       }
     }

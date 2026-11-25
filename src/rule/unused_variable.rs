@@ -5,7 +5,8 @@ define_rule! {
   /// document or any of its imports.
   UnusedVariableRule {
     id: "unused-variable",
-    message: "unused variable",
+    title: "unused variable",
+    severity: Warning,
   }
 }
 
@@ -39,7 +40,7 @@ impl UnusedVariableRule {
         continue;
       }
 
-      diagnostics.push(Diagnostic::warning(
+      diagnostics.push(Diagnostic::new(
         format!("Variable `{variable_name}` appears unused"),
         variable.name.range,
       ));

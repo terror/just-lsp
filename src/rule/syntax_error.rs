@@ -5,7 +5,8 @@ define_rule! {
   /// on malformed `justfile` syntax before other rules run.
   SyntaxErrorRule {
     id: "syntax-error",
-    message: "syntax errors",
+    title: "syntax errors",
+    severity: Error,
   }
 }
 
@@ -114,7 +115,7 @@ impl SyntaxErrorRule {
 
     let _ = TreeWalker::new(root).walk(|node, _| {
       if node.is_error() {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           SyntaxErrorRule::error_message(document, &node),
           document.get_range(&node),
         ));
@@ -125,7 +126,7 @@ impl SyntaxErrorRule {
       {
         let range = document.get_range(&node);
 
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!("Unknown start of token `{start}`"),
           lsp::Range {
             end: lsp::Position {
@@ -139,7 +140,7 @@ impl SyntaxErrorRule {
 
       if node.kind() == "dependencies" {
         for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             "Expected comment, end of file, end of line, or dependency, but found `&&`",
             document.get_range(&marker),
           ));
@@ -147,7 +148,7 @@ impl SyntaxErrorRule {
       }
 
       if node.is_missing() {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           SyntaxErrorRule::missing_message(&node),
           document.get_range(&node),
         ));
@@ -156,7 +157,7 @@ impl SyntaxErrorRule {
       if node.kind() == "expression"
         && let Some(operator) = SyntaxErrorRule::chained_comparison(&node)
       {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!(
             "Expected `&&`, `||`, `+`, `++`, or `/`, but found `{}`",
             operator.kind()
@@ -168,7 +169,7 @@ impl SyntaxErrorRule {
       if node.kind() == "if_expression"
         && let Some(operator) = SyntaxErrorRule::operator_after_if(&node)
       {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!(
             "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `{}`",
             operator.kind()
@@ -185,7 +186,7 @@ impl SyntaxErrorRule {
 
       let end = document.get_range(&node).end;
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Missing newline in {}",
           SyntaxErrorRule::describe_kind(node.kind())

@@ -5,7 +5,8 @@ macro_rules! define_rule {
     $(#[$doc:meta])*
     $name:ident {
       id: $id:literal,
-      message: $message:literal
+      title: $title:literal,
+      severity: $severity:ident
       $(,)?
     }
   ) => {
@@ -17,16 +18,26 @@ macro_rules! define_rule {
         $id
       }
 
-      fn message(&self) -> &'static str {
-        $message
-      }
-
       fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic> {
         Self::run(context)
+      }
+
+      fn severity(&self) -> lsp::DiagnosticSeverity {
+        define_rule!(@severity $severity)
+      }
+
+      fn title(&self) -> &'static str {
+        $title
       }
     }
 
     inventory::submit!(&$name as &dyn Rule);
+  };
+  (@severity Error) => {
+    lsp::DiagnosticSeverity::ERROR
+  };
+  (@severity Warning) => {
+    lsp::DiagnosticSeverity::WARNING
   };
 }
 
@@ -102,9 +113,52 @@ pub(crate) trait Rule: Sync {
   /// Unique identifier for the rule.
   fn id(&self) -> &'static str;
 
-  /// What to show the user in the header of the diagnostics.
-  fn message(&self) -> &'static str;
-
   /// Execute the rule and return diagnostics.
   fn run(&self, context: &RuleContext<'_>) -> Vec<Diagnostic>;
+
+  fn severity(&self) -> lsp::DiagnosticSeverity;
+
+  /// What to show the user in the header of the diagnostics.
+  fn title(&self) -> &'static str;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn documented_severity() {
+    let categories = fs::read_dir(
+      Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/features/analysis"),
+    )
+    .unwrap()
+    .map(|entry| entry.unwrap().path())
+    .filter(|path| path.is_dir())
+    .collect::<Vec<_>>();
+
+    for rule in inventory::iter::<&dyn Rule> {
+      let Some(page) = categories
+        .iter()
+        .map(|category| category.join(format!("{}.md", rule.id())))
+        .find(|page| page.is_file())
+      else {
+        continue;
+      };
+
+      let content = fs::read_to_string(page).unwrap();
+
+      let severity = content
+        .lines()
+        .find_map(|line| line.strip_prefix("severity: "))
+        .unwrap();
+
+      let expected = match rule.severity() {
+        lsp::DiagnosticSeverity::ERROR => "error",
+        lsp::DiagnosticSeverity::WARNING => "warning",
+        severity => panic!("unexpected severity {severity:?}"),
+      };
+
+      assert_eq!(severity, expected, "{}", rule.id());
+    }
+  }
 }

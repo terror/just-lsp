@@ -62,7 +62,8 @@ impl<'a> Definition<'a> {
 define_rule! {
   VariableDependencyCycleRule {
     id: "variable-dependency-cycle",
-    message: "circular variable dependency",
+    title: "circular variable dependency",
+    severity: Error,
   }
 }
 
@@ -103,7 +104,7 @@ impl VariableDependencyCycleRule {
           )
         };
 
-        Some(Diagnostic::error(message, variable.name.range))
+        Some(Diagnostic::new(message, variable.name.range))
       })
       .collect()
   }

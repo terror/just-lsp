@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   ExtraneousAttributeRule {
     id: "extraneous-attribute",
-    message: "extraneous attribute",
+    title: "extraneous attribute",
+    severity: Error,
   }
 }
 
@@ -39,7 +40,7 @@ impl ExtraneousAttributeRule {
 
       let first = attributes.last().unwrap_or(&attribute);
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("extraneous {}", Count("attribute", count)),
         lsp::Range {
           start: document.get_range(first).start,

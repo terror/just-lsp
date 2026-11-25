@@ -5,7 +5,8 @@ define_rule! {
   /// (recipe, module, alias, etc.) according to the builtin metadata.
   UnsupportedAttributeTargetRule {
     id: "unsupported-attribute-target",
-    message: "unsupported attribute target",
+    title: "unsupported attribute target",
+    severity: Error,
   }
 }
 
@@ -27,7 +28,7 @@ impl UnsupportedAttributeTargetRule {
       };
 
       if !targets.contains(&target_type) {
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!(
             "Attribute `{attribute_name}` cannot be applied to {target_type} target",
           ),

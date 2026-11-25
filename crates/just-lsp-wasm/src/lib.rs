@@ -90,7 +90,7 @@ pub fn analyze(source: &str) -> Result<JsValue, JsError> {
     .map(|diagnostic| Diagnostic {
       end_character: diagnostic.range.end.character,
       end_line: diagnostic.range.end.line,
-      id: diagnostic.id,
+      id: diagnostic.id.into(),
       message: diagnostic.message,
       quickfixes: diagnostic
         .quickfixes

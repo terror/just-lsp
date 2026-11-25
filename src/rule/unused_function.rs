@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   UnusedFunctionRule {
     id: "unused-function",
-    message: "unused function",
+    title: "unused function",
+    severity: Warning,
   }
 }
 
@@ -20,7 +21,7 @@ impl UnusedFunctionRule {
           && !called_functions.contains(&function.name.value)
       })
       .map(|function| {
-        Diagnostic::warning(
+        Diagnostic::new(
           format!("Function `{}` appears unused", function.name.value),
           function.name.range,
         )

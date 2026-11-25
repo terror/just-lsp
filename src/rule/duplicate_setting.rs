@@ -4,7 +4,8 @@ define_rule! {
   /// Emits diagnostics when the same `set` option is declared more than once.
   DuplicateSettingRule {
     id: "duplicate-setting",
-    message: "duplicate setting",
+    title: "duplicate setting",
+    severity: Error,
   }
 }
 
@@ -17,7 +18,7 @@ impl DuplicateSettingRule {
       |setting| &setting.name,
       |setting| &setting.attributes,
     ) {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("Duplicate setting `{}`", setting.name.value),
         setting.range,
       ));

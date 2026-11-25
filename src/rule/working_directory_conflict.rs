@@ -4,7 +4,8 @@ define_rule! {
   /// Detects conflicts between working-directory and no-cd directives.
   WorkingDirectoryConflictRule {
     id: "working-directory-conflict",
-    message: "conflicting working directory configuration",
+    title: "conflicting working directory configuration",
+    severity: Error,
   }
 }
 
@@ -24,7 +25,7 @@ impl WorkingDirectoryConflictRule {
       })
       .into_iter()
       .map(|(previous, current)| {
-        Diagnostic::error(
+        Diagnostic::new(
           format!(
             "`{}` is incompatible with `{}`",
             previous.name.value, current.name.value,
@@ -37,7 +38,7 @@ impl WorkingDirectoryConflictRule {
           .conflicting_recipe_attributes("working-directory", "no-cd")
           .into_iter()
           .map(|(recipe, attribute)| {
-            Diagnostic::error(
+            Diagnostic::new(
               format!(
                 "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
                 recipe.name.value,

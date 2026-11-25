@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidRecipeParameterOrderRule {
     id: "invalid-recipe-parameter-order",
-    message: "invalid recipe parameter order",
+    title: "invalid recipe parameter order",
+    severity: Error,
   }
 }
 
@@ -25,7 +26,7 @@ impl InvalidRecipeParameterOrderRule {
           && !has_default
           && param.kind != ParameterKind::Variadic(VariadicType::ZeroOrMore)
         {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Required parameter `{}` follows a parameter with a default value",
               param.name

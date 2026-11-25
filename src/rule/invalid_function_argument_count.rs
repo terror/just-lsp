@@ -5,7 +5,8 @@ define_rule! {
   /// constraints.
   InvalidFunctionArgumentCountRule {
     id: "invalid-function-argument-count",
-    message: "invalid function arguments",
+    title: "invalid function arguments",
+    severity: Error,
   }
 }
 
@@ -21,7 +22,7 @@ impl InvalidFunctionArgumentCountRule {
           (function_call.arguments.len(), function.parameters.len());
 
         if argument_count != parameter_count {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Function `{function_name}` accepts {parameter_count} {}, but {argument_count} provided",
               Count("argument", parameter_count)
@@ -39,7 +40,7 @@ impl InvalidFunctionArgumentCountRule {
         let argument_count = function_call.arguments.len();
 
         if argument_count < min {
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Function `{function_name}` requires at least {min} {}, but {argument_count} provided",
               Count("argument", min)
@@ -53,7 +54,7 @@ impl InvalidFunctionArgumentCountRule {
             format!("at most {max} {}", Count("argument", max))
           };
 
-          diagnostics.push(Diagnostic::error(
+          diagnostics.push(Diagnostic::new(
             format!(
               "Function `{function_name}` accepts {upper}, but {argument_count} provided"
             ),

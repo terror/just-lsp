@@ -4,7 +4,8 @@ define_rule! {
   /// Warns when a deprecated function is used and suggests the replacement.
   DeprecatedFunctionRule {
     id: "deprecated-function",
-    message: "deprecated function",
+    title: "deprecated function",
+    severity: Warning,
   }
 }
 
@@ -24,7 +25,7 @@ impl DeprecatedFunctionRule {
         ..
       }) = Builtin::function(function_name.as_str())
       {
-        let diagnostic = Diagnostic::warning(
+        let diagnostic = Diagnostic::new(
           format!("`{function_name}` is deprecated, use {deprecation} instead"),
           function_call.name.range,
         );

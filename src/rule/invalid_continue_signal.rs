@@ -5,7 +5,8 @@ const SIGNALS: &[&str] = &["SIGHUP", "SIGINT", "SIGQUIT"];
 define_rule! {
   InvalidContinueSignalRule {
     id: "invalid-continue-signal",
-    message: "invalid continue signal",
+    title: "invalid continue signal",
+    severity: Error,
   }
 }
 
@@ -22,7 +23,7 @@ impl InvalidContinueSignalRule {
         if SIGNALS.contains(&signal.as_str()) {
           None
         } else {
-          Some(Diagnostic::error(
+          Some(Diagnostic::new(
             format!(
               "Invalid signal `{signal}`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`"
             ),

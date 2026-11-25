@@ -5,7 +5,8 @@ define_rule! {
   /// the current document.
   UnresolvedDependencyRule {
     id: "unresolved-dependency",
-    message: "missing dependency",
+    title: "missing dependency",
+    severity: Error,
   }
 }
 
@@ -18,17 +19,17 @@ impl UnresolvedDependencyRule {
         let path = &dependency.name;
 
         Some(match context.unresolved_recipe(path)? {
-          UnresolvedRecipe::Module(segment) => Diagnostic::error(
+          UnresolvedRecipe::Module(segment) => Diagnostic::new(
             format!("Module `{}` not found", segment.value),
             segment.range,
           ),
-          UnresolvedRecipe::Recipe { suggestion: None } => Diagnostic::error(
+          UnresolvedRecipe::Recipe { suggestion: None } => Diagnostic::new(
             format!("Recipe `{path}` not found"),
             dependency.range,
           ),
           UnresolvedRecipe::Recipe {
             suggestion: Some(suggestion),
-          } => Diagnostic::error(
+          } => Diagnostic::new(
             format!("Recipe `{path}` not found. Did you mean `{suggestion}`?"),
             dependency.range,
           )

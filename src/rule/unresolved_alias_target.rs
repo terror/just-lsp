@@ -4,7 +4,8 @@ define_rule! {
   /// Flags aliases that point to recipes which aren't defined.
   UnresolvedAliasTargetRule {
     id: "unresolved-alias-target",
-    message: "alias target not found",
+    title: "alias target not found",
+    severity: Error,
   }
 }
 
@@ -17,17 +18,17 @@ impl UnresolvedAliasTargetRule {
         let path = &alias.value;
 
         Some(match context.unresolved_recipe(path)? {
-          UnresolvedRecipe::Module(segment) => Diagnostic::error(
+          UnresolvedRecipe::Module(segment) => Diagnostic::new(
             format!("Module `{}` not found", segment.value),
             segment.range,
           ),
-          UnresolvedRecipe::Recipe { suggestion: None } => Diagnostic::error(
+          UnresolvedRecipe::Recipe { suggestion: None } => Diagnostic::new(
             format!("Recipe `{path}` not found"),
             alias.value.range,
           ),
           UnresolvedRecipe::Recipe {
             suggestion: Some(suggestion),
-          } => Diagnostic::error(
+          } => Diagnostic::new(
             format!("Recipe `{path}` not found. Did you mean `{suggestion}`?"),
             alias.value.range,
           )

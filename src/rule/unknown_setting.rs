@@ -5,7 +5,8 @@ define_rule! {
   /// in the builtin catalog.
   UnknownSettingRule {
     id: "unknown-setting",
-    message: "unknown setting",
+    title: "unknown setting",
+    severity: Error,
   }
 }
 
@@ -32,7 +33,7 @@ impl UnknownSettingRule {
           .map(|suggestion| Quickfix::replacement(&setting.name, suggestion));
 
         diagnostics
-          .push(Diagnostic::error(message, setting.range).quickfix(quickfix));
+          .push(Diagnostic::new(message, setting.range).quickfix(quickfix));
       }
     }
 

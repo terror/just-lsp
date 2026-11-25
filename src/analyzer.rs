@@ -74,9 +74,9 @@ impl Analyzer<'_> {
           .into_iter()
           .filter_map(move |diagnostic| {
             Some(Diagnostic {
-              id: rule.id().to_string(),
-              display: rule.message().to_string(),
-              severity: rule_config.severity(diagnostic.severity)?,
+              id: rule.id(),
+              display: rule.title(),
+              severity: rule_config.severity(rule.severity())?,
               ..diagnostic
             })
           })

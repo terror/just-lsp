@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidAttributeArgumentExpressionRule {
     id: "invalid-attribute-argument-expression",
-    message: "invalid attribute argument expression",
+    title: "invalid attribute argument expression",
+    severity: Error,
   }
 }
 
@@ -54,7 +55,7 @@ impl InvalidAttributeArgumentExpressionRule {
           _ => continue,
         };
 
-        diagnostics.push(Diagnostic::error(
+        diagnostics.push(Diagnostic::new(
           format!("Attribute `{attribute_name}` arguments must be {expected}"),
           expression.text.range,
         ));

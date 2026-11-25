@@ -5,7 +5,8 @@ define_rule! {
   /// results in confusing or invalid `just` bodies.
   MixedIndentationRule {
     id: "mixed-recipe-indentation",
-    message: "mixed indentation",
+    title: "mixed indentation",
+    severity: Error,
   }
 }
 
@@ -33,7 +34,7 @@ impl MixedIndentationRule {
             };
 
             if mixed {
-              ControlFlow::Break(Diagnostic::error(
+              ControlFlow::Break(Diagnostic::new(
                 format!(
                   "Recipe `{}` mixes tabs and spaces for indentation",
                   recipe.name.value,

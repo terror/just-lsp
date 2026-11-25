@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   UnusedFunctionParameterRule {
     id: "unused-function-parameter",
-    message: "unused function parameter",
+    title: "unused function parameter",
+    severity: Warning,
   }
 }
 
@@ -31,7 +32,7 @@ impl UnusedFunctionParameterRule {
           .any(|identifier| document.get_node_text(identifier) == name);
 
         (!name.starts_with('_') && !used).then(|| {
-          Diagnostic::warning(
+          Diagnostic::new(
             format!("Function parameter `{name}` appears unused"),
             document.get_range(&parameter),
           )

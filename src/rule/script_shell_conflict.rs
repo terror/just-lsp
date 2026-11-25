@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   ScriptShellConflictRule {
     id: "script-shell-conflict",
-    message: "conflicting script attributes",
+    title: "conflicting script attributes",
+    severity: Error,
   }
 }
 
@@ -13,7 +14,7 @@ impl ScriptShellConflictRule {
       .conflicting_recipe_attributes("script", "shell")
       .into_iter()
       .map(|(recipe, attribute)| {
-        Diagnostic::error(
+        Diagnostic::new(
           format!(
             "Recipe `{}` can't combine `[script]` with `[shell]`",
             recipe.name.value,

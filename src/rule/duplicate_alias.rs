@@ -4,7 +4,8 @@ define_rule! {
   /// Flags alias declarations that reuse the same name multiple times.
   DuplicateAliasRule {
     id: "duplicate-alias",
-    message: "duplicate alias",
+    title: "duplicate alias",
+    severity: Error,
   }
 }
 
@@ -17,7 +18,7 @@ impl DuplicateAliasRule {
       |alias| &alias.name,
       |alias| &alias.attributes,
     ) {
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!("Duplicate alias `{}`", alias.name.value),
         alias.range,
       ));

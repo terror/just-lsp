@@ -5,7 +5,8 @@ define_rule! {
   /// or array) for the targeted builtin setting.
   InvalidSettingTypeRule {
     id: "invalid-setting-type",
-    message: "invalid setting kind",
+    title: "invalid setting kind",
+    severity: Error,
   }
 }
 
@@ -30,7 +31,7 @@ impl InvalidSettingTypeRule {
         "a"
       };
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Setting `{}` expects {article} {kind} value",
           setting.name.value

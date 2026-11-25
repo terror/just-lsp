@@ -5,7 +5,8 @@ define_rule! {
   /// builtin definitions.
   InvalidAttributeArgumentCountRule {
     id: "invalid-attribute-argument-count",
-    message: "invalid attribute arguments",
+    title: "invalid attribute arguments",
+    severity: Error,
   }
 }
 
@@ -38,7 +39,7 @@ impl InvalidAttributeArgumentCountRule {
         _ => format!("{min}-{max}"),
       };
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Attribute `{attribute_name}` got {argument_count} {} but takes {expected} {}",
           Count("argument", argument_count),

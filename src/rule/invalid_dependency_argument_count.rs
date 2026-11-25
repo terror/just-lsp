@@ -5,7 +5,8 @@ define_rule! {
   /// for the referenced recipe's signature.
   InvalidDependencyArgumentCountRule {
     id: "invalid-dependency-argument-count",
-    message: "invalid dependency arguments",
+    title: "invalid dependency arguments",
+    severity: Error,
   }
 }
 
@@ -34,7 +35,7 @@ impl InvalidDependencyArgumentCountRule {
             (dependency.arguments.len(), parameters.len());
 
           if argument_count < required_parameters {
-            diagnostics.push(Diagnostic::error(
+            diagnostics.push(Diagnostic::new(
               format!(
                 "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
                 dependency.name,
@@ -44,7 +45,7 @@ impl InvalidDependencyArgumentCountRule {
             ));
           } else if !has_unlimited_variadic && argument_count > parameter_count
           {
-            diagnostics.push(Diagnostic::error(
+            diagnostics.push(Diagnostic::new(
               format!(
                 "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
                 dependency.name,

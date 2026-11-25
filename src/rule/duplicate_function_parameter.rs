@@ -4,7 +4,8 @@ define_rule! {
   /// Reports invalid user-defined function parameter lists.
   DuplicateFunctionParameterRule {
     id: "duplicate-function-parameter",
-    message: "invalid function parameters",
+    title: "invalid function parameters",
+    severity: Error,
   }
 }
 
@@ -20,7 +21,7 @@ impl DuplicateFunctionParameterRule {
           .iter()
           .filter(move |parameter| !seen.insert(parameter.value.clone()))
           .map(|parameter| {
-            Diagnostic::error(
+            Diagnostic::new(
               format!("Duplicate parameter `{}`", parameter.value),
               parameter.range,
             )

@@ -4,7 +4,8 @@ define_rule! {
   /// Warns when a deprecated setting is used and suggests the replacement.
   DeprecatedSettingRule {
     id: "deprecated-setting",
-    message: "deprecated setting",
+    title: "deprecated setting",
+    severity: Warning,
   }
 }
 
@@ -56,7 +57,7 @@ impl DeprecatedSettingRule {
         ..
       }) = Builtin::setting(&setting.name.value)
       {
-        let diagnostic = Diagnostic::warning(
+        let diagnostic = Diagnostic::new(
           format!(
             "`{}` is deprecated, use {deprecation} instead",
             setting.name.value

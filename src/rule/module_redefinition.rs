@@ -71,7 +71,8 @@ impl<'a> Definition<'a> {
 define_rule! {
   ModuleRedefinitionRule {
     id: "module-redefinition",
-    message: "module redefinition",
+    title: "module redefinition",
+    severity: Error,
   }
 }
 
@@ -135,7 +136,7 @@ impl ModuleRedefinitionRule {
           .chain(&local[..index])
           .find(|previous| previous.conflicts_with(definition))?;
 
-        Some(Diagnostic::error(
+        Some(Diagnostic::new(
           first.redefinition_message(definition),
           definition.name.range,
         ))

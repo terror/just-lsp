@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   InvalidMappedDependencyRule {
     id: "invalid-mapped-dependency",
-    message: "invalid mapped dependency",
+    title: "invalid mapped dependency",
+    severity: Error,
   }
 }
 
@@ -24,14 +25,14 @@ impl InvalidMappedDependencyRule {
         match dependency.mapped {
           Some(range) => {
             if !lists {
-              diagnostics.push(Diagnostic::error(
+              diagnostics.push(Diagnostic::new(
                 "Mapped dependencies require `set lists`".to_string(),
                 range,
               ));
             }
 
             if starred.is_empty() {
-              diagnostics.push(Diagnostic::error(
+              diagnostics.push(Diagnostic::new(
                 "Mapped dependencies must include a starred argument"
                   .to_string(),
                 range,
@@ -39,7 +40,7 @@ impl InvalidMappedDependencyRule {
             }
 
             for range in starred.iter().skip(1) {
-              diagnostics.push(Diagnostic::error(
+              diagnostics.push(Diagnostic::new(
                 "Mapped dependencies may not include multiple starred arguments".to_string(),
                 *range,
               ));
@@ -47,7 +48,7 @@ impl InvalidMappedDependencyRule {
           }
           None => {
             for range in starred {
-              diagnostics.push(Diagnostic::error(
+              diagnostics.push(Diagnostic::new(
                 "Starred dependency arguments require mapped dependencies"
                   .to_string(),
                 range,

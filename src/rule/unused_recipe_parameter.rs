@@ -5,7 +5,8 @@ define_rule! {
   /// body (unless `set export` is on).
   UnusedRecipeParameterRule {
     id: "unused-recipe-parameter",
-    message: "unused parameter",
+    title: "unused parameter",
+    severity: Warning,
   }
 }
 
@@ -153,7 +154,7 @@ impl UnusedRecipeParameterRule {
               !used && !parameter.export && !exported && !used_via_position;
 
             is_unused.then(|| {
-              Diagnostic::warning(
+              Diagnostic::new(
                 format!("Parameter `{}` appears unused", parameter.name),
                 parameter.range,
               )

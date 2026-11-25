@@ -3,7 +3,8 @@ use super::*;
 define_rule! {
   CacheWithoutScriptRule {
     id: "cache-without-script",
-    message: "cache without script mode",
+    title: "cache without script mode",
+    severity: Error,
   }
 }
 
@@ -23,7 +24,7 @@ impl CacheWithoutScriptRule {
         continue;
       }
 
-      diagnostics.push(Diagnostic::error(
+      diagnostics.push(Diagnostic::new(
         format!(
           "Recipe `{}` uses `[cache]` without script mode",
           recipe.name.value
