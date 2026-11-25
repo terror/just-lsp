@@ -7,42 +7,6 @@ define_rule! {
   ListFeatureGateRule {
     id: "list-feature-gate",
     message: "list feature requires set lists",
-    run(context) {
-      let mut diagnostics = Vec::new();
-
-      if context.setting_enabled("lists") {
-        return diagnostics;
-      }
-
-      diagnostics.extend(
-        context
-          .attributes()
-          .iter()
-          .filter(|attribute| attribute.name.value == "arg")
-          .flat_map(|attribute| &attribute.arguments)
-          .filter_map(|argument| match argument {
-            AttributeArgument::Keyword { name, .. } => {
-              let message = match name.value.as_str() {
-                "flag" => "`flag` arguments require `set lists`",
-                "max" => "`[arg(max)]` requires `set lists`",
-                "min" => "`[arg(min)]` requires `set lists`",
-                "multiple" => "`[arg(multiple)]` requires `set lists`",
-                _ => return None,
-              };
-
-              Some(Diagnostic::error(message, name.range))
-            }
-            AttributeArgument::Positional(_) => None,
-          }),
-      );
-
-      let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
-        Self::validate_node(context, context.document(), node, &mut diagnostics);
-        ControlFlow::<(), bool>::Continue(true)
-      });
-
-      diagnostics
-    }
   }
 }
 
@@ -108,6 +72,43 @@ impl ListFeatureGateRule {
     (0..node.child_count())
       .filter_map(|index| node.child(index))
       .find(|child| operators.contains(&child.kind()))
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    if context.setting_enabled("lists") {
+      return diagnostics;
+    }
+
+    diagnostics.extend(
+      context
+        .attributes()
+        .iter()
+        .filter(|attribute| attribute.name.value == "arg")
+        .flat_map(|attribute| &attribute.arguments)
+        .filter_map(|argument| match argument {
+          AttributeArgument::Keyword { name, .. } => {
+            let message = match name.value.as_str() {
+              "flag" => "`flag` arguments require `set lists`",
+              "max" => "`[arg(max)]` requires `set lists`",
+              "min" => "`[arg(min)]` requires `set lists`",
+              "multiple" => "`[arg(multiple)]` requires `set lists`",
+              _ => return None,
+            };
+
+            Some(Diagnostic::error(message, name.range))
+          }
+          AttributeArgument::Positional(_) => None,
+        }),
+    );
+
+    let _ = TreeWalker::new(context.tree().root_node()).walk(|node, _| {
+      Self::validate_node(context, context.document(), node, &mut diagnostics);
+      ControlFlow::<(), bool>::Continue(true)
+    });
+
+    diagnostics
   }
 
   fn validate_node(

@@ -6,52 +6,58 @@ define_rule! {
   InvalidDependencyArgumentCountRule {
     id: "invalid-dependency-argument-count",
     message: "invalid dependency arguments",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      let lists = context.setting_enabled("lists");
+impl InvalidDependencyArgumentCountRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-      for recipe in context.local_declarations(context.recipes()) {
-        for dependency in &recipe.dependencies {
-          if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
-            let parameters = &recipe.parameters;
+    let lists = context.setting_enabled("lists");
 
-            let required_parameters = parameters
-              .iter()
-              .filter(|parameter| recipe.is_required(parameter))
-              .count();
+    for recipe in context.local_declarations(context.recipes()) {
+      for dependency in &recipe.dependencies {
+        if let Some(recipe) = context.view().resolve_recipe(&dependency.name) {
+          let parameters = &recipe.parameters;
 
-            let has_unlimited_variadic = !lists && parameters
-              .iter()
-              .any(|parameter| matches!(parameter.kind, ParameterKind::Variadic(_)));
+          let required_parameters = parameters
+            .iter()
+            .filter(|parameter| recipe.is_required(parameter))
+            .count();
 
-            let (argument_count, parameter_count) = (dependency.arguments.len(), parameters.len());
+          let has_unlimited_variadic = !lists
+            && parameters.iter().any(|parameter| {
+              matches!(parameter.kind, ParameterKind::Variadic(_))
+            });
 
-            if argument_count < required_parameters {
-              diagnostics.push(Diagnostic::error(
-                format!(
-                  "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
-                  dependency.name,
-                  Count("argument", required_parameters)
-                ),
-                dependency.range,
-              ));
-            } else if !has_unlimited_variadic && argument_count > parameter_count {
-              diagnostics.push(Diagnostic::error(
-                format!(
-                  "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
-                  dependency.name,
-                  Count("argument", parameter_count)
-                ),
-                dependency.range,
-              ));
-            }
+          let (argument_count, parameter_count) =
+            (dependency.arguments.len(), parameters.len());
+
+          if argument_count < required_parameters {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Dependency `{}` requires {required_parameters} {}, but {argument_count} provided",
+                dependency.name,
+                Count("argument", required_parameters)
+              ),
+              dependency.range,
+            ));
+          } else if !has_unlimited_variadic && argument_count > parameter_count
+          {
+            diagnostics.push(Diagnostic::error(
+              format!(
+                "Dependency `{}` accepts {parameter_count} {}, but {argument_count} provided",
+                dependency.name,
+                Count("argument", parameter_count)
+              ),
+              dependency.range,
+            ));
           }
         }
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 

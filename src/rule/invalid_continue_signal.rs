@@ -6,28 +6,31 @@ define_rule! {
   InvalidContinueSignalRule {
     id: "invalid-continue-signal",
     message: "invalid continue signal",
-    run(context) {
-      context
-        .attributes()
-        .iter()
-        .filter(|attribute| attribute.name.value == "continue")
-        .flat_map(Attribute::positional_arguments)
-        .filter_map(|argument| {
-          let signal = argument.text.value.literal()?;
+  }
+}
 
-          if SIGNALS.contains(&signal.as_str()) {
-            None
-          } else {
-            Some(Diagnostic::error(
-              format!(
-                "Invalid signal `{signal}`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`"
-              ),
-              argument.text.range,
-            ))
-          }
-        })
-        .collect()
-    }
+impl InvalidContinueSignalRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    context
+      .attributes()
+      .iter()
+      .filter(|attribute| attribute.name.value == "continue")
+      .flat_map(Attribute::positional_arguments)
+      .filter_map(|argument| {
+        let signal = argument.text.value.literal()?;
+
+        if SIGNALS.contains(&signal.as_str()) {
+          None
+        } else {
+          Some(Diagnostic::error(
+            format!(
+              "Invalid signal `{signal}`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`"
+            ),
+            argument.text.range,
+          ))
+        }
+      })
+      .collect()
   }
 }
 

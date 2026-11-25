@@ -4,37 +4,40 @@ define_rule! {
   UnusedFunctionParameterRule {
     id: "unused-function-parameter",
     message: "unused function parameter",
-    run(context) {
-      let document = context.document();
+  }
+}
 
-      context
-        .tree()
-        .root_node()
-        .find_all("function_parameters > identifier")
-        .into_iter()
-        .filter(|parameter| !parameter.is_missing())
-        .filter_map(|parameter| {
-          let body = parameter
-            .get_parent("function_definition")?
-            .child_by_field_name("body")
-            .filter(|body| !body.is_missing())?;
+impl UnusedFunctionParameterRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
 
-          let name = document.get_node_text(&parameter);
+    context
+      .tree()
+      .root_node()
+      .find_all("function_parameters > identifier")
+      .into_iter()
+      .filter(|parameter| !parameter.is_missing())
+      .filter_map(|parameter| {
+        let body = parameter
+          .get_parent("function_definition")?
+          .child_by_field_name("body")
+          .filter(|body| !body.is_missing())?;
 
-          let used = body
-            .find_all("value > identifier")
-            .iter()
-            .any(|identifier| document.get_node_text(identifier) == name);
+        let name = document.get_node_text(&parameter);
 
-          (!name.starts_with('_') && !used).then(|| {
-            Diagnostic::warning(
-              format!("Function parameter `{name}` appears unused"),
-              document.get_range(&parameter),
-            )
-          })
+        let used = body
+          .find_all("value > identifier")
+          .iter()
+          .any(|identifier| document.get_node_text(identifier) == name);
+
+        (!name.starts_with('_') && !used).then(|| {
+          Diagnostic::warning(
+            format!("Function parameter `{name}` appears unused"),
+            document.get_range(&parameter),
+          )
         })
-        .collect()
-    }
+      })
+      .collect()
   }
 }
 

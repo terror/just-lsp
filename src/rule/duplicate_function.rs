@@ -5,22 +5,25 @@ define_rule! {
   DuplicateFunctionRule {
     id: "duplicate-function",
     message: "duplicate function",
-    run(context) {
-      context
-        .duplicate_declarations(
-          context.functions(),
-          |function| &function.name,
-          |function| &function.attributes,
+  }
+}
+
+impl DuplicateFunctionRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    context
+      .duplicate_declarations(
+        context.functions(),
+        |function| &function.name,
+        |function| &function.attributes,
+      )
+      .into_iter()
+      .map(|function| {
+        Diagnostic::error(
+          format!("Duplicate function `{}`", function.name.value),
+          function.range,
         )
-        .into_iter()
-        .map(|function| {
-          Diagnostic::error(
-            format!("Duplicate function `{}`", function.name.value),
-            function.range,
-          )
-        })
-        .collect()
-    }
+      })
+      .collect()
   }
 }
 

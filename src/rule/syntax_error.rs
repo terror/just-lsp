@@ -6,97 +6,6 @@ define_rule! {
   SyntaxErrorRule {
     id: "syntax-error",
     message: "syntax errors",
-    run(context) {
-      let document = context.document();
-
-      let root = context.tree().root_node();
-
-      let mut diagnostics = Vec::new();
-
-      let _ = TreeWalker::new(root).walk(|node, _| {
-        if node.is_error() {
-          diagnostics.push(Diagnostic::error(
-            SyntaxErrorRule::error_message(document, &node),
-            document.get_range(&node),
-          ));
-        }
-
-        if node.kind() == "numeric_error"
-          && let Some(start) = document.get_node_text(&node).chars().next()
-        {
-          let range = document.get_range(&node);
-
-          diagnostics.push(Diagnostic::error(
-            format!("Unknown start of token `{start}`"),
-            lsp::Range {
-              end: lsp::Position {
-                character: range.start.character + 1,
-                ..range.start
-              },
-              ..range
-            },
-          ));
-        }
-
-        if node.kind() == "dependencies" {
-          for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
-            diagnostics.push(Diagnostic::error(
-              "Expected comment, end of file, end of line, or dependency, but found `&&`",
-              document.get_range(&marker),
-            ));
-          }
-        }
-
-        if node.is_missing() {
-          diagnostics.push(Diagnostic::error(
-            SyntaxErrorRule::missing_message(&node),
-            document.get_range(&node),
-          ));
-        }
-
-        if node.kind() == "expression"
-          && let Some(operator) = SyntaxErrorRule::chained_comparison(&node)
-        {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Expected `&&`, `||`, `+`, `++`, or `/`, but found `{}`",
-              operator.kind()
-            ),
-            document.get_range(&operator),
-          ));
-        }
-
-        if node.kind() == "if_expression"
-          && let Some(operator) = SyntaxErrorRule::operator_after_if(&node)
-        {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `{}`",
-              operator.kind()
-            ),
-            document.get_range(&operator),
-          ));
-        }
-
-        ControlFlow::<(), bool>::Continue(true)
-      });
-
-      if diagnostics.is_empty() && root.has_error() {
-        let node = SyntaxErrorRule::deepest_error(root);
-
-        let end = document.get_range(&node).end;
-
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Missing newline in {}",
-            SyntaxErrorRule::describe_kind(node.kind())
-          ),
-          lsp::Range { start: end, end },
-        ));
-      }
-
-      diagnostics
-    }
   }
 }
 
@@ -194,6 +103,98 @@ impl SyntaxErrorRule {
 
       current = parent;
     }
+  }
+
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
+
+    let root = context.tree().root_node();
+
+    let mut diagnostics = Vec::new();
+
+    let _ = TreeWalker::new(root).walk(|node, _| {
+      if node.is_error() {
+        diagnostics.push(Diagnostic::error(
+          SyntaxErrorRule::error_message(document, &node),
+          document.get_range(&node),
+        ));
+      }
+
+      if node.kind() == "numeric_error"
+        && let Some(start) = document.get_node_text(&node).chars().next()
+      {
+        let range = document.get_range(&node);
+
+        diagnostics.push(Diagnostic::error(
+          format!("Unknown start of token `{start}`"),
+          lsp::Range {
+            end: lsp::Position {
+              character: range.start.character + 1,
+              ..range.start
+            },
+            ..range
+          },
+        ));
+      }
+
+      if node.kind() == "dependencies" {
+        for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
+          diagnostics.push(Diagnostic::error(
+            "Expected comment, end of file, end of line, or dependency, but found `&&`",
+            document.get_range(&marker),
+          ));
+        }
+      }
+
+      if node.is_missing() {
+        diagnostics.push(Diagnostic::error(
+          SyntaxErrorRule::missing_message(&node),
+          document.get_range(&node),
+        ));
+      }
+
+      if node.kind() == "expression"
+        && let Some(operator) = SyntaxErrorRule::chained_comparison(&node)
+      {
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Expected `&&`, `||`, `+`, `++`, or `/`, but found `{}`",
+            operator.kind()
+          ),
+          document.get_range(&operator),
+        ));
+      }
+
+      if node.kind() == "if_expression"
+        && let Some(operator) = SyntaxErrorRule::operator_after_if(&node)
+      {
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Expected `&&`, `!=`, `!~`, `||`, `==`, or `=~`, but found `{}`",
+            operator.kind()
+          ),
+          document.get_range(&operator),
+        ));
+      }
+
+      ControlFlow::<(), bool>::Continue(true)
+    });
+
+    if diagnostics.is_empty() && root.has_error() {
+      let node = SyntaxErrorRule::deepest_error(root);
+
+      let end = document.get_range(&node).end;
+
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Missing newline in {}",
+          SyntaxErrorRule::describe_kind(node.kind())
+        ),
+        lsp::Range { start: end, end },
+      ));
+    }
+
+    diagnostics
   }
 
   fn snippet_preview(text: &str) -> Option<String> {

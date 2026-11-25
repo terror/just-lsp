@@ -6,28 +6,31 @@ define_rule! {
   DuplicateRecipeRule {
     id: "duplicate-recipe",
     message: "duplicate recipes",
-    run(context) {
-      let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
+  }
+}
 
-      if allow_duplicates {
-        return Vec::new();
-      }
+impl DuplicateRecipeRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let allow_duplicates = context.setting_enabled("allow-duplicate-recipes");
 
-      let mut diagnostics = Vec::new();
-
-      for recipe in context.duplicate_declarations(
-        context.recipes(),
-        |recipe| &recipe.name,
-        |recipe| &recipe.attributes,
-      ) {
-        diagnostics.push(Diagnostic::error(
-          format!("Duplicate recipe name `{}`", recipe.name.value),
-          recipe.range,
-        ));
-      }
-
-      diagnostics
+    if allow_duplicates {
+      return Vec::new();
     }
+
+    let mut diagnostics = Vec::new();
+
+    for recipe in context.duplicate_declarations(
+      context.recipes(),
+      |recipe| &recipe.name,
+      |recipe| &recipe.attributes,
+    ) {
+      diagnostics.push(Diagnostic::error(
+        format!("Duplicate recipe name `{}`", recipe.name.value),
+        recipe.range,
+      ));
+    }
+
+    diagnostics
   }
 }
 

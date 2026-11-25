@@ -4,39 +4,47 @@ define_rule! {
   InvalidImportPathRule {
     id: "invalid-import-path",
     message: "invalid import path",
-    run(context) {
-      let document = context.document();
+  }
+}
 
-      let view = context.view();
+impl InvalidImportPathRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let document = context.document();
 
-      document
-        .imports()
-        .into_iter()
-        .filter_map(|import| {
-          if import.is_dynamic() {
-            return Some(Diagnostic::error(
-              "Expected keyword `x` but found identifier `f`",
-              import.path.range,
-            ));
+    let view = context.view();
+
+    document
+      .imports()
+      .into_iter()
+      .filter_map(|import| {
+        if import.is_dynamic() {
+          return Some(Diagnostic::error(
+            "Expected keyword `x` but found identifier `f`",
+            import.path.range,
+          ));
+        }
+
+        let message = match import.resolve(&document.uri) {
+          Ok(Some(path))
+            if import.is_enabled()
+              && !import.optional
+              && !view.loads(&path) =>
+          {
+            format!("Import path does not exist: `{}`", path.display())
           }
+          Err(Error::EmptyImportPath)
+            if import.optional || !import.is_enabled() =>
+          {
+            return None;
+          }
+          Err(Error::InvalidStringEscape) => return None,
+          Err(error) => error.to_string(),
+          _ => return None,
+        };
 
-          let message = match import.resolve(&document.uri) {
-            Ok(Some(path))
-              if import.is_enabled() && !import.optional && !view.loads(&path) =>
-            {
-              format!("Import path does not exist: `{}`", path.display())
-            }
-            Err(Error::EmptyImportPath)
-              if import.optional || !import.is_enabled() => return None,
-            Err(Error::InvalidStringEscape) => return None,
-            Err(error) => error.to_string(),
-            _ => return None,
-          };
-
-          Some(Diagnostic::error(message, import.path.range))
-        })
-        .collect()
-    }
+        Some(Diagnostic::error(message, import.path.range))
+      })
+      .collect()
   }
 }
 

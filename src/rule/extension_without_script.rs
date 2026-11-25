@@ -6,31 +6,34 @@ define_rule! {
   ExtensionWithoutScriptRule {
     id: "extension-without-script",
     message: "extension without script",
-    run(context) {
-      let default_script = context.setting_enabled("default-script");
+  }
+}
 
-      let mut diagnostics = Vec::new();
+impl ExtensionWithoutScriptRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let default_script = context.setting_enabled("default-script");
 
-      for recipe in context.local_declarations(context.recipes()) {
-        let Some(extension_attribute) = recipe.find_attribute("extension") else {
-          continue;
-        };
+    let mut diagnostics = Vec::new();
 
-        if recipe.runs_as_script(default_script) {
-          continue;
-        }
+    for recipe in context.local_declarations(context.recipes()) {
+      let Some(extension_attribute) = recipe.find_attribute("extension") else {
+        continue;
+      };
 
-        diagnostics.push(Diagnostic::error(
-          format!(
-            "Recipe `{}` uses `[extension]` without `[script]` or a shebang",
-            recipe.name.value
-          ),
-          extension_attribute.range,
-        ));
+      if recipe.runs_as_script(default_script) {
+        continue;
       }
 
-      diagnostics
+      diagnostics.push(Diagnostic::error(
+        format!(
+          "Recipe `{}` uses `[extension]` without `[script]` or a shebang",
+          recipe.name.value
+        ),
+        extension_attribute.range,
+      ));
     }
+
+    diagnostics
   }
 }
 

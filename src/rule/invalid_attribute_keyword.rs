@@ -4,85 +4,84 @@ define_rule! {
   InvalidAttributeKeywordRule {
     id: "invalid-attribute-keyword",
     message: "invalid attribute keyword",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for attribute in context.attributes() {
-        let attribute_name = &attribute.name.value;
+impl InvalidAttributeKeywordRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        let Some(Builtin::Attribute { signature, .. }) =
-          Builtin::attribute(attribute_name)
-        else {
+    for attribute in context.attributes() {
+      let attribute_name = &attribute.name.value;
+
+      let Some(Builtin::Attribute { signature, .. }) =
+        Builtin::attribute(attribute_name)
+      else {
+        continue;
+      };
+
+      let mut keywords = HashSet::new();
+
+      for argument in &attribute.arguments {
+        let AttributeArgument::Keyword { name, value, range } = argument else {
+          if !keywords.is_empty() {
+            diagnostics.push(Diagnostic::error(
+              "Positional attribute arguments cannot follow keyword attribute arguments",
+              argument.range(),
+            ));
+          }
+
           continue;
         };
 
-        let mut keywords = HashSet::new();
+        if !signature.keywords.is_empty() && !keywords.insert(&name.value) {
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate `[{attribute_name}]` keyword `{}`", name.value),
+            name.range,
+          ));
+        }
 
-        for argument in &attribute.arguments {
-          let AttributeArgument::Keyword { name, value, range } = argument
-          else {
-            if !keywords.is_empty() {
-              diagnostics.push(Diagnostic::error(
-                "Positional attribute arguments cannot follow keyword attribute arguments",
-                argument.range(),
-              ));
-            }
-
-            continue;
-          };
-
-          if !signature.keywords.is_empty() && !keywords.insert(&name.value) {
-            diagnostics.push(Diagnostic::error(
+        let Some(keyword) = signature
+          .keywords
+          .iter()
+          .find(|keyword| keyword.name == name.value)
+        else {
+          diagnostics.push(Diagnostic::error(
+            if signature.keywords.is_empty() {
               format!(
-                "Duplicate `[{attribute_name}]` keyword `{}`",
-                name.value
-              ),
-              name.range,
-            ));
-          }
-
-          let Some(keyword) = signature
-            .keywords
-            .iter()
-            .find(|keyword| keyword.name == name.value)
-          else {
-            diagnostics.push(Diagnostic::error(
-              if signature.keywords.is_empty() {
-                format!(
-                  "Attribute `{attribute_name}` does not accept keyword arguments"
-                )
-              } else {
-                format!(
-                  "Unknown `[{attribute_name}]` keyword `{}`, expected one of {}",
-                  name.value,
-                  signature
-                    .keywords
-                    .iter()
-                    .map(|keyword| keyword.name)
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                )
-              },
-              *range,
-            ));
-
-            continue;
-          };
-
-          if value.is_none() && keyword.value_required {
-            diagnostics.push(Diagnostic::error(
+                "Attribute `{attribute_name}` does not accept keyword arguments"
+              )
+            } else {
               format!(
-                "`[{attribute_name}]` keyword `{}` requires a value",
-                name.value
-              ),
-              *range,
-            ));
-          }
+                "Unknown `[{attribute_name}]` keyword `{}`, expected one of {}",
+                name.value,
+                signature
+                  .keywords
+                  .iter()
+                  .map(|keyword| keyword.name)
+                  .collect::<Vec<_>>()
+                  .join(", "),
+              )
+            },
+            *range,
+          ));
+
+          continue;
+        };
+
+        if value.is_none() && keyword.value_required {
+          diagnostics.push(Diagnostic::error(
+            format!(
+              "`[{attribute_name}]` keyword `{}` requires a value",
+              name.value
+            ),
+            *range,
+          ));
         }
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 

@@ -6,24 +6,27 @@ define_rule! {
   DuplicateRecipeParameterRule {
     id: "duplicate-recipe-parameter",
     message: "invalid recipe parameters",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for recipe in context.local_declarations(context.recipes()) {
-        let mut seen = HashSet::new();
+impl DuplicateRecipeParameterRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        for param in &recipe.parameters {
-          if !seen.insert(param.name.clone()) {
-            diagnostics.push(Diagnostic::error(
-              format!("Duplicate parameter `{}`", param.name),
-              param.range,
-            ));
-          }
+    for recipe in context.local_declarations(context.recipes()) {
+      let mut seen = HashSet::new();
+
+      for param in &recipe.parameters {
+        if !seen.insert(param.name.clone()) {
+          diagnostics.push(Diagnostic::error(
+            format!("Duplicate parameter `{}`", param.name),
+            param.range,
+          ));
         }
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 

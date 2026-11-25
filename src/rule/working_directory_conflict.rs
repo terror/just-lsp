@@ -5,45 +5,48 @@ define_rule! {
   WorkingDirectoryConflictRule {
     id: "working-directory-conflict",
     message: "conflicting working directory configuration",
-    run(context) {
-      context
-        .conflicting_settings(|left, right| {
-          match (left.name.value.as_str(), right.name.value.as_str()) {
-            ("working-directory", "no-cd") => {
-              matches!(right.kind, SettingKind::Boolean(true))
-            }
-            ("no-cd", "working-directory") => {
-              matches!(left.kind, SettingKind::Boolean(true))
-            }
-            _ => false,
+  }
+}
+
+impl WorkingDirectoryConflictRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    context
+      .conflicting_settings(|left, right| {
+        match (left.name.value.as_str(), right.name.value.as_str()) {
+          ("working-directory", "no-cd") => {
+            matches!(right.kind, SettingKind::Boolean(true))
           }
-        })
-        .into_iter()
-        .map(|(previous, current)| {
-          Diagnostic::error(
-            format!(
-              "`{}` is incompatible with `{}`",
-              previous.name.value, current.name.value,
-            ),
-            current.range,
-          )
-        })
-        .chain(
-          context
-            .conflicting_recipe_attributes("working-directory", "no-cd")
-            .into_iter()
-            .map(|(recipe, attribute)| {
-              Diagnostic::error(
-                format!(
-                  "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
-                  recipe.name.value,
-                ),
-                attribute.range,
-              )
-            }),
+          ("no-cd", "working-directory") => {
+            matches!(left.kind, SettingKind::Boolean(true))
+          }
+          _ => false,
+        }
+      })
+      .into_iter()
+      .map(|(previous, current)| {
+        Diagnostic::error(
+          format!(
+            "`{}` is incompatible with `{}`",
+            previous.name.value, current.name.value,
+          ),
+          current.range,
         )
-        .collect()
-    }
+      })
+      .chain(
+        context
+          .conflicting_recipe_attributes("working-directory", "no-cd")
+          .into_iter()
+          .map(|(recipe, attribute)| {
+            Diagnostic::error(
+              format!(
+                "Recipe `{}` can't combine `[working-directory]` with `[no-cd]`",
+                recipe.name.value,
+              ),
+              attribute.range,
+            )
+          }),
+      )
+      .collect()
   }
 }
 

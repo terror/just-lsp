@@ -6,34 +6,37 @@ define_rule! {
   UnsupportedAttributeTargetRule {
     id: "unsupported-attribute-target",
     message: "unsupported attribute target",
-    run(context) {
-      let mut diagnostics = Vec::new();
+  }
+}
 
-      for attribute in context.attributes() {
-        let attribute_name = &attribute.name.value;
+impl UnsupportedAttributeTargetRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
 
-        let Some(Builtin::Attribute { targets, .. }) =
-          Builtin::attribute(attribute_name)
-        else {
-          continue;
-        };
+    for attribute in context.attributes() {
+      let attribute_name = &attribute.name.value;
 
-        let Some(target_type) = attribute.target else {
-          continue;
-        };
+      let Some(Builtin::Attribute { targets, .. }) =
+        Builtin::attribute(attribute_name)
+      else {
+        continue;
+      };
 
-        if !targets.contains(&target_type) {
-          diagnostics.push(Diagnostic::error(
-            format!(
-              "Attribute `{attribute_name}` cannot be applied to {target_type} target",
-            ),
-            attribute.range,
-          ));
-        }
+      let Some(target_type) = attribute.target else {
+        continue;
+      };
+
+      if !targets.contains(&target_type) {
+        diagnostics.push(Diagnostic::error(
+          format!(
+            "Attribute `{attribute_name}` cannot be applied to {target_type} target",
+          ),
+          attribute.range,
+        ));
       }
-
-      diagnostics
     }
+
+    diagnostics
   }
 }
 

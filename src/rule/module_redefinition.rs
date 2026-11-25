@@ -72,74 +72,75 @@ define_rule! {
   ModuleRedefinitionRule {
     id: "module-redefinition",
     message: "module redefinition",
-    run(context) {
-      let filesystem = context.view().filesystem();
+  }
+}
 
-      let modules = context
-        .view()
-        .modules()
-        .iter()
-        .filter(|module| {
-          module.resolve(&module.uri, filesystem).is_some()
-        })
-        .map(|module| {
-          Definition::new(
-            DefinitionKind::Module,
-            &module.name,
-            &module.attributes,
-            &module.uri,
-          )
-        })
-        .collect::<Vec<_>>();
+impl ModuleRedefinitionRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let filesystem = context.view().filesystem();
 
-      if modules.is_empty() {
-        return Vec::new();
-      }
-
-      let aliases = context.aliases().iter().map(|alias| {
+    let modules = context
+      .view()
+      .modules()
+      .iter()
+      .filter(|module| module.resolve(&module.uri, filesystem).is_some())
+      .map(|module| {
         Definition::new(
-          DefinitionKind::Alias,
-          &alias.name,
-          &alias.attributes,
-          &alias.uri,
+          DefinitionKind::Module,
+          &module.name,
+          &module.attributes,
+          &module.uri,
         )
-      });
+      })
+      .collect::<Vec<_>>();
 
-      let recipes = context.recipes().iter().map(|recipe| {
-        Definition::new(
-          DefinitionKind::Recipe,
-          &recipe.name,
-          &recipe.attributes,
-          &recipe.uri,
-        )
-      });
-
-      let (mut local, imported) = modules
-        .into_iter()
-        .chain(aliases)
-        .chain(recipes)
-        .partition::<Vec<_>, _>(|definition| {
-          definition.uri == &context.document().uri
-        });
-
-      local.sort_by_key(|definition| definition.name.range.start);
-
-      local
-        .iter()
-        .enumerate()
-        .filter_map(|(index, definition)| {
-          let first = imported
-            .iter()
-            .chain(&local[..index])
-            .find(|previous| previous.conflicts_with(definition))?;
-
-          Some(Diagnostic::error(
-            first.redefinition_message(definition),
-            definition.name.range,
-          ))
-        })
-        .collect()
+    if modules.is_empty() {
+      return Vec::new();
     }
+
+    let aliases = context.aliases().iter().map(|alias| {
+      Definition::new(
+        DefinitionKind::Alias,
+        &alias.name,
+        &alias.attributes,
+        &alias.uri,
+      )
+    });
+
+    let recipes = context.recipes().iter().map(|recipe| {
+      Definition::new(
+        DefinitionKind::Recipe,
+        &recipe.name,
+        &recipe.attributes,
+        &recipe.uri,
+      )
+    });
+
+    let (mut local, imported) = modules
+      .into_iter()
+      .chain(aliases)
+      .chain(recipes)
+      .partition::<Vec<_>, _>(|definition| {
+        definition.uri == &context.document().uri
+      });
+
+    local.sort_by_key(|definition| definition.name.range.start);
+
+    local
+      .iter()
+      .enumerate()
+      .filter_map(|(index, definition)| {
+        let first = imported
+          .iter()
+          .chain(&local[..index])
+          .find(|previous| previous.conflicts_with(definition))?;
+
+        Some(Diagnostic::error(
+          first.redefinition_message(definition),
+          definition.name.range,
+        ))
+      })
+      .collect()
   }
 }
 

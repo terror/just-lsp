@@ -63,44 +63,49 @@ define_rule! {
   VariableDependencyCycleRule {
     id: "variable-dependency-cycle",
     message: "circular variable dependency",
-    run(context) {
-      let view = context.view();
+  }
+}
 
-      let bindings = view
-        .documents()
-        .map(|document| (document, view.bindings(document)))
-        .collect::<Vec<_>>();
+impl VariableDependencyCycleRule {
+  fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
+    let view = context.view();
 
-      let graph = bindings
-        .iter()
-        .flat_map(|(document, bindings)| Definition::edges(view, document, bindings))
-        .collect::<Graph<_>>();
+    let bindings = view
+      .documents()
+      .map(|document| (document, view.bindings(document)))
+      .collect::<Vec<_>>();
 
-      view
-        .resolved_variables()
-        .filter(|variable| variable.uri == context.document().uri)
-        .filter_map(|variable| {
-          let name = &variable.name.value;
+    let graph = bindings
+      .iter()
+      .flat_map(|(document, bindings)| {
+        Definition::edges(view, document, bindings)
+      })
+      .collect::<Graph<_>>();
 
-          let cycle = graph
-            .cycle(Definition::Variable(name))?
-            .into_iter()
-            .filter_map(Definition::variable)
-            .collect::<Vec<_>>();
+    view
+      .resolved_variables()
+      .filter(|variable| variable.uri == context.document().uri)
+      .filter_map(|variable| {
+        let name = &variable.name.value;
 
-          let message = if cycle.len() == 2 {
-            format!("Variable `{name}` is defined in terms of itself")
-          } else {
-            format!(
-              "Variable `{name}` depends on its own value: `{}`",
-              cycle.join(" -> ")
-            )
-          };
+        let cycle = graph
+          .cycle(Definition::Variable(name))?
+          .into_iter()
+          .filter_map(Definition::variable)
+          .collect::<Vec<_>>();
 
-          Some(Diagnostic::error(message, variable.name.range))
-        })
-        .collect()
-    }
+        let message = if cycle.len() == 2 {
+          format!("Variable `{name}` is defined in terms of itself")
+        } else {
+          format!(
+            "Variable `{name}` depends on its own value: `{}`",
+            cycle.join(" -> ")
+          )
+        };
+
+        Some(Diagnostic::error(message, variable.name.range))
+      })
+      .collect()
   }
 }
 
