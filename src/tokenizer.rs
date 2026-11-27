@@ -318,16 +318,15 @@ impl<'doc> Tokenizer<'doc> {
       return 0;
     }
 
-    if rope.byte(line_end_byte - 1) != b'\n' {
-      return 0;
-    }
-
-    if line_end_byte - 1 > line_start_byte
-      && rope.byte(line_end_byte - 2) == b'\r'
-    {
-      2
-    } else {
-      1
+    match rope.byte(line_end_byte - 1) {
+      b'\n'
+        if line_end_byte - 1 > line_start_byte
+          && rope.byte(line_end_byte - 2) == b'\r' =>
+      {
+        2
+      }
+      b'\n' | b'\r' => 1,
+      _ => 0,
     }
   }
 }
@@ -1374,6 +1373,7 @@ mod tests {
 
     case("foo\r\nbar", 0, 2);
     case("foo\r\nbar", 1, 0);
+    case("foo\rbar", 0, 1);
     case("foo\n", 0, 1);
     case("foo", 0, 0);
     case("# カ\n", 0, 1);

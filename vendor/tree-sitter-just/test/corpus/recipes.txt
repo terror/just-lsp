@@ -330,6 +330,30 @@ corge: foo (quux corge + banana)
         (text)))))
 
 ================================================================================
+escaped interpolation delimiters
+================================================================================
+
+foo:
+  echo {{{{x}}
+  echo {{{{{{x}}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (text))
+      (recipe_line
+        (text)
+        (interpolation
+          (expression
+            (value
+              (identifier))))))))
+
+================================================================================
 group attribute: Issue #176
 ================================================================================
 
@@ -1001,6 +1025,32 @@ foo:
         (language))
       (recipe_line
         (text)))))
+
+================================================================================
+sigil-only lines
+================================================================================
+
+foo:
+  @
+  -
+  ?
+  @-
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (recipe
+    (recipe_header
+      (identifier))
+    (recipe_body
+      (recipe_line
+        (recipe_line_prefix))
+      (recipe_line
+        (recipe_line_prefix))
+      (recipe_line
+        (recipe_line_prefix))
+      (recipe_line
+        (recipe_line_prefix)))))
 
 ================================================================================
 stacked attributes

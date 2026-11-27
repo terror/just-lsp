@@ -3540,6 +3540,20 @@ mod tests {
   }
 
   #[test]
+  fn recipe_with_crlf_shebang() {
+    let document =
+      Document::from("foo:\r\n  #!/usr/bin/env bash\r\n  echo bar\r\n");
+
+    assert_eq!(
+      document.recipes()[0].shebang,
+      Some(TextNode {
+        value: "#!/usr/bin/env bash".into(),
+        range: lsp::Range::at(1, 2, 1, 21),
+      })
+    );
+  }
+
+  #[test]
   fn recipe_with_shebang() {
     let document = Document::from(indoc! {
       "

@@ -80,8 +80,10 @@ mod tests {
       alias foo :=
       "
     })
-    .error("Missing identifier in alias", lsp::Range::at(0, 12, 0, 12))
-    .error("Recipe `` not found", lsp::Range::at(0, 12, 0, 12))
+    .error(
+      "Syntax error near `alias foo :=`",
+      lsp::Range::at(0, 0, 0, 12),
+    )
     .run();
   }
 }

@@ -877,7 +877,7 @@
       "required": true,
       "types": [
         {
-          "type": "string",
+          "type": "expression",
           "named": true
         }
       ]
