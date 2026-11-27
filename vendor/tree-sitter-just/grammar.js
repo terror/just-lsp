@@ -51,7 +51,6 @@ module.exports = grammar({
     $._format_string_indented,
     $._format_raw_string,
     $._format_raw_string_indented,
-    $._expression_recurse,
   ],
   word: ($) => $.identifier,
 
@@ -223,23 +222,52 @@ module.exports = grammar({
 
     _expression_inner: ($) =>
       choice(
+        seq(
+          alias($._disjunct, "expression"),
+          "||",
+          alias($._expression_inner, "expression"),
+        ),
+        $._disjunct,
+      ),
+
+    _disjunct: ($) =>
+      choice(
+        seq(
+          alias($._comparison, "expression"),
+          "&&",
+          alias($._disjunct, "expression"),
+        ),
+        $._comparison,
+      ),
+
+    _comparison: ($) =>
+      choice(
+        seq(
+          alias($._conjunct, "expression"),
+          choice("==", "!="),
+          alias($._conjunct, "expression"),
+        ),
+        seq(
+          alias($._conjunct, "expression"),
+          choice("=~", "!~"),
+          $.regex_literal,
+        ),
+        $._conjunct,
+      ),
+
+    _conjunct: ($) =>
+      choice(
         $.if_expression,
-        prec.right(4, seq("/", $._expression_recurse)),
-        prec.left(4, seq($._expression_recurse, "++", $._expression_recurse)),
-        prec.left(4, seq($._expression_recurse, "/", $._expression_recurse)),
-        prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
-        prec.left(3, seq($._expression_recurse, "==", $._expression_recurse)),
-        prec.left(3, seq($._expression_recurse, "!=", $._expression_recurse)),
-        prec.left(3, seq($._expression_recurse, "=~", $.regex_literal)),
-        prec.left(3, seq($._expression_recurse, "!~", $.regex_literal)),
-        prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
-        prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
+        seq("/", alias($._conjunct, "expression")),
+        seq(
+          alias($._operand, "expression"),
+          choice("/", "++", "+"),
+          alias($._conjunct, "expression"),
+        ),
         $.value,
       ),
 
-    // We can't mark `_expression_inner` inline because it causes an infinite
-    // loop at generation, so we just alias it.
-    _expression_recurse: ($) => alias($._expression_inner, "expression"),
+    _operand: ($) => prec(1, choice($.value, $.if_expression)),
 
     if_expression: ($) =>
       seq(
@@ -260,8 +288,7 @@ module.exports = grammar({
     condition: ($) => $.expression,
 
     // Capture this special for injections
-    regex_literal: ($) =>
-      prec.left(3, alias($._expression_inner, $.expression)),
+    regex_literal: ($) => alias($._conjunct, $.expression),
 
     // value         : NAME '(' sequence? ')'
     //               | BACKTICK
@@ -396,7 +423,11 @@ module.exports = grammar({
     variadic_parameter: ($) =>
       seq(field("kleene", choice("*", "+")), $.parameter),
 
-    dependencies: ($) => repeat1(seq(optional("&&"), $.dependency)),
+    dependencies: ($) =>
+      choice(
+        seq(repeat1($.dependency), optional(seq("&&", repeat($.dependency)))),
+        seq("&&", repeat($.dependency)),
+      ),
 
     dependency: ($) =>
       choice(
