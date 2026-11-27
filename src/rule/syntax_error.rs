@@ -751,6 +751,17 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_shebang_without_language() {
+    #[track_caller]
+    fn case(shebang: &str) {
+      AnalyzerTest::new(&format!("foo:\n  {shebang}\n  echo bar\n")).run();
+    }
+
+    case("#!/usr/bin/env` python");
+    case("#!/usr/ + bin/env python");
+  }
+
+  #[test]
   fn parser_errors_valid_with_shell_expanded_strings() {
     AnalyzerTest::new(indoc! {
       r#"

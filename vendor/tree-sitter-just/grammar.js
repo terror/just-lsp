@@ -491,8 +491,8 @@ module.exports = grammar({
       seq(
         /\S*\//,
         optional(seq("env", repeat(SHEBANG_ENV_FLAG))),
-        choice(alias($.identifier, $.language), $.interpolation),
-        /[^\r\n]*/,
+        optional(choice(alias($.identifier, $.language), $.interpolation)),
+        optional(token(prec(-1, /[^\r\n]+/))),
       ),
 
     // Fallback shebang, any string
