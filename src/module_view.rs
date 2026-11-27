@@ -273,6 +273,7 @@ impl<'a> ModuleView<'a> {
     self.settings().iter().any(|setting| {
       setting.name.value == name
         && matches!(setting.kind, SettingKind::Boolean(true))
+        && Attribute::is_enabled(&setting.attributes)
     })
   }
 
@@ -310,7 +311,11 @@ impl<'a> From<&'a Document> for ModuleView<'a> {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, indoc::indoc, pretty_assertions::assert_eq};
+  use {
+    super::*,
+    indoc::{formatdoc, indoc},
+    pretty_assertions::assert_eq,
+  };
 
   #[test]
   fn bindings_are_shared_across_views() {
@@ -398,6 +403,57 @@ mod tests {
     assert_eq!(view.find_recipe("foo").unwrap().uri, direct.uri);
     assert_eq!(view.find_variable("foo").unwrap().uri, direct.uri);
     assert_eq!(view.find_function("foo").unwrap().uri, direct.uri);
+  }
+
+  #[test]
+  fn enabled_declarations_take_precedence() {
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    let root = Document::from(
+      formatdoc! {
+        "
+        [{enabled}]
+        foo := 'foo'
+        [{enabled}]
+        foo() := 'foo'
+        [{enabled}]
+        foo:
+          echo foo
+
+        [{disabled}]
+        foo := 'bar'
+        [{disabled}]
+        foo() := 'bar'
+        [{disabled}]
+        foo:
+          echo bar
+
+        [{disabled}]
+        baz := 'baz'
+        ",
+        enabled = env::consts::OS,
+      }
+      .as_str(),
+    );
+
+    let view = ModuleView::from(&root);
+
+    assert_eq!(
+      view.find_recipe("foo").unwrap().content,
+      format!("[{}]\nfoo:\n  echo foo", env::consts::OS),
+    );
+    assert_eq!(
+      view.find_variable("foo").unwrap().content,
+      format!("[{}]\nfoo := 'foo'", env::consts::OS),
+    );
+    assert_eq!(
+      view.find_function("foo").unwrap().content,
+      format!("[{}]\nfoo() := 'foo'", env::consts::OS),
+    );
+    assert_eq!(
+      view.find_variable("baz").unwrap().content,
+      format!("[{disabled}]\nbaz := 'baz'"),
+    );
   }
 
   #[test]
@@ -526,6 +582,22 @@ mod tests {
     assert_eq!(view.find_recipe("foo").unwrap().uri, root.uri);
     assert_eq!(view.find_variable("foo").unwrap().uri, root.uri);
     assert_eq!(view.find_function("foo").unwrap().uri, root.uri);
+  }
+
+  #[test]
+  fn setting_enabled() {
+    #[track_caller]
+    fn case(os: &str, expected: bool) {
+      let document = Document::from(format!("[{os}]\nset export\n").as_str());
+
+      assert_eq!(
+        ModuleView::from(&document).setting_enabled("export"),
+        expected
+      );
+    }
+
+    case(env::consts::OS, true);
+    case(if cfg!(windows) { "unix" } else { "windows" }, false);
   }
 
   #[test]

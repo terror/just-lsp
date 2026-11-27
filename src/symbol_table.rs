@@ -41,18 +41,21 @@ impl SymbolTable {
       resolved_functions: Self::resolve(
         documents,
         &functions,
+        |function| &function.attributes,
         |function| &function.name.value,
         |function| function.range.start,
       ),
       resolved_recipes: Self::resolve(
         documents,
         &recipes,
+        |recipe| &recipe.attributes,
         |recipe| &recipe.name.value,
         |recipe| recipe.range.start,
       ),
       resolved_variables: Self::resolve(
         documents,
         &variables,
+        |variable| &variable.attributes,
         |variable| &variable.name.value,
         |variable| variable.range.start,
       ),
@@ -68,6 +71,7 @@ impl SymbolTable {
   fn resolve<T>(
     documents: &[ScopeDocument<&Document>],
     declarations: &[Located<T>],
+    attributes: impl Fn(&T) -> &[Attribute],
     name: impl Fn(&T) -> &str,
     position: impl Fn(&T) -> lsp::Position,
   ) -> HashMap<String, usize> {
@@ -87,7 +91,11 @@ impl SymbolTable {
     candidates.sort_by_key(|index| {
       let declaration = &declarations[*index];
 
-      (precedence[&declaration.uri], position(declaration))
+      (
+        Attribute::is_enabled(attributes(declaration)),
+        precedence[&declaration.uri],
+        position(declaration),
+      )
     });
 
     candidates
