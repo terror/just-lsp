@@ -532,6 +532,25 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_unpaired_carriage_return() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "foo:\r",
+      "Syntax error near `foo:`",
+      lsp::Range::at(0, 0, 0, 4),
+    );
+    case(
+      "foo: \rbar\n\nbar:\n",
+      "Syntax error near `bar`",
+      lsp::Range::at(1, 0, 1, 3),
+    );
+  }
+
+  #[test]
   fn parser_errors_valid() {
     AnalyzerTest::new(indoc! {
       "
