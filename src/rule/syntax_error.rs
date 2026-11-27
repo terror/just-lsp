@@ -484,6 +484,22 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_quotes_in_indented_strings() {
+    #[track_caller]
+    fn case(string: &str) {
+      AnalyzerTest::new(&format!(
+        "foo := {string}\n\nbar:\n  echo {{{{foo}}}}\n"
+      ))
+      .run();
+    }
+
+    case(r#""""foo""bar""""#);
+    case(r#"x"""foo""bar""""#);
+    case(r#"f"""foo""bar""""#);
+    case("f'''foo''bar'''");
+  }
+
+  #[test]
   fn parser_errors_valid_with_list_expressions() {
     AnalyzerTest::new(indoc! {
       "
