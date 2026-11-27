@@ -1,32 +1,40 @@
-//! Extensions that bridge `ropey::Rope` with Language Server Protocol positions
-//! and tree-sitter edit bookkeeping.
+//! Conversions between LSP positions and [`Rope`] offsets, and edits that
+//! keep a rope and its tree-sitter syntax tree in sync.
 //!
-//! The [`RopeExt`] trait is used inside `just-lsp` to keep three different
-//! coordinate spaces (bytes, UTF-16 code units, and tree-sitter points) in sync
-//! whenever an editor sends a `textDocument/didChange` notification.
+//! LSP clients describe a position as a zero-based line and a character
+//! measured in UTF-16 code units from the start of the line. A [`Rope`] is
+//! indexed by `char`, and tree-sitter uses byte offsets and points, whose
+//! column is a byte offset within the row. The [`RopeExt`] trait converts
+//! between these coordinate spaces, so that the changes in a
+//! `textDocument/didChange` notification can be applied to both a document's
+//! rope and its syntax tree.
+//!
+//! # Example
 //!
 //! ```
 //! use {
 //!   just_lsp::RopeExt,
 //!   ropey::Rope,
-//!   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent}
+//!   tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent},
 //! };
 //!
-//! let mut rope = Rope::from_str("hello world");
+//! let mut rope = Rope::from_str("😀 foo");
 //!
 //! let change = TextDocumentContentChangeEvent {
-//!   range: Some(Range {
-//!     start: Position::new(0, 6),
-//!     end: Position::new(0, 11),
-//!   }),
+//!   range: Some(Range::new(Position::new(0, 3), Position::new(0, 6))),
 //!   range_length: None,
-//!   text: "rope".into(),
+//!   text: "bar".into(),
 //! };
 //!
 //! let edit = rope.build_edit(&change);
+//!
+//! assert_eq!((edit.start_char, edit.end_char), (2, 5));
+//! assert_eq!(edit.input_edit.start_byte, 5);
+//! assert_eq!(edit.input_edit.old_end_byte, 8);
+//!
 //! rope.apply_edit(&edit);
 //!
-//! assert_eq!(rope.to_string(), "hello rope");
+//! assert_eq!(rope.to_string(), "😀 bar");
 //! ```
 
 use super::*;
@@ -146,6 +154,26 @@ pub trait RopeExt {
   /// ```
   fn byte_to_lsp_position(&self, byte: usize) -> lsp::Position;
 
+  /// Returns the character offset of the LSP position `position`.
+  ///
+  /// The position's character is measured in UTF-16 code units, and the
+  /// returned offset is measured in `char`s from the start of the rope. A
+  /// character inside a surrogate pair maps to the `char` that contains it. A
+  /// character past the end of a line is clamped to the end of the line,
+  /// before its line break, and a line past the end of the document is clamped
+  /// to the end of the document.
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use {just_lsp::RopeExt, ropey::Rope, tower_lsp::lsp_types::Position};
+  ///
+  /// let rope = Rope::from_str("foo\n😀bar");
+  ///
+  /// assert_eq!(rope.lsp_position_to_char(Position::new(1, 2)), 5);
+  /// assert_eq!(rope.lsp_position_to_char(Position::new(0, 10)), 3);
+  /// assert_eq!(rope.lsp_position_to_char(Position::new(10, 0)), 8);
+  /// ```
   fn lsp_position_to_char(&self, position: lsp::Position) -> usize;
 
   /// Returns the byte offset, character offset, and tree-sitter point of the
