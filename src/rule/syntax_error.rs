@@ -446,6 +446,21 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_assert_trailing_comma() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar' == 'bar', 'baz',) }}
+      "
+    })
+    .error(
+      "Syntax error near `{{ assert('bar' == 'bar', 'baz',`",
+      lsp::Range::at(1, 7, 1, 39),
+    )
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_brace_runs_in_recipe() {
     AnalyzerTest::new(indoc! {
       "

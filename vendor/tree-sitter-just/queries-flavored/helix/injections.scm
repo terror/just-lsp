@@ -11,7 +11,9 @@
 
 ; Highlight the RHS of `=~` as regex
 ((regex_literal
-  (_) @injection.content)
+  (expression
+    (value
+      (string) @injection.content)))
   (#set! injection.language "regex"))
 
 ; ================ Global defaults ================

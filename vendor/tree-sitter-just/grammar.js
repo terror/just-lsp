@@ -229,22 +229,8 @@ module.exports = grammar({
         prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
         prec.left(3, seq($._expression_recurse, "==", $._expression_recurse)),
         prec.left(3, seq($._expression_recurse, "!=", $._expression_recurse)),
-        prec.left(
-          3,
-          seq(
-            $._expression_recurse,
-            "=~",
-            choice($.regex_literal, $._expression_recurse),
-          ),
-        ),
-        prec.left(
-          3,
-          seq(
-            $._expression_recurse,
-            "!~",
-            choice($.regex_literal, $._expression_recurse),
-          ),
-        ),
+        prec.left(3, seq($._expression_recurse, "=~", $.regex_literal)),
+        prec.left(3, seq($._expression_recurse, "!~", $.regex_literal)),
         prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
         prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
@@ -273,7 +259,8 @@ module.exports = grammar({
     condition: ($) => $.expression,
 
     // Capture this special for injections
-    regex_literal: ($) => prec(1, $.string),
+    regex_literal: ($) =>
+      prec.left(3, alias($._expression_inner, $.expression)),
 
     // value         : NAME '(' sequence? ')'
     //               | BACKTICK
@@ -315,7 +302,7 @@ module.exports = grammar({
           field("name", alias("assert", $.identifier)),
           "(",
           field("condition", $.condition),
-          optional(seq(",", field("message", $.expression), optional(","))),
+          optional(seq(",", field("message", $.expression))),
           ")",
         ),
       ),

@@ -385,7 +385,9 @@ regex := 'foo' =~ '^f'
       (value
         (string))
       (regex_literal
-        (string)))))
+        (expression
+          (value
+            (string)))))))
 
 ================================================================================
 list literals
@@ -600,7 +602,9 @@ foo_re := if ".JUSTFILE" =~ '(?i)\.?just(?:file)?' { "match" } else { "mismatch"
             (value
               (string))
             (regex_literal
-              (string))))
+              (expression
+                (value
+                  (string))))))
         (expression
           (value
             (string)))
@@ -627,7 +631,9 @@ foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
             (value
               (string))
             (regex_literal
-              (string))))
+              (expression
+                (value
+                  (string))))))
         (expression
           (value
             (string)))
@@ -635,6 +641,27 @@ foo_not_re := if ".JUSTFILE" !~ '^makefile$' { "mismatch" } else { "match" }
           (expression
             (value
               (string))))))))
+
+================================================================================
+regex with concatenated pattern
+================================================================================
+
+foo := x =~ 'a' + 'b'
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (identifier))
+      (regex_literal
+        (expression
+          (value
+            (string))
+          (value
+            (string)))))))
 
 ================================================================================
 set

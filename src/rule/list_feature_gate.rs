@@ -202,6 +202,25 @@ mod tests {
   };
 
   #[test]
+  fn accepts_concatenated_regex_conditions_without_lists() {
+    #[track_caller]
+    fn case(operator: &str) {
+      AnalyzerTest::new(&formatdoc! {
+        "
+        foo := if 'bar' {operator} 'b' + 'ar' {{ 'baz' }} else {{ 'qux' }}
+
+        bar:
+          echo {{{{ foo }}}}
+        "
+      })
+      .run();
+    }
+
+    case("=~");
+    case("!~");
+  }
+
+  #[test]
   fn accepts_logical_operators_with_lists() {
     AnalyzerTest::new(indoc! {
       "
