@@ -37,7 +37,7 @@ module.exports = grammar({
 
   // Allow comments, backslash-escaped newlines (with optional trailing whitespace),
   // and whitespace anywhere
-  extras: ($) => [$.comment, /\\(\n|\r\n)\s*/, /\s/],
+  extras: ($) => [$.comment, /\\\r?\n/, /[ \t\n]/, /\r\n/],
 
   inline: ($) => [
     $._string,
@@ -80,13 +80,13 @@ module.exports = grammar({
     _item: ($) =>
       choice(
         $.recipe,
-        $.alias,
+        seq($.alias, $._newline),
         $.assignment,
         $.eager,
         $.export,
         $.unexport,
         $.function_definition,
-        $.import,
+        seq($.import, $._newline),
         seq($.module, $._newline),
         $.setting,
       ),
@@ -229,22 +229,8 @@ module.exports = grammar({
         prec.left(4, seq($._expression_recurse, "+", $._expression_recurse)),
         prec.left(3, seq($._expression_recurse, "==", $._expression_recurse)),
         prec.left(3, seq($._expression_recurse, "!=", $._expression_recurse)),
-        prec.left(
-          3,
-          seq(
-            $._expression_recurse,
-            "=~",
-            choice($.regex_literal, $._expression_recurse),
-          ),
-        ),
-        prec.left(
-          3,
-          seq(
-            $._expression_recurse,
-            "!~",
-            choice($.regex_literal, $._expression_recurse),
-          ),
-        ),
+        prec.left(3, seq($._expression_recurse, "=~", $.regex_literal)),
+        prec.left(3, seq($._expression_recurse, "!~", $.regex_literal)),
         prec.left(2, seq($._expression_recurse, "&&", $._expression_recurse)),
         prec.left(1, seq($._expression_recurse, "||", $._expression_recurse)),
         $.value,
@@ -273,7 +259,8 @@ module.exports = grammar({
     condition: ($) => $.expression,
 
     // Capture this special for injections
-    regex_literal: ($) => prec(1, $.string),
+    regex_literal: ($) =>
+      prec.left(3, alias($._expression_inner, $.expression)),
 
     // value         : NAME '(' sequence? ')'
     //               | BACKTICK
@@ -315,7 +302,7 @@ module.exports = grammar({
           field("name", alias("assert", $.identifier)),
           "(",
           field("condition", $.condition),
-          optional(seq(",", field("message", $.expression), optional(","))),
+          optional(seq(",", field("message", $.expression))),
           ")",
         ),
       ),
@@ -439,8 +426,8 @@ module.exports = grammar({
       ),
 
     recipe_line: ($) =>
-      seq(
-        optional($.recipe_line_prefix),
+      choice(
+        seq($.recipe_line_prefix, repeat(choice($.text, $.interpolation))),
         repeat1(choice($.text, $.interpolation)),
       ),
 
@@ -473,11 +460,11 @@ module.exports = grammar({
         /\S*\//,
         optional(seq("env", repeat(SHEBANG_ENV_FLAG))),
         choice(alias($.identifier, $.language), $.interpolation),
-        /.*/,
+        /[^\r\n]*/,
       ),
 
     // Fallback shebang, any string
-    _opaque_shebang: (_) => seq(/[^/\n]+/, optional(/\/.*/)),
+    _opaque_shebang: (_) => seq(/[^/\r\n]+/, optional(/\/[^\r\n]*/)),
 
     // string        : STRING
     //               | INDENTED_STRING
@@ -527,7 +514,14 @@ module.exports = grammar({
       seq(
         'f"""',
         repeat(
-          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+          choice(
+            "{{{{",
+            $.interpolation,
+            $.escape_sequence,
+            /[^\\"{]+/,
+            /\{/,
+            '"',
+          ),
         ),
         '"""',
       ),
@@ -542,7 +536,7 @@ module.exports = grammar({
     _format_raw_string_indented: ($) =>
       seq(
         "f'''",
-        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/, "'")),
         "'''",
       ),
 
@@ -551,13 +545,13 @@ module.exports = grammar({
     _shell_expanded_string: ($) =>
       seq('x"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
     _shell_expanded_string_indented: ($) =>
-      seq('x"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+      seq('x"""', repeat(choice($.escape_sequence, /[^\\"]+/, '"')), '"""'),
     _shell_expanded_raw_string_indented: (_) =>
       seq("x'''", repeat(/./), "'''"),
     // We need try two separate munches so neither escape sequences nor
     // potential closing quotes get eaten.
     _string_indented: ($) =>
-      seq('"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+      seq('"""', repeat(choice($.escape_sequence, /[^\\"]+/, '"')), '"""'),
 
     escape_sequence: (_) => ESCAPE_SEQUENCE,
 
@@ -576,6 +570,6 @@ module.exports = grammar({
     numeric_error: (_) => /(\d+\.\d*|\d+)/,
 
     // `# ...` comment
-    comment: (_) => token(prec(-1, /#.*/)),
+    comment: (_) => token(prec(-1, /#([^\r\n]|\r+[^\r\n])*/)),
   },
 });

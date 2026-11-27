@@ -895,7 +895,7 @@ impl Document {
     parser.set_language(&unsafe { tree_sitter_just() })?;
 
     parser
-      .parse(content.to_string(), old_tree)
+      .parse(content.to_string().replace('\0', "\u{1}"), old_tree)
       .ok_or(Error::Parse)
   }
 
@@ -3536,6 +3536,20 @@ mod tests {
         range: lsp::Range::at(0, 0, 2, 0),
         shebang: None,
       }
+    );
+  }
+
+  #[test]
+  fn recipe_with_crlf_shebang() {
+    let document =
+      Document::from("foo:\r\n  #!/usr/bin/env bash\r\n  echo bar\r\n");
+
+    assert_eq!(
+      document.recipes()[0].shebang,
+      Some(TextNode {
+        value: "#!/usr/bin/env bash".into(),
+        range: lsp::Range::at(1, 2, 1, 21),
+      })
     );
   }
 

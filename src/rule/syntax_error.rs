@@ -72,6 +72,53 @@ impl SyntaxErrorRule {
     }
   }
 
+  fn indented_items(document: &Document, root: Node<'_>) -> Vec<Diagnostic> {
+    let mut cursor = root.walk();
+
+    root
+      .children(&mut cursor)
+      .filter(|item| !item.is_error())
+      .flat_map(|item| {
+        let mut cursor = item.walk();
+
+        let after_attributes = item
+          .children(&mut cursor)
+          .filter(|child| child.kind() == "attribute")
+          .filter_map(|attribute| attribute.next_sibling())
+          .map(|node| (node, true))
+          .collect::<Vec<_>>();
+
+        once((item, false)).chain(after_attributes)
+      })
+      .filter_map(|(node, after_attribute)| {
+        let (start, column) = (node.start_byte(), node.start_position().column);
+
+        let line_start = start - column;
+
+        let indented = column > 0
+          && document
+            .content
+            .byte_slice(line_start..start)
+            .bytes()
+            .all(|byte| byte == b' ' || byte == b'\t');
+
+        indented.then(|| {
+          Diagnostic::new(
+            if after_attribute {
+              "Expected `@`, `[`, comment, end of line, or identifier, but found indent"
+            } else {
+              "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent"
+            },
+            lsp::Range {
+              start: document.content.byte_to_lsp_position(line_start),
+              end: document.content.byte_to_lsp_position(start),
+            },
+          )
+        })
+      })
+      .collect()
+  }
+
   fn missing_message(node: &Node<'_>) -> String {
     let missing = SyntaxErrorRule::describe_kind(node.kind());
 
@@ -184,6 +231,12 @@ impl SyntaxErrorRule {
     if diagnostics.is_empty() && root.has_error() {
       let node = SyntaxErrorRule::deepest_error(root);
 
+      let node = if node == root {
+        SyntaxErrorRule::unterminated_item(root).unwrap_or(root)
+      } else {
+        node
+      };
+
       let end = document.get_range(&node).end;
 
       diagnostics.push(Diagnostic::new(
@@ -195,19 +248,7 @@ impl SyntaxErrorRule {
       ));
     }
 
-    diagnostics.extend(
-      document
-        .modules()
-        .into_iter()
-        .filter(ModuleDeclaration::is_dynamic)
-        .filter_map(|module| module.path)
-        .map(|path| {
-          Diagnostic::new(
-            "Expected keyword `x` but found identifier `f`",
-            path.range,
-          )
-        }),
-    );
+    diagnostics.extend(SyntaxErrorRule::indented_items(document, root));
 
     diagnostics
   }
@@ -235,6 +276,20 @@ impl SyntaxErrorRule {
     }
 
     truncated
+  }
+
+  fn unterminated_item(root: Node<'_>) -> Option<Node<'_>> {
+    let mut cursor = root.walk();
+
+    let children = root.children(&mut cursor).collect::<Vec<_>>();
+
+    children
+      .windows(2)
+      .find(|pair| {
+        pair[1].kind() != "comment"
+          && pair[0].end_position().row == pair[1].start_position().row
+      })
+      .map(|pair| pair[0])
   }
 }
 
@@ -372,6 +427,54 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_after_alias_or_import() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "alias foo := bar bar:\n",
+      "Missing newline in alias",
+      lsp::Range::at(0, 16, 0, 16),
+    );
+    case(
+      "import? 'foo' bar:\n",
+      "Missing newline in import",
+      lsp::Range::at(0, 13, 0, 13),
+    );
+  }
+
+  #[test]
+  fn parser_errors_invalid_assert_trailing_comma() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{ assert('bar' == 'bar', 'baz',) }}
+      "
+    })
+    .error(
+      "Syntax error near `{{ assert('bar' == 'bar', 'baz',`",
+      lsp::Range::at(1, 7, 1, 39),
+    )
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_brace_runs_in_recipe() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{{bar}}
+        echo {{{{{{{bar}}
+      "
+    })
+    .error("Syntax error near `{{{`", lsp::Range::at(1, 7, 1, 10))
+    .error("Syntax error near `{{{`", lsp::Range::at(2, 11, 2, 14))
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_chained_comparison() {
     AnalyzerTest::new(indoc! {
       "
@@ -422,13 +525,27 @@ mod tests {
   }
 
   #[test]
-  fn parser_errors_invalid_module_format_string_path() {
-    AnalyzerTest::new("mod foo f'foo.just'\n")
-      .error(
-        "Expected keyword `x` but found identifier `f`",
-        lsp::Range::at(0, 8, 0, 19),
-      )
-      .run();
+  fn parser_errors_invalid_indented_items() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "  foo:\n",
+      "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent",
+      lsp::Range::at(0, 0, 0, 2),
+    );
+    case(
+      "\t# foo\n",
+      "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent",
+      lsp::Range::at(0, 0, 0, 1),
+    );
+    case(
+      "[private]\n  foo:\n",
+      "Expected `@`, `[`, comment, end of line, or identifier, but found indent",
+      lsp::Range::at(1, 0, 1, 2),
+    );
   }
 
   #[test]
@@ -441,6 +558,25 @@ mod tests {
     })
     .error("Unknown start of token `1`", lsp::Range::at(0, 8, 0, 9))
     .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_unpaired_carriage_return() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "foo:\r",
+      "Syntax error near `foo:`",
+      lsp::Range::at(0, 0, 0, 4),
+    );
+    case(
+      "foo: \rbar\n\nbar:\n",
+      "Syntax error near `bar`",
+      lsp::Range::at(1, 0, 1, 3),
+    );
   }
 
   #[test]
@@ -508,6 +644,17 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_line_continuation_before_blank_line() {
+    #[track_caller]
+    fn case(source: &str) {
+      AnalyzerTest::new(source).run();
+    }
+
+    case("foo := 'bar' \\\n\nbaz:\n  echo {{foo}}\n");
+    case("baz:\n  echo {{foo}}\n\nfoo := 'bar' \\\n");
+  }
+
+  #[test]
   fn parser_errors_valid_with_list_expressions() {
     AnalyzerTest::new(indoc! {
       "
@@ -542,6 +689,35 @@ mod tests {
     case("'\nbaz\n'");
     case("\"\nbaz\n\"");
     case("`\nbaz\n`");
+  }
+
+  #[test]
+  fn parser_errors_valid_with_nul_bytes() {
+    #[track_caller]
+    fn case(source: &str) {
+      AnalyzerTest::new(source).run();
+    }
+
+    case("# foo\0bar\n");
+    case("foo := 'bar\0baz'\n\nqux:\n  echo {{foo}}\n");
+    case("foo := `bar\0baz`\n\nqux:\n  echo {{foo}}\n");
+    case("foo:\n  #!/bin/sh bar\0baz\n");
+  }
+
+  #[test]
+  fn parser_errors_valid_with_quotes_in_indented_strings() {
+    #[track_caller]
+    fn case(string: &str) {
+      AnalyzerTest::new(&format!(
+        "foo := {string}\n\nbar:\n  echo {{{{foo}}}}\n"
+      ))
+      .run();
+    }
+
+    case(r#""""foo""bar""""#);
+    case(r#"x"""foo""bar""""#);
+    case(r#"f"""foo""bar""""#);
+    case("f'''foo''bar'''");
   }
 
   #[test]
@@ -595,6 +771,22 @@ mod tests {
       foo:
         echo {{greeting}}
       "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_sigil_only_lines() {
+    AnalyzerTest::new(indoc! {
+      "
+      set guards
+
+      foo:
+        @
+        -
+        ?
+        @-
+      "
     })
     .run();
   }

@@ -256,7 +256,7 @@ impl<'doc> Tokenizer<'doc> {
       .set_language(&unsafe { tree_sitter_just() })
       .map_err(|error| anyhow!("Failed to configure highlighter: {error}"))?;
 
-    let source = self.document.content.to_string();
+    let source = self.document.content.to_string().replace('\0', "\u{1}");
 
     let highlight_iter = highlighter
       .highlight(
@@ -318,16 +318,15 @@ impl<'doc> Tokenizer<'doc> {
       return 0;
     }
 
-    if rope.byte(line_end_byte - 1) != b'\n' {
-      return 0;
-    }
-
-    if line_end_byte - 1 > line_start_byte
-      && rope.byte(line_end_byte - 2) == b'\r'
-    {
-      2
-    } else {
-      1
+    match rope.byte(line_end_byte - 1) {
+      b'\n'
+        if line_end_byte - 1 > line_start_byte
+          && rope.byte(line_end_byte - 2) == b'\r' =>
+      {
+        2
+      }
+      b'\n' | b'\r' => 1,
+      _ => 0,
     }
   }
 }
@@ -1235,6 +1234,20 @@ mod tests {
   }
 
   #[test]
+  fn nul_byte() {
+    assert_eq!(
+      tokenize("# foo\0bar\n"),
+      [Expected {
+        line: 0,
+        start: 0,
+        length: 9,
+        modifiers: 0,
+        token_type: "comment",
+      }]
+    );
+  }
+
+  #[test]
   fn parameters() {
     assert_eq!(
       tokenize("foo bar baz:\n"),
@@ -1360,6 +1373,7 @@ mod tests {
 
     case("foo\r\nbar", 0, 2);
     case("foo\r\nbar", 1, 0);
+    case("foo\rbar", 0, 1);
     case("foo\n", 0, 1);
     case("foo", 0, 0);
     case("# カ\n", 0, 1);
