@@ -80,13 +80,13 @@ module.exports = grammar({
     _item: ($) =>
       choice(
         $.recipe,
-        $.alias,
+        seq($.alias, $._newline),
         $.assignment,
         $.eager,
         $.export,
         $.unexport,
         $.function_definition,
-        $.import,
+        seq($.import, $._newline),
         seq($.module, $._newline),
         $.setting,
       ),

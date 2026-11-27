@@ -167,8 +167,40 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
     return handle_eof(lexer, scanner, valid_symbols);
   }
 
-  // Handle backslash escaping for newlines
-  if (valid_symbols[NEWLINE]) {
+  if (valid_symbols[NEWLINE] && !valid_symbols[TEXT]) {
+    while (1) {
+      while (iswspace(lexer->lookahead) && lexer->lookahead != '\n') {
+        skip(lexer);
+      }
+
+      if (lexer->lookahead != '\\') {
+        break;
+      }
+
+      skip(lexer);
+
+      if (lexer->lookahead == '\r') {
+        skip(lexer);
+      }
+
+      if (lexer->lookahead != '\n') {
+        return false;
+      }
+
+      skip(lexer);
+    }
+
+    if (lexer->eof(lexer)) {
+      return handle_eof(lexer, scanner, valid_symbols);
+    }
+
+    if (lexer->lookahead == '\n') {
+      skip(lexer);
+      lexer->result_symbol = NEWLINE;
+      return true;
+    }
+  } else if (valid_symbols[NEWLINE]) {
+    // Handle backslash escaping for newlines
     bool escape = false;
     if (lexer->lookahead == '\\') {
       escape = true;

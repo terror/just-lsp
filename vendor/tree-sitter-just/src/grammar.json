@@ -44,8 +44,17 @@
           "name": "recipe"
         },
         {
-          "type": "SYMBOL",
-          "name": "alias"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "alias"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_newline"
+            }
+          ]
         },
         {
           "type": "SYMBOL",
@@ -68,8 +77,17 @@
           "name": "function_definition"
         },
         {
-          "type": "SYMBOL",
-          "name": "import"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "import"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_newline"
+            }
+          ]
         },
         {
           "type": "SEQ",
