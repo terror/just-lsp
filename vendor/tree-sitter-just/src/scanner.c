@@ -168,8 +168,16 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
 
   if (valid_symbols[NEWLINE] && !valid_symbols[TEXT]) {
     while (1) {
-      while (iswspace(lexer->lookahead) && lexer->lookahead != '\n') {
+      while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
         skip(lexer);
+      }
+
+      if (lexer->lookahead == '\r') {
+        skip(lexer);
+
+        if (lexer->lookahead != '\n') {
+          return false;
+        }
       }
 
       if (lexer->lookahead != '\\') {
@@ -274,7 +282,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
       }
 
       while (!lexer->eof(lexer) && lexer->lookahead != '\n' &&
-             lexer->lookahead != '{') {
+             lexer->lookahead != '\r' && lexer->lookahead != '{') {
         // Can't start with #!
         if (lexer->lookahead == '#' && !advanced_once) {
           advance(lexer);
@@ -290,7 +298,17 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
         advanced_once = true;
       }
 
-      if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
+      if (lexer->lookahead == '\r') {
+        lexer->mark_end(lexer);
+        advance(lexer);
+
+        if (lexer->lookahead == '\n') {
+          lexer->result_symbol = TEXT;
+          return advanced_once;
+        }
+
+        advanced_once = true;
+      } else if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
         lexer->mark_end(lexer);
         lexer->result_symbol = TEXT;
         if (advanced_once) {

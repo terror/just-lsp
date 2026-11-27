@@ -2231,7 +2231,7 @@
         },
         {
           "type": "PATTERN",
-          "value": ".*"
+          "value": "[^\\r\\n]*"
         }
       ]
     },
@@ -2240,14 +2240,14 @@
       "members": [
         {
           "type": "PATTERN",
-          "value": "[^/\\n]+"
+          "value": "[^/\\r\\n]+"
         },
         {
           "type": "CHOICE",
           "members": [
             {
               "type": "PATTERN",
-              "value": "\\/.*"
+              "value": "\\/[^\\r\\n]*"
             },
             {
               "type": "BLANK"
@@ -2742,7 +2742,7 @@
         "value": -1,
         "content": {
           "type": "PATTERN",
-          "value": "#.*"
+          "value": "#([^\\r\\n]|\\r+[^\\r\\n])*"
         }
       }
     }
@@ -2754,11 +2754,15 @@
     },
     {
       "type": "PATTERN",
-      "value": "\\\\(\\n|\\r\\n)\\s*"
+      "value": "\\\\\\r?\\n"
     },
     {
       "type": "PATTERN",
-      "value": "\\s"
+      "value": "[ \\t\\n]"
+    },
+    {
+      "type": "PATTERN",
+      "value": "\\r\\n"
     }
   ],
   "conflicts": [

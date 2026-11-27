@@ -37,7 +37,7 @@ module.exports = grammar({
 
   // Allow comments, backslash-escaped newlines (with optional trailing whitespace),
   // and whitespace anywhere
-  extras: ($) => [$.comment, /\\(\n|\r\n)\s*/, /\s/],
+  extras: ($) => [$.comment, /\\\r?\n/, /[ \t\n]/, /\r\n/],
 
   inline: ($) => [
     $._string,
@@ -473,11 +473,11 @@ module.exports = grammar({
         /\S*\//,
         optional(seq("env", repeat(SHEBANG_ENV_FLAG))),
         choice(alias($.identifier, $.language), $.interpolation),
-        /.*/,
+        /[^\r\n]*/,
       ),
 
     // Fallback shebang, any string
-    _opaque_shebang: (_) => seq(/[^/\n]+/, optional(/\/.*/)),
+    _opaque_shebang: (_) => seq(/[^/\r\n]+/, optional(/\/[^\r\n]*/)),
 
     // string        : STRING
     //               | INDENTED_STRING
@@ -583,6 +583,6 @@ module.exports = grammar({
     numeric_error: (_) => /(\d+\.\d*|\d+)/,
 
     // `# ...` comment
-    comment: (_) => token(prec(-1, /#.*/)),
+    comment: (_) => token(prec(-1, /#([^\r\n]|\r+[^\r\n])*/)),
   },
 });
