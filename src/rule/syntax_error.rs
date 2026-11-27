@@ -72,6 +72,53 @@ impl SyntaxErrorRule {
     }
   }
 
+  fn indented_items(document: &Document, root: Node<'_>) -> Vec<Diagnostic> {
+    let mut cursor = root.walk();
+
+    root
+      .children(&mut cursor)
+      .filter(|item| !item.is_error())
+      .flat_map(|item| {
+        let mut cursor = item.walk();
+
+        let after_attributes = item
+          .children(&mut cursor)
+          .filter(|child| child.kind() == "attribute")
+          .filter_map(|attribute| attribute.next_sibling())
+          .map(|node| (node, true))
+          .collect::<Vec<_>>();
+
+        once((item, false)).chain(after_attributes)
+      })
+      .filter_map(|(node, after_attribute)| {
+        let (start, column) = (node.start_byte(), node.start_position().column);
+
+        let line_start = start - column;
+
+        let indented = column > 0
+          && document
+            .content
+            .byte_slice(line_start..start)
+            .bytes()
+            .all(|byte| byte == b' ' || byte == b'\t');
+
+        indented.then(|| {
+          Diagnostic::new(
+            if after_attribute {
+              "Expected `@`, `[`, comment, end of line, or identifier, but found indent"
+            } else {
+              "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent"
+            },
+            lsp::Range {
+              start: document.content.byte_to_lsp_position(line_start),
+              end: document.content.byte_to_lsp_position(start),
+            },
+          )
+        })
+      })
+      .collect()
+  }
+
   fn missing_message(node: &Node<'_>) -> String {
     let missing = SyntaxErrorRule::describe_kind(node.kind());
 
@@ -184,6 +231,12 @@ impl SyntaxErrorRule {
     if diagnostics.is_empty() && root.has_error() {
       let node = SyntaxErrorRule::deepest_error(root);
 
+      let node = if node == root {
+        SyntaxErrorRule::unterminated_item(root).unwrap_or(root)
+      } else {
+        node
+      };
+
       let end = document.get_range(&node).end;
 
       diagnostics.push(Diagnostic::new(
@@ -194,6 +247,8 @@ impl SyntaxErrorRule {
         lsp::Range { start: end, end },
       ));
     }
+
+    diagnostics.extend(SyntaxErrorRule::indented_items(document, root));
 
     diagnostics
   }
@@ -221,6 +276,20 @@ impl SyntaxErrorRule {
     }
 
     truncated
+  }
+
+  fn unterminated_item(root: Node<'_>) -> Option<Node<'_>> {
+    let mut cursor = root.walk();
+
+    let children = root.children(&mut cursor).collect::<Vec<_>>();
+
+    children
+      .windows(2)
+      .find(|pair| {
+        pair[1].kind() != "comment"
+          && pair[0].end_position().row == pair[1].start_position().row
+      })
+      .map(|pair| pair[0])
   }
 }
 
@@ -358,6 +427,25 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_after_alias_or_import() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "alias foo := bar bar:\n",
+      "Missing newline in alias",
+      lsp::Range::at(0, 16, 0, 16),
+    );
+    case(
+      "import? 'foo' bar:\n",
+      "Missing newline in import",
+      lsp::Range::at(0, 13, 0, 13),
+    );
+  }
+
+  #[test]
   fn parser_errors_invalid_brace_runs_in_recipe() {
     AnalyzerTest::new(indoc! {
       "
@@ -419,6 +507,30 @@ mod tests {
       lsp::Range::at(2, 51, 2, 52),
     )
     .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_indented_items() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "  foo:\n",
+      "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent",
+      lsp::Range::at(0, 0, 0, 2),
+    );
+    case(
+      "\t# foo\n",
+      "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent",
+      lsp::Range::at(0, 0, 0, 1),
+    );
+    case(
+      "[private]\n  foo:\n",
+      "Expected `@`, `[`, comment, end of line, or identifier, but found indent",
+      lsp::Range::at(1, 0, 1, 2),
+    );
   }
 
   #[test]
@@ -495,6 +607,17 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_line_continuation_before_blank_line() {
+    #[track_caller]
+    fn case(source: &str) {
+      AnalyzerTest::new(source).run();
+    }
+
+    case("foo := 'bar' \\\n\nbaz:\n  echo {{foo}}\n");
+    case("baz:\n  echo {{foo}}\n\nfoo := 'bar' \\\n");
   }
 
   #[test]
