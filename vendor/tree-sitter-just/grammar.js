@@ -33,6 +33,7 @@ module.exports = grammar({
     $._newline,
     $.text,
     $.error_recovery,
+    $._unpaired_carriage_return,
   ],
 
   // Allow comments, backslash-escaped newlines (with optional trailing whitespace),

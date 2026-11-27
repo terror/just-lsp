@@ -2791,6 +2791,10 @@
     {
       "type": "SYMBOL",
       "name": "error_recovery"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_unpaired_carriage_return"
     }
   ],
   "inline": [
