@@ -3,7 +3,6 @@ use {
   arguments::Arguments,
   ariadne::{Color, Label, Report, ReportKind, sources},
   clap::{Parser, builder::styling},
-  command::Command,
   executor::Executor,
   just_lsp::*,
   quickfixer::Quickfixer,
@@ -14,7 +13,7 @@ use {
     backtrace::BacktraceStatus,
     collections::{BTreeMap, BTreeSet, HashMap},
     env,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     fs,
     io::{self, stderr},
     path::{Path, PathBuf},
@@ -41,7 +40,6 @@ use {
 };
 
 mod arguments;
-mod command;
 mod executor;
 mod quickfixer;
 mod server;

@@ -1,12 +1,13 @@
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Command {
+pub enum Command {
   RunRecipe,
 }
 
 impl Command {
-  pub(crate) fn all() -> Vec<String> {
+  #[must_use]
+  pub fn all() -> Vec<String> {
     vec![Command::RunRecipe.to_string()]
   }
 }
@@ -26,10 +27,10 @@ impl Display for Command {
 impl TryFrom<&str> for Command {
   type Error = Error;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> Result<Self> {
     match value {
       "just-lsp.run_recipe" => Ok(Command::RunRecipe),
-      _ => Err(anyhow!("Unknown command: {value}")),
+      _ => Err(Error::UnknownCommand(value.into())),
     }
   }
 }

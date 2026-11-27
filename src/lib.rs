@@ -86,6 +86,7 @@ pub use {
   attribute_target::AttributeTarget,
   builtin::Builtin,
   builtins::BUILTINS,
+  command::Command,
   config::{Config, FormattingConfig, RuleConfig, RuleLevel},
   dependency::Dependency,
   dependency_argument::DependencyArgument,
@@ -138,6 +139,7 @@ mod bindings;
 mod bound_identifier;
 mod builtin;
 mod builtins;
+mod command;
 mod config;
 mod conflict_tracker;
 mod count;

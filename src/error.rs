@@ -25,4 +25,6 @@ pub enum Error {
   Parse,
   #[error("Shell expansion failed: {0}")]
   ShellExpansion(#[from] shellexpand::LookupError<std::env::VarError>),
+  #[error("Unknown command: {0}")]
+  UnknownCommand(String),
 }

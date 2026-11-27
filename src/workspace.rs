@@ -917,7 +917,34 @@ impl Workspace {
   }
 
   #[must_use]
-  pub fn run_context(&self, uri: &lsp::Url) -> (lsp::Url, Vec<String>) {
+  pub fn run_commands(
+    &self,
+    uri: &lsp::Url,
+  ) -> Option<Vec<(lsp::Range, lsp::Command)>> {
+    let document = self.documents.get_open(uri)?;
+
+    let (justfile, modules) = self.run_context(uri);
+
+    Some(
+      document
+        .recipes()
+        .into_iter()
+        .map(|recipe| {
+          (
+            recipe.name.range,
+            lsp::Command {
+              title: recipe.name.value.clone(),
+              command: Command::RunRecipe.to_string(),
+              arguments: Some(recipe.run_arguments(&justfile, &modules)),
+            },
+          )
+        })
+        .collect(),
+    )
+  }
+
+  #[must_use]
+  fn run_context(&self, uri: &lsp::Url) -> (lsp::Url, Vec<String>) {
     let contexts = Self::contexts(&self.root_projects(), uri);
 
     contexts
@@ -1518,6 +1545,79 @@ mod tests {
         .map(|item| item.label)
         .collect::<Vec<_>>(),
       ["qux", "baz"],
+    );
+  }
+
+  #[test]
+  fn run_commands() {
+    #[track_caller]
+    fn case(justfile: &str, path: &str, recipe: &str, expected: &str) {
+      let directory = if cfg!(windows) {
+        PathBuf::from("C:\\")
+      } else {
+        PathBuf::from("/")
+      };
+
+      let uri =
+        |path: &str| lsp::Url::from_file_path(directory.join(path)).unwrap();
+
+      let mut workspace = Workspace {
+        documents: DocumentStore::new(Arc::new(MemoryFilesystem::new(
+          [
+            ("justfile", justfile),
+            ("foo.just", "bar:\n"),
+            ("baz.just", "qux:\n"),
+          ]
+          .map(|(path, content)| (directory.join(path), content.into())),
+        ))),
+        ..Workspace::default()
+      };
+
+      for (path, content) in [
+        ("justfile", justfile.into()),
+        (path, format!("{recipe}:\n")),
+      ] {
+        workspace
+          .open(lsp::DidOpenTextDocumentParams {
+            text_document: lsp::TextDocumentItem::new(
+              uri(path),
+              "just".into(),
+              1,
+              content,
+            ),
+          })
+          .unwrap();
+      }
+
+      assert_eq!(
+        workspace.run_commands(&uri(path)),
+        Some(vec![(
+          lsp::Range::at(0, 0, 0, 3),
+          lsp::Command {
+            title: recipe.into(),
+            command: "just-lsp.run_recipe".into(),
+            arguments: Some(vec![
+              Value::String(expected.into()),
+              Value::String(uri("justfile").to_string()),
+              Value::Bool(false),
+            ]),
+          },
+        )]),
+      );
+    }
+
+    case(
+      "mod foo\nimport 'baz.just'\n",
+      "foo.just",
+      "bar",
+      "foo::bar",
+    );
+    case("mod foo\nimport 'baz.just'\n", "baz.just", "qux", "qux");
+    case(
+      "import 'foo.just'\nmod foo\n",
+      "foo.just",
+      "bar",
+      "foo::bar",
     );
   }
 
