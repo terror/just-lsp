@@ -439,8 +439,8 @@ module.exports = grammar({
       ),
 
     recipe_line: ($) =>
-      seq(
-        optional($.recipe_line_prefix),
+      choice(
+        seq($.recipe_line_prefix, repeat(choice($.text, $.interpolation))),
         repeat1(choice($.text, $.interpolation)),
       ),
 
@@ -527,7 +527,14 @@ module.exports = grammar({
       seq(
         'f"""',
         repeat(
-          choice("{{{{", $.interpolation, $.escape_sequence, /[^\\"{]+/, /\{/),
+          choice(
+            "{{{{",
+            $.interpolation,
+            $.escape_sequence,
+            /[^\\"{]+/,
+            /\{/,
+            '"',
+          ),
         ),
         '"""',
       ),
@@ -542,7 +549,7 @@ module.exports = grammar({
     _format_raw_string_indented: ($) =>
       seq(
         "f'''",
-        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/)),
+        repeat(choice("{{{{", $.interpolation, /[^'{]+/, /\{/, "'")),
         "'''",
       ),
 
@@ -551,13 +558,13 @@ module.exports = grammar({
     _shell_expanded_string: ($) =>
       seq('x"', repeat(choice($.escape_sequence, /[^\\"]+/)), '"'),
     _shell_expanded_string_indented: ($) =>
-      seq('x"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+      seq('x"""', repeat(choice($.escape_sequence, /[^\\"]+/, '"')), '"""'),
     _shell_expanded_raw_string_indented: (_) =>
       seq("x'''", repeat(/./), "'''"),
     // We need try two separate munches so neither escape sequences nor
     // potential closing quotes get eaten.
     _string_indented: ($) =>
-      seq('"""', repeat(choice($.escape_sequence, /[^\\]?[^\\"]+/)), '"""'),
+      seq('"""', repeat(choice($.escape_sequence, /[^\\"]+/, '"')), '"""'),
 
     escape_sequence: (_) => ESCAPE_SEQUENCE,
 

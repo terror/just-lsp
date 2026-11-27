@@ -78,7 +78,6 @@ unused_attr static inline void assert_valid_token(const TSSymbol sym) {
 
 typedef struct Scanner {
   uint32_t prev_indent;
-  uint16_t advance_brace_count;
   bool has_seen_eof;
 } Scanner;
 
@@ -277,13 +276,6 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
 
     bool advanced_once = false;
 
-    while (lexer->lookahead == '{' && scanner->advance_brace_count > 0 &&
-           !lexer->eof(lexer)) {
-      scanner->advance_brace_count--;
-      advance(lexer);
-      advanced_once = true;
-    }
-
     while (1) {
       if (lexer->eof(lexer)) {
         return handle_eof(lexer, scanner, valid_symbols);
@@ -328,38 +320,24 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
         advance(lexer);
       } else if (lexer->lookahead == '{') {
         lexer->mark_end(lexer);
-        advance(lexer);
 
-        if (lexer->eof(lexer) || lexer->lookahead == '\n' ||
-            lexer->lookahead == '\r') { // EOF without anything after {
-          lexer->mark_end(lexer);
-          lexer->result_symbol = TEXT;
-          return true;
-        }
+        uint32_t braces = 0;
 
-        if (lexer->lookahead == '{') {
+        while (lexer->lookahead == '{') {
           advance(lexer);
+          braces++;
 
-          if (lexer->lookahead == '{') {
-            advance(lexer);
-            if (lexer->lookahead == '{') {
-              advance(lexer);
-              advanced_once = true;
-              lexer->mark_end(lexer);
-              continue;
-            } else {
-              scanner->advance_brace_count++;
-            }
+          if (braces % 4 == 0) {
+            lexer->mark_end(lexer);
           }
-
-          while (lexer->lookahead == '{') { // more braces!
-            scanner->advance_brace_count++;
-            advance(lexer);
-          }
-
-          lexer->result_symbol = TEXT;
-          return advanced_once;
         }
+
+        if (braces % 4 >= 2) {
+          lexer->result_symbol = TEXT;
+          return advanced_once || braces >= 4;
+        }
+
+        advanced_once = true;
       }
     }
   }
