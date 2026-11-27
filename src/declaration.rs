@@ -61,6 +61,20 @@ impl_declaration!(
   Variable,
 );
 
+impl Declaration for Import {
+  fn attributes(&self) -> &[Attribute] {
+    &self.attributes
+  }
+
+  fn name(&self) -> &TextNode {
+    &self.path
+  }
+
+  fn range(&self) -> lsp::Range {
+    self.range
+  }
+}
+
 impl<T: Declaration> Declaration for Located<T> {
   fn attributes(&self) -> &[Attribute] {
     (**self).attributes()
@@ -160,5 +174,23 @@ mod tests {
     assert!(unexport.has_attribute("foo"));
     assert!(unexport.has_attribute("bar"));
     assert!(!unexport.has_attribute("baz"));
+  }
+
+  #[test]
+  fn is_enabled() {
+    #[track_caller]
+    fn case(attributes: &[&str], expected: bool) {
+      assert_eq!(unexport(attributes).is_enabled(), expected);
+    }
+
+    let disabled = if cfg!(windows) { "unix" } else { "windows" };
+
+    case(&[], true);
+    case(&["foo"], true);
+    case(&[env::consts::OS], true);
+    case(&["unix"], cfg!(unix));
+    case(&[disabled], false);
+    case(&[disabled, "foo"], false);
+    case(&[disabled, env::consts::OS], true);
   }
 }
