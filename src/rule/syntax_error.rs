@@ -11,22 +11,6 @@ define_rule! {
 }
 
 impl SyntaxErrorRule {
-  fn chained_comparison<'a>(node: &Node<'a>) -> Option<Node<'a>> {
-    let operator = SyntaxErrorRule::comparison_operator(node)?;
-
-    let lhs = node.child(0).filter(|lhs| lhs.kind() == "expression")?;
-
-    SyntaxErrorRule::comparison_operator(&lhs)?;
-
-    Some(operator)
-  }
-
-  fn comparison_operator<'a>(node: &Node<'a>) -> Option<Node<'a>> {
-    node
-      .child(1)
-      .filter(|child| ["==", "!=", "=~", "!~"].contains(&child.kind()))
-  }
-
   fn deepest_error(node: Node<'_>) -> Node<'_> {
     let mut cursor = node.walk();
 
@@ -190,31 +174,23 @@ impl SyntaxErrorRule {
         ));
       }
 
-      if node.kind() == "dependencies" {
-        for marker in TreeWalker::new(node).find_all("^&&").into_iter().skip(1) {
-          diagnostics.push(Diagnostic::new(
-            "Expected comment, end of file, end of line, or dependency, but found `&&`",
-            document.get_range(&marker),
-          ));
-        }
+      if node.kind() == "dependencies"
+        && let Some(marker) = node
+          .child(node.child_count().saturating_sub(1))
+          .filter(|child| child.kind() == "&&")
+      {
+        let end = document.get_range(&marker).end;
+
+        diagnostics.push(Diagnostic::new(
+          "Expected `*`, identifier, or `(`, but found end of line",
+          lsp::Range { start: end, end },
+        ));
       }
 
       if node.is_missing() {
         diagnostics.push(Diagnostic::new(
           SyntaxErrorRule::missing_message(&node),
           document.get_range(&node),
-        ));
-      }
-
-      if node.kind() == "expression"
-        && let Some(operator) = SyntaxErrorRule::chained_comparison(&node)
-      {
-        diagnostics.push(Diagnostic::new(
-          format!(
-            "Expected `&&`, `||`, `+`, `++`, or `/`, but found `{}`",
-            operator.kind()
-          ),
-          document.get_range(&operator),
         ));
       }
 
@@ -487,10 +463,7 @@ mod tests {
         echo {{ if 'a' == 'b' != 'c' { 'd' } else { 'e' } }}
       "
     })
-    .error(
-      "Expected `&&`, `||`, `+`, `++`, or `/`, but found `!=`",
-      lsp::Range::at(4, 24, 4, 26),
-    )
+    .error("Syntax error near `!= 'c'`", lsp::Range::at(4, 24, 4, 30))
     .run();
   }
 
@@ -822,6 +795,22 @@ mod tests {
   }
 
   #[test]
+  fn recipe_dependencies_marker_without_dependency() {
+    #[track_caller]
+    fn case(source: &str, range: lsp::Range) {
+      AnalyzerTest::new(source)
+        .error(
+          "Expected `*`, identifier, or `(`, but found end of line",
+          range,
+        )
+        .run();
+    }
+
+    case("foo: &&\n  echo\n", lsp::Range::at(0, 7, 0, 7));
+    case("foo: bar &&\n\nbar:\n", lsp::Range::at(0, 11, 0, 11));
+  }
+
+  #[test]
   fn recipe_dependencies_repeated_subsequent_marker() {
     AnalyzerTest::new(indoc! {
       "
@@ -834,14 +823,8 @@ mod tests {
       qux:
       "
     })
-    .error(
-      "Expected comment, end of file, end of line, or dependency, but found `&&`",
-      lsp::Range::at(0, 12, 0, 14),
-    )
-    .error(
-      "Expected comment, end of file, end of line, or dependency, but found `&&`",
-      lsp::Range::at(0, 19, 0, 21),
-    )
+    .error("Syntax error near `&&`", lsp::Range::at(0, 12, 0, 14))
+    .error("Syntax error near `&&`", lsp::Range::at(0, 19, 0, 21))
     .run();
   }
 
