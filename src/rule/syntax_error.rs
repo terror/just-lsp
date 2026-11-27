@@ -446,6 +446,20 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_brace_runs_in_recipe() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo:
+        echo {{{bar}}
+        echo {{{{{{{bar}}
+      "
+    })
+    .error("Syntax error near `{{{`", lsp::Range::at(1, 7, 1, 10))
+    .error("Syntax error near `{{{`", lsp::Range::at(2, 11, 2, 14))
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_chained_comparison() {
     AnalyzerTest::new(indoc! {
       "
@@ -644,6 +658,22 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_quotes_in_indented_strings() {
+    #[track_caller]
+    fn case(string: &str) {
+      AnalyzerTest::new(&format!(
+        "foo := {string}\n\nbar:\n  echo {{{{foo}}}}\n"
+      ))
+      .run();
+    }
+
+    case(r#""""foo""bar""""#);
+    case(r#"x"""foo""bar""""#);
+    case(r#"f"""foo""bar""""#);
+    case("f'''foo''bar'''");
+  }
+
+  #[test]
   fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
     AnalyzerTest::new(indoc! {
       r#"
@@ -694,6 +724,22 @@ mod tests {
       foo:
         echo {{greeting}}
       "#
+    })
+    .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_sigil_only_lines() {
+    AnalyzerTest::new(indoc! {
+      "
+      set guards
+
+      foo:
+        @
+        -
+        ?
+        @-
+      "
     })
     .run();
   }
