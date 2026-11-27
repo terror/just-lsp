@@ -477,6 +477,41 @@ bar:= """b
         (string)))))
 
 ================================================================================
+indented with repeated nested delim
+================================================================================
+
+foo := """a""b"""
+bar := x"""a""b"""
+baz := f"""a""b"""
+qux := f'''a''b'''
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string)))))
+  (assignment
+    (identifier)
+    (expression
+      (value
+        (string
+          (format_string))))))
+
+================================================================================
 raw strings
 ================================================================================
 

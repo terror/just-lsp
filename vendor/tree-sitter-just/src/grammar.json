@@ -44,8 +44,17 @@
           "name": "recipe"
         },
         {
-          "type": "SYMBOL",
-          "name": "alias"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "alias"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_newline"
+            }
+          ]
         },
         {
           "type": "SYMBOL",
@@ -68,8 +77,17 @@
           "name": "function_definition"
         },
         {
-          "type": "SYMBOL",
-          "name": "import"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "import"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_newline"
+            }
+          ]
         },
         {
           "type": "SEQ",
@@ -2002,17 +2020,30 @@
       ]
     },
     "recipe_line": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
-          "type": "CHOICE",
+          "type": "SEQ",
           "members": [
             {
               "type": "SYMBOL",
               "name": "recipe_line_prefix"
             },
             {
-              "type": "BLANK"
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "text"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "interpolation"
+                  }
+                ]
+              }
             }
           ]
         },
@@ -2175,7 +2206,7 @@
         },
         {
           "type": "PATTERN",
-          "value": ".*"
+          "value": "[^\\r\\n]*"
         }
       ]
     },
@@ -2184,14 +2215,14 @@
       "members": [
         {
           "type": "PATTERN",
-          "value": "[^/\\n]+"
+          "value": "[^/\\r\\n]+"
         },
         {
           "type": "CHOICE",
           "members": [
             {
               "type": "PATTERN",
-              "value": "\\/.*"
+              "value": "\\/[^\\r\\n]*"
             },
             {
               "type": "BLANK"
@@ -2334,6 +2365,10 @@
               {
                 "type": "PATTERN",
                 "value": "\\{"
+              },
+              {
+                "type": "STRING",
+                "value": "\""
               }
             ]
           }
@@ -2408,6 +2443,10 @@
               {
                 "type": "PATTERN",
                 "value": "\\{"
+              },
+              {
+                "type": "STRING",
+                "value": "'"
               }
             ]
           }
@@ -2514,7 +2553,11 @@
               },
               {
                 "type": "PATTERN",
-                "value": "[^\\\\]?[^\\\\\"]+"
+                "value": "[^\\\\\"]+"
+              },
+              {
+                "type": "STRING",
+                "value": "\""
               }
             ]
           }
@@ -2563,7 +2606,11 @@
               },
               {
                 "type": "PATTERN",
-                "value": "[^\\\\]?[^\\\\\"]+"
+                "value": "[^\\\\\"]+"
+              },
+              {
+                "type": "STRING",
+                "value": "\""
               }
             ]
           }
@@ -2670,7 +2717,7 @@
         "value": -1,
         "content": {
           "type": "PATTERN",
-          "value": "#.*"
+          "value": "#([^\\r\\n]|\\r+[^\\r\\n])*"
         }
       }
     }
@@ -2682,11 +2729,15 @@
     },
     {
       "type": "PATTERN",
-      "value": "\\\\(\\n|\\r\\n)\\s*"
+      "value": "\\\\\\r?\\n"
     },
     {
       "type": "PATTERN",
-      "value": "\\s"
+      "value": "[ \\t\\n]"
+    },
+    {
+      "type": "PATTERN",
+      "value": "\\r\\n"
     }
   ],
   "conflicts": [
