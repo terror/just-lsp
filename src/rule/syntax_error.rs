@@ -59,6 +59,171 @@ impl SyntaxErrorRule {
     }
   }
 
+  fn expected_tokens(
+    document: &Document,
+    node: Node<'_>,
+    first: bool,
+  ) -> Option<Vec<&'static str>> {
+    let parent = node.parent()?;
+
+    if first && node.kind() == "@" {
+      return Some(vec!["identifier"]);
+    }
+
+    if first
+      || parent.kind() == "recipe_header"
+        && parent.child_by_field_name("name") == Some(node)
+    {
+      return Some(vec!["`*`", "`:`", "`$`", "identifier", "`+`"]);
+    }
+
+    let expression = vec![
+      "backtick",
+      "`!`",
+      "`[`",
+      "identifier",
+      "`(`",
+      "`/`",
+      "string",
+    ];
+
+    let parameter = vec!["`*`", "`:`", "`$`", "`=`", "identifier", "`+`"];
+
+    match (node.kind(), parent.kind()) {
+      ("$" | "::", _) | (":=", "alias") | ("?", "module") => {
+        return Some(vec!["identifier"]);
+      }
+      ("*" | "+", "variadic_parameter") => {
+        return Some(vec!["`$`", "identifier"]);
+      }
+      ("*", "dependency_expression") | ("identifier", "assert_expression") => {
+        return Some(vec!["`(`"]);
+      }
+      ("!", _) | ("=", "parameter") => {
+        return Some(vec![
+          "backtick",
+          "`!`",
+          "`[`",
+          "identifier",
+          "`(`",
+          "string",
+        ]);
+      }
+      ("?", "import") => return Some(vec!["identifier", "string"]),
+      (")", "function_definition") => return Some(vec!["`:=`"]),
+      (":=", "setting") => {
+        let name = parent.child_by_field_name("left")?;
+
+        return Some(match Builtin::setting(&document.get_node_text(&name)) {
+          Some(Builtin::Setting {
+            kind: SettingKind::Array,
+            ..
+          }) => vec!["`[`"],
+          Some(Builtin::Setting {
+            kind: SettingKind::Boolean(_),
+            ..
+          }) => vec!["identifier"],
+          _ => expression,
+        });
+      }
+      ("else", _) => return Some(vec!["`{`"]),
+      (
+        "!=" | "!~" | "&&" | "+" | "++" | "/" | ":=" | "==" | "=~" | "if"
+        | "||",
+        _,
+      ) => return Some(expression),
+      ("identifier", "alias")
+        if parent.child_by_field_name("left") == Some(node) =>
+      {
+        return Some(parameter);
+      }
+      ("identifier", "assignment")
+        if parent.parent().is_some_and(|grandparent| {
+          matches!(grandparent.kind(), "eager" | "export")
+        }) && parent.child_by_field_name("left") == Some(node) =>
+      {
+        return Some(parameter);
+      }
+      ("identifier", "parameter")
+        if parent.child_by_field_name("name") == Some(node) =>
+      {
+        return Some(
+          if parent.parent().is_some_and(|grandparent| {
+            grandparent.kind() == "variadic_parameter"
+          }) {
+            vec!["`:`", "`=`"]
+          } else {
+            parameter
+          },
+        );
+      }
+      _ => {}
+    }
+
+    let variable = node.kind() == "identifier"
+      && (parent.kind() == "value"
+        || parent.kind() == "function_call"
+          && parent.child_by_field_name("name") == Some(node));
+
+    let context = successors(Some(parent), Node::parent).find(|ancestor| {
+      ancestor.kind() == "parameter"
+        || ancestor.kind() == "condition"
+          && ancestor.parent().is_some_and(|parent| {
+            matches!(parent.kind(), "else_if_clause" | "if_expression")
+          })
+    })?;
+
+    if context.kind() == "parameter" {
+      let variadic = context
+        .parent()
+        .is_some_and(|parent| parent.kind() == "variadic_parameter");
+
+      return Some(
+        [
+          (!variadic).then_some("`*`"),
+          Some("`:`"),
+          (!variadic).then_some("`$`"),
+          (!variadic).then_some("identifier"),
+          variable.then_some("`(`"),
+          (!variadic).then_some("`+`"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect(),
+      );
+    }
+
+    let comparison = successors(Some(parent), Node::parent)
+      .take_while(|ancestor| *ancestor != context)
+      .any(|ancestor| {
+        let mut cursor = ancestor.walk();
+
+        ancestor.children(&mut cursor).any(|child| {
+          matches!(child.kind(), "!=" | "!~" | "==" | "=~")
+            && child.start_byte() < node.start_byte()
+        })
+      });
+
+    Some(
+      [
+        Some("`&&`"),
+        (!comparison).then_some("`!=`"),
+        (!comparison).then_some("`!~`"),
+        Some("`||`"),
+        Some("`{`"),
+        (!comparison).then_some("`==`"),
+        (!comparison).then_some("`=~`"),
+        variable.then_some("`(`"),
+        Some("`+`"),
+        Some("`++`"),
+        Some("`/`"),
+      ]
+      .into_iter()
+      .flatten()
+      .collect(),
+    )
+  }
+
   fn indented_items(document: &Document, root: Node<'_>) -> Vec<Diagnostic> {
     let mut cursor = root.walk();
 
@@ -102,6 +267,130 @@ impl SyntaxErrorRule {
             },
           )
         })
+      })
+      .collect()
+  }
+
+  fn leaves<'a>(node: Node<'a>, leaves: &mut Vec<Node<'a>>) {
+    if node.child_count() == 0
+      || matches!(node.kind(), "external_command" | "string")
+    {
+      leaves.push(node);
+      return;
+    }
+
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+      SyntaxErrorRule::leaves(child, leaves);
+    }
+  }
+
+  fn line_break(
+    document: &Document,
+    leaves: &[Node<'_>],
+  ) -> Option<Diagnostic> {
+    let start = leaves.iter().position(|leaf| leaf.kind() != "comment")?;
+
+    let leaves = &leaves[start..];
+
+    let column = leaves[0].start_position().column;
+
+    if column > 0
+      && document
+        .content
+        .byte_slice(leaves[0].start_byte() - column..leaves[0].start_byte())
+        .bytes()
+        .all(|byte| byte == b' ' || byte == b'\t')
+    {
+      return None;
+    }
+
+    let mut depth = 0usize;
+
+    for (index, pair) in leaves.windows(2).enumerate() {
+      let (previous, next) = (pair[0], pair[1]);
+
+      match previous.kind() {
+        "(" | "[" | "{" => depth += 1,
+        ")" | "]" | "}" => depth = depth.saturating_sub(1),
+        _ => {}
+      }
+
+      if depth > 0 || previous.kind() == "comment" {
+        continue;
+      }
+
+      let gap = document
+        .content
+        .byte_slice(previous.end_byte()..next.start_byte())
+        .bytes()
+        .collect::<Vec<u8>>();
+
+      let newline = gap.iter().enumerate().find_map(|(i, byte)| {
+        if *byte != b'\n' {
+          return None;
+        }
+
+        let eol = if i > 0 && gap[i - 1] == b'\r' {
+          i - 1
+        } else {
+          i
+        };
+
+        (eol == 0 || gap[eol - 1] != b'\\').then_some(previous.end_byte() + eol)
+      });
+
+      let (found, range) = if let Some(newline) = newline {
+        let position = document.content.byte_to_lsp_position(newline);
+
+        (
+          "end of line",
+          lsp::Range {
+            start: position,
+            end: position,
+          },
+        )
+      } else if next.kind() == "comment" && index + 2 < leaves.len() {
+        ("comment", document.get_range(&next))
+      } else {
+        continue;
+      };
+
+      let expected =
+        SyntaxErrorRule::expected_tokens(document, previous, index == 0)?;
+
+      return Some(Diagnostic::new(
+        format!("Expected {}, but found {found}", List::or(expected)),
+        range,
+      ));
+    }
+
+    None
+  }
+
+  fn line_breaks(document: &Document, root: Node<'_>) -> Vec<Diagnostic> {
+    let mut cursor = root.walk();
+
+    root
+      .children(&mut cursor)
+      .filter(|item| item.kind() != "shebang" && !item.has_error())
+      .filter_map(|item| {
+        let mut cursor = item.walk();
+
+        let mut leaves = Vec::new();
+
+        for child in item.children(&mut cursor).filter(|child| {
+          if item.kind() == "recipe" {
+            child.kind() == "recipe_header"
+          } else {
+            child.kind() != "attribute"
+          }
+        }) {
+          SyntaxErrorRule::leaves(child, &mut leaves);
+        }
+
+        SyntaxErrorRule::line_break(document, &leaves)
       })
       .collect()
   }
@@ -230,6 +519,8 @@ impl SyntaxErrorRule {
     }
 
     diagnostics.extend(SyntaxErrorRule::indented_items(document, root));
+
+    diagnostics.extend(SyntaxErrorRule::line_breaks(document, root));
 
     diagnostics
   }
@@ -518,9 +809,63 @@ mod tests {
       lsp::Range::at(0, 0, 0, 1),
     );
     case(
+      "  foo\n:\n",
+      "Expected `@`, `[`, comment, end of file, end of line, or identifier, but found indent",
+      lsp::Range::at(0, 0, 0, 2),
+    );
+    case(
       "[private]\n  foo:\n",
       "Expected `@`, `[`, comment, end of line, or identifier, but found indent",
       lsp::Range::at(1, 0, 1, 2),
+    );
+  }
+
+  #[test]
+  fn parser_errors_invalid_line_breaks() {
+    #[track_caller]
+    fn case(source: &str, message: &'static str, range: lsp::Range) {
+      AnalyzerTest::new(source).error(message, range).run();
+    }
+
+    case(
+      "foo\n:\n",
+      "Expected `*`, `:`, `$`, identifier, or `+`, but found end of line",
+      lsp::Range::at(0, 3, 0, 3),
+    );
+    case(
+      "foo # bar\n:\n",
+      "Expected `*`, `:`, `$`, identifier, or `+`, but found comment",
+      lsp::Range::at(0, 4, 0, 9),
+    );
+    case(
+      "foo \\\n\n:\n",
+      "Expected `*`, `:`, `$`, identifier, or `+`, but found end of line",
+      lsp::Range::at(1, 0, 1, 0),
+    );
+    case(
+      "export foo\n:= 'bar'\n",
+      "Expected `*`, `:`, `$`, `=`, identifier, or `+`, but found end of line",
+      lsp::Range::at(0, 10, 0, 10),
+    );
+    case(
+      "foo $bar=\n'baz':\n",
+      "Expected backtick, `!`, `[`, identifier, `(`, or string, but found end of line",
+      lsp::Range::at(0, 9, 0, 9),
+    );
+    case(
+      "baz := 'qux'\n\nfoo +$bar=baz\n:\n",
+      "Expected `:` or `(`, but found end of line",
+      lsp::Range::at(2, 13, 2, 13),
+    );
+    case(
+      "set quiet :=\ntrue\n",
+      "Expected identifier, but found end of line",
+      lsp::Range::at(0, 12, 0, 12),
+    );
+    case(
+      "export foo := if 'a' == 'b'\n{ 'c' } else { 'd' }\n",
+      "Expected `&&`, `||`, `{`, `+`, `++`, or `/`, but found end of line",
+      lsp::Range::at(0, 27, 0, 27),
     );
   }
 
@@ -631,6 +976,18 @@ mod tests {
       "
     })
     .run();
+  }
+
+  #[test]
+  fn parser_errors_valid_with_line_breaks_in_delimiters() {
+    #[track_caller]
+    fn case(source: &str) {
+      AnalyzerTest::new(source).run();
+    }
+
+    case("export foo := 'bar' \\\n+ 'baz'\n");
+    case("export foo := ( # bar\n'baz')\n");
+    case("[group(\n'foo'\n)]\nbar:\n");
   }
 
   #[test]

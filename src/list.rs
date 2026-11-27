@@ -20,6 +20,15 @@ impl<T: Display, I: Iterator<Item = T> + Clone> List<T, I> {
   ) -> List<Enclosure<T>, impl Iterator<Item = Enclosure<T>> + Clone> {
     List::and(values.into_iter().map(Enclosure::tick))
   }
+
+  pub(crate) fn or<II: IntoIterator<Item = T, IntoIter = I>>(
+    values: II,
+  ) -> Self {
+    Self {
+      conjunction: "or",
+      values: values.into_iter(),
+    }
+  }
 }
 
 impl<T: Display, I: Iterator<Item = T> + Clone> Display for List<T, I> {
