@@ -69,6 +69,7 @@ enum TokenType {
   NEWLINE,
   TEXT,
   ERROR_RECOVERY,
+  UNPAIRED_CARRIAGE_RETURN,
   TOKEN_TYPE_END,
 };
 
@@ -162,21 +163,28 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
                                             const bool *valid_symbols) {
   Scanner *scanner = (Scanner *)(payload);
 
+  bool text_valid = valid_symbols[TEXT] && !valid_symbols[ERROR_RECOVERY];
+
+  bool line_start =
+      !valid_symbols[ERROR_RECOVERY] || lexer->get_column(lexer) == 0;
+
   if (lexer->eof(lexer)) {
     return handle_eof(lexer, scanner, valid_symbols);
   }
 
-  if (valid_symbols[NEWLINE] && !valid_symbols[TEXT]) {
+  if (valid_symbols[NEWLINE] && !text_valid) {
     while (1) {
       while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
         skip(lexer);
       }
 
       if (lexer->lookahead == '\r') {
-        skip(lexer);
+        advance(lexer);
 
         if (lexer->lookahead != '\n') {
-          return false;
+          lexer->mark_end(lexer);
+          lexer->result_symbol = UNPAIRED_CARRIAGE_RETURN;
+          return true;
         }
       }
 
@@ -230,7 +238,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
-  if (valid_symbols[INDENT] || valid_symbols[DEDENT]) {
+  if ((valid_symbols[INDENT] || valid_symbols[DEDENT]) && line_start) {
     while (!lexer->eof(lexer) && iswspace(lexer->lookahead)) {
       switch (lexer->lookahead) {
       case '\n':
@@ -267,7 +275,7 @@ bool tree_sitter_just_external_scanner_scan(void *payload, TSLexer *lexer,
     }
   }
 
-  if (valid_symbols[TEXT]) {
+  if (text_valid) {
     if (lexer->get_column(lexer) == scanner->prev_indent &&
         (lexer->lookahead == '\n' || lexer->lookahead == '@' ||
          lexer->lookahead == '-' || lexer->lookahead == '?')) {

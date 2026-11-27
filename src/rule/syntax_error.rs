@@ -57,10 +57,13 @@ impl SyntaxErrorRule {
   }
 
   fn error_message(document: &Document, node: &Node<'_>) -> String {
-    let preview =
-      SyntaxErrorRule::snippet_preview(&document.get_node_text(node));
+    let text = document.get_node_text(node);
 
-    if let Some(snippet) = preview {
+    let preview = SyntaxErrorRule::snippet_preview(&text);
+
+    if text == "\r" {
+      "Unpaired carriage return".to_string()
+    } else if let Some(snippet) = preview {
       format!("Syntax error near `{snippet}`")
     } else if let Some(parent) = node.parent() {
       format!(
@@ -166,6 +169,8 @@ impl SyntaxErrorRule {
           SyntaxErrorRule::error_message(document, &node),
           document.get_range(&node),
         ));
+
+        return ControlFlow::Continue(false);
       }
 
       if node.kind() == "numeric_error"
@@ -318,13 +323,13 @@ mod tests {
 
     case(
       "[doc(,)]",
-      "Missing identifier in value",
-      lsp::Range::at(0, 5, 0, 5),
+      "Syntax error near `,`",
+      lsp::Range::at(0, 5, 0, 6),
     );
     case(
       "[arg('bar', short,,)]",
-      "Missing identifier in attribute named param",
-      lsp::Range::at(0, 18, 0, 18),
+      "Syntax error near `,`",
+      lsp::Range::at(0, 18, 0, 19),
     );
     case(
       "[private(),]",
@@ -453,10 +458,7 @@ mod tests {
         echo {{ assert('bar' == 'bar', 'baz',) }}
       "
     })
-    .error(
-      "Syntax error near `{{ assert('bar' == 'bar', 'baz',`",
-      lsp::Range::at(1, 7, 1, 39),
-    )
+    .error("Syntax error near `,`", lsp::Range::at(1, 38, 1, 39))
     .run();
   }
 
@@ -464,13 +466,13 @@ mod tests {
   fn parser_errors_invalid_brace_runs_in_recipe() {
     AnalyzerTest::new(indoc! {
       "
-      foo:
+      foo bar:
         echo {{{bar}}
         echo {{{{{{{bar}}
       "
     })
-    .error("Syntax error near `{{{`", lsp::Range::at(1, 7, 1, 10))
-    .error("Syntax error near `{{{`", lsp::Range::at(2, 11, 2, 14))
+    .error("Syntax error near `{`", lsp::Range::at(1, 9, 1, 10))
+    .error("Syntax error near `{`", lsp::Range::at(2, 13, 2, 14))
     .run();
   }
 
@@ -500,7 +502,8 @@ mod tests {
         echo "{{.Foo}}"
       "#
     })
-    .error("Syntax error near `{{`", lsp::Range::at(1, 8, 1, 10))
+    .error("Syntax error near `.`", lsp::Range::at(1, 10, 1, 11))
+    .error("Variable `Foo` not found", lsp::Range::at(1, 11, 1, 14))
     .run();
   }
 
@@ -561,6 +564,20 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_invalid_recovers_recipe_body() {
+    AnalyzerTest::new(indoc! {
+      "
+      foo := 'bar' }
+
+      baz:
+        echo {{foo}}
+      "
+    })
+    .error("Syntax error near `}`", lsp::Range::at(0, 13, 0, 14))
+    .run();
+  }
+
+  #[test]
   fn parser_errors_invalid_unpaired_carriage_return() {
     #[track_caller]
     fn case(source: &str, message: &'static str, range: lsp::Range) {
@@ -570,12 +587,12 @@ mod tests {
     case(
       "foo:\r",
       "Syntax error near `foo:`",
-      lsp::Range::at(0, 0, 0, 4),
+      lsp::Range::at(0, 0, 1, 0),
     );
     case(
       "foo: \rbar\n\nbar:\n",
-      "Syntax error near `bar`",
-      lsp::Range::at(1, 0, 1, 3),
+      "Unpaired carriage return",
+      lsp::Range::at(0, 5, 1, 0),
     );
   }
 
