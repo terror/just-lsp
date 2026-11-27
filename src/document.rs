@@ -895,7 +895,7 @@ impl Document {
     parser.set_language(&unsafe { tree_sitter_just() })?;
 
     parser
-      .parse(content.to_string(), old_tree)
+      .parse(content.to_string().replace('\0', "\u{1}"), old_tree)
       .ok_or(Error::Parse)
   }
 

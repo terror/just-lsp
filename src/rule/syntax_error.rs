@@ -521,6 +521,19 @@ mod tests {
   }
 
   #[test]
+  fn parser_errors_valid_with_nul_bytes() {
+    #[track_caller]
+    fn case(source: &str) {
+      AnalyzerTest::new(source).run();
+    }
+
+    case("# foo\0bar\n");
+    case("foo := 'bar\0baz'\n\nqux:\n  echo {{foo}}\n");
+    case("foo := `bar\0baz`\n\nqux:\n  echo {{foo}}\n");
+    case("foo:\n  #!/bin/sh bar\0baz\n");
+  }
+
+  #[test]
   fn parser_errors_valid_with_recipe_line_containing_only_open_brace() {
     AnalyzerTest::new(indoc! {
       r#"

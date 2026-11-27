@@ -256,7 +256,7 @@ impl<'doc> Tokenizer<'doc> {
       .set_language(&unsafe { tree_sitter_just() })
       .map_err(|error| anyhow!("Failed to configure highlighter: {error}"))?;
 
-    let source = self.document.content.to_string();
+    let source = self.document.content.to_string().replace('\0', "\u{1}");
 
     let highlight_iter = highlighter
       .highlight(
@@ -1231,6 +1231,20 @@ mod tests {
           type_index: Tokenizer::token_type_index("keyword"),
         },
       ]
+    );
+  }
+
+  #[test]
+  fn nul_byte() {
+    assert_eq!(
+      tokenize("# foo\0bar\n"),
+      [Expected {
+        line: 0,
+        start: 0,
+        length: 9,
+        modifiers: 0,
+        token_type: "comment",
+      }]
     );
   }
 
