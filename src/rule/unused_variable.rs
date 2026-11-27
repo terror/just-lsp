@@ -33,10 +33,7 @@ impl UnusedVariableRule {
       if variable.eager
         || variable.export
         || exported
-        || variable
-          .attributes
-          .iter()
-          .any(|attribute| attribute.name.value == "private")
+        || variable.has_attribute("private")
       {
         continue;
       }

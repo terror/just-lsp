@@ -273,7 +273,7 @@ impl<'a> ModuleView<'a> {
     self.settings().iter().any(|setting| {
       setting.name.value == name
         && matches!(setting.kind, SettingKind::Boolean(true))
-        && Attribute::is_enabled(&setting.attributes)
+        && setting.is_enabled()
     })
   }
 

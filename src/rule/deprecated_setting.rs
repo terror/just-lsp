@@ -25,8 +25,7 @@ impl DeprecatedSettingRule {
 
     let replacement_exists = context.settings(Scope::Module).any(|candidate| {
       candidate.name.value == replacement
-        && GroupSet::from_attributes(&candidate.attributes)
-          .conflicts_with(&groups)
+        && candidate.groups().conflicts_with(&groups)
     });
 
     if has_other_platform || replacement_exists {

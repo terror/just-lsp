@@ -12,11 +12,9 @@ impl DuplicateUnexportRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for unexport in context.duplicate_declarations(
-      context.unexports(Scope::Module),
-      |unexport| &unexport.name,
-      |unexport| &unexport.attributes,
-    ) {
+    for unexport in
+      context.duplicate_declarations(context.unexports(Scope::Module))
+    {
       diagnostics.push(Diagnostic::new(
         format!(
           "Variable `{}` is unexported multiple times",

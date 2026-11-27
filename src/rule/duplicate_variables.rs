@@ -20,11 +20,9 @@ impl DuplicateVariableRule {
 
     let mut diagnostics = Vec::new();
 
-    for variable in context.duplicate_declarations(
-      context.variables(Scope::Module),
-      |variable| &variable.name,
-      |variable| &variable.attributes,
-    ) {
+    for variable in
+      context.duplicate_declarations(context.variables(Scope::Module))
+    {
       diagnostics.push(Diagnostic::new(
         format!("Duplicate variable `{}`", variable.name.value),
         variable.range,

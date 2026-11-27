@@ -13,11 +13,9 @@ impl DuplicateSettingRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for setting in context.duplicate_declarations(
-      context.settings(Scope::Module),
-      |setting| &setting.name,
-      |setting| &setting.attributes,
-    ) {
+    for setting in
+      context.duplicate_declarations(context.settings(Scope::Module))
+    {
       diagnostics.push(Diagnostic::new(
         format!("Duplicate setting `{}`", setting.name.value),
         setting.range,

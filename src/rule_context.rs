@@ -56,9 +56,7 @@ impl<'a> RuleContext<'a> {
     let settings = |scope| {
       self
         .settings(scope)
-        .map(|setting| {
-          (setting, GroupSet::from_attributes(&setting.attributes))
-        })
+        .map(|setting| (setting, setting.groups()))
         .collect::<Vec<_>>()
     };
 
@@ -107,11 +105,9 @@ impl<'a> RuleContext<'a> {
     self.view.documents()
   }
 
-  pub(super) fn duplicate_declarations<T: 'a>(
+  pub(super) fn duplicate_declarations<T: Declaration + 'a>(
     &self,
     declarations: impl IntoIterator<Item = &'a Located<T>>,
-    name: impl Fn(&T) -> &TextNode,
-    attributes: impl Fn(&T) -> &[Attribute],
   ) -> Vec<&'a T> {
     let (local, imported) = declarations
       .into_iter()
@@ -120,15 +116,13 @@ impl<'a> RuleContext<'a> {
     let mut conflicts = ConflictTracker::default();
 
     for declaration in imported {
-      conflicts.record(name(declaration), attributes(declaration));
+      conflicts.record(declaration);
     }
 
     local
       .into_iter()
+      .filter(|declaration| conflicts.record(*declaration))
       .map(Deref::deref)
-      .filter(|declaration| {
-        conflicts.record(name(declaration), attributes(declaration))
-      })
       .collect()
   }
 

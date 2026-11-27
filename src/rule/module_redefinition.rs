@@ -39,15 +39,11 @@ impl<'a> Definition<'a> {
       && self.groups.conflicts_with(&other.groups)
   }
 
-  fn new(
-    kind: DefinitionKind,
-    name: &'a TextNode,
-    attributes: &[Attribute],
-  ) -> Self {
+  fn new(kind: DefinitionKind, declaration: &'a impl Declaration) -> Self {
     Self {
-      groups: GroupSet::from_attributes(attributes),
+      groups: declaration.groups(),
       kind,
-      name,
+      name: declaration.name(),
     }
   }
 
@@ -83,23 +79,17 @@ impl ModuleRedefinitionRule {
     context
       .modules(scope)
       .filter(|module| module.resolve(&module.uri, filesystem).is_some())
-      .map(|module| {
-        Definition::new(
-          DefinitionKind::Module,
-          &module.name,
-          &module.attributes,
-        )
-      })
-      .chain(context.aliases(scope).map(|alias| {
-        Definition::new(DefinitionKind::Alias, &alias.name, &alias.attributes)
-      }))
-      .chain(context.recipes(scope).map(|recipe| {
-        Definition::new(
-          DefinitionKind::Recipe,
-          &recipe.name,
-          &recipe.attributes,
-        )
-      }))
+      .map(|module| Definition::new(DefinitionKind::Module, module))
+      .chain(
+        context
+          .aliases(scope)
+          .map(|alias| Definition::new(DefinitionKind::Alias, alias)),
+      )
+      .chain(
+        context
+          .recipes(scope)
+          .map(|recipe| Definition::new(DefinitionKind::Recipe, recipe)),
+      )
       .collect()
   }
 

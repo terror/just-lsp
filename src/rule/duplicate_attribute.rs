@@ -29,26 +29,27 @@ impl DuplicateAttributeRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let document = context.document();
 
-    let (mut diagnostics, mut conflicts) =
-      (Vec::new(), ConflictTracker::default());
+    let (mut diagnostics, mut defaults) = (Vec::new(), GroupSet::default());
 
     for recipe in context.recipes(Scope::Imported) {
-      for attribute in recipe
-        .attributes
-        .iter()
-        .filter(|attribute| attribute.name.value == "default")
-      {
-        conflicts.record(&attribute.name, &recipe.attributes);
+      if recipe.has_attribute("default") {
+        defaults.union_with(recipe.groups());
       }
     }
 
     for recipe in context.recipes(Scope::Local) {
+      let groups = recipe.groups();
+
       for attribute in recipe
         .attributes
         .iter()
         .filter(|attribute| attribute.name.value == "default")
       {
-        if conflicts.record(&attribute.name, &recipe.attributes) {
+        let conflict = defaults.conflicts_with(&groups);
+
+        defaults.union_with(groups.clone());
+
+        if conflict {
           diagnostics.push(Diagnostic::new(
             format!(
               "Recipe `{}` has duplicate `[default]` attribute, which may only appear once per module",
