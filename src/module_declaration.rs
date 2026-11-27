@@ -107,6 +107,13 @@ impl ModuleDeclaration {
       .collect()
   }
 
+  pub(crate) fn is_dynamic(&self) -> bool {
+    self
+      .path
+      .as_ref()
+      .is_some_and(|path| path.value.starts_with('f'))
+  }
+
   pub(crate) fn is_enabled(&self) -> bool {
     Attribute::is_enabled(&self.attributes)
   }

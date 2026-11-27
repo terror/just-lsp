@@ -45,13 +45,10 @@ impl ProjectDependency {
     module: &ModuleDeclaration,
     filesystem: &dyn Filesystem,
   ) -> Self {
-    Self {
-      kind: ProjectDependencyKind::Module {
-        name: module.name.value.clone(),
-      },
-      location: module.location(),
-      optional: module.optional,
-      target: module.resolve(source, filesystem).map_or_else(
+    let target = if module.is_dynamic() {
+      ProjectDependencyTarget::Dynamic
+    } else {
+      module.resolve(source, filesystem).map_or_else(
         || {
           ProjectDependencyTarget::Candidates(
             module
@@ -62,7 +59,16 @@ impl ProjectDependency {
           )
         },
         |path| Self::target(&path),
-      ),
+      )
+    };
+
+    Self {
+      kind: ProjectDependencyKind::Module {
+        name: module.name.value.clone(),
+      },
+      location: module.location(),
+      optional: module.optional,
+      target,
     }
   }
 

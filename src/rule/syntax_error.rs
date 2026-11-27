@@ -195,6 +195,20 @@ impl SyntaxErrorRule {
       ));
     }
 
+    diagnostics.extend(
+      document
+        .modules()
+        .into_iter()
+        .filter(ModuleDeclaration::is_dynamic)
+        .filter_map(|module| module.path)
+        .map(|path| {
+          Diagnostic::new(
+            "Expected keyword `x` but found identifier `f`",
+            path.range,
+          )
+        }),
+    );
+
     diagnostics
   }
 
@@ -405,6 +419,16 @@ mod tests {
       lsp::Range::at(2, 51, 2, 52),
     )
     .run();
+  }
+
+  #[test]
+  fn parser_errors_invalid_module_format_string_path() {
+    AnalyzerTest::new("mod foo f'foo.just'\n")
+      .error(
+        "Expected keyword `x` but found identifier `f`",
+        lsp::Range::at(0, 8, 0, 19),
+      )
+      .run();
   }
 
   #[test]
