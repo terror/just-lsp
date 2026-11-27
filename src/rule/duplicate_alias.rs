@@ -13,11 +13,8 @@ impl DuplicateAliasRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for alias in context.duplicate_declarations(
-      context.aliases(Scope::Module),
-      |alias| &alias.name,
-      |alias| &alias.attributes,
-    ) {
+    for alias in context.duplicate_declarations(context.aliases(Scope::Module))
+    {
       diagnostics.push(Diagnostic::new(
         format!("Duplicate alias `{}`", alias.name.value),
         alias.range,

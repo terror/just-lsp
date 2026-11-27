@@ -4,6 +4,7 @@ use {
   bound_identifier::BoundIdentifier,
   conflict_tracker::ConflictTracker,
   count::Count,
+  declaration::Declaration,
   document_entry::DocumentEntry,
   document_store::DocumentStore,
   enclosure::Enclosure,
@@ -140,6 +141,7 @@ mod builtins;
 mod config;
 mod conflict_tracker;
 mod count;
+mod declaration;
 mod dependency;
 mod dependency_argument;
 mod dependency_phase;

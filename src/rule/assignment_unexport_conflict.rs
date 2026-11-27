@@ -13,13 +13,13 @@ impl AssignmentUnexportConflictRule {
     let mut unexports = ConflictTracker::default();
 
     for unexport in context.unexports(Scope::Module) {
-      unexports.record(&unexport.name, &unexport.attributes);
+      unexports.record(unexport);
     }
 
     let mut diagnostics = Vec::new();
 
     for variable in context.variables(Scope::Local) {
-      if unexports.conflicts_with(&variable.name, &variable.attributes) {
+      if unexports.conflicts_with(variable) {
         diagnostics.push(Diagnostic::new(
           format!(
             "Variable {} is both exported and unexported",
@@ -33,11 +33,11 @@ impl AssignmentUnexportConflictRule {
     let mut variables = ConflictTracker::default();
 
     for variable in context.variables(Scope::Imported) {
-      variables.record(&variable.name, &variable.attributes);
+      variables.record(variable);
     }
 
     for unexport in context.unexports(Scope::Local) {
-      if variables.conflicts_with(&unexport.name, &unexport.attributes) {
+      if variables.conflicts_with(unexport) {
         diagnostics.push(Diagnostic::new(
           format!(
             "Variable {} is both exported and unexported",

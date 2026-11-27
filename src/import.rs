@@ -14,10 +14,6 @@ impl Import {
     self.path.value.starts_with('f')
   }
 
-  pub(crate) fn is_enabled(&self) -> bool {
-    Attribute::is_enabled(&self.attributes)
-  }
-
   /// Returns the filesystem path of the imported file.
   ///
   /// The path literal is unquoted and its escape sequences are processed.
@@ -115,38 +111,6 @@ mod tests {
     case("'~/bar.just'", "bar.just");
     case("x'~/bar.just'", "bar.just");
     case("x'~'", "");
-  }
-
-  #[test]
-  fn is_enabled() {
-    #[track_caller]
-    fn case(attributes: &[&str], expected: bool) {
-      let import = Import {
-        attributes: attributes
-          .iter()
-          .map(|name| Attribute {
-            name: TextNode {
-              value: (*name).into(),
-              ..Default::default()
-            },
-            ..Default::default()
-          })
-          .collect(),
-        ..import("'foo.just'")
-      };
-
-      assert_eq!(import.is_enabled(), expected);
-    }
-
-    let disabled = if cfg!(windows) { "unix" } else { "windows" };
-
-    case(&[], true);
-    case(&["foo"], true);
-    case(&[env::consts::OS], true);
-    case(&["unix"], cfg!(unix));
-    case(&[disabled], false);
-    case(&[disabled, "foo"], false);
-    case(&[disabled, env::consts::OS], true);
   }
 
   #[test]

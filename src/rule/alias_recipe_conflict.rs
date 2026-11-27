@@ -24,13 +24,17 @@ impl<'a> Item<'a> {
   }
 
   fn conflicts_with(&self, other: &Self) -> bool {
-    !self.is_same_kind(other) && self.groups().conflicts_with(&other.groups())
+    !self.is_same_kind(other)
+      && self
+        .declaration()
+        .groups()
+        .conflicts_with(&other.declaration().groups())
   }
 
-  fn groups(&self) -> GroupSet {
-    match self {
-      Item::Alias(alias) => GroupSet::from_attributes(&alias.attributes),
-      Item::Recipe(recipe) => GroupSet::from_attributes(&recipe.attributes),
+  fn declaration(&self) -> &'a dyn Declaration {
+    match *self {
+      Item::Alias(alias) => alias,
+      Item::Recipe(recipe) => recipe,
     }
   }
 
@@ -42,17 +46,11 @@ impl<'a> Item<'a> {
   }
 
   fn name(&self) -> &'a str {
-    match self {
-      Item::Alias(alias) => &alias.name.value,
-      Item::Recipe(recipe) => &recipe.name.value,
-    }
+    &self.declaration().name().value
   }
 
   fn range(&self) -> lsp::Range {
-    match self {
-      Item::Alias(alias) => alias.name.range,
-      Item::Recipe(recipe) => recipe.name.range,
-    }
+    self.declaration().name().range
   }
 }
 

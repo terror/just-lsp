@@ -12,11 +12,7 @@ define_rule! {
 impl DuplicateFunctionRule {
   fn run(context: &RuleContext<'_>) -> Vec<Diagnostic> {
     context
-      .duplicate_declarations(
-        context.functions(Scope::Module),
-        |function| &function.name,
-        |function| &function.attributes,
-      )
+      .duplicate_declarations(context.functions(Scope::Module))
       .into_iter()
       .map(|function| {
         Diagnostic::new(

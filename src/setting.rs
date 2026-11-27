@@ -82,14 +82,6 @@ impl Setting {
   }
 
   #[must_use]
-  pub fn has_attribute(&self, name: &str) -> bool {
-    self
-      .attributes
-      .iter()
-      .any(|attribute| attribute.name.value == name)
-  }
-
-  #[must_use]
   pub fn loads_dotenv(&self) -> bool {
     match self.name.value.as_str() {
       "dotenv-filename" | "dotenv-path" => true,

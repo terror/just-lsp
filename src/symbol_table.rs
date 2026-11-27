@@ -38,27 +38,9 @@ impl SymbolTable {
 
     Self {
       aliases: Self::declarations(documents, Document::aliases),
-      resolved_functions: Self::resolve(
-        documents,
-        &functions,
-        |function| &function.attributes,
-        |function| &function.name.value,
-        |function| function.range.start,
-      ),
-      resolved_recipes: Self::resolve(
-        documents,
-        &recipes,
-        |recipe| &recipe.attributes,
-        |recipe| &recipe.name.value,
-        |recipe| recipe.range.start,
-      ),
-      resolved_variables: Self::resolve(
-        documents,
-        &variables,
-        |variable| &variable.attributes,
-        |variable| &variable.name.value,
-        |variable| variable.range.start,
-      ),
+      resolved_functions: Self::resolve(documents, &functions),
+      resolved_recipes: Self::resolve(documents, &recipes),
+      resolved_variables: Self::resolve(documents, &variables),
       functions,
       modules: Self::declarations(documents, Document::modules),
       recipes,
@@ -68,12 +50,9 @@ impl SymbolTable {
     }
   }
 
-  fn resolve<T>(
+  fn resolve<T: Declaration>(
     documents: &[ScopeDocument<&Document>],
     declarations: &[Located<T>],
-    attributes: impl Fn(&T) -> &[Attribute],
-    name: impl Fn(&T) -> &str,
-    position: impl Fn(&T) -> lsp::Position,
   ) -> HashMap<String, usize> {
     let precedence = documents
       .iter()
@@ -92,15 +71,15 @@ impl SymbolTable {
       let declaration = &declarations[*index];
 
       (
-        Attribute::is_enabled(attributes(declaration)),
+        declaration.is_enabled(),
         precedence[&declaration.uri],
-        position(declaration),
+        declaration.range().start,
       )
     });
 
     candidates
       .into_iter()
-      .map(|index| (name(&declarations[index]).to_owned(), index))
+      .map(|index| (declarations[index].name().value.clone(), index))
       .collect()
   }
 }
