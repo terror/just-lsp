@@ -439,8 +439,8 @@ module.exports = grammar({
       ),
 
     recipe_line: ($) =>
-      seq(
-        optional($.recipe_line_prefix),
+      choice(
+        seq($.recipe_line_prefix, repeat(choice($.text, $.interpolation))),
         repeat1(choice($.text, $.interpolation)),
       ),
 
